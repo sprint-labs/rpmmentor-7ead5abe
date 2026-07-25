@@ -230,9 +230,14 @@ function InteractionForm({ onDone }: { onDone: () => void }) {
         <Field label="Interaction Type"><select className={selectCls} required>{["Live Match Observation", "Training Ground Visit", "Coffee Catch Up", "Phone Call"].map((t) => <option key={t}>{t}</option>)}</select></Field>
         <Field label="Club">
           <input className={inputCls} value={club} onChange={(e) => handleClubChange(e.target.value)} placeholder="e.g. Brighton & Hove Albion" maxLength={80} />
-          {clubAutoFilled && (
+          {clubAutoFilled ? (
             <p className="mt-1 text-[11px] text-muted-foreground">Auto-filled from roster · edit to override</p>
-          )}
+          ) : autoFilledClubRef.current ? (
+            <button type="button" onClick={resetClub} className="mt-1 inline-flex items-center gap-1 text-[11px] text-primary hover:text-primary/80">
+              <RotateCcw className="size-3" /> Reset to roster club
+            </button>
+          ) : null}
+
         </Field>
         <Field label="Date"><input type="date" className={inputCls} defaultValue={new Date().toISOString().slice(0, 10)} required /></Field>
         <Field label="Outcome"><select className={selectCls}>{["On track", "Above expectation", "Below expectation", "Needs follow-up", "Action plan agreed"].map((t) => <option key={t}>{t}</option>)}</select></Field>
