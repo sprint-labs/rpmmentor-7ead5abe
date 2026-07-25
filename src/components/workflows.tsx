@@ -209,8 +209,21 @@ function InteractionForm({ onDone }: { onDone: () => void }) {
 function ReportForm({ onDone, prefillGoalkeeper, prefillMatchDate, prefillOpponent }: { onDone: () => void; prefillGoalkeeper?: string; prefillMatchDate?: string; prefillOpponent?: string }) {
   const { user } = useAuth();
   const submitFn = useServerFn(submitMatchReport);
-
-  
+  const listPlayersFn = useServerFn(listPlayers);
+  const playersQuery = useQuery({
+    queryKey: ["players", "roster"],
+    queryFn: () => listPlayersFn(),
+    staleTime: 5 * 60_000,
+  });
+  const players: PlayerRosterRow[] = playersQuery.data ?? [];
+  const playersByName = useMemo(() => {
+    const map = new Map<string, PlayerRosterRow>();
+    for (const p of players) map.set(p.full_name.trim().toLowerCase(), p);
+    return map;
+  }, [players]);
+  // Track the value we auto-filled so a mentor's manual edit is never overwritten.
+  const autoFilledTeamRef = useRef<string | null>(null);
+  const [teamAutoFilled, setTeamAutoFilled] = useState(false);
 
   const [done, setDone] = useState<{ report_id: string; average: number } | null>(null);
   const [goalkeeper, setGoalkeeper] = useState("");
