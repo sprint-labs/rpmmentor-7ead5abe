@@ -1,72 +1,89 @@
-# Offline caching for core dashboard routes
+# Fixture-aware Match Report form
 
-Add a controlled service worker so Mentor Hub keeps working through short network drops (subway, spotty Wi-Fi, weak mobile signal). The last-seen dashboard, goalkeeper list, calendar and reports index remain viewable; writes queue naturally through TanStack Query retries when the connection returns.
+## Current state
 
-## What the user gets
+`ReportForm` in `src/components/workflows.tsx` uses `goalkeepers` from `src/lib/mock-data.ts` for the goalkeeper datalist. `team`, `opponent`, `competition`, `matchDate` are free-text; nothing reacts when the mentor picks a keeper. Roster data (club, league, parent club, loan status) lives only in `mock-data.ts` — Supabase has no `players`/`fixtures` tables yet.
 
-- Open the app after losing signal and still see the last dashboard, calendar, goalkeeper roster and reports list.
-- A subtle "Offline — showing last synced data" banner appears when the browser reports no network, and disappears on reconnect.
-- Installed home-screen app updates automatically in the background; a small toast offers "Reload for latest" when a new version is ready.
-- No change in the Lovable editor preview — the worker only runs on the published site (`rpmmentor.com` / `rpmmentor.lovable.app`).
+## Phase 1 — Auto-fill club from Supabase (immediate)
 
-## Scope
+### Data model
+- New `public.players` table as roster source of truth:
+  - `id uuid pk`, `full_name text`, `current_club text`, `parent_club text nullable`, `on_loan bool`, `league text`, `nationality text`, `tier text`, `instagram_handle text nullable`, timestamps.
+  - `UNIQUE (lower(full_name))` for name-based lookup (keeper picker is a name string today).
+- Grants: `SELECT` to `authenticated`; write to `service_role` + super_admin via policy. RLS on.
+- Seed via migration from the current `mock-data.ts` roster (one-off).
 
-In:
-- `/` (dashboard), `/goalkeepers`, `/calendar`, `/reports`, `/alerts`, `/account` — HTML shell + JS/CSS/font/icon assets.
-- Supabase GET responses for the dashboard/roster/calendar/reports queries (short SWR window, network-first).
+### Server
+- `src/lib/players.functions.ts`:
+  - `listPlayers()` — id, full_name, current_club, league, tier. `requireSupabaseAuth`, cached in TanStack Query.
+  - `getPlayerByName(name)` — case-insensitive lookup, returns club/league/tier or null.
 
-Out (explicitly not cached):
-- `/login`, `/reset-password`, `/[.]lovable.oauth.consent`, `/api/*`, `/[.mcp]/*`, `/[.well-known]/*` — always network.
-- Any Supabase POST/PUT/PATCH/DELETE — offline writes are out of scope; the UI shows the offline banner and surfaces failures via existing toasts.
-- Voice-note transcription and media uploads — network-only.
+### UI (`ReportForm`)
+- Replace `goalkeepers` import with a `useQuery(['players'], listPlayers)` roster.
+- On goalkeeper change:
+  - Look up the player row.
+  - If found AND the `team` field is empty OR still equal to the previously auto-filled value, set `team = current_club`.
+  - Track `autoFilledTeam` in a ref so a mentor's manual edit is never overwritten by a later re-selection.
+  - Show a subtle "Auto-filled from roster · Edit" hint under the Team field; clicking it clears the auto-fill lock.
+- Keep the input free-text and editable (loan clubs, trials, mid-transfer cases).
+- Draft store: no schema change; `team` already persists.
 
-## Approach
+### Assumptions / gaps
+- Keeper selection is still by **name** (datalist), not id. Name-based join is fine short-term but will drift on renames/duplicates; migrating the form to store `player_id` is a follow-up.
+- Mock roster becomes seed-only; the goalkeeper profile page still reads mock data and should switch to `listPlayers` in a later pass.
 
-Follow the Lovable PWA skill (offline path):
+## Phase 2 — Fixture-aware suggestions (design only, not built)
 
-1. Add `vite-plugin-pwa` with `generateSW`, `registerType: "autoUpdate"`, `injectRegister: null`, `devOptions.enabled: false`, SW filename `/sw.js`.
-2. Runtime caching rules in `vite.config.ts`:
-   - Navigations → `NetworkFirst` (3s timeout, fallback to cached shell).
-   - Same-origin hashed build assets (`/assets/*`) → `CacheFirst`, 30-day expiry.
-   - Google Fonts CSS + files → `StaleWhileRevalidate` / `CacheFirst`.
-   - Supabase REST GETs for the four dashboard endpoints → `NetworkFirst`, 5s timeout, 24h max age, cap ~50 entries.
-   - Exclude `/~oauth`, `/api/`, `/[.mcp]`, `/[.well-known]`, `/login`, auth token endpoints from navigation fallback and caching.
-3. Registration wrapper `src/lib/pwa/register-sw.ts` — refuses to register when any of these hold, and unregisters any matching `/sw.js` first:
-   - `!import.meta.env.PROD`
-   - inside an iframe
-   - hostname starts with `id-preview--` or `preview--`
-   - hostname is/ends with `lovableproject.com`, `lovableproject-dev.com`, `beta.lovable.dev`
-   - URL contains `?sw=off` (kill switch)
-4. Call the wrapper once from `RootComponent` in `src/routes/__root.tsx` inside a `useEffect`.
-5. Add `src/components/offline-banner.tsx` — listens to `online`/`offline` events, renders a slim bar under the header when offline. Mount inside `AppShell`.
-6. Add "Update available" toast via a small `onNeedRefresh` hook using `virtual:pwa-register` inside the same guarded wrapper.
+### Data model
+```text
+public.fixtures
+  id uuid pk
+  player_id uuid fk -> players(id)      -- keeper the fixture is for
+  team text not null                     -- keeper's side, denormalised (loan/national team)
+  opponent text not null
+  competition text nullable              -- may be unknown at import time
+  kickoff_at timestamptz not null
+  venue text nullable
+  source text not null                   -- 'manual' | 'import:<provider>' | 'ingest:<sheet>'
+  external_id text nullable              -- provider fixture id for idempotent upsert
+  status text not null default 'scheduled'  -- scheduled | played | postponed | cancelled
+  created_at, updated_at
+  UNIQUE (player_id, kickoff_at, opponent)
+  UNIQUE (source, external_id) where external_id is not null
+```
+- Index `(player_id, kickoff_at desc)` for the picker.
+- RLS: `SELECT` to authenticated; writes to service_role + admin.
+- Optional `public.fixture_imports` audit table (provider, batch, counts) for the integrations page.
 
-## Files
+### Server
+- `listFixturesForPlayer(playerId, { window: '±30d' })` — returns candidate fixtures ordered by proximity to today, played or scheduled.
+- `getFixture(id)` — hydrate on selection.
+- Ingest job (later): TanStack server route under `src/routes/api/public/fixtures/ingest` for provider webhooks, or a scheduled pull; both idempotent via `(source, external_id)`.
 
-New:
-- `src/lib/pwa/register-sw.ts` — guarded registration + update prompt.
-- `src/components/offline-banner.tsx` — online/offline indicator.
+### UI behaviour
+When the mentor picks a goalkeeper:
+1. Fetch fixtures in a ±30-day window.
+2. Render a **"Link a fixture"** combobox above Team/Opponent/Date, plus a "No fixture yet — enter manually" escape.
+3. On fixture select, auto-fill `team`, `opponent`, `competition`, `matchDate`.
+   - Each field individually retains the same "auto-filled / edit to override" pattern as Phase 1.
+   - **Competition is always editable** (cup rounds, friendlies, unknown at fixture-import time).
+4. Persist `fixture_id` on the submitted report (new nullable column on `match_reports_cache`/report row); mentors can also submit with `fixture_id = null` for matches not yet in the fixture list.
+5. Reverse link: goalkeeper profile can show "Reports linked to this fixture" once both exist.
 
-Modified:
-- `vite.config.ts` — add `VitePWA` plugin with the config above.
-- `src/routes/__root.tsx` — call `registerSw()` in a `useEffect`.
-- `src/components/app-shell.tsx` — render `<OfflineBanner />`.
-- `package.json` — add `vite-plugin-pwa` and `workbox-window` via `bun add`.
+### Conflict / edge cases
+- Two fixtures on the same day (double-header, national team + club): combobox shows both with kickoff + competition.
+- Fixture is later updated (opponent/date change): show a "Fixture updated since draft" banner in the draft-conflict UI; mentor chooses to keep entered values or refresh from fixture.
+- Fixture deleted after report submission: report keeps its snapshot (team/opponent/date persisted on the report row), `fixture_id` set to null via `ON DELETE SET NULL`.
 
-Not touched:
-- Existing manifest, icons, splash screens (already correct).
-- Any Supabase edge/RLS logic.
-- `firebase-messaging-sw.js` — none present; nothing to preserve.
+### Assumptions / gaps
+- No fixture provider decided yet (Opta, SofaScore, manual CSV, or piggy-back on the existing Google Sheets connector). The `source`/`external_id` design is provider-agnostic.
+- Assumes fixtures are player-scoped, not club-scoped. A club-scoped model (`fixtures` keyed by club, joined via `players.current_club`) is simpler to import but breaks for loan/national/trial scenarios — recommend keeping player-scoped and letting ingest fan out per squad.
+- No handling here for opponent-goalkeeper metadata (their #1, their form) — out of scope.
+- Report schema currently lives partly in Google Sheets; adding `fixture_id` presumes the Supabase migration for `match_reports` (previously proposed) lands first, otherwise `fixture_id` has to be stored in `match_reports_cache` only and won't round-trip through Sheets.
 
-## Verification
-
-- `bun run build` succeeds; `sw.js` emitted with the expected precache manifest.
-- Local production build: DevTools → Application → Service Workers shows `/sw.js` activated only on the published-style origin; nothing registers under `id-preview--*`.
-- Offline throttling in DevTools → dashboard, goalkeepers, calendar, reports remain viewable; login route falls back to network error (expected).
-- `?sw=off` unregisters the worker cleanly.
-
-## Risks / caveats
-
-- Cached Supabase reads can be up to 24h stale on a fresh reconnect until the network-first refetch lands — acceptable for read-only glance use.
-- Offline write queueing is deliberately out of scope; adding it later would use Workbox Background Sync on specific server-function endpoints.
-- iOS PWA users won't see updates until the tab is closed and reopened after the new worker activates (standard PWA behavior).
+## Rollout order
+1. Ship Phase 1 (players table + auto-fill). Low risk, unblocks club consistency.
+2. Migrate the goalkeeper profile + roster page reads to `listPlayers` (removes mock coupling).
+3. Land the Match Reports Supabase migration (previously scoped).
+4. Add `fixtures` table + manual admin CRUD; wire the combobox behind a feature flag.
+5. Add the first automated fixture ingest.
