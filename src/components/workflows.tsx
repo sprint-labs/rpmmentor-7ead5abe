@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
-import { X, CheckCircle2, Upload, AlertCircle, Paperclip, Search, Trash2, Loader2 } from "lucide-react";
+import { X, CheckCircle2, Upload, AlertCircle, Paperclip, Search, Trash2, Loader2, RotateCcw } from "lucide-react";
 import { goalkeepers } from "@/lib/mock-data";
 import { listPlayers, type PlayerRosterRow } from "@/lib/players.functions";
 import { useAuth, type SessionUser } from "@/lib/auth";
