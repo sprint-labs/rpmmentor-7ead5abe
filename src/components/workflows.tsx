@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
-import { X, CheckCircle2, Upload, AlertCircle, Paperclip, Search, Trash2, Loader2 } from "lucide-react";
+import { X, CheckCircle2, Upload, AlertCircle, Paperclip, Search, Trash2, Loader2, RotateCcw } from "lucide-react";
 import { goalkeepers } from "@/lib/mock-data";
 import { listPlayers, type PlayerRosterRow } from "@/lib/players.functions";
 import { useAuth, type SessionUser } from "@/lib/auth";
@@ -213,6 +213,15 @@ function InteractionForm({ onDone }: { onDone: () => void }) {
     if (v !== autoFilledClubRef.current) setClubAutoFilled(false);
   }
 
+  function resetClub() {
+    const rosterClub = autoFilledClubRef.current;
+    if (rosterClub) {
+      setClub(rosterClub);
+      setClubAutoFilled(true);
+    }
+  }
+
+
   if (done) return <Submitted message="Interaction logged successfully." onDone={onDone} />;
   return (
     <form onSubmit={(e) => { e.preventDefault(); setDone(true); }} className="space-y-4">
@@ -221,10 +230,15 @@ function InteractionForm({ onDone }: { onDone: () => void }) {
         <Field label="Interaction Type"><select className={selectCls} required>{["Live Match Observation", "Training Ground Visit", "Coffee Catch Up", "Phone Call"].map((t) => <option key={t}>{t}</option>)}</select></Field>
         <Field label="Club">
           <input className={inputCls} value={club} onChange={(e) => handleClubChange(e.target.value)} placeholder="e.g. Brighton & Hove Albion" maxLength={80} />
-          {clubAutoFilled && (
+          {clubAutoFilled ? (
             <p className="mt-1 text-[11px] text-muted-foreground">Auto-filled from roster · edit to override</p>
-          )}
+          ) : autoFilledClubRef.current ? (
+            <button type="button" onClick={resetClub} className="mt-1 inline-flex items-center gap-1 text-[11px] text-primary hover:text-primary/80">
+              <RotateCcw className="size-3" /> Reset to roster club
+            </button>
+          ) : null}
         </Field>
+
         <Field label="Date"><input type="date" className={inputCls} defaultValue={new Date().toISOString().slice(0, 10)} required /></Field>
         <Field label="Outcome"><select className={selectCls}>{["On track", "Above expectation", "Below expectation", "Needs follow-up", "Action plan agreed"].map((t) => <option key={t}>{t}</option>)}</select></Field>
       </div>
