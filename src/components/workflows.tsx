@@ -237,8 +237,8 @@ function InteractionForm({ onDone }: { onDone: () => void }) {
               <RotateCcw className="size-3" /> Reset to roster club
             </button>
           ) : null}
-
         </Field>
+
         <Field label="Date"><input type="date" className={inputCls} defaultValue={new Date().toISOString().slice(0, 10)} required /></Field>
         <Field label="Outcome"><select className={selectCls}>{["On track", "Above expectation", "Below expectation", "Needs follow-up", "Action plan agreed"].map((t) => <option key={t}>{t}</option>)}</select></Field>
       </div>
