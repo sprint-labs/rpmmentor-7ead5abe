@@ -684,7 +684,9 @@ function ReportForm({ onDone, prefillGoalkeeper, prefillMatchDate, prefillOppone
             onChange={(e) => setGoalkeeper(e.target.value)}
             placeholder="e.g. James Beadle" maxLength={80} />
           <datalist id="mr-gk-suggestions">
-            {goalkeepers.map((g) => <option key={g.id} value={g.name} />)}
+            {(players.length ? players.map((p) => ({ id: p.id, name: p.full_name })) : goalkeepers.map((g) => ({ id: g.id, name: g.name }))).map((g) => (
+              <option key={g.id} value={g.name} />
+            ))}
           </datalist>
         </Field>
         <Field label="Coach (you) *">
@@ -696,14 +698,22 @@ function ReportForm({ onDone, prefillGoalkeeper, prefillMatchDate, prefillOppone
             onChange={(e) => setCompetition(e.target.value)}
             placeholder="e.g. EFL Championship" maxLength={80} />
           <datalist id="mr-competition-suggestions">
-            {Array.from(new Set(goalkeepers.map((g) => g.league).filter(Boolean))).sort().map((l) => (
+            {Array.from(new Set([
+              ...players.map((p) => p.league),
+              ...goalkeepers.map((g) => g.league),
+            ].filter(Boolean))).sort().map((l) => (
               <option key={l} value={l} />
             ))}
           </datalist>
         </Field>
         <Field label="Team *">
-          <input className={inputCls} required value={team} onChange={(e) => setTeam(e.target.value)}
+          <input className={inputCls} required value={team} onChange={(e) => handleTeamChange(e.target.value)}
             placeholder="e.g. Wolves" maxLength={80} />
+          {teamAutoFilled && (
+            <div className="mt-1 text-[10px] text-muted-foreground">
+              Auto-filled from roster · edit to override
+            </div>
+          )}
         </Field>
         <Field label="Opponent *">
           <input className={inputCls} required value={opponent} onChange={(e) => setOpponent(e.target.value)}
