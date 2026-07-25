@@ -213,6 +213,15 @@ function InteractionForm({ onDone }: { onDone: () => void }) {
     if (v !== autoFilledClubRef.current) setClubAutoFilled(false);
   }
 
+  function resetClub() {
+    const rosterClub = autoFilledClubRef.current;
+    if (rosterClub) {
+      setClub(rosterClub);
+      setClubAutoFilled(true);
+    }
+  }
+
+
   if (done) return <Submitted message="Interaction logged successfully." onDone={onDone} />;
   return (
     <form onSubmit={(e) => { e.preventDefault(); setDone(true); }} className="space-y-4">
