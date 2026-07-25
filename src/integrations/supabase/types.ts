@@ -299,6 +299,48 @@ export type Database = {
         }
         Relationships: []
       }
+      players: {
+        Row: {
+          contract_until: string | null
+          created_at: string
+          current_club: string
+          full_name: string
+          id: string
+          instagram_url: string | null
+          league: string
+          nationality: string
+          on_loan: boolean
+          parent_club: string | null
+          updated_at: string
+        }
+        Insert: {
+          contract_until?: string | null
+          created_at?: string
+          current_club?: string
+          full_name: string
+          id?: string
+          instagram_url?: string | null
+          league?: string
+          nationality?: string
+          on_loan?: boolean
+          parent_club?: string | null
+          updated_at?: string
+        }
+        Update: {
+          contract_until?: string | null
+          created_at?: string
+          current_club?: string
+          full_name?: string
+          id?: string
+          instagram_url?: string | null
+          league?: string
+          nationality?: string
+          on_loan?: boolean
+          parent_club?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
