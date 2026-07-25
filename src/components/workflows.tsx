@@ -178,18 +178,58 @@ function InteractionForm({ onDone }: { onDone: () => void }) {
   const [done, setDone] = useState(false);
   const [notes, setNotes] = useState("");
   const [gkId, setGkId] = useState("");
+  const [club, setClub] = useState("");
+  const [clubAutoFilled, setClubAutoFilled] = useState(false);
+  const autoFilledClubRef = useRef<string | null>(null);
   const gk = goalkeepers.find((g) => g.id === gkId);
+
+  const listPlayersFn = useServerFn(listPlayers);
+  const playersQuery = useQuery({
+    queryKey: ["players", "roster"],
+    queryFn: () => listPlayersFn(),
+    staleTime: 5 * 60_000,
+  });
+  const players: PlayerRosterRow[] = playersQuery.data ?? [];
+  const playersByName = useMemo(() => {
+    const map = new Map<string, PlayerRosterRow>();
+    for (const p of players) map.set(p.full_name.trim().toLowerCase(), p);
+    return map;
+  }, [players]);
+
+  useEffect(() => {
+    if (!gk) return;
+    const match = playersByName.get(gk.name.trim().toLowerCase());
+    if (!match) return;
+    const canOverwrite = !club.trim() || club === autoFilledClubRef.current;
+    if (!canOverwrite) return;
+    if (club === match.current_club) return;
+    setClub(match.current_club);
+    autoFilledClubRef.current = match.current_club;
+    setClubAutoFilled(true);
+  }, [gk, playersByName, club]);
+
+  function handleClubChange(v: string) {
+    setClub(v);
+    if (v !== autoFilledClubRef.current) setClubAutoFilled(false);
+  }
+
   if (done) return <Submitted message="Interaction logged successfully." onDone={onDone} />;
   return (
     <form onSubmit={(e) => { e.preventDefault(); setDone(true); }} className="space-y-4">
       <div className="grid grid-cols-2 gap-3">
         <Field label="Goalkeeper"><select className={selectCls} required value={gkId} onChange={(e) => setGkId(e.target.value)}><option value="" disabled>Select…</option>{goalkeepers.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}</select></Field>
         <Field label="Interaction Type"><select className={selectCls} required>{["Live Match Observation", "Training Ground Visit", "Coffee Catch Up", "Phone Call"].map((t) => <option key={t}>{t}</option>)}</select></Field>
+        <Field label="Club">
+          <input className={inputCls} value={club} onChange={(e) => handleClubChange(e.target.value)} placeholder="e.g. Brighton & Hove Albion" maxLength={80} />
+          {clubAutoFilled && (
+            <p className="mt-1 text-[11px] text-muted-foreground">Auto-filled from roster · edit to override</p>
+          )}
+        </Field>
         <Field label="Date"><input type="date" className={inputCls} defaultValue={new Date().toISOString().slice(0, 10)} required /></Field>
         <Field label="Outcome"><select className={selectCls}>{["On track", "Above expectation", "Below expectation", "Needs follow-up", "Action plan agreed"].map((t) => <option key={t}>{t}</option>)}</select></Field>
       </div>
       <HandwrittenNotesField
-        context={gk ? `Session notes about ${gk.name} (${gk.club})` : undefined}
+        context={gk ? `Session notes about ${gk.name} (${club || gk.club})` : undefined}
         onTranscribed={(text, mode) => setNotes((prev) => mode === "replace" || !prev.trim() ? text : `${prev.trim()}\n\n${text}`)}
       />
       <VoiceNoteField
@@ -201,6 +241,7 @@ function InteractionForm({ onDone }: { onDone: () => void }) {
     </form>
   );
 }
+
 
 /**
  * Match Report form — writes to the RPM Match Reports Google Sheet via
