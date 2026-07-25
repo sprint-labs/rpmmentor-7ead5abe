@@ -1,7 +1,9 @@
 import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useServerFn } from "@tanstack/react-start";
+import { useQuery } from "@tanstack/react-query";
 import { X, CheckCircle2, Upload, AlertCircle, Paperclip, Search, Trash2, Loader2 } from "lucide-react";
 import { goalkeepers } from "@/lib/mock-data";
+import { listPlayers, type PlayerRosterRow } from "@/lib/players.functions";
 import { useAuth, type SessionUser } from "@/lib/auth";
 import {
   ACCEPT_BY_KIND, MAX_FILE_BYTES, detectKind, formatBytes, uploadMedia,
@@ -207,8 +209,21 @@ function InteractionForm({ onDone }: { onDone: () => void }) {
 function ReportForm({ onDone, prefillGoalkeeper, prefillMatchDate, prefillOpponent }: { onDone: () => void; prefillGoalkeeper?: string; prefillMatchDate?: string; prefillOpponent?: string }) {
   const { user } = useAuth();
   const submitFn = useServerFn(submitMatchReport);
-
-  
+  const listPlayersFn = useServerFn(listPlayers);
+  const playersQuery = useQuery({
+    queryKey: ["players", "roster"],
+    queryFn: () => listPlayersFn(),
+    staleTime: 5 * 60_000,
+  });
+  const players: PlayerRosterRow[] = playersQuery.data ?? [];
+  const playersByName = useMemo(() => {
+    const map = new Map<string, PlayerRosterRow>();
+    for (const p of players) map.set(p.full_name.trim().toLowerCase(), p);
+    return map;
+  }, [players]);
+  // Track the value we auto-filled so a mentor's manual edit is never overwritten.
+  const autoFilledTeamRef = useRef<string | null>(null);
+  const [teamAutoFilled, setTeamAutoFilled] = useState(false);
 
   const [done, setDone] = useState<{ report_id: string; average: number } | null>(null);
   const [goalkeeper, setGoalkeeper] = useState("");
@@ -339,6 +354,30 @@ function ReportForm({ onDone, prefillGoalkeeper, prefillMatchDate, prefillOppone
     return () => { if (saveTimer.current) clearTimeout(saveTimer.current); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, draftLoaded, done, conflict, goalkeeper, coach, competition, team, opponent, matchDate, scores, comments, selectedMedia, voiceTranscript]);
+
+  // Auto-fill Team from the roster when the goalkeeper matches a known player.
+  // Only writes when Team is empty OR still equals the last auto-filled value —
+  // a mentor's manual edit is never overwritten.
+  useEffect(() => {
+    if (!playersByName.size) return;
+    const match = playersByName.get(goalkeeper.trim().toLowerCase());
+    if (!match) return;
+    const canOverwrite = !team.trim() || team === autoFilledTeamRef.current;
+    if (!canOverwrite) return;
+    if (team === match.current_club) return;
+    setTeam(match.current_club);
+    autoFilledTeamRef.current = match.current_club;
+    setTeamAutoFilled(true);
+  }, [goalkeeper, playersByName, team]);
+
+  const handleTeamChange = (value: string) => {
+    setTeam(value);
+    if (value !== autoFilledTeamRef.current) {
+      autoFilledTeamRef.current = null;
+      setTeamAutoFilled(false);
+    }
+  };
+
 
   const discardDraft = () => {
     if (!user) return;
@@ -645,7 +684,9 @@ function ReportForm({ onDone, prefillGoalkeeper, prefillMatchDate, prefillOppone
             onChange={(e) => setGoalkeeper(e.target.value)}
             placeholder="e.g. James Beadle" maxLength={80} />
           <datalist id="mr-gk-suggestions">
-            {goalkeepers.map((g) => <option key={g.id} value={g.name} />)}
+            {(players.length ? players.map((p) => ({ id: p.id, name: p.full_name })) : goalkeepers.map((g) => ({ id: g.id, name: g.name }))).map((g) => (
+              <option key={g.id} value={g.name} />
+            ))}
           </datalist>
         </Field>
         <Field label="Coach (you) *">
@@ -657,14 +698,22 @@ function ReportForm({ onDone, prefillGoalkeeper, prefillMatchDate, prefillOppone
             onChange={(e) => setCompetition(e.target.value)}
             placeholder="e.g. EFL Championship" maxLength={80} />
           <datalist id="mr-competition-suggestions">
-            {Array.from(new Set(goalkeepers.map((g) => g.league).filter(Boolean))).sort().map((l) => (
+            {Array.from(new Set([
+              ...players.map((p) => p.league),
+              ...goalkeepers.map((g) => g.league),
+            ].filter(Boolean))).sort().map((l) => (
               <option key={l} value={l} />
             ))}
           </datalist>
         </Field>
         <Field label="Team *">
-          <input className={inputCls} required value={team} onChange={(e) => setTeam(e.target.value)}
+          <input className={inputCls} required value={team} onChange={(e) => handleTeamChange(e.target.value)}
             placeholder="e.g. Wolves" maxLength={80} />
+          {teamAutoFilled && (
+            <div className="mt-1 text-[10px] text-muted-foreground">
+              Auto-filled from roster · edit to override
+            </div>
+          )}
         </Field>
         <Field label="Opponent *">
           <input className={inputCls} required value={opponent} onChange={(e) => setOpponent(e.target.value)}
