@@ -355,6 +355,30 @@ function ReportForm({ onDone, prefillGoalkeeper, prefillMatchDate, prefillOppone
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, draftLoaded, done, conflict, goalkeeper, coach, competition, team, opponent, matchDate, scores, comments, selectedMedia, voiceTranscript]);
 
+  // Auto-fill Team from the roster when the goalkeeper matches a known player.
+  // Only writes when Team is empty OR still equals the last auto-filled value —
+  // a mentor's manual edit is never overwritten.
+  useEffect(() => {
+    if (!playersByName.size) return;
+    const match = playersByName.get(goalkeeper.trim().toLowerCase());
+    if (!match) return;
+    const canOverwrite = !team.trim() || team === autoFilledTeamRef.current;
+    if (!canOverwrite) return;
+    if (team === match.current_club) return;
+    setTeam(match.current_club);
+    autoFilledTeamRef.current = match.current_club;
+    setTeamAutoFilled(true);
+  }, [goalkeeper, playersByName, team]);
+
+  const handleTeamChange = (value: string) => {
+    setTeam(value);
+    if (value !== autoFilledTeamRef.current) {
+      autoFilledTeamRef.current = null;
+      setTeamAutoFilled(false);
+    }
+  };
+
+
   const discardDraft = () => {
     if (!user) return;
     clearDraft(user.id);
