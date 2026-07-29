@@ -147,6 +147,18 @@ export type SubmitMatchReportResult =
       window: "strong" | "soft";
       message: string;
       report_id: string | null;
+    }
+  | {
+      /** Another request with the same key/fixture is mid-flight. */
+      status: "in_progress";
+      message: string;
+      submission_key: string;
+    }
+  | {
+      /** The append may or may not have landed — needs a human decision. */
+      status: "ambiguous";
+      message: string;
+      submission_key: string;
     };
 
 export const submitMatchReport = createServerFn({ method: "POST" })
@@ -161,16 +173,22 @@ export const submitMatchReport = createServerFn({ method: "POST" })
             allowDuplicate: z.boolean().optional().default(false),
             /** Set by the offline sync queue when replaying a queued submit. */
             replay: z.boolean().optional().default(false),
-            /** Client-generated idempotency key — stable across retries. */
-            submissionKey: z.string().min(8).max(80),
+            /**
+             * Client-generated idempotency key — stable across retries.
+             * Optional: callers that omit it get a server-generated key so a
+             * reservation is still claimed before any Sheet append.
+             */
+            submissionKey: z.string().max(80).optional(),
           })
-          .default({ allowDuplicate: false, replay: false, submissionKey: "" }),
+          .optional()
+          .default({ allowDuplicate: false, replay: false }),
       })
       .parse(data);
   })
   .handler(async ({ data, context }): Promise<SubmitMatchReportResult> => {
     const { supabase, userId } = context;
     const { payload, options } = data;
+    const submissionKey = ensureSubmissionKey(options.submissionKey);
 
     // Look up the caller's real role from the database — never trust the client.
     const { data: roleRows, error: roleErr } = await supabase
@@ -186,8 +204,8 @@ export const submitMatchReport = createServerFn({ method: "POST" })
     }
 
     // ---- Coach integrity -------------------------------------------------
-    // Coach is derived EXCLUSIVELY from the authenticated user. There is no
-    // privileged payload override on a real report write.
+    // Coach is derived EXCLUSIVELY from the authenticated profile. There is no
+    // privileged payload override, and the client value is ignored entirely.
     const { data: profile } = await supabase
       .from("profiles")
       .select("name,email")
@@ -208,10 +226,11 @@ export const submitMatchReport = createServerFn({ method: "POST" })
     }
 
     const average = averageOfScores(payload);
-    const report_id = computeReportId({
+    const report_id = computeReportUid({
       goalkeeper: payload.goalkeeper,
-      match_date: payload.match_date,
+      team: payload.team,
       opponent: payload.opponent,
+      match_date: payload.match_date,
     });
     const fingerprint = submissionFingerprint({
       goalkeeper: payload.goalkeeper,
@@ -221,55 +240,127 @@ export const submitMatchReport = createServerFn({ method: "POST" })
     });
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const now = Date.now();
 
-    // ---- Idempotency -----------------------------------------------------
-    // A replay after a lost response must never write a second row.
-    if (options.submissionKey) {
-      const { data: existing } = await supabaseAdmin
-        .from("match_report_submissions")
-        .select("report_id,sheet_row_index")
-        .eq("submission_key", options.submissionKey)
-        .maybeSingle();
-      if (existing) {
+    // ---- Idempotency: has this exact key been seen? ----------------------
+    const { data: byKey, error: byKeyErr } = await supabaseAdmin
+      .from("match_report_submissions")
+      .select("status,submitted_at,reserved_at,report_id,sheet_row_index")
+      .eq("submission_key", submissionKey)
+      .maybeSingle();
+    if (byKeyErr) {
+      // Never continue blind — an unreadable ledger cannot guarantee safety.
+      throw new Error("Could not verify submission state. Nothing was written; please try again.");
+    }
+    const decision = decideForSubmissionKey((byKey ?? null) as LedgerRecord | null, now);
+    if (decision.action === "return_success") {
+      return {
+        status: "ok",
+        report_id: decision.report_id ?? report_id,
+        row_index: decision.row_index ?? -1,
+        average,
+        idempotent: true,
+      };
+    }
+    if (decision.action === "in_progress") {
+      return {
+        status: "in_progress",
+        submission_key: submissionKey,
+        message:
+          "This report is already being submitted. Nothing extra has been written — check the reports list in a moment before trying again.",
+      };
+    }
+    if (decision.action === "ambiguous") {
+      return {
+        status: "ambiguous",
+        submission_key: submissionKey,
+        message:
+          "A previous attempt for this report didn't confirm, so we can't tell whether it reached the sheet. Check the reports list before submitting again.",
+      };
+    }
+
+    // Expire stale reservations for this fixture so a crashed request can't
+    // block the fingerprint forever. Expired rows become `ambiguous` — they
+    // never count as a prior success.
+    const { data: fpRows, error: fpErr } = await supabaseAdmin
+      .from("match_report_submissions")
+      .select("id,status,submitted_at,reserved_at,report_id,sheet_row_index")
+      .eq("fingerprint", fingerprint)
+      .order("submitted_at", { ascending: false })
+      .limit(50);
+    if (fpErr) {
+      throw new Error("Could not verify duplicate state. Nothing was written; please try again.");
+    }
+    for (const rec of fpRows ?? []) {
+      if (isPendingExpired(rec as LedgerRecord, now)) {
+        await supabaseAdmin
+          .from("match_report_submissions")
+          .update({ status: "ambiguous", updated_at: new Date().toISOString() })
+          .eq("id", (rec as { id: string }).id);
+      }
+    }
+
+    // ---- Duplicate protection (confirmed successes only) -----------------
+    // Legacy sheet rows have no submit timestamp and are deliberately NOT
+    // considered — cache `synced_at` is reconciliation time, not a submit time.
+    if (!options.allowDuplicate) {
+      const dup = duplicateWindowForRecords((fpRows ?? []) as LedgerRecord[], now);
+      if (dup.window) {
         return {
-          status: "ok",
-          report_id: (existing.report_id as string) ?? report_id,
-          row_index: (existing.sheet_row_index as number) ?? -1,
-          average,
-          idempotent: true,
+          status: "duplicate",
+          window: dup.window,
+          message: duplicateMessage(dup.window, {
+            goalkeeper: payload.goalkeeper,
+            team: payload.team,
+            opponent: payload.opponent,
+            match_date: payload.match_date,
+          }),
+          report_id: dup.report_id,
         };
       }
     }
 
-    // ---- Duplicate protection (durable SUCCESS ledger) -------------------
-    // Only real app submissions are in the ledger. Legacy sheet rows have no
-    // submit timestamp and are deliberately NOT considered here — cache
-    // `synced_at` is reconciliation time and would produce false warnings.
-    if (!options.allowDuplicate) {
-      const { data: prior } = await supabaseAdmin
-        .from("match_report_submissions")
-        .select("submitted_at,report_id")
-        .eq("fingerprint", fingerprint)
-        .order("submitted_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      if (prior?.submitted_at) {
-        const win = classifyDuplicateWindow(new Date(prior.submitted_at as string).getTime());
-        if (win) {
-          return {
-            status: "duplicate",
-            window: win,
-            message: duplicateMessage(win, {
-              goalkeeper: payload.goalkeeper,
-              team: payload.team,
-              opponent: payload.opponent,
-              match_date: payload.match_date,
-            }),
-            report_id: (prior.report_id as string) ?? null,
-          };
-        }
-      }
+    // ---- Durable reservation BEFORE the append ---------------------------
+    // The unique indexes on (submission_key) and (fingerprint) WHERE pending
+    // serialise concurrent tabs: only one request can hold the reservation.
+    const nowIso = new Date().toISOString();
+    const { data: reserved, error: reserveErr } = await supabaseAdmin
+      .from("match_report_submissions")
+      .insert({
+        user_id: userId,
+        submission_key: submissionKey,
+        fingerprint,
+        goalkeeper: payload.goalkeeper,
+        team: payload.team,
+        opponent: payload.opponent,
+        match_date: payload.match_date,
+        report_id,
+        report_uid: report_id,
+        status: "pending",
+        confirmed_duplicate: options.allowDuplicate,
+        reserved_at: nowIso,
+        submitted_at: nowIso,
+      })
+      .select("id")
+      .maybeSingle();
+    if (reserveErr || !reserved) {
+      // Unique-violation => a concurrent request holds this key/fixture.
+      return {
+        status: "in_progress",
+        submission_key: submissionKey,
+        message:
+          "Another submission for this fixture is already in progress. Nothing extra has been written — check the reports list in a moment.",
+      };
     }
+    const ledgerId = (reserved as { id: string }).id;
+
+    const markLedger = async (patch: Record<string, unknown>) => {
+      const { error } = await supabaseAdmin
+        .from("match_report_submissions")
+        .update({ ...patch, updated_at: new Date().toISOString() })
+        .eq("id", ledgerId);
+      return !error;
+    };
 
     // Column order MUST match COLUMN_INDEX / SHEET_HEADERS (A:O).
     const row = new Array<string | number>(15).fill("");
@@ -283,25 +374,40 @@ export const submitMatchReport = createServerFn({ method: "POST" })
     row[COLUMN_INDEX.comments] = comments;
     row[COLUMN_INDEX.competition] = payload.competition ?? "";
 
-    const { appendRow } = await import("./sheets.server");
-    const rowIndex = await appendRow(row);
-
-    // Record the success in the durable ledger BEFORE anything else that can
-    // fail, so a later crash can't cause a duplicate on retry.
+    const { appendRow, AmbiguousAppendError } = await import("./sheets.server");
+    let rowIndex = -1;
     try {
-      await supabaseAdmin.from("match_report_submissions").insert({
-        user_id: userId,
-        submission_key: options.submissionKey,
-        fingerprint,
-        goalkeeper: payload.goalkeeper,
-        team: payload.team,
-        opponent: payload.opponent,
-        match_date: payload.match_date,
-        report_id,
-        sheet_row_index: rowIndex > 0 ? rowIndex : null,
-      });
-    } catch (e) {
-      console.error("[match-reports] submission ledger insert failed:", e);
+      // Single attempt — the transport never retries an append.
+      rowIndex = await appendRow(row);
+    } catch (err) {
+      if (err instanceof AmbiguousAppendError) {
+        await markLedger({ status: "ambiguous" });
+        return {
+          status: "ambiguous",
+          submission_key: submissionKey,
+          message:
+            "The sheet didn't confirm this report, so it may or may not have been written. Check the reports list before submitting again — we won't retry automatically.",
+        };
+      }
+      await markLedger({ status: "failed" });
+      throw err;
+    }
+
+    // ---- Confirm the success in the ledger --------------------------------
+    const confirmed = await markLedger({
+      status: "succeeded",
+      sheet_row_index: rowIndex > 0 ? rowIndex : null,
+      submitted_at: new Date().toISOString(),
+    });
+    if (!confirmed) {
+      // The row IS in the sheet but we can't prove it durably. Report the
+      // uncertain state rather than a clean success.
+      return {
+        status: "ambiguous",
+        submission_key: submissionKey,
+        message:
+          "The report reached the sheet but we couldn't record it. Check the reports list and do not submit again without checking.",
+      };
     }
 
     // Mirror into cache immediately so /reports reflects the new row without a re-read.
