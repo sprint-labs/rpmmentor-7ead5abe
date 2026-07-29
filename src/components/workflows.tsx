@@ -764,6 +764,14 @@ function ReportForm({ onDone, prefillGoalkeeper, prefillMatchDate, prefillOppone
         setSubmitting(false);
         return;
       }
+      if (res.status === "in_progress" || res.status === "ambiguous") {
+        // Never auto-retry: a second attempt could write a second sheet row.
+        // Keep the same submission key so a deliberate retry stays idempotent.
+        setError(res.message);
+        setSubmitting(false);
+        return;
+      }
+
       submissionKeyRef.current = newSubmissionKey();
       if (selectedMedia.length > 0) {
         try {

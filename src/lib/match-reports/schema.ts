@@ -2,7 +2,7 @@ import { z } from "zod";
 
 /**
  * Match Report schema — locked field list from the RPM Match Reports sheet.
- * Column order matches "GKHQ Propietry Data Hub" (A..N) exactly.
+ * Column order matches "GKHQ Propietry Data Hub" (A..O) exactly.
  * If the sheet is ever restructured, only `sheetHeader` needs to change;
  * `columnId` is stable and used throughout the app.
  */
@@ -88,7 +88,10 @@ export const pillarScore = z
 /** Full payload accepted by the submit server fn. */
 export const matchReportSubmitSchema = z.object({
   goalkeeper: z.string().trim().min(1, "Goalkeeper is required").max(80),
-  coach: z.string().trim().min(1, "Coach is required").max(80),
+  // Coach is derived server-side from the authenticated profile on every real
+  // write. The client value is display-only, so a missing/stale name must not
+  // fail schema validation before the server derivation runs.
+  coach: z.string().trim().max(80).optional().default(""),
   team: z.string().trim().min(1, "Team is required").max(80),
   opponent: z.string().trim().min(1, "Opponent is required").max(80),
   competition: z.string().trim().max(120).optional().default(""),
@@ -110,7 +113,10 @@ export type MatchReportSubmit = z.infer<typeof matchReportSubmitSchema>;
 
 /** Server-side row shape returned to the UI (already normalised). */
 export interface MatchReportRow {
+  /** Unique, team-aware identity (with an occurrence suffix when needed). */
   report_id: string;
+  /** Pre-Team identity — kept so historic detail URLs still resolve. */
+  legacy_report_id: string;
   row_index: number | null;
   goalkeeper: string;
   coach: string;
@@ -123,18 +129,82 @@ export interface MatchReportRow {
   comments: string;
 }
 
-/** Deterministic ID we own — the sheet doesn't carry one. */
+/** Small non-cryptographic stable hash. */
+function stableHash(s: string): string {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+  return (h >>> 0).toString(16).padStart(8, "0");
+}
+
+/**
+ * LEGACY identity (Goalkeeper + Match Date + Opponent). It excludes Team, so
+ * two clubs' fixtures can collide. Retained ONLY so historic detail URLs and
+ * cache rows keep resolving — never used as the primary identity for new work.
+ */
 export function computeReportId(input: {
   goalkeeper: string;
   match_date: string | null;
   opponent: string | null;
 }): string {
   const s = `${input.goalkeeper.trim().toLowerCase()}|${input.match_date ?? ""}|${(input.opponent ?? "").trim().toLowerCase()}`;
-  // Not cryptographic — just a stable key. Same input → same report_id.
-  let h = 0;
-  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
-  const hex = (h >>> 0).toString(16).padStart(8, "0");
-  return `mr_${hex}`;
+  return `mr_${stableHash(s)}`;
+}
+
+/**
+ * Current identity: Goalkeeper + Team + Opponent + Match Date. Same inputs
+ * always produce the same base id; genuinely confirmed duplicates are
+ * separated by an occurrence suffix assigned in `parseSheetRows`.
+ */
+export function computeReportUid(input: {
+  goalkeeper: string;
+  team: string | null;
+  opponent: string | null;
+  match_date: string | null;
+}): string {
+  const norm = (v: string | null | undefined) =>
+    (v ?? "").trim().replace(/\s+/g, " ").toLowerCase();
+  const s = [
+    norm(input.goalkeeper),
+    norm(input.team),
+    norm(input.opponent),
+    (input.match_date ?? "").trim(),
+  ].join("|");
+  return `mr2_${stableHash(s)}`;
+}
+
+/** Strip an occurrence suffix ("mr2_abc~2" -> "mr2_abc"). */
+export function baseReportUid(id: string): string {
+  const i = id.indexOf("~");
+  return i === -1 ? id : id.slice(0, i);
+}
+
+/**
+ * Parse all sheet rows into reports with unique identities.
+ * Rows sharing a base uid (an explicitly confirmed duplicate) get `~2`, `~3`…
+ * in sheet order, so list/detail/cache/delete never collapse them.
+ */
+export function parseSheetRows(rows: string[][], firstDataRow: number): MatchReportRow[] {
+  const seen = new Map<string, number>();
+  const out: MatchReportRow[] = [];
+  rows.forEach((row, i) => {
+    const r = rowToMatchReport(row, firstDataRow + i);
+    if (!r) return;
+    const base = r.report_id;
+    const n = (seen.get(base) ?? 0) + 1;
+    seen.set(base, n);
+    if (n > 1) r.report_id = `${base}~${n}`;
+    out.push(r);
+  });
+  return out;
+}
+
+/** True when `id` addresses this report by current OR legacy identity. */
+export function matchesReportId(r: MatchReportRow, id: string): boolean {
+  return (
+    r.report_id === id ||
+    baseReportUid(r.report_id) === id ||
+    r.legacy_report_id === id
+  );
 }
 
 export function averageOfScores(v: Pick<MatchReportSubmit,
@@ -193,7 +263,8 @@ export function rowToMatchReport(row: string[], rowIndex: number): MatchReportRo
     return Number.isFinite(n) ? n : null;
   };
   return {
-    report_id: computeReportId({ goalkeeper, match_date, opponent }),
+    report_id: computeReportUid({ goalkeeper, team: (row[COLUMN_INDEX.team] ?? "").trim() || null, opponent, match_date }),
+    legacy_report_id: computeReportId({ goalkeeper, match_date, opponent }),
     row_index: rowIndex,
     goalkeeper,
     coach: (row[COLUMN_INDEX.coach] ?? "").trim(),
