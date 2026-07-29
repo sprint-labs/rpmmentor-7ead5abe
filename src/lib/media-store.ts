@@ -1,5 +1,8 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { SessionUser } from "@/lib/auth";
+import { attachmentLookupIds, mergeAttachments } from "@/lib/report-attachments";
+
+export { attachmentLookupIds, mergeAttachments };
 
 export type MediaKind = "video" | "pdf" | "image" | "audio";
 
@@ -345,20 +348,6 @@ export function canDeleteAsset(asset: MediaAsset, user: SessionUser | null): boo
 
 // ---------- Report attachments ----------
 
-/** Pure helper: merge attachment result sets and dedupe by asset id. */
-export function mergeAttachments(...groups: MediaAsset[][]): MediaAsset[] {
-  const seen = new Set<string>();
-  const out: MediaAsset[] = [];
-  for (const group of groups) {
-    for (const a of group ?? []) {
-      if (!a || seen.has(a.id)) continue;
-      seen.add(a.id);
-      out.push(a);
-    }
-  }
-  return out;
-}
-
 export async function listReportAttachments(reportId: string): Promise<MediaAsset[]> {
   return listReportAttachmentsForIds([reportId]);
 }
@@ -371,7 +360,7 @@ export async function listReportAttachments(reportId: string): Promise<MediaAsse
  * fetch every known id (current + legacy) and dedupe.
  */
 export async function listReportAttachmentsForIds(reportIds: (string | null | undefined)[]): Promise<MediaAsset[]> {
-  const ids = Array.from(new Set(reportIds.filter((x): x is string => !!x)));
+  const ids = attachmentLookupIds(...reportIds);
   if (ids.length === 0) return [];
   const { data, error } = await supabase
     .from("report_attachments")

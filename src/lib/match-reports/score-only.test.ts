@@ -25,7 +25,7 @@ describe("score-only comments are blocked deterministically", () => {
   }
 
   it("rejects a 40+ character all-score string that would otherwise pass length", () => {
-    const body = "4/5 4/5 4/5 4/5 4/5 4/5 4/5 4/5 4/5 4/5 4/5 4/5";
+    const body = "4/5 4/5 4/5 4/5 4/5 4/5 4/5 4/5 4/5 4/5 4/5 4/5 4/5 4/5 4/5 4/5";
     expect(body.replace(/\s+/g, "").length).toBeGreaterThan(40);
     expect(validateComments(wrap(body)).ok).toBe(false);
   });
