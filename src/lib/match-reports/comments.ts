@@ -187,19 +187,65 @@ export function validateComments(text: string): CommentValidation {
 const KEY_MOMENT_RE =
   /\b(save[ds]?|saved|block(?:ed|s)?|punch(?:ed|es)?|claim(?:ed|s)?|cross(?:es|ed)?|distribut\w*|pass(?:es|ed|ing)?|kick(?:ed|s|ing)?|goal(?:s)?|concede[ds]?|penalt\w*|corner|free[- ]?kick|one[- ]?on[- ]?one|1v1|minute[s]?|\b\d{1,3}'\s|injur\w*|card|foul)\b/i;
 
+/** Wording that reads as a general overview rather than a specific incident. */
+const GENERAL_OVERVIEW_RE =
+  /\b(overall|in general|generally|throughout|on the whole|performance|confiden\w*|calm|composed|assured|presence|communicat\w*|body language|mentality|attitude|workload|energy|solid|steady|dominant|positive|encouraging|looked\s+\w+|felt\s+\w+)\b/i;
+
 export type InsertTarget = CommentSection;
 
-/** Pick the section a transcript should land in. */
+/**
+ * Placement of a transcript:
+ * - `section` when the classification (or an explicit Development Focus caret)
+ *   is confident.
+ * - `cursor` when the classification is uncertain and the mentor has a caret.
+ */
+export type InsertPlacement =
+  | { kind: "section"; section: CommentSection }
+  | { kind: "cursor"; offset: number };
+
+/** True when the transcript matches neither the action nor the overview cue. */
+export function isUncertainTranscript(transcript: string): boolean {
+  const t = transcript ?? "";
+  return !KEY_MOMENT_RE.test(t) && !GENERAL_OVERVIEW_RE.test(t);
+}
+
+/** Pick the section a transcript should land in (section-only callers). */
 export function chooseInsertSection(
   transcript: string,
   cursorSection: CommentSection | null,
 ): InsertTarget {
-  // A cursor explicitly placed in Development Focus is always respected.
+  // A cursor explicitly placed in Development Focus is always respected;
+  // Development Focus is never chosen automatically otherwise.
   if (cursorSection === "Development Focus") return "Development Focus";
   if (KEY_MOMENT_RE.test(transcript)) return "Key Moments";
+  if (GENERAL_OVERVIEW_RE.test(transcript)) return "Summary";
   if (cursorSection) return cursorSection;
-  return "Summary";
+  // Uncertain with no caret at all — append under Key Moments.
+  return "Key Moments";
 }
+
+/**
+ * Exact placement rules:
+ *   action incidents            -> Key Moments
+ *   clearly general overview    -> Summary
+ *   caret in Development Focus  -> Development Focus (never automatic)
+ *   uncertain + caret available -> insert at the caret
+ *   uncertain + no caret        -> append under Key Moments
+ */
+export function resolveInsertPlacement(
+  transcript: string,
+  cursorSection: CommentSection | null,
+  caret: number | null,
+): InsertPlacement {
+  if (cursorSection === "Development Focus") {
+    return { kind: "section", section: "Development Focus" };
+  }
+  if (KEY_MOMENT_RE.test(transcript)) return { kind: "section", section: "Key Moments" };
+  if (GENERAL_OVERVIEW_RE.test(transcript)) return { kind: "section", section: "Summary" };
+  if (caret != null && caret >= 0) return { kind: "cursor", offset: caret };
+  return { kind: "section", section: "Key Moments" };
+}
+
 
 /** Which section a caret offset sits in (null when not inside any section). */
 export function sectionAtOffset(text: string, offset: number): CommentSection | null {
