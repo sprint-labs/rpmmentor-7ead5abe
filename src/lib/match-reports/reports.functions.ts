@@ -17,6 +17,7 @@ import {
   computeReportUid,
   parseSheetRows,
   matchesReportId,
+  identityForRowIndex,
   formatSheetDate,
   COLUMN_INDEX,
   PILLAR_IDS,
@@ -29,8 +30,11 @@ import {
   duplicateWindowForRecords,
   ensureSubmissionKey,
   isPendingExpired,
+  openFingerprintBlock,
+  classifyLedgerWriteError,
   type LedgerRecord,
 } from "./ledger";
+
 
 // NOTE: helpers used inside `createServerFn` handlers must be declared inside the
 // handler or in a separate imported module — the splitter deletes sibling module-
