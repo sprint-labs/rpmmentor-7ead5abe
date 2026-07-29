@@ -75,12 +75,14 @@ interface Props {
   onAudioAttach?: (audio: { blob: Blob; mimeType: string; durationSec: number }) => void | Promise<void>;
   draft?: VoiceDraft | null;
   onDraftChange?: (draft: VoiceDraft | null) => void;
+  /** Match Report comments are never replaced — hide the replace actions. */
+  allowReplace?: boolean;
   className?: string;
 }
 
 type Phase = "idle" | "preparing" | "uploading" | "transcribing";
 
-export function VoiceNoteField({ onTranscribed, onAudioAttach, draft, onDraftChange, className }: Props) {
+export function VoiceNoteField({ onTranscribed, onAudioAttach, draft, onDraftChange, allowReplace = true, className }: Props) {
   const [recording, setRecording] = useState(false);
   const [phase, setPhase] = useState<Phase>("idle");
   const [phaseElapsed, setPhaseElapsed] = useState(0);
@@ -1100,9 +1102,11 @@ export function VoiceNoteField({ onTranscribed, onAudioAttach, draft, onDraftCha
                   <button type="button" disabled={!reviewed || !transcript.trim() || isEditingText} onClick={() => requestApply("append")} className="inline-flex items-center gap-1 h-7 px-2 rounded-md bg-primary text-primary-foreground text-[11px] font-medium hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed">
                     Append to comments
                   </button>
-                  <button type="button" disabled={!reviewed || !transcript.trim() || isEditingText} onClick={() => requestApply("replace")} className="inline-flex items-center gap-1 h-7 px-2 rounded-md border border-border text-[11px] font-medium hover:bg-accent disabled:opacity-40 disabled:cursor-not-allowed">
-                    Replace comments
-                  </button>
+                  {allowReplace && (
+                    <button type="button" disabled={!reviewed || !transcript.trim() || isEditingText} onClick={() => requestApply("replace")} className="inline-flex items-center gap-1 h-7 px-2 rounded-md border border-border text-[11px] font-medium hover:bg-accent disabled:opacity-40 disabled:cursor-not-allowed">
+                      Replace comments
+                    </button>
+                  )}
                   <button type="button" onClick={() => { navigator.clipboard?.writeText(transcript); toast.success("Copied"); }} className="inline-flex items-center gap-1 h-7 px-2 rounded-md border border-border text-[11px] font-medium hover:bg-accent">
                     Copy
                   </button>
@@ -1170,9 +1174,11 @@ export function VoiceNoteField({ onTranscribed, onAudioAttach, draft, onDraftCha
                     <button type="button" onClick={() => insertSummary("append")} className="inline-flex items-center gap-1 h-7 px-2 rounded-md bg-primary text-primary-foreground text-[11px] font-medium hover:opacity-90">
                       Append to comments
                     </button>
-                    <button type="button" onClick={() => insertSummary("replace")} className="inline-flex items-center gap-1 h-7 px-2 rounded-md border border-border text-[11px] font-medium hover:bg-accent">
-                      Replace comments
-                    </button>
+                    {allowReplace && (
+                      <button type="button" onClick={() => insertSummary("replace")} className="inline-flex items-center gap-1 h-7 px-2 rounded-md border border-border text-[11px] font-medium hover:bg-accent">
+                        Replace comments
+                      </button>
+                    )}
                     <button
                       type="button"
                       onClick={() => { navigator.clipboard?.writeText(formatSummary(summary)); toast.success("Summary copied"); }}

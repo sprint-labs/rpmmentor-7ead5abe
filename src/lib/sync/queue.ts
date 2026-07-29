@@ -23,7 +23,24 @@ export type SyncJob = {
   userId?: string;
   /** Free-form label shown in the UI (e.g. "Match report — Beadle vs Blackburn"). */
   label?: string;
+  /**
+   * The server refused the job pending an explicit user decision (e.g. a
+   * duplicate confirmation). The job is kept, never auto-retried, and never
+   * silently submitted — the UI must surface it.
+   */
+  needsAction?: boolean;
 };
+
+/**
+ * Thrown by a handler when the job cannot proceed without a user decision.
+ * The queue keeps the job and flags it instead of retrying or dropping it.
+ */
+export class NeedsUserActionError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "NeedsUserActionError";
+  }
+}
 
 const KEY = "rpm.sync-queue.v1";
 const LAST_SYNC_KEY = "rpm.sync-queue.last-synced";
@@ -117,14 +134,18 @@ export async function drainQueue(handlers: Record<string, SyncHandler>): Promise
   processed: number;
   failed: number;
   dropped: number;
+  needsAction: number;
 }> {
   const jobs = read();
   let processed = 0;
   let failed = 0;
   let dropped = 0;
+  let needsAction = 0;
   const now = Date.now();
 
   for (const job of jobs) {
+    // Awaiting an explicit user decision — never auto-submit or drop.
+    if (job.needsAction) continue;
     if (job.attempts > 0 && nextRetryAt(job) > now) continue;
     const handler = handlers[job.type];
     if (!handler) {
@@ -137,6 +158,11 @@ export async function drainQueue(handlers: Record<string, SyncHandler>): Promise
       processed += 1;
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
+      if (err instanceof NeedsUserActionError) {
+        updateJob(job.id, { needsAction: true, lastError: message });
+        needsAction += 1;
+        continue;
+      }
       if (!isTransient(err) || job.attempts + 1 >= MAX_ATTEMPTS) {
         removeJob(job.id);
         dropped += 1;
@@ -148,7 +174,7 @@ export async function drainQueue(handlers: Record<string, SyncHandler>): Promise
   }
 
   if (processed > 0) setLastSyncedAt(Date.now());
-  return { processed, failed, dropped };
+  return { processed, failed, dropped, needsAction };
 }
 
 export function subscribe(cb: () => void): () => void {

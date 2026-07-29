@@ -16,7 +16,7 @@ export type SheetsIntegrationStatus = {
   spreadsheetTitle: string | null;
   sheetTab: string;
   sheetTabExists: boolean;
-  /** Actual A1:P1 header row from the sheet (empty when unreachable). */
+  /** Actual A1:O1 header row from the sheet (empty when unreachable). */
   headerRow: string[];
   /** Columns whose header text differs from SHEET_HEADERS. */
   headerMismatches: { column: string; expected: string; actual: string }[];
@@ -139,26 +139,4 @@ export const getSheetsIntegrationStatus = createServerFn({ method: "GET" })
       checkedAt,
       error,
     };
-  });
-
-/**
- * Write the two app-owned header cells (O1 "Competition", P1 "Source").
- * Super-admin only. Never touches A1:N1 or any data row.
- */
-export const repairSheetHeaders = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
-    const { supabase, userId } = context;
-    const { data: roleRows, error: roleErr } = await supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", userId);
-    if (roleErr) throw new Error("Unable to verify caller role.");
-    const roles = (roleRows ?? []).map((r) => r.role as string);
-    if (!roles.includes("super_admin")) {
-      throw new Error("Forbidden: super_admin role required.");
-    }
-    const { writeAppOwnedHeaders, readHeaderRow } = await import("@/lib/match-reports/sheets.server");
-    await writeAppOwnedHeaders();
-    return { ok: true as const, headerRow: await readHeaderRow() };
   });

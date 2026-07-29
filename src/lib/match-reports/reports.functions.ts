@@ -4,6 +4,9 @@
  * All handlers require an authenticated Supabase session. The caller's role
  * and display name are looked up from the database (`user_roles`, `profiles`)
  * — never trusted from client input.
+ *
+ * Sheet layout is A:O. A "Source" provenance column is DEFERRED pending an
+ * Excel audit — nothing here reads, writes or stamps a source value.
  */
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
@@ -16,10 +19,14 @@ import {
   formatSheetDate,
   COLUMN_INDEX,
   PILLAR_IDS,
-  SOURCE_APP,
-  SOURCE_APP_REPLAY,
   type MatchReportRow,
 } from "./schema";
+import { ensureSections, validateComments } from "./comments";
+import {
+  submissionFingerprint,
+  classifyDuplicateWindow,
+  duplicateMessage,
+} from "./duplicates";
 
 // NOTE: helpers used inside `createServerFn` handlers must be declared inside the
 // handler or in a separate imported module — the splitter deletes sibling module-
@@ -62,7 +69,6 @@ export const listMatchReports = createServerFn({ method: "GET" })
           team: r.team,
           opponent: r.opponent,
           competition: r.competition,
-          source: r.source,
           match_date: r.match_date,
           protect_goal: r.scores.protect_goal,
           protect_space: r.scores.protect_space,
@@ -73,6 +79,8 @@ export const listMatchReports = createServerFn({ method: "GET" })
           physical: r.scores.physical,
           average: r.average,
           comments: r.comments,
+          // `synced_at` is reconciliation time, NOT a submit timestamp — it is
+          // never used for duplicate-window decisions.
           synced_at: new Date().toISOString(),
         })),
         { onConflict: "report_id" },
@@ -123,6 +131,22 @@ export const getMatchReport = createServerFn({ method: "GET" })
 // submitMatchReport
 // ---------------------------------------------------------------------------
 
+export type SubmitMatchReportResult =
+  | {
+      status: "ok";
+      report_id: string;
+      row_index: number;
+      average: number;
+      /** True when the same submission key had already been written. */
+      idempotent: boolean;
+    }
+  | {
+      status: "duplicate";
+      window: "strong" | "soft";
+      message: string;
+      report_id: string | null;
+    };
+
 export const submitMatchReport = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data: unknown) => {
@@ -131,17 +155,18 @@ export const submitMatchReport = createServerFn({ method: "POST" })
         payload: matchReportSubmitSchema,
         options: z
           .object({
-            /** Privileged override for the duplicate-fixture guard. */
+            /** User confirmed a legitimate duplicate. */
             allowDuplicate: z.boolean().optional().default(false),
             /** Set by the offline sync queue when replaying a queued submit. */
             replay: z.boolean().optional().default(false),
+            /** Client-generated idempotency key — stable across retries. */
+            submissionKey: z.string().min(8).max(80),
           })
-          .optional()
-          .default({ allowDuplicate: false, replay: false }),
+          .default({ allowDuplicate: false, replay: false, submissionKey: "" }),
       })
       .parse(data);
   })
-  .handler(async ({ data, context }) => {
+  .handler(async ({ data, context }): Promise<SubmitMatchReportResult> => {
     const { supabase, userId } = context;
     const { payload, options } = data;
 
@@ -153,97 +178,99 @@ export const submitMatchReport = createServerFn({ method: "POST" })
     if (roleErr) throw new Error("Unable to verify caller role.");
 
     const roles = (roleRows ?? []).map((r) => r.role as string);
-    const effectiveRole =
-      roles.includes("super_admin") ? "super_admin" :
-      roles.includes("admin") ? "admin" :
-      roles.includes("mentor_manager") ? "mentor_manager" :
-      roles.includes("mentor") ? "mentor" : null;
-
     const CAN_SUBMIT = ["super_admin", "mentor_manager", "mentor"];
-    const CAN_OVERRIDE_COACH = ["super_admin", "admin", "mentor_manager"];
-
-    if (!effectiveRole || !CAN_SUBMIT.includes(effectiveRole)) {
+    if (!roles.some((r) => CAN_SUBMIT.includes(r))) {
       throw new Error("You don't have permission to submit reports.");
     }
 
-    // Look up caller's canonical name from profiles.
+    // ---- Coach integrity -------------------------------------------------
+    // Coach is derived EXCLUSIVELY from the authenticated user. There is no
+    // privileged payload override on a real report write.
     const { data: profile } = await supabase
       .from("profiles")
       .select("name,email")
       .eq("id", userId)
       .maybeSingle<{ name: string | null; email: string | null }>();
-    const callerName = (profile?.name || profile?.email || "").trim();
-
-    // Coach is a read-only, server-derived field. Non-privileged roles get
-    // their canonical profile name authoritatively; privileged roles may
-    // submit on another coach's behalf.
-    const canOverrideCoach = CAN_OVERRIDE_COACH.includes(effectiveRole);
-    const resolvedCoach = canOverrideCoach
-      ? (payload.coach?.trim() || callerName)
-      : callerName;
-
-    // The Zod schema validates the *client* coach value; the resolved value is
-    // what actually reaches the sheet, so it gets its own guard.
+    const resolvedCoach = (profile?.name || profile?.email || "").trim();
     if (!resolvedCoach) {
       throw new Error(
         "Your profile has no name or email set, so the Coach field can't be filled. Add a name in Account settings and try again.",
       );
     }
-    if (resolvedCoach.length > 80) {
-      throw new Error("Coach name is too long (max 80 characters).");
-    }
-    // A privileged override must name a real Mentor Hub profile — no free text.
-    if (canOverrideCoach && resolvedCoach !== callerName) {
-      const { data: match } = await supabase
-        .from("profiles")
-        .select("id")
-        .ilike("name", resolvedCoach)
-        .limit(1);
-      if (!match || match.length === 0) {
-        throw new Error(
-          `"${resolvedCoach}" doesn't match a Mentor Hub user. Coach must be an existing profile name.`,
-        );
-      }
+
+    // ---- Comments validation (server enforcement) ------------------------
+    const comments = ensureSections(payload.comments ?? "");
+    const commentCheck = validateComments(comments);
+    if (!commentCheck.ok) {
+      throw new Error(`Comments: ${commentCheck.message}`);
     }
 
     const average = averageOfScores(payload);
-    const { readAllRows, appendRow } = await import("./sheets.server");
-
     const report_id = computeReportId({
       goalkeeper: payload.goalkeeper,
       match_date: payload.match_date,
       opponent: payload.opponent,
     });
+    const fingerprint = submissionFingerprint({
+      goalkeeper: payload.goalkeeper,
+      team: payload.team,
+      opponent: payload.opponent,
+      match_date: payload.match_date,
+    });
 
-    // ---- Duplicate-fixture guard -----------------------------------------
-    // Same goalkeeper + match date + opponent already in the sheet means this
-    // is a double submit or a replayed queue job that already landed.
-    if (!options.allowDuplicate) {
-      try {
-        const { rows, firstDataRow } = await readAllRows();
-        for (let i = 0; i < rows.length; i++) {
-          const existing = rowToMatchReport(rows[i], firstDataRow + i);
-          if (existing && existing.report_id === report_id) {
-            const err = new Error(
-              `A match report already exists for ${payload.goalkeeper} vs ${payload.opponent} on ${payload.match_date}.`,
-            ) as Error & { code?: string; report_id?: string; canOverride?: boolean };
-            err.code = "duplicate_report";
-            err.report_id = existing.report_id;
-            err.canOverride = canOverrideCoach;
-            throw err;
-          }
-        }
-      } catch (e) {
-        // Only swallow read failures — a real duplicate must still block.
-        if ((e as { code?: string })?.code === "duplicate_report") throw e;
-        console.warn("[match-reports] duplicate pre-check skipped:", e);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    // ---- Idempotency -----------------------------------------------------
+    // A replay after a lost response must never write a second row.
+    if (options.submissionKey) {
+      const { data: existing } = await supabaseAdmin
+        .from("match_report_submissions")
+        .select("report_id,sheet_row_index")
+        .eq("submission_key", options.submissionKey)
+        .maybeSingle();
+      if (existing) {
+        return {
+          status: "ok",
+          report_id: (existing.report_id as string) ?? report_id,
+          row_index: (existing.sheet_row_index as number) ?? -1,
+          average,
+          idempotent: true,
+        };
       }
     }
 
-    const source = options.replay ? SOURCE_APP_REPLAY : SOURCE_APP;
+    // ---- Duplicate protection (durable SUCCESS ledger) -------------------
+    // Only real app submissions are in the ledger. Legacy sheet rows have no
+    // submit timestamp and are deliberately NOT considered here — cache
+    // `synced_at` is reconciliation time and would produce false warnings.
+    if (!options.allowDuplicate) {
+      const { data: prior } = await supabaseAdmin
+        .from("match_report_submissions")
+        .select("submitted_at,report_id")
+        .eq("fingerprint", fingerprint)
+        .order("submitted_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (prior?.submitted_at) {
+        const win = classifyDuplicateWindow(new Date(prior.submitted_at as string).getTime());
+        if (win) {
+          return {
+            status: "duplicate",
+            window: win,
+            message: duplicateMessage(win, {
+              goalkeeper: payload.goalkeeper,
+              team: payload.team,
+              opponent: payload.opponent,
+              match_date: payload.match_date,
+            }),
+            report_id: (prior.report_id as string) ?? null,
+          };
+        }
+      }
+    }
 
-    // Column order MUST match COLUMN_INDEX / SHEET_HEADERS.
-    const row = new Array<string | number>(16).fill("");
+    // Column order MUST match COLUMN_INDEX / SHEET_HEADERS (A:O).
+    const row = new Array<string | number>(15).fill("");
     row[COLUMN_INDEX.goalkeeper] = payload.goalkeeper;
     row[COLUMN_INDEX.coach] = resolvedCoach;
     row[COLUMN_INDEX.team] = payload.team;
@@ -251,15 +278,32 @@ export const submitMatchReport = createServerFn({ method: "POST" })
     row[COLUMN_INDEX.match_date] = formatSheetDate(payload.match_date);
     for (const id of PILLAR_IDS) row[COLUMN_INDEX[id]] = payload[id];
     row[COLUMN_INDEX.average] = average;
-    row[COLUMN_INDEX.comments] = payload.comments ?? "";
+    row[COLUMN_INDEX.comments] = comments;
     row[COLUMN_INDEX.competition] = payload.competition ?? "";
-    row[COLUMN_INDEX.source] = source;
 
+    const { appendRow } = await import("./sheets.server");
     const rowIndex = await appendRow(row);
+
+    // Record the success in the durable ledger BEFORE anything else that can
+    // fail, so a later crash can't cause a duplicate on retry.
+    try {
+      await supabaseAdmin.from("match_report_submissions").insert({
+        user_id: userId,
+        submission_key: options.submissionKey,
+        fingerprint,
+        goalkeeper: payload.goalkeeper,
+        team: payload.team,
+        opponent: payload.opponent,
+        match_date: payload.match_date,
+        report_id,
+        sheet_row_index: rowIndex > 0 ? rowIndex : null,
+      });
+    } catch (e) {
+      console.error("[match-reports] submission ledger insert failed:", e);
+    }
 
     // Mirror into cache immediately so /reports reflects the new row without a re-read.
     try {
-      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
       await supabaseAdmin.from("match_reports_cache").upsert(
         [
           {
@@ -270,7 +314,6 @@ export const submitMatchReport = createServerFn({ method: "POST" })
             team: payload.team,
             opponent: payload.opponent,
             competition: payload.competition ?? "",
-            source,
             match_date: payload.match_date,
             protect_goal: payload.protect_goal,
             protect_space: payload.protect_space,
@@ -280,7 +323,7 @@ export const submitMatchReport = createServerFn({ method: "POST" })
             psych: payload.psych,
             physical: payload.physical,
             average,
-            comments: payload.comments ?? "",
+            comments,
             synced_at: new Date().toISOString(),
           },
         ],
@@ -290,7 +333,7 @@ export const submitMatchReport = createServerFn({ method: "POST" })
       console.error("[match-reports] cache mirror on submit failed:", e);
     }
 
-    return { report_id, row_index: rowIndex, average, source };
+    return { status: "ok", report_id, row_index: rowIndex, average, idempotent: false };
   });
 
 // ---------------------------------------------------------------------------
@@ -352,11 +395,13 @@ export const deleteMatchReport = createServerFn({ method: "POST" })
         .from("match_reports_cache")
         .delete()
         .eq("report_id", data.reportId);
+      await supabaseAdmin
+        .from("match_report_submissions")
+        .delete()
+        .eq("report_id", data.reportId);
     } catch (e) {
       console.error("[match-reports] cache delete after sheet delete failed:", e);
     }
 
     return { deleted: true, row_index: matchedRowIndex };
   });
-
-

@@ -18,10 +18,12 @@ function readAsDataUrl(file: File): Promise<string> {
 interface Props {
   context?: string;
   onTranscribed: (text: string, mode: "replace" | "append") => void;
+  /** Match Report comments are never replaced — hide the replace action. */
+  allowReplace?: boolean;
   className?: string;
 }
 
-export function HandwrittenNotesField({ context, onTranscribed, className }: Props) {
+export function HandwrittenNotesField({ context, onTranscribed, allowReplace = true, className }: Props) {
   const fileRef = useRef<HTMLInputElement>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
   const [preview, setPreview] = useState<string | null>(null);
@@ -97,9 +99,11 @@ export function HandwrittenNotesField({ context, onTranscribed, className }: Pro
                   <button type="button" onClick={() => onTranscribed(transcript, "append")} className="inline-flex items-center gap-1 h-7 px-2 rounded-md bg-primary text-primary-foreground text-[11px] font-medium hover:opacity-90">
                     Append to notes
                   </button>
-                  <button type="button" onClick={() => onTranscribed(transcript, "replace")} className="inline-flex items-center gap-1 h-7 px-2 rounded-md border border-border text-[11px] font-medium hover:bg-accent">
-                    Replace notes
-                  </button>
+                  {allowReplace && (
+                    <button type="button" onClick={() => onTranscribed(transcript, "replace")} className="inline-flex items-center gap-1 h-7 px-2 rounded-md border border-border text-[11px] font-medium hover:bg-accent">
+                      Replace notes
+                    </button>
+                  )}
                   <button type="button" onClick={() => { navigator.clipboard?.writeText(transcript); toast.success("Copied"); }} className="inline-flex items-center gap-1 h-7 px-2 rounded-md border border-border text-[11px] font-medium hover:bg-accent">
                     Copy
                   </button>

@@ -22,6 +22,11 @@ import {
   subscribeDraftChanges, newTabId,
   type ReportDraft, type ReportDraftSnapshot,
 } from "@/lib/match-reports/draft-store";
+import {
+  BLANK_COMMENTS_TEMPLATE, SECTION_HELP, ensureSections, validateComments,
+  chooseInsertSection, sectionAtOffset, insertUnderSection,
+} from "@/lib/match-reports/comments";
+import { newSubmissionKey } from "@/lib/match-reports/duplicates";
 
 function formatDraftTime(iso: string): string {
   try {
@@ -291,12 +296,20 @@ function ReportForm({ onDone, prefillGoalkeeper, prefillMatchDate, prefillOppone
     protect_goal: 3, protect_space: 3, protect_air: 3,
     control_play: 3, change_play: 3, psych: 3, physical: 3,
   });
-  const [comments, setComments] = useState("");
+  const [comments, setComments] = useState(BLANK_COMMENTS_TEMPLATE);
+  const commentsRef = useRef<HTMLTextAreaElement | null>(null);
+  const commentsCaretRef = useRef<number | null>(null);
+  const [commentsError, setCommentsError] = useState<string | null>(null);
   const [selectedMedia, setSelectedMedia] = useState<string[]>([]);
   const [voiceTranscript, setVoiceTranscript] = useState<import("@/lib/match-reports/draft-store").VoiceTranscriptDraft | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [duplicate, setDuplicate] = useState(false);
+  // Idempotency key for this attempt-set: stable across retries and the
+  // "submit duplicate anyway" confirmation, so a lost response can never
+  // produce a second sheet row. Reset only after a successful write.
+  const submissionKeyRef = useRef<string>("");
+  if (!submissionKeyRef.current) submissionKeyRef.current = newSubmissionKey();
+  const [duplicate, setDuplicate] = useState<null | { window: "strong" | "soft"; message: string }>(null);
   const [, setFieldErrors] = useState<Record<string, string>>({});
 
   // ---------------- Draft persistence + versioning (localStorage) ----------------
@@ -447,7 +460,7 @@ function ReportForm({ onDone, prefillGoalkeeper, prefillMatchDate, prefillOppone
       protect_goal: 3, protect_space: 3, protect_air: 3,
       control_play: 3, change_play: 3, psych: 3, physical: 3,
     });
-    setComments("");
+    setComments(BLANK_COMMENTS_TEMPLATE);
     setSelectedMedia([]);
     setVoiceTranscript(null);
     setDraftSavedAt(null);
@@ -671,6 +684,31 @@ function ReportForm({ onDone, prefillGoalkeeper, prefillMatchDate, prefillOppone
   const setScore = (id: PillarId, v: number) =>
     setScores((s) => ({ ...s, [id]: Math.max(1, Math.min(5, Math.round(v))) }));
 
+  /**
+   * OCR / voice transcripts are ALWAYS inserted, never a replacement.
+   * A caret explicitly placed in Development Focus wins; otherwise action
+   * keywords route to Key Moments, general overview text to Summary.
+   */
+  const insertTranscript = (text: string) => {
+    const base = ensureSections(comments);
+    const caret = commentsCaretRef.current;
+    const cursorSection = caret == null ? null : sectionAtOffset(base, caret);
+    const section = chooseInsertSection(text, cursorSection);
+    const result = insertUnderSection(base, text, section);
+    setComments(result.text);
+    setCommentsError(null);
+    // Restore the caret after the inserted text where the browser allows it.
+    requestAnimationFrame(() => {
+      const el = commentsRef.current;
+      if (!el) return;
+      try {
+        el.focus();
+        el.setSelectionRange(result.selectionStart, result.selectionEnd);
+        commentsCaretRef.current = result.selectionStart;
+      } catch { /* selection unsupported — text is still inserted */ }
+    });
+  };
+
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     void doSubmit(false);
@@ -679,8 +717,20 @@ function ReportForm({ onDone, prefillGoalkeeper, prefillMatchDate, prefillOppone
   const doSubmit = async (force: boolean) => {
     if (submitting) return;
     setError(null);
-    setDuplicate(false);
+    setDuplicate(null);
     setFieldErrors({});
+
+    // Ensure the three section labels exist before any write, without
+    // losing text the mentor typed.
+    const normalisedComments = ensureSections(comments);
+    if (normalisedComments !== comments) setComments(normalisedComments);
+    const check = validateComments(normalisedComments);
+    if (!check.ok) {
+      setCommentsError(check.message);
+      commentsRef.current?.focus();
+      return;
+    }
+    setCommentsError(null);
     setSubmitting(true);
     const payload = {
       goalkeeper: goalkeeper.trim(),
@@ -696,10 +746,25 @@ function ReportForm({ onDone, prefillGoalkeeper, prefillMatchDate, prefillOppone
       change_play: scores.change_play,
       psych: scores.psych,
       physical: scores.physical,
-      comments,
+      comments: normalisedComments,
     };
     try {
-      const res = await submitFn({ data: { payload, options: { allowDuplicate: force, replay: false } } });
+      const res = await submitFn({
+        data: {
+          payload,
+          options: {
+            allowDuplicate: force,
+            replay: false,
+            submissionKey: submissionKeyRef.current,
+          },
+        },
+      });
+      if (res.status === "duplicate") {
+        setDuplicate({ window: res.window, message: res.message });
+        setSubmitting(false);
+        return;
+      }
+      submissionKeyRef.current = newSubmissionKey();
       if (selectedMedia.length > 0) {
         try {
           await attachMediaToReport(res.report_id, selectedMedia, user);
@@ -712,9 +777,8 @@ function ReportForm({ onDone, prefillGoalkeeper, prefillMatchDate, prefillOppone
       try { window.dispatchEvent(new CustomEvent("rpm:report-submitted", { detail: res })); } catch { /* ignore */ }
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Submission failed. Please try again.";
-      if (/already exists for/i.test(msg)) {
-        setDuplicate(true);
-        setError(msg);
+      if (/^Comments:/i.test(msg)) {
+        setCommentsError(msg.replace(/^Comments:\s*/i, ""));
         return;
       }
       const offline = typeof navigator !== "undefined" && !navigator.onLine;
@@ -724,7 +788,7 @@ function ReportForm({ onDone, prefillGoalkeeper, prefillMatchDate, prefillOppone
           const { enqueueJob } = await import("@/lib/sync/queue");
           enqueueJob({
             type: "submitMatchReport",
-            payload: { payload },
+            payload: { payload, submissionKey: submissionKeyRef.current },
             userId: user?.id,
             label: `Match report — ${payload.goalkeeper || "Unknown"} vs ${payload.opponent || "Unknown"}`,
           });
@@ -826,16 +890,14 @@ function ReportForm({ onDone, prefillGoalkeeper, prefillMatchDate, prefillOppone
 
       <HandwrittenNotesField
         context={goalkeeper ? `Match notes on ${goalkeeper} vs ${opponent || "opponent"}` : undefined}
-        onTranscribed={(text, mode) =>
-          setComments((prev) => (mode === "replace" || !prev.trim() ? text : `${prev.trim()}\n\n${text}`))
-        }
+        allowReplace={false}
+        onTranscribed={(text) => insertTranscript(text)}
       />
       <VoiceNoteField
         draft={voiceTranscript}
         onDraftChange={setVoiceTranscript}
-        onTranscribed={(text, mode) =>
-          setComments((prev) => (mode === "replace" || !prev.trim() ? text : `${prev.trim()}\n\n${text}`))
-        }
+        allowReplace={false}
+        onTranscribed={(text) => insertTranscript(text)}
         onAudioAttach={async ({ blob, mimeType, durationSec }) => {
           if (!user) throw new Error("Sign in required to save audio.");
           const gk = goalkeepers.find(
@@ -861,10 +923,47 @@ function ReportForm({ onDone, prefillGoalkeeper, prefillMatchDate, prefillOppone
           setSelectedMedia((prev) => (prev.includes(asset.id) ? prev : [...prev, asset.id]));
         }}
       />
-      <Field label="Comments">
-        <textarea rows={5} className={taCls} value={comments}
-          onChange={(e) => setComments(e.target.value)} maxLength={5000}
-          placeholder="What did you see? Key moments, strengths, areas to develop…" />
+      <Field label="Comments *">
+        <div className="mb-1.5 text-[10px] leading-relaxed text-muted-foreground">
+          Keep the three section labels and write under each — they stay editable.
+          <span className="block"><strong>Summary:</strong> {SECTION_HELP.Summary}</span>
+          <span className="block"><strong>Key Moments:</strong> {SECTION_HELP["Key Moments"]}</span>
+          <span className="block"><strong>Development Focus:</strong> {SECTION_HELP["Development Focus"]}</span>
+        </div>
+        <textarea
+          ref={commentsRef}
+          rows={10}
+          className={taCls}
+          value={comments}
+          onChange={(e) => {
+            setComments(e.target.value);
+            commentsCaretRef.current = e.target.selectionStart;
+            if (commentsError) setCommentsError(null);
+          }}
+          onSelect={(e) => { commentsCaretRef.current = (e.target as HTMLTextAreaElement).selectionStart; }}
+          onKeyUp={(e) => { commentsCaretRef.current = (e.target as HTMLTextAreaElement).selectionStart; }}
+          onClick={(e) => { commentsCaretRef.current = (e.target as HTMLTextAreaElement).selectionStart; }}
+          maxLength={5000}
+          placeholder={BLANK_COMMENTS_TEMPLATE}
+        />
+        <div className="mt-1 flex items-center justify-between gap-2">
+          <button
+            type="button"
+            onClick={() => setComments((prev) => ensureSections(prev))}
+            className="text-[10px] text-muted-foreground hover:text-foreground underline underline-offset-2"
+          >
+            Restore section labels
+          </button>
+          <span className="text-[10px] text-muted-foreground">
+            Minimum 40 characters of detail (headings don't count)
+          </span>
+        </div>
+        {commentsError && (
+          <div className="mt-1 flex items-start gap-1.5 text-[11px] text-destructive">
+            <AlertCircle className="size-3.5 mt-0.5 shrink-0" />
+            <span>{commentsError}</span>
+          </div>
+        )}
       </Field>
 
       {conflict && (() => {
@@ -1021,25 +1120,46 @@ function ReportForm({ onDone, prefillGoalkeeper, prefillMatchDate, prefillOppone
         );
       })()}
 
-      {error && (
-        <div className="text-xs text-destructive flex flex-col gap-2">
-          <div className="flex items-start gap-1.5">
-            <AlertCircle className="size-3.5 mt-0.5" />
-            <span>{error}</span>
-          </div>
-          {duplicate && (
-            <div className="flex flex-wrap items-center gap-2 text-muted-foreground">
-              <span>Nothing was written to the sheet.</span>
-              <button
-                type="button"
-                disabled={submitting}
-                onClick={() => void doSubmit(true)}
-                className="h-7 px-2.5 rounded-md border border-border text-[11px] text-foreground disabled:opacity-60"
-              >
-                Submit anyway
-              </button>
+      {duplicate && (
+        <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-xs space-y-2">
+          <div className="flex items-start gap-2">
+            <AlertCircle className="size-4 mt-0.5 text-amber-500 shrink-0" />
+            <div>
+              <div className="font-semibold text-foreground">
+                {duplicate.window === "strong" ? "Possible double submission" : "Similar report already submitted"}
+              </div>
+              <div className="text-muted-foreground mt-0.5">{duplicate.message}</div>
+              <div className="text-muted-foreground mt-1">
+                Nothing has been written to the sheet. If this is a genuinely separate
+                report, confirm below.
+              </div>
             </div>
-          )}
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              disabled={submitting}
+              onClick={() => void doSubmit(true)}
+              className="h-7 px-2.5 rounded-md border border-border bg-background text-[11px] text-foreground disabled:opacity-60"
+            >
+              Submit duplicate anyway
+            </button>
+            <button
+              type="button"
+              disabled={submitting}
+              onClick={() => setDuplicate(null)}
+              className="h-7 px-2.5 rounded-md text-[11px] text-muted-foreground hover:text-foreground"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {error && (
+        <div className="text-xs text-destructive flex items-start gap-1.5">
+          <AlertCircle className="size-3.5 mt-0.5" />
+          <span>{error}</span>
         </div>
       )}
 

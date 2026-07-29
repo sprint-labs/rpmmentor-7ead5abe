@@ -3,9 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { CheckCircle2, XCircle, RefreshCw, ExternalLink, FileSpreadsheet, Loader2, AlertCircle } from "lucide-react";
 import { useAuth } from "@/lib/auth";
-import { getSheetsIntegrationStatus, repairSheetHeaders } from "@/lib/integrations/sheets-status.functions";
-import { toast } from "sonner";
-import { useState } from "react";
+import { getSheetsIntegrationStatus } from "@/lib/integrations/sheets-status.functions";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/system/integrations")({
@@ -39,8 +37,6 @@ function fmtRelative(iso: string | null): string {
 function IntegrationsPage() {
   const { user, can } = useAuth();
   const fetchStatus = useServerFn(getSheetsIntegrationStatus);
-  const repairHeaders = useServerFn(repairSheetHeaders);
-  const [repairing, setRepairing] = useState(false);
 
   const canManage = !!user && can("system.manage");
 
@@ -185,28 +181,6 @@ function IntegrationsPage() {
                     </li>
                   ))}
                 </ul>
-                {s.headerMismatches.every((m) => m.column === "O" || m.column === "P") && (
-                  <button
-                    type="button"
-                    disabled={repairing}
-                    onClick={async () => {
-                      setRepairing(true);
-                      try {
-                        await repairHeaders({ data: undefined as never });
-                        toast.success("Competition and Source headers written.");
-                        await q.refetch();
-                      } catch (e) {
-                        toast.error(e instanceof Error ? e.message : "Header write failed.");
-                      } finally {
-                        setRepairing(false);
-                      }
-                    }}
-                    className="inline-flex items-center gap-2 rounded-md border border-border bg-background px-3 py-1.5 text-xs hover:bg-accent disabled:opacity-50"
-                  >
-                    {repairing && <Loader2 className="h-3 w-3 animate-spin" />}
-                    Write Competition &amp; Source headers
-                  </button>
-                )}
               </div>
             </div>
           </div>
