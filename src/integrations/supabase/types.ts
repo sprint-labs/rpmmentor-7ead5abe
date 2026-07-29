@@ -103,6 +103,7 @@ export type Database = {
       }
       match_report_submissions: {
         Row: {
+          confirmed_duplicate: boolean
           created_at: string
           fingerprint: string
           goalkeeper: string
@@ -110,7 +111,10 @@ export type Database = {
           match_date: string | null
           opponent: string
           report_id: string | null
+          report_uid: string | null
+          reserved_at: string
           sheet_row_index: number | null
+          status: string
           submission_key: string
           submitted_at: string
           team: string
@@ -118,6 +122,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          confirmed_duplicate?: boolean
           created_at?: string
           fingerprint: string
           goalkeeper: string
@@ -125,7 +130,10 @@ export type Database = {
           match_date?: string | null
           opponent?: string
           report_id?: string | null
+          report_uid?: string | null
+          reserved_at?: string
           sheet_row_index?: number | null
+          status?: string
           submission_key: string
           submitted_at?: string
           team?: string
@@ -133,6 +141,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          confirmed_duplicate?: boolean
           created_at?: string
           fingerprint?: string
           goalkeeper?: string
@@ -140,7 +149,10 @@ export type Database = {
           match_date?: string | null
           opponent?: string
           report_id?: string | null
+          report_uid?: string | null
+          reserved_at?: string
           sheet_row_index?: number | null
+          status?: string
           submission_key?: string
           submitted_at?: string
           team?: string
