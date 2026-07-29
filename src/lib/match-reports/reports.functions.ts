@@ -604,29 +604,42 @@ export const deleteMatchReport = createServerFn({ method: "POST" })
       return { deleted: false, reason: "not_found" as const };
     }
 
+    // Capture a STABLE, content-based signature of the raw row before deleting.
+    // Occurrence-derived ids (…~2) reindex when a row is removed, so they can
+    // never be used to prove an ambiguous delete landed.
+    const { rawRowSignature, countSignature, classifyDeleteReadback } = await import(
+      "./delete-verify"
+    );
+    const rawRow = rows[matchedRowIndex - firstDataRow] ?? [];
+    const signature = rawRowSignature(rawRow);
+    const countBefore = countSignature(rows, signature);
+    const hadDuplicates = countBefore > 1;
+
     // Delete sheet row first — SINGLE attempt. An ambiguous outcome must never
     // trigger a second delete (that would remove the following report); we read
-    // the sheet back and only clean up cache/ledger when the row is proven gone.
+    // the sheet back by content and only clean up when the row is proven gone.
+    let verifiedViaReadback = false;
     try {
       await deleteRow(matchedRowIndex);
     } catch (err) {
       if (err instanceof AmbiguousDeleteError) {
-        let stillPresent: boolean | null = null;
+        let rowsAfter: string[][] | null = null;
         try {
-          const after = await readAllRows();
-          const parsedAfter = parseSheetRows(after.rows, after.firstDataRow);
-          stillPresent = parsedAfter.some(
-            (r) => r.report_id === (target?.report_id ?? data.reportId),
-          );
+          rowsAfter = (await readAllRows()).rows;
         } catch (readErr) {
           console.error("[match-reports] delete read-back failed:", readErr);
         }
-        if (stillPresent === false) {
-          // Verified gone — the delete did land. Fall through to cleanup.
-          console.warn("[match-reports] ambiguous delete verified as applied.");
+        const verdict = classifyDeleteReadback({ signature, countBefore, rowsAfter });
+        if (verdict.outcome === "applied") {
+          verifiedViaReadback = true;
+          console.warn("[match-reports] ambiguous delete verified as applied by content.");
+        } else if (verdict.outcome === "not_applied") {
+          throw new Error(
+            `${(err as Error).message} The row is still present and unchanged — nothing was deleted, and no cache or ledger records were changed. You can safely try again.`,
+          );
         } else {
           throw new Error(
-            `${(err as Error).message} No cache or ledger records were changed.`,
+            `${(err as Error).message} The result could not be verified (${verdict.detail}). No cache or ledger records were changed. Do not retry in the app — check the sheet directly.`,
           );
         }
       } else {
@@ -634,10 +647,22 @@ export const deleteMatchReport = createServerFn({ method: "POST" })
       }
     }
 
+    // Cleanup. For content that existed more than once, the surviving rows have
+    // reindexed occurrence ids, so identity-based cache/ledger deletion could
+    // remove the wrong record. In that case we skip cleanup and return a
+    // terminal outcome instead of leaving the UI able to retry onto the next row.
+    if (hadDuplicates) {
+      return {
+        deleted: true,
+        row_index: matchedRowIndex,
+        terminal: true,
+        reason: "duplicate_reindexed" as const,
+        message:
+          "The row was deleted. Because identical duplicate rows exist for this fixture, their identities have shifted — cached records were left untouched and no further delete was attempted. Do not retry in the app; refresh to re-sync.",
+      };
+    }
 
-    // Then remove ONLY this occurrence's cache/ledger records. An explicitly
-    // confirmed duplicate has its own suffixed identity (…~2) and must not
-    // take the base report's rows with it.
+    // Unique row: remove ONLY this occurrence's cache/ledger records.
     const exactId = target?.report_id ?? data.reportId;
     try {
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -653,6 +678,5 @@ export const deleteMatchReport = createServerFn({ method: "POST" })
       console.error("[match-reports] cache delete after sheet delete failed:", e);
     }
 
-
-    return { deleted: true, row_index: matchedRowIndex };
+    return { deleted: true, row_index: matchedRowIndex, verified: verifiedViaReadback };
   });
