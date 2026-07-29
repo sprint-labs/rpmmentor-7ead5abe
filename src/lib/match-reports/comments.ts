@@ -109,12 +109,20 @@ const SCORE_ONLY_RE =
 const PLACEHOLDER_RE =
   /^(?:test(?:ing)?(?:\s*\d+)?|tbc|tba|n\/?a|none|nil|null|xx+|asdf+|qwerty|placeholder|todo|lorem(?:\s+ipsum)?|same as (?:above|last)|no comment|ok|fine|good|bad)$/i;
 
+/** Split prose into comparable fragments (sentences / list items / lines). */
+function fragments(body: string): string[] {
+  return body
+    .split(/[\n,;.!?]+/)
+    .map(normaliseParagraph)
+    .filter(Boolean);
+}
+
 export type CommentValidation = { ok: true } | { ok: false; message: string };
 
 /**
  * Deterministic-only validation. No AI, no subjective judgement about
  * football language — we block empty/short input, score-only values,
- * obvious placeholder/testing strings, and plainly repeated paragraphs.
+ * obvious placeholder/testing strings, and plainly repeated text.
  */
 export function validateComments(text: string): CommentValidation {
   const body = meaningfulText(text ?? "");
@@ -131,20 +139,30 @@ export function validateComments(text: string): CommentValidation {
     return { ok: false, message: "Comments can't be just a score — describe what you saw." };
   }
 
+  const frags = fragments(body);
+
+  // Placeholder / test-only content, including the classic "testing, testing"
+  // (and any case/whitespace variation of it).
+  if (frags.length > 0 && frags.every((f) => PLACEHOLDER_RE.test(f))) {
+    return { ok: false, message: "Placeholder or test text isn't accepted — add real match notes." };
+  }
+
+  // A repeated phrase such as "testing, testing" or "same, same".
+  if (frags.length >= 2 && new Set(frags).size === 1) {
+    return {
+      ok: false,
+      message: "Comments repeat the same phrase — add real match detail.",
+    };
+  }
+
+  // ANY duplicated paragraph (A / B / A) is rejected, not just all-identical.
   const paragraphs = body
     .split(/\n\s*\n/)
     .map(normaliseParagraph)
     .filter(Boolean);
 
-  if (paragraphs.length > 0 && paragraphs.every((p) => PLACEHOLDER_RE.test(p))) {
-    return { ok: false, message: "Placeholder or test text isn't accepted — add real match notes." };
-  }
-
-  if (paragraphs.length >= 2) {
-    const unique = new Set(paragraphs);
-    if (unique.size === 1) {
-      return { ok: false, message: "Comments repeat the same text — add distinct notes for each section." };
-    }
+  if (paragraphs.length >= 2 && new Set(paragraphs).size < paragraphs.length) {
+    return { ok: false, message: "Comments repeat the same text — add distinct notes for each section." };
   }
 
   if (meaningfulCharCount(text) < MIN_MEANINGFUL_CHARS) {
@@ -156,6 +174,7 @@ export function validateComments(text: string): CommentValidation {
 
   return { ok: true };
 }
+
 
 // ---------------------------------------------------------------------------
 // Transcript / OCR insertion — never replaces the user's comments.
