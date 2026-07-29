@@ -24,7 +24,7 @@ import {
 } from "@/lib/match-reports/draft-store";
 import {
   BLANK_COMMENTS_TEMPLATE, SECTION_HELP, ensureSections, validateComments,
-  chooseInsertSection, sectionAtOffset, insertUnderSection,
+  resolveInsertPlacement, sectionAtOffset, insertUnderSection, insertAtOffset,
 } from "@/lib/match-reports/comments";
 import { newSubmissionKey } from "@/lib/match-reports/duplicates";
 
@@ -686,15 +686,21 @@ function ReportForm({ onDone, prefillGoalkeeper, prefillMatchDate, prefillOppone
 
   /**
    * OCR / voice transcripts are ALWAYS inserted, never a replacement.
-   * A caret explicitly placed in Development Focus wins; otherwise action
-   * keywords route to Key Moments, general overview text to Summary.
+   * A caret explicitly placed in Development Focus wins; action keywords go to
+   * Key Moments; clear overview wording goes to Summary; anything uncertain is
+   * inserted at the mentor's caret, or appended under Key Moments when there
+   * is no caret.
    */
   const insertTranscript = (text: string) => {
     const base = ensureSections(comments);
     const caret = commentsCaretRef.current;
     const cursorSection = caret == null ? null : sectionAtOffset(base, caret);
-    const section = chooseInsertSection(text, cursorSection);
-    const result = insertUnderSection(base, text, section);
+    const placement = resolveInsertPlacement(text, cursorSection, caret ?? null);
+    const result =
+      placement.kind === "cursor"
+        ? insertAtOffset(base, text, placement.offset)
+        : insertUnderSection(base, text, placement.section);
+
     setComments(result.text);
     setCommentsError(null);
     // Restore the caret after the inserted text where the browser allows it.

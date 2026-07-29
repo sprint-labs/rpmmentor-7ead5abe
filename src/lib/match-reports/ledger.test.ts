@@ -46,7 +46,7 @@ describe("decideForSubmissionKey — lost response never appends twice", () => {
   });
 
   it("lets a definitively failed key be reused", () => {
-    expect(decideForSubmissionKey({ status: "failed" }, NOW)).toEqual({ action: "reserve" });
+    expect(decideForSubmissionKey({ status: "failed" }, NOW)).toEqual({ action: "reuse_failed" });
   });
 });
 
