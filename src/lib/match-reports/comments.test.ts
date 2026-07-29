@@ -62,6 +62,29 @@ describe("validateComments", () => {
     expect(validateComments("Summary:\ntest\n\nKey Moments:\ntesting\n\nDevelopment Focus:\ntbc\n").ok).toBe(false);
   });
 
+  it("rejects an A / B / A duplicate paragraph pattern", () => {
+    const aba =
+      "Summary:\nHe commanded his box confidently all afternoon today.\n\n" +
+      "Key Moments:\nTwo strong low saves in the second half of the game.\n\n" +
+      "Development Focus:\nhe COMMANDED his   box confidently all afternoon today.\n";
+    expect(validateComments(aba).ok).toBe(false);
+  });
+
+  it("rejects the repeated testing phrase in any casing or spacing", () => {
+    for (const v of ["testing, testing", "Testing,   Testing", " TESTING , testing "]) {
+      const text = `Summary:\n${v}\n\nKey Moments:\n${v}\n\nDevelopment Focus:\n${v}\n`;
+      expect(validateComments(text).ok).toBe(false);
+    }
+  });
+
+  it("keeps legitimate football language unrestricted", () => {
+    const good =
+      "Summary:\nCalm distribution under pressure and good workload management.\n\n" +
+      "Key Moments:\nStrong one-on-one save on 63', claimed four crosses cleanly.\n\n" +
+      "Development Focus:\nStarting position for balls in behind the back line.\n";
+    expect(validateComments(good).ok).toBe(true);
+  });
+
   it("rejects plainly repeated paragraphs", () => {
     const repeated = "Summary:\nHe played well today.\n\nKey Moments:\nhe played WELL today.\n\nDevelopment Focus:\nHe played well today.\n";
     expect(validateComments(repeated).ok).toBe(false);
