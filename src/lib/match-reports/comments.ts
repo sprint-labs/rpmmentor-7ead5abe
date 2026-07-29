@@ -154,9 +154,13 @@ export function validateComments(text: string): CommentValidation {
     };
   }
 
-  if (SCORE_ONLY_RE.test(compact)) {
-    return { ok: false, message: "Comments can't be just a score — describe what you saw." };
+  if (isScoreOnly(compact)) {
+    return {
+      ok: false,
+      message: "Comments can't be only scores — describe what you actually saw in the match.",
+    };
   }
+
 
   const frags = fragments(body);
 
