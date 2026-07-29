@@ -38,16 +38,33 @@ function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-async function gatewayFetch(path: string, init?: RequestInit): Promise<Response> {
+/**
+ * Thrown when an append may or may not have been applied by Google Sheets
+ * (network failure or 5xx after the request left us). The caller MUST treat
+ * this as ambiguous and must never retry the append automatically.
+ */
+export class AmbiguousAppendError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "AmbiguousAppendError";
+  }
+}
+
+async function gatewayFetch(
+  path: string,
+  init?: RequestInit,
+  opts?: { retry?: boolean },
+): Promise<Response> {
   const url = `${GATEWAY_BASE}${path}`;
+  const maxAttempts = opts?.retry === false ? 1 : MAX_ATTEMPTS;
   let lastErr: unknown = null;
-  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
       const res = await fetch(url, {
         ...init,
         headers: { ...authHeaders(), ...(init?.headers ?? {}) },
       });
-      if (!RETRYABLE_STATUSES.has(res.status) || attempt === MAX_ATTEMPTS) {
+      if (!RETRYABLE_STATUSES.has(res.status) || attempt === maxAttempts) {
         return res;
       }
       // Honor Retry-After when present, else exponential backoff with jitter.
@@ -56,16 +73,16 @@ async function gatewayFetch(path: string, init?: RequestInit): Promise<Response>
         ? retryAfter * 1000
         : BASE_DELAY_MS * 2 ** (attempt - 1) + Math.floor(Math.random() * 200);
       console.warn(
-        `[sheets] gateway ${res.status} on attempt ${attempt}/${MAX_ATTEMPTS}; retrying in ${backoff}ms`,
+        `[sheets] gateway ${res.status} on attempt ${attempt}/${maxAttempts}; retrying in ${backoff}ms`,
       );
       await sleep(backoff);
       continue;
     } catch (err) {
       lastErr = err;
-      if (attempt === MAX_ATTEMPTS) break;
+      if (attempt === maxAttempts) break;
       const backoff = BASE_DELAY_MS * 2 ** (attempt - 1) + Math.floor(Math.random() * 200);
       console.warn(
-        `[sheets] network error on attempt ${attempt}/${MAX_ATTEMPTS}: ${(err as Error)?.message}; retrying in ${backoff}ms`,
+        `[sheets] network error on attempt ${attempt}/${maxAttempts}: ${(err as Error)?.message}; retrying in ${backoff}ms`,
       );
       await sleep(backoff);
     }
@@ -107,24 +124,42 @@ export async function readHeaderRow(): Promise<string[]> {
   return (data.values?.[0] ?? []).map((c) => (c == null ? "" : String(c).trim()));
 }
 
-/** Append one row to the sheet. Returns the resulting 1-based row index. */
+/**
+ * Append one row to the sheet — SINGLE attempt, never retried.
+ *
+ * A retried append can double-write: the request can reach Google, be applied,
+ * and the response can then be lost. Any uncertain outcome therefore surfaces
+ * as `AmbiguousAppendError` for the caller to resolve with the user.
+ */
 export async function appendRow(values: (string | number)[]): Promise<number> {
   const range = `'${SHEET_TAB}'!A1`;
-  const res = await gatewayFetch(
-    `/spreadsheets/${SHEET_ID}/values/${encodeURI(range)}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS&includeValuesInResponse=false`,
-    {
-      method: "POST",
-      body: JSON.stringify({ values: [values] }),
-    },
-  );
+  let res: Response;
+  try {
+    res = await gatewayFetch(
+      `/spreadsheets/${SHEET_ID}/values/${encodeURI(range)}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS&includeValuesInResponse=false`,
+      {
+        method: "POST",
+        body: JSON.stringify({ values: [values] }),
+      },
+      { retry: false },
+    );
+  } catch (err) {
+    throw new AmbiguousAppendError(
+      `Google Sheets append did not return a response (${(err as Error)?.message ?? "network error"}).`,
+    );
+  }
   if (!res.ok) {
     const body = await res.text();
     console.error(`[sheets] appendRow failed [${res.status}]: ${body}`);
+    if (res.status >= 500 || res.status === 429) {
+      // The append may already have been applied server-side.
+      throw new AmbiguousAppendError(`Google Sheets append outcome unknown [${res.status}]`);
+    }
     throw new Error(`Google Sheets append failed [${res.status}]`);
   }
   const data = (await res.json()) as { updates?: { updatedRange?: string } };
   const updated = data.updates?.updatedRange ?? "";
-  // e.g. "'GKHQ Propietry Data Hub'!A6:N6"
+  // e.g. "'GKHQ Propietry Data Hub'!A6:O6"
   const m = updated.match(/![A-Z]+(\d+):[A-Z]+\d+$/);
   return m ? Number(m[1]) : -1;
 }
