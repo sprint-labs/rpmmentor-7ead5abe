@@ -24,7 +24,7 @@ import {
 } from "@/lib/match-reports/draft-store";
 import {
   BLANK_COMMENTS_TEMPLATE, SECTION_HELP, ensureSections, validateComments,
-  chooseInsertSection, sectionAtOffset, insertUnderSection,
+  resolveInsertPlacement, sectionAtOffset, insertUnderSection, insertAtOffset,
 } from "@/lib/match-reports/comments";
 import { newSubmissionKey } from "@/lib/match-reports/duplicates";
 
