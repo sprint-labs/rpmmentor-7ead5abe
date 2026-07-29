@@ -3,7 +3,9 @@ import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { CheckCircle2, XCircle, RefreshCw, ExternalLink, FileSpreadsheet, Loader2, AlertCircle } from "lucide-react";
 import { useAuth } from "@/lib/auth";
-import { getSheetsIntegrationStatus } from "@/lib/integrations/sheets-status.functions";
+import { getSheetsIntegrationStatus, repairSheetHeaders } from "@/lib/integrations/sheets-status.functions";
+import { toast } from "sonner";
+import { useState } from "react";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/system/integrations")({
@@ -37,6 +39,8 @@ function fmtRelative(iso: string | null): string {
 function IntegrationsPage() {
   const { user, can } = useAuth();
   const fetchStatus = useServerFn(getSheetsIntegrationStatus);
+  const repairHeaders = useServerFn(repairSheetHeaders);
+  const [repairing, setRepairing] = useState(false);
 
   const canManage = !!user && can("system.manage");
 
@@ -162,6 +166,51 @@ function IntegrationsPage() {
             </span>
           </Row>
         </dl>
+
+        {s && s.headerMismatches.length > 0 && (
+          <div className="border-t border-border bg-warning/10 p-4 text-sm">
+            <div className="flex items-start gap-2">
+              <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0 text-warning" />
+              <div className="space-y-2">
+                <p className="font-medium">Column headers don't match the app's mapping</p>
+                <p className="text-muted-foreground">
+                  Match Reports are read by column position. Fix these headers in the sheet
+                  before submitting new reports.
+                </p>
+                <ul className="space-y-0.5 text-xs text-muted-foreground">
+                  {s.headerMismatches.map((m) => (
+                    <li key={m.column}>
+                      <code>{m.column}1</code> — expected “{m.expected}”, found{" "}
+                      {m.actual ? `“${m.actual}”` : <em>empty</em>}
+                    </li>
+                  ))}
+                </ul>
+                {s.headerMismatches.every((m) => m.column === "O" || m.column === "P") && (
+                  <button
+                    type="button"
+                    disabled={repairing}
+                    onClick={async () => {
+                      setRepairing(true);
+                      try {
+                        await repairHeaders({ data: undefined as never });
+                        toast.success("Competition and Source headers written.");
+                        await q.refetch();
+                      } catch (e) {
+                        toast.error(e instanceof Error ? e.message : "Header write failed.");
+                      } finally {
+                        setRepairing(false);
+                      }
+                    }}
+                    className="inline-flex items-center gap-2 rounded-md border border-border bg-background px-3 py-1.5 text-xs hover:bg-accent disabled:opacity-50"
+                  >
+                    {repairing && <Loader2 className="h-3 w-3 animate-spin" />}
+                    Write Competition &amp; Source headers
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
         {s?.error && (
           <div className="border-t border-border bg-destructive/10 p-4 text-sm text-destructive">

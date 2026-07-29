@@ -296,6 +296,7 @@ function ReportForm({ onDone, prefillGoalkeeper, prefillMatchDate, prefillOppone
   const [voiceTranscript, setVoiceTranscript] = useState<import("@/lib/match-reports/draft-store").VoiceTranscriptDraft | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [duplicate, setDuplicate] = useState(false);
   const [, setFieldErrors] = useState<Record<string, string>>({});
 
   // ---------------- Draft persistence + versioning (localStorage) ----------------
@@ -670,10 +671,15 @@ function ReportForm({ onDone, prefillGoalkeeper, prefillMatchDate, prefillOppone
   const setScore = (id: PillarId, v: number) =>
     setScores((s) => ({ ...s, [id]: Math.max(1, Math.min(5, Math.round(v))) }));
 
-  const onSubmit = async (e: React.FormEvent) => {
+  const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    void doSubmit(false);
+  };
+
+  const doSubmit = async (force: boolean) => {
     if (submitting) return;
     setError(null);
+    setDuplicate(false);
     setFieldErrors({});
     setSubmitting(true);
     const payload = {
@@ -693,7 +699,7 @@ function ReportForm({ onDone, prefillGoalkeeper, prefillMatchDate, prefillOppone
       comments,
     };
     try {
-      const res = await submitFn({ data: { payload } });
+      const res = await submitFn({ data: { payload, options: { allowDuplicate: force, replay: false } } });
       if (selectedMedia.length > 0) {
         try {
           await attachMediaToReport(res.report_id, selectedMedia, user);
@@ -706,6 +712,11 @@ function ReportForm({ onDone, prefillGoalkeeper, prefillMatchDate, prefillOppone
       try { window.dispatchEvent(new CustomEvent("rpm:report-submitted", { detail: res })); } catch { /* ignore */ }
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Submission failed. Please try again.";
+      if (/already exists for/i.test(msg)) {
+        setDuplicate(true);
+        setError(msg);
+        return;
+      }
       const offline = typeof navigator !== "undefined" && !navigator.onLine;
       const transient = offline || /network|failed to fetch|load failed|timeout|fetch/i.test(msg);
       if (transient) {
@@ -1010,7 +1021,27 @@ function ReportForm({ onDone, prefillGoalkeeper, prefillMatchDate, prefillOppone
         );
       })()}
 
-      {error && <div className="text-xs text-destructive flex items-start gap-1.5"><AlertCircle className="size-3.5 mt-0.5" />{error}</div>}
+      {error && (
+        <div className="text-xs text-destructive flex flex-col gap-2">
+          <div className="flex items-start gap-1.5">
+            <AlertCircle className="size-3.5 mt-0.5" />
+            <span>{error}</span>
+          </div>
+          {duplicate && (
+            <div className="flex flex-wrap items-center gap-2 text-muted-foreground">
+              <span>Nothing was written to the sheet.</span>
+              <button
+                type="button"
+                disabled={submitting}
+                onClick={() => void doSubmit(true)}
+                className="h-7 px-2.5 rounded-md border border-border text-[11px] text-foreground disabled:opacity-60"
+              >
+                Submit anyway
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="flex items-center justify-between gap-2 pt-2 border-t border-border/60">
         <div className="text-[11px] flex items-center gap-2 min-h-6">

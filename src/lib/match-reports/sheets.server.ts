@@ -78,7 +78,7 @@ async function gatewayFetch(path: string, init?: RequestInit): Promise<Response>
 
 /** Fetch all data rows (skips header). Returns raw string rows + first-row offset (2). */
 export async function readAllRows(): Promise<{ rows: string[][]; firstDataRow: number }> {
-  const range = `'${SHEET_TAB}'!A2:O`;
+  const range = `'${SHEET_TAB}'!A2:P`;
   const res = await gatewayFetch(
     `/spreadsheets/${SHEET_ID}/values/${encodeURI(range)}?valueRenderOption=UNFORMATTED_VALUE&dateTimeRenderOption=FORMATTED_STRING`,
   );
@@ -91,6 +91,39 @@ export async function readAllRows(): Promise<{ rows: string[][]; firstDataRow: n
   const rows = (data.values ?? []).map((r) => r.map((c) => (c == null ? "" : String(c))));
   return { rows, firstDataRow: 2 };
 }
+
+/** Read the header row (A1:P1) exactly as it currently exists in the sheet. */
+export async function readHeaderRow(): Promise<string[]> {
+  const range = `'${SHEET_TAB}'!A1:P1`;
+  const res = await gatewayFetch(
+    `/spreadsheets/${SHEET_ID}/values/${encodeURI(range)}?valueRenderOption=FORMATTED_VALUE`,
+  );
+  if (!res.ok) {
+    const body = await res.text();
+    console.error(`[sheets] readHeaderRow failed [${res.status}]: ${body}`);
+    throw new Error(`Google Sheets header read failed [${res.status}]`);
+  }
+  const data = (await res.json()) as { values?: unknown[][] };
+  return (data.values?.[0] ?? []).map((c) => (c == null ? "" : String(c).trim()));
+}
+
+/**
+ * Write the app-owned header cells O1 ("Competition") and P1 ("Source").
+ * Only ever touches those two cells — never a data row, never A1:N1.
+ */
+export async function writeAppOwnedHeaders(): Promise<void> {
+  const range = `'${SHEET_TAB}'!O1:P1`;
+  const res = await gatewayFetch(
+    `/spreadsheets/${SHEET_ID}/values/${encodeURI(range)}?valueInputOption=RAW`,
+    { method: "PUT", body: JSON.stringify({ values: [["Competition", "Source"]] }) },
+  );
+  if (!res.ok) {
+    const body = await res.text();
+    console.error(`[sheets] writeAppOwnedHeaders failed [${res.status}]: ${body}`);
+    throw new Error(`Google Sheets header write failed [${res.status}]`);
+  }
+}
+
 
 /** Append one row to the sheet. Returns the resulting 1-based row index. */
 export async function appendRow(values: (string | number)[]): Promise<number> {

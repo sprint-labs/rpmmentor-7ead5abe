@@ -121,6 +121,7 @@ export type Database = {
           psych: number | null
           report_id: string
           row_index: number | null
+          source: string | null
           synced_at: string
           team: string | null
           updated_at: string
@@ -144,6 +145,7 @@ export type Database = {
           psych?: number | null
           report_id: string
           row_index?: number | null
+          source?: string | null
           synced_at?: string
           team?: string | null
           updated_at?: string
@@ -167,6 +169,7 @@ export type Database = {
           psych?: number | null
           report_id?: string
           row_index?: number | null
+          source?: string | null
           synced_at?: string
           team?: string | null
           updated_at?: string

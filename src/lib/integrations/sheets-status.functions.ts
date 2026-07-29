@@ -16,6 +16,10 @@ export type SheetsIntegrationStatus = {
   spreadsheetTitle: string | null;
   sheetTab: string;
   sheetTabExists: boolean;
+  /** Actual A1:P1 header row from the sheet (empty when unreachable). */
+  headerRow: string[];
+  /** Columns whose header text differs from SHEET_HEADERS. */
+  headerMismatches: { column: string; expected: string; actual: string }[];
   lastWriteAt: string | null; // ISO
   totalWrites: number;
   checkedAt: string; // ISO
@@ -38,7 +42,7 @@ export const getSheetsIntegrationStatus = createServerFn({ method: "GET" })
       throw new Error("Forbidden: super_admin role required.");
     }
 
-    const { SHEET_ID, SHEET_TAB } = await import("@/lib/match-reports/schema");
+    const { SHEET_ID, SHEET_TAB, SHEET_HEADERS } = await import("@/lib/match-reports/schema");
     const checkedAt = new Date().toISOString();
 
     const lovable = process.env.LOVABLE_API_KEY;
@@ -49,6 +53,8 @@ export const getSheetsIntegrationStatus = createServerFn({ method: "GET" })
     let spreadsheetTitle: string | null = null;
     let sheetTabExists = false;
     let error: string | null = null;
+    let headerRow: string[] = [];
+    let headerMismatches: { column: string; expected: string; actual: string }[] = [];
 
     if (linked) {
       try {
@@ -76,6 +82,22 @@ export const getSheetsIntegrationStatus = createServerFn({ method: "GET" })
         }
       } catch (e) {
         error = e instanceof Error ? e.message : "Unknown gateway error";
+      }
+
+      // Positional integrity check — the sheet is editable outside this app, so
+      // a renamed/inserted column would silently mis-map every read.
+      if (reachable && sheetTabExists) {
+        try {
+          const { readHeaderRow } = await import("@/lib/match-reports/sheets.server");
+          headerRow = await readHeaderRow();
+          headerMismatches = SHEET_HEADERS.flatMap((expected, i) => {
+            const actual = (headerRow[i] ?? "").trim();
+            if (actual === expected) return [];
+            return [{ column: String.fromCharCode(65 + i), expected, actual }];
+          });
+        } catch (e) {
+          console.error("[integrations] header check failed:", e);
+        }
       }
     } else {
       error = "Connector not linked (missing LOVABLE_API_KEY or GOOGLE_SHEETS_API_KEY).";
@@ -110,9 +132,33 @@ export const getSheetsIntegrationStatus = createServerFn({ method: "GET" })
       spreadsheetTitle,
       sheetTab: SHEET_TAB,
       sheetTabExists,
+      headerRow,
+      headerMismatches,
       lastWriteAt,
       totalWrites,
       checkedAt,
       error,
     };
+  });
+
+/**
+ * Write the two app-owned header cells (O1 "Competition", P1 "Source").
+ * Super-admin only. Never touches A1:N1 or any data row.
+ */
+export const repairSheetHeaders = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabase, userId } = context;
+    const { data: roleRows, error: roleErr } = await supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", userId);
+    if (roleErr) throw new Error("Unable to verify caller role.");
+    const roles = (roleRows ?? []).map((r) => r.role as string);
+    if (!roles.includes("super_admin")) {
+      throw new Error("Forbidden: super_admin role required.");
+    }
+    const { writeAppOwnedHeaders, readHeaderRow } = await import("@/lib/match-reports/sheets.server");
+    await writeAppOwnedHeaders();
+    return { ok: true as const, headerRow: await readHeaderRow() };
   });
