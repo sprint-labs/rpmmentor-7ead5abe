@@ -9,11 +9,26 @@ import { SHEET_ID, SHEET_TAB } from "./schema";
 
 const GATEWAY_BASE = "https://connector-gateway.lovable.dev/google_sheets/v4";
 
-function authHeaders(): HeadersInit {
+/**
+ * Thrown for PREFLIGHT / configuration / credential problems — i.e. before any
+ * request could possibly have left this app. These are DEFINITIVE no-write
+ * failures: the caller must mark the reservation `failed` so the same form and
+ * submission key can be retried once the connector is linked again.
+ */
+export class SheetsConfigError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "SheetsConfigError";
+  }
+}
+
+export function authHeaders(): HeadersInit {
   const lovable = process.env.LOVABLE_API_KEY;
   const conn = process.env.GOOGLE_SHEETS_API_KEY;
   if (!lovable || !conn) {
-    throw new Error("Google Sheets connector is not linked. Set LOVABLE_API_KEY and GOOGLE_SHEETS_API_KEY.");
+    throw new SheetsConfigError(
+      "Google Sheets is not connected, so nothing was written. Re-link the Google Sheets connector and submit again.",
+    );
   }
   return {
     Authorization: `Bearer ${lovable}`,
@@ -21,6 +36,7 @@ function authHeaders(): HeadersInit {
     "Content-Type": "application/json",
   };
 }
+
 
 /**
  * Fetch through the connector gateway with automatic retry + exponential
@@ -50,6 +66,17 @@ export class AmbiguousAppendError extends Error {
   }
 }
 
+/**
+ * Thrown when a row deletion may or may not have been applied. NEVER retried
+ * automatically: a blind second delete would remove the following report.
+ */
+export class AmbiguousDeleteError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "AmbiguousDeleteError";
+  }
+}
+
 async function gatewayFetch(
   path: string,
   init?: RequestInit,
@@ -58,12 +85,17 @@ async function gatewayFetch(
   const url = `${GATEWAY_BASE}${path}`;
   const maxAttempts = opts?.retry === false ? 1 : MAX_ATTEMPTS;
   let lastErr: unknown = null;
+  // PREFLIGHT: resolved once, OUTSIDE the network try/catch. A missing or
+  // unlinked connector must surface as SheetsConfigError (definitive no-write),
+  // never as a transport failure that the caller reads as ambiguous.
+  const baseHeaders = authHeaders();
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
       const res = await fetch(url, {
         ...init,
-        headers: { ...authHeaders(), ...(init?.headers ?? {}) },
+        headers: { ...baseHeaders, ...(init?.headers ?? {}) },
       });
+
       if (!RETRYABLE_STATUSES.has(res.status) || attempt === maxAttempts) {
         return res;
       }
@@ -144,25 +176,49 @@ export async function appendRow(values: (string | number)[]): Promise<number> {
       { retry: false },
     );
   } catch (err) {
+    // Configuration/credential problems happen BEFORE dispatch — nothing was
+    // written, so they must stay definitive failures, not ambiguous locks.
+    if (err instanceof SheetsConfigError) throw err;
     throw new AmbiguousAppendError(
       `Google Sheets append did not return a response (${(err as Error)?.message ?? "network error"}).`,
     );
   }
   if (!res.ok) {
-    const body = await res.text();
+    const body = await res.text().catch(() => "");
     console.error(`[sheets] appendRow failed [${res.status}]: ${body}`);
+    if (res.status === 401 || res.status === 403) {
+      // Gateway rejected our credentials: the provider never applied a write.
+      throw new SheetsConfigError(
+        `Google Sheets rejected our credentials [${res.status}] and nothing was written. Re-link the connector and submit again.`,
+      );
+    }
     if (res.status >= 500 || res.status === 429) {
       // The append may already have been applied server-side.
       throw new AmbiguousAppendError(`Google Sheets append outcome unknown [${res.status}]`);
     }
     throw new Error(`Google Sheets append failed [${res.status}]`);
   }
-  const data = (await res.json()) as { updates?: { updatedRange?: string } };
-  const updated = data.updates?.updatedRange ?? "";
+  // From here on the sheet returned 2xx — a row may already exist. Any parse
+  // problem is therefore AMBIGUOUS, never a plain failure.
+  let data: { updates?: { updatedRange?: string } };
+  try {
+    data = (await res.json()) as { updates?: { updatedRange?: string } };
+  } catch (err) {
+    throw new AmbiguousAppendError(
+      `Google Sheets accepted the append but the response body could not be read (${(err as Error)?.message ?? "parse error"}).`,
+    );
+  }
+  const updated = data?.updates?.updatedRange ?? "";
   // e.g. "'GKHQ Propietry Data Hub'!A6:O6"
   const m = updated.match(/![A-Z]+(\d+):[A-Z]+\d+$/);
-  return m ? Number(m[1]) : -1;
+  if (!m) {
+    throw new AmbiguousAppendError(
+      "Google Sheets accepted the append but did not report which row was written.",
+    );
+  }
+  return Number(m[1]);
 }
+
 
 /** Look up the numeric sheetId (gid) for SHEET_TAB. Cached in-memory. */
 let cachedSheetGid: number | null = null;
@@ -189,36 +245,63 @@ export async function getSheetGid(): Promise<number> {
   return cachedSheetGid;
 }
 
-/** Delete a single 1-based row from the sheet. */
+/**
+ * Delete a single 1-based row from the sheet — SINGLE attempt, never retried.
+ *
+ * A retried deleteDimension is destructive: if the first delete landed and its
+ * response was lost, repeating the same row index removes the NEXT report.
+ * Any uncertain outcome therefore surfaces as `AmbiguousDeleteError` and the
+ * caller must read the sheet back before touching cache/ledger records.
+ */
 export async function deleteRow(rowIndex: number): Promise<void> {
   if (!Number.isInteger(rowIndex) || rowIndex < 2) {
     throw new Error(`Refusing to delete invalid row index ${rowIndex}.`);
   }
   const sheetId = await getSheetGid();
-  const res = await gatewayFetch(
-    `/spreadsheets/${SHEET_ID}:batchUpdate`,
-    {
-      method: "POST",
-      body: JSON.stringify({
-        requests: [
-          {
-            deleteDimension: {
-              range: {
-                sheetId,
-                dimension: "ROWS",
-                startIndex: rowIndex - 1, // 0-based, inclusive
-                endIndex: rowIndex, // exclusive
+  let res: Response;
+  try {
+    res = await gatewayFetch(
+      `/spreadsheets/${SHEET_ID}:batchUpdate`,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          requests: [
+            {
+              deleteDimension: {
+                range: {
+                  sheetId,
+                  dimension: "ROWS",
+                  startIndex: rowIndex - 1, // 0-based, inclusive
+                  endIndex: rowIndex, // exclusive
+                },
               },
             },
-          },
-        ],
-      }),
-    },
-  );
+          ],
+        }),
+      },
+      { retry: false },
+    );
+  } catch (err) {
+    if (err instanceof SheetsConfigError) throw err;
+    throw new AmbiguousDeleteError(
+      `Google Sheets did not confirm the delete of row ${rowIndex} (${(err as Error)?.message ?? "network error"}). It may or may not have been removed — check the sheet before deleting again.`,
+    );
+  }
   if (!res.ok) {
-    const body = await res.text();
+    const body = await res.text().catch(() => "");
     console.error(`[sheets] deleteRow failed [${res.status}]: ${body}`);
+    if (res.status === 401 || res.status === 403) {
+      throw new SheetsConfigError(
+        `Google Sheets rejected our credentials [${res.status}]; nothing was deleted.`,
+      );
+    }
+    if (res.status >= 500 || res.status === 429) {
+      throw new AmbiguousDeleteError(
+        `Google Sheets delete outcome unknown [${res.status}] for row ${rowIndex}. Check the sheet before deleting again — we will not retry automatically.`,
+      );
+    }
     throw new Error(`Google Sheets delete failed [${res.status}]`);
   }
 }
+
 

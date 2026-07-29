@@ -448,13 +448,26 @@ export const submitMatchReport = createServerFn({ method: "POST" })
     row[COLUMN_INDEX.comments] = comments;
     row[COLUMN_INDEX.competition] = payload.competition ?? "";
 
-    const { appendRow, AmbiguousAppendError, readAllRows: readRowsAfterAppend } =
-      await import("./sheets.server");
+    const {
+      appendRow,
+      AmbiguousAppendError,
+      SheetsConfigError,
+      readAllRows: readRowsAfterAppend,
+    } = await import("./sheets.server");
     let rowIndex = -1;
     try {
       // Single attempt — the transport never retries an append.
       rowIndex = await appendRow(row);
     } catch (err) {
+      if (err instanceof SheetsConfigError) {
+        // Definitive no-write: nothing left the app. Release the reservation so
+        // the same form and submission key work again once the connector is
+        // re-linked — never an ambiguous lock.
+        await markLedger({ status: "failed" });
+        throw new Error(
+          `${(err as Error).message} Nothing was written to the sheet, so you can submit this report again.`,
+        );
+      }
       if (err instanceof AmbiguousAppendError) {
         await markLedger({ status: "ambiguous" });
         return {
@@ -467,6 +480,7 @@ export const submitMatchReport = createServerFn({ method: "POST" })
       await markLedger({ status: "failed" });
       throw err;
     }
+
 
     // ---- Resolve the ACTUAL identity of the appended row ------------------
     // Confirmed duplicates get an occurrence suffix (~2, ~3…). Ledger, cache,
@@ -569,7 +583,7 @@ export const deleteMatchReport = createServerFn({ method: "POST" })
     }
 
     // Locate the row in the sheet (source of truth).
-    const { readAllRows, deleteRow } = await import("./sheets.server");
+    const { readAllRows, deleteRow, AmbiguousDeleteError } = await import("./sheets.server");
     const { rows, firstDataRow } = await readAllRows();
     const parsedRows = parseSheetRows(rows, firstDataRow);
     const target =
@@ -590,8 +604,36 @@ export const deleteMatchReport = createServerFn({ method: "POST" })
       return { deleted: false, reason: "not_found" as const };
     }
 
-    // Delete sheet row first — if it fails we leave the cache alone.
-    await deleteRow(matchedRowIndex);
+    // Delete sheet row first — SINGLE attempt. An ambiguous outcome must never
+    // trigger a second delete (that would remove the following report); we read
+    // the sheet back and only clean up cache/ledger when the row is proven gone.
+    try {
+      await deleteRow(matchedRowIndex);
+    } catch (err) {
+      if (err instanceof AmbiguousDeleteError) {
+        let stillPresent: boolean | null = null;
+        try {
+          const after = await readAllRows();
+          const parsedAfter = parseSheetRows(after.rows, after.firstDataRow);
+          stillPresent = parsedAfter.some(
+            (r) => r.report_id === (target?.report_id ?? data.reportId),
+          );
+        } catch (readErr) {
+          console.error("[match-reports] delete read-back failed:", readErr);
+        }
+        if (stillPresent === false) {
+          // Verified gone — the delete did land. Fall through to cleanup.
+          console.warn("[match-reports] ambiguous delete verified as applied.");
+        } else {
+          throw new Error(
+            `${(err as Error).message} No cache or ledger records were changed.`,
+          );
+        }
+      } else {
+        throw err;
+      }
+    }
+
 
     // Then remove ONLY this occurrence's cache/ledger records. An explicitly
     // confirmed duplicate has its own suffixed identity (…~2) and must not
