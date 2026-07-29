@@ -104,7 +104,7 @@ function normaliseParagraph(p: string): string {
 }
 
 const SCORE_TOKEN_RE =
-  /^(?:[1-5](?:\.\d)?|[1-5]\s*\/\s*(?:5|10)|(?:10)|one|two|three|four|five|six|seven|eight|nine|ten|out of)$/i;
+  /^(?:[1-5](?:\.\d)?|[1-5]\s*\/\s*(?:5|10)|(?:10)|one|two|three|four|five|six|seven|eight|nine|ten|out|of|and|score|scores|rating|ratings|point|points|pts)$/i;
 
 /**
  * True when EVERY token in the text is a bare score token (digits, "4/5",

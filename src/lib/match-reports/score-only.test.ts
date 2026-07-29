@@ -44,3 +44,25 @@ describe("real observations containing scores still pass", () => {
     });
   }
 });
+
+describe("verbal score-only variants", () => {
+  const wrap2 = (b: string) => `Summary:\n${b}\n\nKey Moments:\n\nDevelopment Focus:\n`;
+  for (const s of [
+    "4 out of 5",
+    "4 out of 5, 4 out of 5, 3 out of 5, 5 out of 5, 4 out of 5, 3 out of 5",
+    "four out of five and three out of five and four out of five and five out of five",
+    "Rating 4 out of 5. Score 3 out of 5. Points 4 out of 5. Rating 5 out of 5.",
+  ]) {
+    it(`rejects ${JSON.stringify(s.slice(0, 30))}`, () => {
+      expect(isScoreOnly(s)).toBe(true);
+      expect(validateComments(wrap2(s)).ok).toBe(false);
+    });
+  }
+
+  it("still accepts an observation containing 'out of 5'", () => {
+    const good =
+      "Handling 4 out of 5 — he claimed three crosses under pressure and organised the back line well.";
+    expect(isScoreOnly(good)).toBe(false);
+    expect(validateComments(wrap2(good)).ok).toBe(true);
+  });
+});
