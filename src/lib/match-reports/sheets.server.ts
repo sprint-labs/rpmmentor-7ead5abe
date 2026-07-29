@@ -176,25 +176,49 @@ export async function appendRow(values: (string | number)[]): Promise<number> {
       { retry: false },
     );
   } catch (err) {
+    // Configuration/credential problems happen BEFORE dispatch — nothing was
+    // written, so they must stay definitive failures, not ambiguous locks.
+    if (err instanceof SheetsConfigError) throw err;
     throw new AmbiguousAppendError(
       `Google Sheets append did not return a response (${(err as Error)?.message ?? "network error"}).`,
     );
   }
   if (!res.ok) {
-    const body = await res.text();
+    const body = await res.text().catch(() => "");
     console.error(`[sheets] appendRow failed [${res.status}]: ${body}`);
+    if (res.status === 401 || res.status === 403) {
+      // Gateway rejected our credentials: the provider never applied a write.
+      throw new SheetsConfigError(
+        `Google Sheets rejected our credentials [${res.status}] and nothing was written. Re-link the connector and submit again.`,
+      );
+    }
     if (res.status >= 500 || res.status === 429) {
       // The append may already have been applied server-side.
       throw new AmbiguousAppendError(`Google Sheets append outcome unknown [${res.status}]`);
     }
     throw new Error(`Google Sheets append failed [${res.status}]`);
   }
-  const data = (await res.json()) as { updates?: { updatedRange?: string } };
-  const updated = data.updates?.updatedRange ?? "";
+  // From here on the sheet returned 2xx — a row may already exist. Any parse
+  // problem is therefore AMBIGUOUS, never a plain failure.
+  let data: { updates?: { updatedRange?: string } };
+  try {
+    data = (await res.json()) as { updates?: { updatedRange?: string } };
+  } catch (err) {
+    throw new AmbiguousAppendError(
+      `Google Sheets accepted the append but the response body could not be read (${(err as Error)?.message ?? "parse error"}).`,
+    );
+  }
+  const updated = data?.updates?.updatedRange ?? "";
   // e.g. "'GKHQ Propietry Data Hub'!A6:O6"
   const m = updated.match(/![A-Z]+(\d+):[A-Z]+\d+$/);
-  return m ? Number(m[1]) : -1;
+  if (!m) {
+    throw new AmbiguousAppendError(
+      "Google Sheets accepted the append but did not report which row was written.",
+    );
+  }
+  return Number(m[1]);
 }
+
 
 /** Look up the numeric sheetId (gid) for SHEET_TAB. Cached in-memory. */
 let cachedSheetGid: number | null = null;
