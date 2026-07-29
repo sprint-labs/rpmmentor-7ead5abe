@@ -363,3 +363,23 @@ export function insertAtOffset(
   const caret = at + lead.length + trimmed.length;
   return { text: merged, selectionStart: caret, selectionEnd: caret };
 }
+
+/**
+ * Handwritten-note OCR merge (user-controlled replace/append).
+ *
+ * Unlike voice transcripts — which are never allowed to overwrite and are
+ * placed by section (see `resolveInsertPlacement`) — OCR keeps its original
+ * behaviour where the mentor explicitly picks the mode. Both modes return text
+ * that still satisfies the single-textarea section structure.
+ */
+export function mergeOcrText(
+  previous: string,
+  incoming: string,
+  mode: "replace" | "append",
+): string {
+  const text = incoming.trim();
+  if (!text) return previous;
+  if (mode === "replace" || !previous.trim()) return ensureSections(text);
+  const base = ensureSections(previous);
+  return `${base.replace(/\s+$/, "")}\n\n${text}`;
+}

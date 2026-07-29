@@ -18,7 +18,7 @@ function readAsDataUrl(file: File): Promise<string> {
 interface Props {
   context?: string;
   onTranscribed: (text: string, mode: "replace" | "append") => void;
-  /** Match Report comments are never replaced — hide the replace action. */
+  /** Set false to hide the replace action (append-only consumers). */
   allowReplace?: boolean;
   className?: string;
 }

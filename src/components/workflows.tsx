@@ -23,7 +23,7 @@ import {
   type ReportDraft, type ReportDraftSnapshot,
 } from "@/lib/match-reports/draft-store";
 import {
-  BLANK_COMMENTS_TEMPLATE, SECTION_HELP, ensureSections, validateComments,
+  BLANK_COMMENTS_TEMPLATE, SECTION_HELP, ensureSections, mergeOcrText, validateComments,
   resolveInsertPlacement, sectionAtOffset, insertUnderSection, insertAtOffset,
 } from "@/lib/match-reports/comments";
 import { newSubmissionKey } from "@/lib/match-reports/duplicates";
@@ -715,6 +715,20 @@ function ReportForm({ onDone, prefillGoalkeeper, prefillMatchDate, prefillOppone
     });
   };
 
+  /**
+   * Handwritten-note OCR keeps its original user-controlled behaviour: the
+   * mentor chooses replace or append. Only the single-textarea section
+   * structure is preserved (via `ensureSections`); append never deletes text
+   * the mentor already wrote. This is deliberately NOT the voice placement
+   * path — voice transcripts must never overwrite (see `insertTranscript`).
+   */
+  const applyOcrText = (text: string, mode: "replace" | "append") => {
+    const incoming = text.trim();
+    if (!incoming) return;
+    setComments((prev) => mergeOcrText(prev, incoming, mode));
+    setCommentsError(null);
+  };
+
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     void doSubmit(false);
@@ -904,8 +918,7 @@ function ReportForm({ onDone, prefillGoalkeeper, prefillMatchDate, prefillOppone
 
       <HandwrittenNotesField
         context={goalkeeper ? `Match notes on ${goalkeeper} vs ${opponent || "opponent"}` : undefined}
-        allowReplace={false}
-        onTranscribed={(text) => insertTranscript(text)}
+        onTranscribed={(text, mode) => applyOcrText(text, mode)}
       />
       <VoiceNoteField
         draft={voiceTranscript}
