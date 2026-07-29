@@ -9,11 +9,26 @@ import { SHEET_ID, SHEET_TAB } from "./schema";
 
 const GATEWAY_BASE = "https://connector-gateway.lovable.dev/google_sheets/v4";
 
-function authHeaders(): HeadersInit {
+/**
+ * Thrown for PREFLIGHT / configuration / credential problems — i.e. before any
+ * request could possibly have left this app. These are DEFINITIVE no-write
+ * failures: the caller must mark the reservation `failed` so the same form and
+ * submission key can be retried once the connector is linked again.
+ */
+export class SheetsConfigError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "SheetsConfigError";
+  }
+}
+
+export function authHeaders(): HeadersInit {
   const lovable = process.env.LOVABLE_API_KEY;
   const conn = process.env.GOOGLE_SHEETS_API_KEY;
   if (!lovable || !conn) {
-    throw new Error("Google Sheets connector is not linked. Set LOVABLE_API_KEY and GOOGLE_SHEETS_API_KEY.");
+    throw new SheetsConfigError(
+      "Google Sheets is not connected, so nothing was written. Re-link the Google Sheets connector and submit again.",
+    );
   }
   return {
     Authorization: `Bearer ${lovable}`,
@@ -21,6 +36,7 @@ function authHeaders(): HeadersInit {
     "Content-Type": "application/json",
   };
 }
+
 
 /**
  * Fetch through the connector gateway with automatic retry + exponential
