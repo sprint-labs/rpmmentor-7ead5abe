@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { PageHeader, Card, Pill } from "@/components/primitives";
 import { useCallback, useEffect, useState } from "react";
 import { ArrowLeft, FileText, Video, Image as ImageIcon, Mic, ExternalLink } from "lucide-react";
-import { listReportAttachments, openAsset, type MediaAsset } from "@/lib/media-store";
+import { listReportAttachmentsForIds, openAsset, type MediaAsset } from "@/lib/media-store";
 import { useAuth } from "@/lib/auth";
 import { getMatchReport } from "@/lib/match-reports/reports.functions";
 import { PILLAR_IDS, PILLAR_LABELS } from "@/lib/match-reports/schema";
@@ -42,12 +42,18 @@ function ReportDetail() {
   const [attachments, setAttachments] = useState<MediaAsset[]>([]);
   const [loadingAttachments, setLoadingAttachments] = useState(true);
 
+  // Load attachments for EVERY identity this report has ever had: the route id
+  // the user arrived on, its current resolved id, and its legacy id. Historic
+  // `mr_` attachments therefore stay visible on `mr2_` detail pages.
+  const currentId = r?.report_id ?? null;
+  const legacyId = r?.legacy_report_id ?? null;
+
   const loadAttachments = useCallback(async () => {
     setLoadingAttachments(true);
-    try { setAttachments(await listReportAttachments(reportId)); }
+    try { setAttachments(await listReportAttachmentsForIds([reportId, currentId, legacyId])); }
     catch (e) { console.error(e); }
     finally { setLoadingAttachments(false); }
-  }, [reportId]);
+  }, [reportId, currentId, legacyId]);
 
   useEffect(() => { loadAttachments(); }, [loadAttachments]);
 
