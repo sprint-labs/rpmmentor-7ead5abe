@@ -317,3 +317,26 @@ export function insertUnderSection(
     before.join("\n").length + 1 + insertLines.join("\n").length;
   return { text: merged, selectionStart: caret, selectionEnd: caret };
 }
+
+/**
+ * Insert `snippet` at an exact caret offset, preserving all existing text and
+ * returning the caret position at the end of the inserted snippet.
+ */
+export function insertAtOffset(
+  text: string,
+  snippet: string,
+  offset: number,
+): InsertResult {
+  const base = ensureSections(text);
+  const trimmed = snippet.trim();
+  if (!trimmed) return { text: base, selectionStart: offset, selectionEnd: offset };
+  const at = Math.max(0, Math.min(offset, base.length));
+  const before = base.slice(0, at);
+  const after = base.slice(at);
+  const lead = before && !/\s$/.test(before) ? " " : "";
+  const tail = after && !/^\s/.test(after) ? " " : "";
+  const insert = `${lead}${trimmed}${tail}`;
+  const merged = `${before}${insert}${after}`;
+  const caret = at + lead.length + trimmed.length;
+  return { text: merged, selectionStart: caret, selectionEnd: caret };
+}
