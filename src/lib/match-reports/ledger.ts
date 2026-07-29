@@ -18,6 +18,7 @@ import { classifyDuplicateWindow, type DuplicateWindow } from "./duplicates";
 export type LedgerStatus = "pending" | "succeeded" | "ambiguous" | "failed";
 
 export interface LedgerRecord {
+  id?: string | null;
   status: LedgerStatus;
   submitted_at?: string | null;
   reserved_at?: string | null;
@@ -32,7 +33,10 @@ export type KeyDecision =
   | { action: "return_success"; report_id: string | null; row_index: number | null }
   | { action: "in_progress" }
   | { action: "ambiguous" }
+  /** A previous attempt with this key definitively failed — reuse its row. */
+  | { action: "reuse_failed" }
   | { action: "reserve" };
+
 
 function ms(value: string | null | undefined): number {
   const t = value ? Date.parse(value) : Number.NaN;
