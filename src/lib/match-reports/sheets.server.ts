@@ -66,6 +66,17 @@ export class AmbiguousAppendError extends Error {
   }
 }
 
+/**
+ * Thrown when a row deletion may or may not have been applied. NEVER retried
+ * automatically: a blind second delete would remove the following report.
+ */
+export class AmbiguousDeleteError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "AmbiguousDeleteError";
+  }
+}
+
 async function gatewayFetch(
   path: string,
   init?: RequestInit,
@@ -74,12 +85,17 @@ async function gatewayFetch(
   const url = `${GATEWAY_BASE}${path}`;
   const maxAttempts = opts?.retry === false ? 1 : MAX_ATTEMPTS;
   let lastErr: unknown = null;
+  // PREFLIGHT: resolved once, OUTSIDE the network try/catch. A missing or
+  // unlinked connector must surface as SheetsConfigError (definitive no-write),
+  // never as a transport failure that the caller reads as ambiguous.
+  const baseHeaders = authHeaders();
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
       const res = await fetch(url, {
         ...init,
-        headers: { ...authHeaders(), ...(init?.headers ?? {}) },
+        headers: { ...baseHeaders, ...(init?.headers ?? {}) },
       });
+
       if (!RETRYABLE_STATUSES.has(res.status) || attempt === maxAttempts) {
         return res;
       }
