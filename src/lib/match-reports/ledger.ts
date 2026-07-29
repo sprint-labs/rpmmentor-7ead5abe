@@ -70,9 +70,48 @@ export function decideForSubmissionKey(
     return isPendingExpired(existing, now) ? { action: "ambiguous" } : { action: "in_progress" };
   }
   if (existing.status === "ambiguous") return { action: "ambiguous" };
-  // failed — the append definitively didn't land, so the key can be reused.
-  return { action: "reserve" };
+  // failed — the append definitively didn't land. The unique submission_key
+  // means we can't INSERT again, so the existing row is reused (updated back
+  // to `pending`) rather than reported as another request in progress.
+  return { action: "reuse_failed" };
 }
+
+/**
+ * An unresolved attempt (pending or ambiguous) for this fixture from ANOTHER
+ * key blocks a fresh append: the earlier append may have landed. It is NOT a
+ * confirmed duplicate — it needs a human decision.
+ */
+export function openFingerprintBlock(
+  records: LedgerRecord[],
+  now: number = Date.now(),
+  excludeId?: string | null,
+): "ambiguous" | "in_progress" | null {
+  let inProgress = false;
+  for (const rec of records) {
+    if (excludeId && rec.id && rec.id === excludeId) continue;
+    if (rec.status === "ambiguous") return "ambiguous";
+    if (rec.status === "pending") {
+      if (isPendingExpired(rec, now)) return "ambiguous";
+      inProgress = true;
+    }
+  }
+  return inProgress ? "in_progress" : null;
+}
+
+/**
+ * Distinguish "another request holds the reservation" (unique violation) from
+ * any other ledger failure, which must never be reported as in-progress.
+ */
+export function classifyLedgerWriteError(err: unknown): "conflict" | "error" {
+  const e = (err ?? {}) as { code?: string; message?: string; details?: string };
+  const code = String(e.code ?? "");
+  const text = `${e.message ?? ""} ${e.details ?? ""}`.toLowerCase();
+  if (code === "23505" || text.includes("duplicate key value") || text.includes("unique constraint")) {
+    return "conflict";
+  }
+  return "error";
+}
+
 
 /** Only confirmed successes count as a prior submission. */
 export function countsAsPriorSuccess(rec: LedgerRecord): boolean {
