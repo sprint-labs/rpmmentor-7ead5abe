@@ -27,13 +27,13 @@ export type MentorWorkflow = "interaction" | "report" | "voice";
 
 const TITLES: Record<MentorWorkflow, string> = {
   interaction: "Log interaction",
-  report: "Match report",
+  report: "Match report — not available here",
   voice: "Voice note",
 };
 
 const SUBTITLES: Record<MentorWorkflow, string> = {
   interaction: "Under 2 minutes — capture the touchpoint.",
-  report: "Score the 7 RPM metrics and add your recommendation.",
+  report: "Match Reports must be submitted through the production form on Reports.",
   voice: "Paste or type a transcript. We'll turn it into an interaction.",
 };
 
@@ -118,11 +118,7 @@ export function MentorWorkflowDialog({ state, mentorProfileId, onClose }: Dialog
             />
           )}
           {state.kind === "report" && (
-            <MatchReportForm
-              mentorProfileId={mentorProfileId}
-              playerId={state.playerId}
-              onDone={onClose}
-            />
+            <MatchReportRedirect playerId={state.playerId} onDone={onClose} />
           )}
           {state.kind === "voice" && (
             <VoiceNoteForm
@@ -450,147 +446,40 @@ function InteractionForm({
 // Match report form (7 RPM metrics)
 // -----------------------------------------------------------------------------
 
-function ScoreSlider({ label, hint, value, onChange }: { label: string; hint: string; value: number; onChange: (v: number) => void }) {
-  const tone = value >= 8 ? "text-primary" : value >= 6 ? "text-info" : value >= 4 ? "text-warning" : "text-destructive";
+/**
+ * The mock/session Match Report form that used to live here has been REMOVED
+ * from the production reporting path.
+ *
+ * It wrote 1–10 scores straight into `mentor-session-store` and bypassed the
+ * server-enforced Coach derivation, structured Comments validation, Competition
+ * (column O) and the submission ledger's duplicate protection. There is exactly
+ * one real Match Report write path: `ReportForm` in `src/components/workflows.tsx`
+ * calling the `submitMatchReport` server function.
+ */
+function MatchReportRedirect({ playerId, onDone }: { playerId?: string; onDone: () => void }) {
   return (
-    <div className="rounded-md border border-border bg-background/40 p-3">
-      <div className="flex items-baseline justify-between gap-2">
-        <div className="min-w-0">
-          <div className="text-sm font-medium truncate">{label}</div>
-          <div className="text-[10px] text-muted-foreground truncate">{hint}</div>
-        </div>
-        <div className={`tabular-nums font-mono text-lg font-semibold ${tone}`}>{value}</div>
+    <div className="space-y-4">
+      <div className="rounded-md border border-warning/40 bg-warning/10 p-3 text-sm">
+        <div className="font-medium">Match Reports are not submitted from here</div>
+        <p className="text-muted-foreground mt-1">
+          This mentor workspace only holds demo/session interactions. Real Match Reports are
+          validated and written to the Match Reports source by the production form.
+        </p>
       </div>
-      <input
-        type="range"
-        min={1}
-        max={10}
-        step={1}
-        value={value}
-        onChange={(e) => onChange(Number(e.target.value))}
-        className="w-full mt-2 accent-primary"
-      />
-    </div>
-  );
-}
-
-function MatchReportForm({
-  mentorProfileId, playerId, onDone,
-}: { mentorProfileId: string; playerId?: string; onDone: () => void }) {
-  const [gkId, setGkId] = useState(playerId ?? "");
-  const [fixtureDate, setFixtureDate] = useState(new Date().toISOString().slice(0, 10));
-  const [fixture, setFixture] = useState("");
-  const [opposition, setOpposition] = useState("");
-  const [minutes, setMinutes] = useState(90);
-  const [scores, setScores] = useState<Rpm7Scores>({
-    shot_stopping: 7, distribution: 7, aerial_command: 7, one_v_one: 7,
-    communication: 7, decision_making: 7, footwork: 7,
-  });
-  const [summary, setSummary] = useState("");
-  const [recommendation, setRecommendation] = useState(RECOMMENDATIONS[0]);
-  const [done, setDone] = useState(false);
-  const [submittedPlayer, setSubmittedPlayer] = useState<string | undefined>();
-
-  const avg = useMemo(() => {
-    const vals = Object.values(scores);
-    return vals.reduce((a, b) => a + b, 0) / vals.length;
-  }, [scores]);
-  const overall = Math.round(avg * 10);
-
-  const canSubmit = gkId && fixture.trim() && opposition.trim() && summary.trim();
-
-  if (done) {
-    return (
-      <Success
-        title="Match report submitted"
-        body={`Overall rating ${overall} / 100 · saved to recent reports.`}
-        playerId={submittedPlayer}
-        onDone={onDone}
-      />
-    );
-  }
-
-  const onSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!canSubmit) return;
-    insertMatchReportRow({
-      player_id: gkId,
-      mentor_profile_id: mentorProfileId,
-      report_type: "Match Report",
-      occurred_at: new Date(fixtureDate).toISOString(),
-      overall_rating: overall,
-      summary: summary.trim(),
-      fixture: fixture.trim(),
-      opposition: opposition.trim(),
-      minutes_watched: minutes,
-      recommendation,
-      scores,
-    });
-    setSubmittedPlayer(gkId);
-    setDone(true);
-  };
-
-  return (
-    <form onSubmit={onSubmit} className="space-y-4">
-      <Field label="Player" required>
-        <PlayerPicker mentorProfileId={mentorProfileId} value={gkId} onChange={setGkId} required={!playerId} />
-      </Field>
-
-      <div className="grid grid-cols-2 gap-3">
-        <Field label="Fixture date" required>
-          <input type="date" className={inputCls} value={fixtureDate} onChange={(e) => setFixtureDate(e.target.value)} required />
-        </Field>
-        <Field label="Minutes watched" required hint="0–120">
-          <input
-            type="number" min={0} max={120} className={inputCls}
-            value={minutes} onChange={(e) => setMinutes(Number(e.target.value))} required
-          />
-        </Field>
-        <Field label="Fixture" required hint="e.g. Premier League, Matchweek 22">
-          <input className={inputCls} value={fixture} onChange={(e) => setFixture(e.target.value)} placeholder="Competition & round" required />
-        </Field>
-        <Field label="Opposition" required>
-          <input className={inputCls} value={opposition} onChange={(e) => setOpposition(e.target.value)} placeholder="e.g. Chelsea U21s" required />
-        </Field>
-      </div>
-
-      <div>
-        <div className="flex items-baseline justify-between mb-2">
-          <div className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">7 RPM metrics</div>
-          <div className="text-xs text-muted-foreground">
-            Overall <span className="text-foreground font-semibold tabular-nums font-mono">{overall}</span> / 100
-          </div>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-          {RPM7_METRICS.map((m) => (
-            <ScoreSlider
-              key={m.key}
-              label={m.label}
-              hint={m.hint}
-              value={scores[m.key]}
-              onChange={(v) => setScores((s) => ({ ...s, [m.key]: v }))}
-            />
-          ))}
-        </div>
-      </div>
-
-      <Field label="Overall summary" required hint="Headline read across the 90 minutes.">
-        <textarea rows={4} className={taCls} value={summary} onChange={(e) => setSummary(e.target.value)} placeholder="Key moments, strengths, areas to develop…" required />
-      </Field>
-
-      <Field label="Recommendation" required>
-        <select className={selectCls} value={recommendation} onChange={(e) => setRecommendation(e.target.value)}>
-          {RECOMMENDATIONS.map((r) => <option key={r}>{r}</option>)}
-        </select>
-      </Field>
-
-      <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 pt-2">
-        <button type="button" onClick={onDone} className="h-11 sm:h-10 px-4 rounded-md border border-border text-sm">Cancel</button>
-        <button type="submit" disabled={!canSubmit} className="h-11 sm:h-10 px-5 rounded-md bg-primary text-primary-foreground text-sm font-medium disabled:opacity-50">
-          Submit report
+      <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
+        <button type="button" onClick={onDone} className="h-11 sm:h-10 px-4 rounded-md border border-border text-sm">
+          Cancel
         </button>
+        <Link
+          to="/reports"
+          search={{ openSubmit: "1", gk: playerId ?? "" }}
+          onClick={onDone}
+          className="h-11 sm:h-10 px-5 rounded-md bg-primary text-primary-foreground text-sm font-medium inline-flex items-center justify-center"
+        >
+          Open the Match Report form
+        </Link>
       </div>
-    </form>
+    </div>
   );
 }
 
@@ -702,7 +591,7 @@ function VoiceNoteForm({
 
 export const MENTOR_WORKFLOW_META: Record<MentorWorkflow, { label: string; icon: typeof Mic }> = {
   interaction: { label: "Log interaction", icon: ClipboardList },
-  report: { label: "Match report", icon: FileText },
+  report: { label: "Match report (opens production form)", icon: FileText },
   voice: { label: "Voice note", icon: Mic },
 };
 
