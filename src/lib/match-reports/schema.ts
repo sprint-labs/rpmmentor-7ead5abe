@@ -198,6 +198,20 @@ export function parseSheetRows(rows: string[][], firstDataRow: number): MatchRep
   return out;
 }
 
+/**
+ * The exact identity of the row at `rowIndex` (1-based sheet row), including
+ * any `~2`/`~3` occurrence suffix given to an explicitly confirmed duplicate.
+ * Returns null when the row can't be located — callers must then report an
+ * ambiguous outcome rather than a clean success.
+ */
+export function identityForRowIndex(
+  reports: MatchReportRow[],
+  rowIndex: number,
+): MatchReportRow | null {
+  if (!Number.isFinite(rowIndex) || rowIndex <= 0) return null;
+  return reports.find((r) => r.row_index === rowIndex) ?? null;
+}
+
 /** True when `id` addresses this report by current OR legacy identity. */
 export function matchesReportId(r: MatchReportRow, id: string): boolean {
   return (
