@@ -23,7 +23,7 @@ import {
   type ReportDraft, type ReportDraftSnapshot,
 } from "@/lib/match-reports/draft-store";
 import {
-  BLANK_COMMENTS_TEMPLATE, SECTION_HELP, ensureSections, validateComments,
+  BLANK_COMMENTS_TEMPLATE, SECTION_HELP, ensureSections, mergeOcrText, validateComments,
   resolveInsertPlacement, sectionAtOffset, insertUnderSection, insertAtOffset,
 } from "@/lib/match-reports/comments";
 import { newSubmissionKey } from "@/lib/match-reports/duplicates";
@@ -725,11 +725,7 @@ function ReportForm({ onDone, prefillGoalkeeper, prefillMatchDate, prefillOppone
   const applyOcrText = (text: string, mode: "replace" | "append") => {
     const incoming = text.trim();
     if (!incoming) return;
-    setComments((prev) => {
-      if (mode === "replace" || !prev.trim()) return ensureSections(incoming);
-      const base = ensureSections(prev);
-      return `${base.replace(/\s+$/, "")}\n\n${incoming}`;
-    });
+    setComments((prev) => mergeOcrText(prev, incoming, mode));
     setCommentsError(null);
   };
 
