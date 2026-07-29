@@ -103,8 +103,27 @@ function normaliseParagraph(p: string): string {
   return p.trim().replace(/\s+/g, " ").toLowerCase();
 }
 
-const SCORE_ONLY_RE =
-  /^(?:[1-5](?:\.\d)?|[1-5]\s*\/\s*5|one|two|three|four|five)$/i;
+const SCORE_TOKEN_RE =
+  /^(?:[1-5](?:\.\d)?|[1-5]\s*\/\s*(?:5|10)|(?:10)|one|two|three|four|five|six|seven|eight|nine|ten|out of)$/i;
+
+/**
+ * True when EVERY token in the text is a bare score token (digits, "4/5",
+ * spelled numbers) plus whitespace/punctuation — no matter how long the string
+ * is. Sentences that merely *contain* scores alongside real observation words
+ * are not score-only and pass.
+ */
+export function isScoreOnly(text: string): boolean {
+  const compact = (text ?? "").replace(/\s+/g, " ").trim();
+  if (!compact) return false;
+  const tokens = compact
+    // keep "4/5" together; split on whitespace and other punctuation
+    .split(/[^0-9a-zA-Z/.]+/)
+    .map((t) => t.replace(/^[./]+|[./]+$/g, ""))
+    .filter(Boolean);
+  if (tokens.length === 0) return false;
+  return tokens.every((t) => SCORE_TOKEN_RE.test(t));
+}
+
 
 const PLACEHOLDER_RE =
   /^(?:test(?:ing)?(?:\s*\d+)?|tbc|tba|n\/?a|none|nil|null|xx+|asdf+|qwerty|placeholder|todo|lorem(?:\s+ipsum)?|same as (?:above|last)|no comment|ok|fine|good|bad)$/i;
