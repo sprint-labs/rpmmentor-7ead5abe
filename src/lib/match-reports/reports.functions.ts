@@ -569,7 +569,7 @@ export const deleteMatchReport = createServerFn({ method: "POST" })
     }
 
     // Locate the row in the sheet (source of truth).
-    const { readAllRows, deleteRow } = await import("./sheets.server");
+    const { readAllRows, deleteRow, AmbiguousDeleteError } = await import("./sheets.server");
     const { rows, firstDataRow } = await readAllRows();
     const parsedRows = parseSheetRows(rows, firstDataRow);
     const target =
