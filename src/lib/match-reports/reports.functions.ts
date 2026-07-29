@@ -590,8 +590,36 @@ export const deleteMatchReport = createServerFn({ method: "POST" })
       return { deleted: false, reason: "not_found" as const };
     }
 
-    // Delete sheet row first — if it fails we leave the cache alone.
-    await deleteRow(matchedRowIndex);
+    // Delete sheet row first — SINGLE attempt. An ambiguous outcome must never
+    // trigger a second delete (that would remove the following report); we read
+    // the sheet back and only clean up cache/ledger when the row is proven gone.
+    try {
+      await deleteRow(matchedRowIndex);
+    } catch (err) {
+      if (err instanceof AmbiguousDeleteError) {
+        let stillPresent: boolean | null = null;
+        try {
+          const after = await readAllRows();
+          const parsedAfter = parseSheetRows(after.rows, after.firstDataRow);
+          stillPresent = parsedAfter.some(
+            (r) => r.report_id === (target?.report_id ?? data.reportId),
+          );
+        } catch (readErr) {
+          console.error("[match-reports] delete read-back failed:", readErr);
+        }
+        if (stillPresent === false) {
+          // Verified gone — the delete did land. Fall through to cleanup.
+          console.warn("[match-reports] ambiguous delete verified as applied.");
+        } else {
+          throw new Error(
+            `${(err as Error).message} No cache or ledger records were changed.`,
+          );
+        }
+      } else {
+        throw err;
+      }
+    }
+
 
     // Then remove ONLY this occurrence's cache/ledger records. An explicitly
     // confirmed duplicate has its own suffixed identity (…~2) and must not
