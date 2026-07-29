@@ -448,13 +448,26 @@ export const submitMatchReport = createServerFn({ method: "POST" })
     row[COLUMN_INDEX.comments] = comments;
     row[COLUMN_INDEX.competition] = payload.competition ?? "";
 
-    const { appendRow, AmbiguousAppendError, readAllRows: readRowsAfterAppend } =
-      await import("./sheets.server");
+    const {
+      appendRow,
+      AmbiguousAppendError,
+      SheetsConfigError,
+      readAllRows: readRowsAfterAppend,
+    } = await import("./sheets.server");
     let rowIndex = -1;
     try {
       // Single attempt — the transport never retries an append.
       rowIndex = await appendRow(row);
     } catch (err) {
+      if (err instanceof SheetsConfigError) {
+        // Definitive no-write: nothing left the app. Release the reservation so
+        // the same form and submission key work again once the connector is
+        // re-linked — never an ambiguous lock.
+        await markLedger({ status: "failed" });
+        throw new Error(
+          `${(err as Error).message} Nothing was written to the sheet, so you can submit this report again.`,
+        );
+      }
       if (err instanceof AmbiguousAppendError) {
         await markLedger({ status: "ambiguous" });
         return {
@@ -467,6 +480,7 @@ export const submitMatchReport = createServerFn({ method: "POST" })
       await markLedger({ status: "failed" });
       throw err;
     }
+
 
     // ---- Resolve the ACTUAL identity of the appended row ------------------
     // Confirmed duplicates get an occurrence suffix (~2, ~3…). Ledger, cache,
