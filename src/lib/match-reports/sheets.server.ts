@@ -245,36 +245,63 @@ export async function getSheetGid(): Promise<number> {
   return cachedSheetGid;
 }
 
-/** Delete a single 1-based row from the sheet. */
+/**
+ * Delete a single 1-based row from the sheet — SINGLE attempt, never retried.
+ *
+ * A retried deleteDimension is destructive: if the first delete landed and its
+ * response was lost, repeating the same row index removes the NEXT report.
+ * Any uncertain outcome therefore surfaces as `AmbiguousDeleteError` and the
+ * caller must read the sheet back before touching cache/ledger records.
+ */
 export async function deleteRow(rowIndex: number): Promise<void> {
   if (!Number.isInteger(rowIndex) || rowIndex < 2) {
     throw new Error(`Refusing to delete invalid row index ${rowIndex}.`);
   }
   const sheetId = await getSheetGid();
-  const res = await gatewayFetch(
-    `/spreadsheets/${SHEET_ID}:batchUpdate`,
-    {
-      method: "POST",
-      body: JSON.stringify({
-        requests: [
-          {
-            deleteDimension: {
-              range: {
-                sheetId,
-                dimension: "ROWS",
-                startIndex: rowIndex - 1, // 0-based, inclusive
-                endIndex: rowIndex, // exclusive
+  let res: Response;
+  try {
+    res = await gatewayFetch(
+      `/spreadsheets/${SHEET_ID}:batchUpdate`,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          requests: [
+            {
+              deleteDimension: {
+                range: {
+                  sheetId,
+                  dimension: "ROWS",
+                  startIndex: rowIndex - 1, // 0-based, inclusive
+                  endIndex: rowIndex, // exclusive
+                },
               },
             },
-          },
-        ],
-      }),
-    },
-  );
+          ],
+        }),
+      },
+      { retry: false },
+    );
+  } catch (err) {
+    if (err instanceof SheetsConfigError) throw err;
+    throw new AmbiguousDeleteError(
+      `Google Sheets did not confirm the delete of row ${rowIndex} (${(err as Error)?.message ?? "network error"}). It may or may not have been removed — check the sheet before deleting again.`,
+    );
+  }
   if (!res.ok) {
-    const body = await res.text();
+    const body = await res.text().catch(() => "");
     console.error(`[sheets] deleteRow failed [${res.status}]: ${body}`);
+    if (res.status === 401 || res.status === 403) {
+      throw new SheetsConfigError(
+        `Google Sheets rejected our credentials [${res.status}]; nothing was deleted.`,
+      );
+    }
+    if (res.status >= 500 || res.status === 429) {
+      throw new AmbiguousDeleteError(
+        `Google Sheets delete outcome unknown [${res.status}] for row ${rowIndex}. Check the sheet before deleting again — we will not retry automatically.`,
+      );
+    }
     throw new Error(`Google Sheets delete failed [${res.status}]`);
   }
 }
+
 
