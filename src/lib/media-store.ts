@@ -345,16 +345,45 @@ export function canDeleteAsset(asset: MediaAsset, user: SessionUser | null): boo
 
 // ---------- Report attachments ----------
 
+/** Pure helper: merge attachment result sets and dedupe by asset id. */
+export function mergeAttachments(...groups: MediaAsset[][]): MediaAsset[] {
+  const seen = new Set<string>();
+  const out: MediaAsset[] = [];
+  for (const group of groups) {
+    for (const a of group ?? []) {
+      if (!a || seen.has(a.id)) continue;
+      seen.add(a.id);
+      out.push(a);
+    }
+  }
+  return out;
+}
+
 export async function listReportAttachments(reportId: string): Promise<MediaAsset[]> {
+  return listReportAttachmentsForIds([reportId]);
+}
+
+/**
+ * Load attachments for one report across ALL of its historical identities.
+ *
+ * Live data holds legacy `mr_` attachment rows while list/detail identities are
+ * now `mr2_`. Querying only the current id hides existing attached media, so we
+ * fetch every known id (current + legacy) and dedupe.
+ */
+export async function listReportAttachmentsForIds(reportIds: (string | null | undefined)[]): Promise<MediaAsset[]> {
+  const ids = Array.from(new Set(reportIds.filter((x): x is string => !!x)));
+  if (ids.length === 0) return [];
   const { data, error } = await supabase
     .from("report_attachments")
     .select("media_id, media_assets:media_id(*)")
-    .eq("report_id", reportId);
+    .in("report_id", ids);
   if (error) throw new Error(error.message);
-  return ((data || []) as Array<{ media_assets: unknown }>)
+  const assets = ((data || []) as Array<{ media_assets: unknown }>)
     .map((row) => row.media_assets as MediaAsset | null)
     .filter((x): x is MediaAsset => !!x);
+  return mergeAttachments(assets);
 }
+
 
 export async function attachMediaToReport(
   reportId: string,
