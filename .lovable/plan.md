@@ -1,89 +1,104 @@
-# Fixture-aware Match Report form
 
-## Current state
+# Match Reports implementation audit (read-only)
 
-`ReportForm` in `src/components/workflows.tsx` uses `goalkeepers` from `src/lib/mock-data.ts` for the goalkeeper datalist. `team`, `opponent`, `competition`, `matchDate` are free-text; nothing reacts when the mentor picks a keeper. Roster data (club, league, parent club, loan status) lives only in `mock-data.ts` — Supabase has no `players`/`fixtures` tables yet.
+No files were edited, no rows written, no integrations changed. All Sheet reads were GET calls through the Google Sheets connector ("Dez Google Sheets", gateway-backed, linked to this project).
 
-## Phase 1 — Auto-fill club from Supabase (immediate)
+## 0. Source reconciliation — "Match_Reports_DB_01"
 
-### Data model
-- New `public.players` table as roster source of truth:
-  - `id uuid pk`, `full_name text`, `current_club text`, `parent_club text nullable`, `on_loan bool`, `league text`, `nationality text`, `tier text`, `instagram_handle text nullable`, timestamps.
-  - `UNIQUE (lower(full_name))` for name-based lookup (keeper picker is a name string today).
-- Grants: `SELECT` to `authenticated`; write to `service_role` + super_admin via policy. RLS on.
-- Seed via migration from the current `mock-data.ts` roster (one-off).
+Evidence from `GET /v4/spreadsheets/1UHesbMdPt89d_oZ86iIppQqkFQyWWwuIxklFEjfdywU`:
 
-### Server
-- `src/lib/players.functions.ts`:
-  - `listPlayers()` — id, full_name, current_club, league, tier. `requireSupabaseAuth`, cached in TanStack Query.
-  - `getPlayerByName(name)` — case-insensitive lookup, returns club/league/tier or null.
-
-### UI (`ReportForm`)
-- Replace `goalkeepers` import with a `useQuery(['players'], listPlayers)` roster.
-- On goalkeeper change:
-  - Look up the player row.
-  - If found AND the `team` field is empty OR still equal to the previously auto-filled value, set `team = current_club`.
-  - Track `autoFilledTeam` in a ref so a mentor's manual edit is never overwritten by a later re-selection.
-  - Show a subtle "Auto-filled from roster · Edit" hint under the Team field; clicking it clears the auto-fill lock.
-- Keep the input free-text and editable (loan clubs, trials, mid-transfer cases).
-- Draft store: no schema change; `team` already persists.
-
-### Assumptions / gaps
-- Keeper selection is still by **name** (datalist), not id. Name-based join is fine short-term but will drift on renames/duplicates; migrating the form to store `player_id` is a follow-up.
-- Mock roster becomes seed-only; the goalkeeper profile page still reads mock data and should switch to `listPlayers` in a later pass.
-
-## Phase 2 — Fixture-aware suggestions (design only, not built)
-
-### Data model
 ```text
-public.fixtures
-  id uuid pk
-  player_id uuid fk -> players(id)      -- keeper the fixture is for
-  team text not null                     -- keeper's side, denormalised (loan/national team)
-  opponent text not null
-  competition text nullable              -- may be unknown at import time
-  kickoff_at timestamptz not null
-  venue text nullable
-  source text not null                   -- 'manual' | 'import:<provider>' | 'ingest:<sheet>'
-  external_id text nullable              -- provider fixture id for idempotent upsert
-  status text not null default 'scheduled'  -- scheduled | played | postponed | cancelled
-  created_at, updated_at
-  UNIQUE (player_id, kickoff_at, opponent)
-  UNIQUE (source, external_id) where external_id is not null
+properties.title = "Match_Reports_DB_01_Loveable"
+sheets = [ { sheetId: 173891700, title: "GKHQ Propietry Data Hub", index: 0,
+             gridProperties: { rowCount: 999, columnCount: 26 } } ]
+locale = en_GB   timeZone = America/Los_Angeles   autoRecalc = ON_CHANGE
 ```
-- Index `(player_id, kickoff_at desc)` for the picker.
-- RLS: `SELECT` to authenticated; writes to service_role + admin.
-- Optional `public.fixture_imports` audit table (provider, batch, counts) for the integrations page.
 
-### Server
-- `listFixturesForPlayer(playerId, { window: '±30d' })` — returns candidate fixtures ordered by proximity to today, played or scheduled.
-- `getFixture(id)` — hydrate on selection.
-- Ingest job (later): TanStack server route under `src/routes/api/public/fixtures/ingest` for provider webhooks, or a scheduled pull; both idempotent via `(source, external_id)`.
+Conclusion: `Match_Reports_DB_01` is the **spreadsheet file name** (`Match_Reports_DB_01_Loveable`), not a tab or an old ID. `GKHQ Propietry Data Hub` is the **only** tab in that file. The configured source in `src/lib/match-reports/schema.ts` (SHEET_ID + SHEET_TAB) is therefore current and correct — the two names refer to the same object at different levels. No source switch is needed or proposed.
 
-### UI behaviour
-When the mentor picks a goalkeeper:
-1. Fetch fixtures in a ±30-day window.
-2. Render a **"Link a fixture"** combobox above Team/Opponent/Date, plus a "No fixture yet — enter manually" escape.
-3. On fixture select, auto-fill `team`, `opponent`, `competition`, `matchDate`.
-   - Each field individually retains the same "auto-filled / edit to override" pattern as Phase 1.
-   - **Competition is always editable** (cup rounds, friendlies, unknown at fixture-import time).
-4. Persist `fixture_id` on the submitted report (new nullable column on `match_reports_cache`/report row); mentors can also submit with `fixture_id = null` for matches not yet in the fixture list.
-5. Reverse link: goalkeeper profile can show "Reports linked to this fixture" once both exist.
+## 1. Active tab, headers, positions, formulas, positional dependencies
 
-### Conflict / edge cases
-- Two fixtures on the same day (double-header, national team + club): combobox shows both with kickoff + competition.
-- Fixture is later updated (opponent/date change): show a "Fixture updated since draft" banner in the draft-conflict UI; mentor chooses to keep entered values or refresh from fixture.
-- Fixture deleted after report submission: report keeps its snapshot (team/opponent/date persisted on the report row), `fixture_id` set to null via `ON DELETE SET NULL`.
+Header row = **row 1**; data starts at **row 2**; ~93 data rows (last populated row ~94).
 
-### Assumptions / gaps
-- No fixture provider decided yet (Opta, SofaScore, manual CSV, or piggy-back on the existing Google Sheets connector). The `source`/`external_id` design is provider-agnostic.
-- Assumes fixtures are player-scoped, not club-scoped. A club-scoped model (`fixtures` keyed by club, joined via `players.current_club`) is simpler to import but breaks for loan/national/trial scenarios — recommend keeping player-scoped and letting ingest fan out per squad.
-- No handling here for opponent-goalkeeper metadata (their #1, their form) — out of scope.
-- Report schema currently lives partly in Google Sheets; adding `fixture_id` presumes the Supabase migration for `match_reports` (previously proposed) lands first, otherwise `fixture_id` has to be stored in `match_reports_cache` only and won't round-trip through Sheets.
+| Col | Header text (A1:N1) | Code key (`COLUMN_INDEX`) |
+|---|---|---|
+| A | Goalkeeper | goalkeeper (0) |
+| B | Coach | coach (1) |
+| C | Team | team (2) |
+| D | Opponent | opponent (3) |
+| E | Match Date | match_date (4) |
+| F–L | Protect the Goal / Space / Air, Control the Play, Change the Play, Courage / Control / Intelligent / Competitor, Speed, Agility, Athleticism | 7 pillars (5–11) |
+| M | Av Score | average (12) |
+| N | Comments | comments (13) |
+| **O** | **(no header — empty)** | **competition (14) — code writes here** |
 
-## Rollout order
-1. Ship Phase 1 (players table + auto-fill). Low risk, unblocks club consistency.
-2. Migrate the goalkeeper profile + roster page reads to `listPlayers` (removes mock coupling).
-3. Land the Match Reports Supabase migration (previously scoped).
-4. Add `fixtures` table + manual admin CRUD; wire the combobox behind a feature flag.
-5. Add the first automated fixture ingest.
+Findings:
+- **There is no Competition column and no Source column in the Sheet.** Column O has no header and no data in any of the ~93 rows, yet `submitMatchReport` writes `payload.competition` into O. New submissions land in an unlabelled column; every historical row returns `competition: null`.
+- **No formulas anywhere.** `valueRenderOption=FORMULA` on A1:Z12 returned literal values; column M ("Av Score") is hard-coded numbers, not `=AVERAGE(...)`. Nothing recalculates on append.
+- Historical averages are full precision (`4.285714286`), the app writes 1 dp (`4.3`) — a cosmetic inconsistency already present in live data. One legacy anomaly: row 4 (Max Crocombe vs Coventry) shows `3.4` where the pillars average `3.428571429`.
+- Match Date cells are real dates rendered `d/m/yyyy`; spreadsheet locale `en_GB`, so `formatSheetDate` + `USER_ENTERED` writes parse correctly today.
+- Positional/format dependencies found: **one banded range** covering A1:P98 (cosmetic; does not extend to rows past 98), header row colouring. **No** protected ranges, conditional formats, filter views, basic filter, charts, or developer metadata. Nothing outside this app reads the tab by column position that the API can see.
+- Consequence: appending rows is safe; **inserting or reordering columns is the only real risk**, and adding new columns to the right (P, Q…) is safe.
+
+## 2. Code mapping and write paths
+
+- Sheet I/O: `src/lib/match-reports/sheets.server.ts` — `readAllRows` (`'GKHQ Propietry Data Hub'!A2:O`), `appendRow` (`A1:append`, USER_ENTERED, INSERT_ROWS), `getSheetGid`, `deleteRow`; retry/backoff on 429/5xx.
+- Schema/mapping: `src/lib/match-reports/schema.ts` — `COLUMN_INDEX`, `SHEET_HEADERS` (15 entries incl. "Competition" that does not exist in the Sheet), `rowToMatchReport`, `computeReportId`, `averageOfScores`, `parseSheetDate`, `formatSheetDate`.
+- Server functions: `src/lib/match-reports/reports.functions.ts` — `listMatchReports`, `getMatchReport`, `submitMatchReport`, `deleteMatchReport`; all behind `requireSupabaseAuth`.
+- Cache: `public.match_reports_cache` (has `competition`, no `source`), mirrored on list and on submit, pruned on list, deleted on delete.
+- Form: `src/components/workflows.tsx` `ReportForm` (Competition is a required input with a league datalist; Coach is read-only/disabled; Team auto-fills from `players`).
+- Write paths to the Sheet, complete list: (a) `ReportForm` → `submitMatchReport`; (b) offline replay `src/components/sync-manager.tsx` job type `submitMatchReport` → the same server fn; (c) `deleteMatchReport`. No other code appends.
+- Read consumers: `src/routes/reports.index.tsx`, `src/routes/reports.$reportId.tsx`, `src/routes/goalkeepers.$gkId.tsx`, `src/components/report-preview-modal.tsx` (shows competition), `src/lib/integrations/sheets-status.functions.ts`, MCP tool `src/lib/mcp/tools/list-match-reports.ts` (reads the cache under RLS; does not select `competition`).
+- Outside this project / unprotectable: there is no `src/routes/api/` and no `/api/public/*` route, so no unauthenticated HTTP surface exists here. The genuinely unprotectable surface is the **Google Sheet itself** — anyone with Drive access can edit/reorder columns, and the app cannot prevent it. MCP endpoints (`/mcp`, `/.mcp/*`) are authenticated and read-only.
+
+## 3. Comments, drafts, OCR, voice
+
+- Comments: single textarea, `maxLength 5000`, schema `z.string().max(5000)`, written verbatim to column N. OCR and voice transcripts are merged into this same field (replace or append with a blank line) — the Sheet keeps no separate transcript provenance.
+- Draft/autosave: `src/lib/match-reports/draft-store.ts` — localStorage, one slot per user (`rpm.report-draft.v2.<userId>`), 30-day retention, 5 s debounce, `version`/`tabId` optimistic concurrency, cross-tab conflict UI in `workflows.tsx`. Drafts are device-local only — never server-side.
+- OCR: `src/components/handwritten-notes-field.tsx` → `transcribeNotes` in `src/lib/api/transcribe.functions.ts` (Lovable AI Gateway, 8 MB cap, authenticated).
+- Voice: `src/components/voice-note-field.tsx` → `transcribeVoiceNote`; confidence tokens, review state, original + version history persisted in the draft (`VoiceTranscriptDraft`), never exported to the Sheet.
+
+## 4. Coach derivation and gaps
+
+`submitMatchReport` resolves Coach server-side from `profiles.name || profiles.email`; mentors cannot override, `super_admin`/`admin`/`mentor_manager` may submit on another coach's behalf. The offline replay path reuses the same server fn, so derivation holds there too. Gaps:
+- If a profile has neither name nor email, `resolvedCoach` becomes `""` and bypasses the Zod `min(1)` check (validation runs on the client-supplied `coach`, not the resolved one).
+- No validation that Coach matches a known mentor — free text for privileged overrides.
+- Historical data: **roughly 40 of ~93 rows have an empty Coach cell** (e.g. Sam Long 18/10/2025, Jake Eastwood 18/10/2025, Liam Roberts 28/10/2025). Any coach-based filter silently drops these.
+
+## 5. Source field
+
+Not persisted and not mapped anywhere: no Sheet column, no `match_reports_cache.source` column, no field in `matchReportSubmitSchema` or `MatchReportRow`. (`src/lib/nav-source.ts` / the `source` URL param on `/reports` is unrelated breadcrumb state.) Origin of a row is currently only inferable indirectly: rows written by the app have a 1 dp average and a populated Coach.
+
+## 6. Duplicate protection and metadata
+
+- **None.** `appendRow` always appends; nothing checks for an existing `goalkeeper + match_date + opponent` before writing. A double submit or an offline replay after a slow-but-successful first write creates two identical Sheet rows.
+- `computeReportId` is a non-cryptographic 32-bit hash, so duplicates collapse to one `report_id`: the cache upsert overwrites, `/reports/$reportId` returns only the first match, `deleteMatchReport` deletes only the first row. Collisions between genuinely different fixtures are also theoretically possible.
+- No created-at, submitter ID, or client/app marker is written to the Sheet.
+
+## 7. Proposed implementation (strictly scoped, no layout change)
+
+Guardrails for every step: form layout unchanged; seven pillars, their order, the 1–5 defaults of 3 and the mean-of-7 average unchanged; columns A–N never reordered, retyped, or rewritten; historical rows never touched; append-only writes.
+
+1. **Label the existing Competition column (O).** Write the single header cell `O1 = "Competition"` (one `values.update` to `O1` only). This is the only Sheet mutation proposed; it fills a blank cell inside the existing banded range and touches no data row. Code already reads and writes O, so no mapping change.
+2. **Add a Source column (P).** Write `P1 = "Source"`; add `source: 15` to `COLUMN_INDEX`, append `"Source"` to `SHEET_HEADERS`, extend `readAllRows` to `A2:P`, and stamp `"Mentor Hub"` (plus a queued-replay marker for offline submissions) on new rows only. Historical rows stay blank and map to `source: null`.
+3. **Persist source + competition end-to-end.** Add a nullable `source text` column to `match_reports_cache` via migration (grants unchanged), map it in `MatchReportRow`, the list/submit cache mirrors, and surface it read-only on the report detail page.
+4. **Duplicate protection at the write boundary.** Before appending, `readAllRows` and reject an exact `goalkeeper + match_date + opponent` match with a clear "a report already exists for this fixture" error, plus an explicit override flag for privileged roles. Reuse the same check in the offline replay so a retried job cannot double-write. Optionally strengthen `computeReportId` — deferred, since changing it re-keys the cache.
+5. **Close the coach gaps.** Validate `resolvedCoach` is non-empty server-side and fail the submit with an actionable message when the profile has no name; validate privileged overrides against known mentor profiles.
+6. **Leave averages alone.** Keep writing 1 dp; do not rewrite the ~93 historical full-precision values or the `3.4` anomaly. If exact parity is wanted later, that is a separate, explicit data-migration decision.
+
+Not in scope: moving the source of truth to Supabase, changing pillars/labels/defaults, backfilling Coach or Competition on historical rows, touching column M, and any change to draft/OCR/voice behaviour.
+
+### Concerns to flag before implementation
+
+- Writing `O1`/`P1` is a Sheet mutation, however small — I will not do it without explicit approval, and it should be done when no one is editing the file.
+- The Sheet is editable outside the app; any column insert breaks positional mapping. A cheap mitigation is a header assertion on read (compare A1:P1 against `SHEET_HEADERS` and surface a banner on `/system/integrations` if they diverge) rather than silently mis-mapping.
+- `parseSheetDate` falls back to `Date.parse`, which reads ambiguous text dates as US m/d. Only a risk if someone types a date as text; worth a defensive tweak while in the file.
+
+### Verification plan
+
+1. Re-read `A1:P1` and confirm the two header cells, with A–N byte-identical to today.
+2. Re-read `A2:P` and diff row count and every A–N cell against a pre-change snapshot — expect zero differences.
+3. Submit one report in preview: confirm one new row, Competition in O, Source in P, average = mean of the seven pillars to 1 dp, Coach = the signed-in profile name.
+4. Re-submit the identical fixture: expect the duplicate to be rejected, with no new Sheet row.
+5. Go offline, submit, come back online: exactly one row appended, `source` marked as replayed.
+6. Confirm `/reports`, `/reports/$reportId`, `/goalkeepers/$gkId`, the preview modal and the MCP tool still render historical rows unchanged (competition/source blank), and `/system/integrations` still reports the tab as reachable.

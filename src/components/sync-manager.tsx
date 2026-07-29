@@ -27,7 +27,21 @@ export function SyncManager() {
 
   const handlers: Record<string, SyncHandler> = {
     submitMatchReport: async (payload) => {
-      await submitFn({ data: payload as { payload: unknown } as never });
+      // Replayed submits are stamped as such in the sheet's Source column, and
+      // still run through the duplicate guard so a job that already landed
+      // before the tab went offline can't be written twice.
+      const p = payload as { payload: unknown };
+      try {
+        await submitFn({
+          data: { payload: p.payload, options: { allowDuplicate: false, replay: true } } as never,
+        });
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        // Already in the sheet — the original submit did land. Treat the job
+        // as done rather than retrying it forever.
+        if (/already exists for/i.test(msg)) return;
+        throw e;
+      }
     },
   };
 
