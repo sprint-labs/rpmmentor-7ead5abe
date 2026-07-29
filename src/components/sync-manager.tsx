@@ -47,12 +47,15 @@ export function SyncManager() {
           },
         } as never,
       });
-      if ((res as { status?: string })?.status === "duplicate") {
-        // Needs an explicit human decision — keep the job, don't write.
+      const status = (res as { status?: string })?.status;
+      if (status === "duplicate" || status === "in_progress" || status === "ambiguous") {
+        // Needs an explicit human decision — keep the job, don't write, and
+        // never retry automatically (a retry could double-write the sheet).
         throw new NeedsUserActionError(
-          (res as { message?: string }).message ?? "Duplicate report needs confirmation.",
+          (res as { message?: string }).message ?? "This queued report needs your confirmation.",
         );
       }
+
     },
   };
 
