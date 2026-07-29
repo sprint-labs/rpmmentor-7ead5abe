@@ -83,8 +83,6 @@ function ReportDetail() {
       <div className="flex flex-wrap items-center gap-2 text-xs">
         <span className="text-muted-foreground uppercase tracking-wider">Competition</span>
         <Pill tone="muted">{r.competition ?? "Not recorded"}</Pill>
-        <span className="text-muted-foreground uppercase tracking-wider ml-2">Source</span>
-        <Pill tone="muted">{r.source ?? "Entered in spreadsheet"}</Pill>
       </div>
 
 

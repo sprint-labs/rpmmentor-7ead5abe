@@ -101,6 +101,54 @@ export type Database = {
         }
         Relationships: []
       }
+      match_report_submissions: {
+        Row: {
+          created_at: string
+          fingerprint: string
+          goalkeeper: string
+          id: string
+          match_date: string | null
+          opponent: string
+          report_id: string | null
+          sheet_row_index: number | null
+          submission_key: string
+          submitted_at: string
+          team: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          fingerprint: string
+          goalkeeper: string
+          id?: string
+          match_date?: string | null
+          opponent?: string
+          report_id?: string | null
+          sheet_row_index?: number | null
+          submission_key: string
+          submitted_at?: string
+          team?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          fingerprint?: string
+          goalkeeper?: string
+          id?: string
+          match_date?: string | null
+          opponent?: string
+          report_id?: string | null
+          sheet_row_index?: number | null
+          submission_key?: string
+          submitted_at?: string
+          team?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       match_reports_cache: {
         Row: {
           average: number | null

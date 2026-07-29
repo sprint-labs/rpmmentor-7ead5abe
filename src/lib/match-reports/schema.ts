@@ -32,11 +32,11 @@ export const SHEET_TAB = "GKHQ Propietry Data Hub";
 export const SHEET_ID = "1UHesbMdPt89d_oZ86iIppQqkFQyWWwuIxklFEjfdywU";
 
 /**
- * Column layout of the sheet (A..P). Index into a row array.
+ * Column layout of the sheet (A..O). Index into a row array.
  *
  * A..N are the historical columns and MUST never be reordered or retyped.
- * O (Competition) and P (Source) are app-owned columns appended to the right;
- * historical rows leave them blank.
+ * O (Competition) is the approved app-owned column; historical rows leave it
+ * blank. The sheet layout is A:O only — nothing writes to P or beyond.
  */
 export const COLUMN_INDEX = {
   goalkeeper: 0,
@@ -54,7 +54,6 @@ export const COLUMN_INDEX = {
   average: 12,
   comments: 13,
   competition: 14,
-  source: 15,
 } as const;
 
 export const SHEET_HEADERS = [
@@ -73,12 +72,11 @@ export const SHEET_HEADERS = [
   "Av Score",
   "Comments",
   "Competition",
-  "Source",
 ];
 
-/** Value stamped into the Source column (P) by this app. */
-export const SOURCE_APP = "Mentor Hub";
-export const SOURCE_APP_REPLAY = "Mentor Hub (offline replay)";
+// NOTE: a "Source" provenance column is deliberately DEFERRED pending an
+// Excel audit. Do not add a Source sheet column, field or stamped value.
+
 
 
 export const pillarScore = z
@@ -119,8 +117,6 @@ export interface MatchReportRow {
   team: string | null;
   opponent: string | null;
   competition: string | null;
-  /** Provenance stamp from column P. Null for historical/manual rows. */
-  source: string | null;
   match_date: string | null; // YYYY-MM-DD
   scores: Record<PillarId, number | null>;
   average: number | null;
@@ -204,7 +200,7 @@ export function rowToMatchReport(row: string[], rowIndex: number): MatchReportRo
     team: (row[COLUMN_INDEX.team] ?? "").trim() || null,
     opponent,
     competition: (row[COLUMN_INDEX.competition] ?? "").toString().trim() || null,
-    source: (row[COLUMN_INDEX.source] ?? "").toString().trim() || null,
+    
     match_date,
     scores: {
       protect_goal: num(COLUMN_INDEX.protect_goal),

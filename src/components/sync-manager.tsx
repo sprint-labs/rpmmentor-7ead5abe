@@ -2,11 +2,14 @@ import { useEffect, useState, useCallback } from "react";
 import { CloudUpload, Check, AlertTriangle, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { useServerFn } from "@tanstack/react-start";
+import { newSubmissionKey } from "@/lib/match-reports/duplicates";
 import { submitMatchReport } from "@/lib/match-reports/reports.functions";
 import {
   drainQueue,
   listJobs,
   subscribe,
+  removeJob,
+  NeedsUserActionError,
   type SyncHandler,
   type SyncJob,
 } from "@/lib/sync/queue";
@@ -27,20 +30,28 @@ export function SyncManager() {
 
   const handlers: Record<string, SyncHandler> = {
     submitMatchReport: async (payload) => {
-      // Replayed submits are stamped as such in the sheet's Source column, and
-      // still run through the duplicate guard so a job that already landed
-      // before the tab went offline can't be written twice.
-      const p = payload as { payload: unknown };
-      try {
-        await submitFn({
-          data: { payload: p.payload, options: { allowDuplicate: false, replay: true } } as never,
-        });
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        // Already in the sheet — the original submit did land. Treat the job
-        // as done rather than retrying it forever.
-        if (/already exists for/i.test(msg)) return;
-        throw e;
+      // The submission key makes replay idempotent: if the original request
+      // reached the server but the response was lost, the server returns the
+      // existing row instead of appending a second one.
+      const p = payload as { payload: unknown; submissionKey?: string };
+      // Jobs queued before idempotency keys existed get one now; the ledger
+      // still catches a genuine re-write via the fingerprint windows.
+      const submissionKey = p.submissionKey || newSubmissionKey();
+      const res = await submitFn({
+        data: {
+          payload: p.payload,
+          options: {
+            allowDuplicate: false,
+            replay: true,
+            submissionKey,
+          },
+        } as never,
+      });
+      if ((res as { status?: string })?.status === "duplicate") {
+        // Needs an explicit human decision — keep the job, don't write.
+        throw new NeedsUserActionError(
+          (res as { message?: string }).message ?? "Duplicate report needs confirmation.",
+        );
       }
     },
   };
@@ -63,6 +74,11 @@ export function SyncManager() {
         try {
           window.dispatchEvent(new CustomEvent("rpm:report-submitted"));
         } catch { /* ignore */ }
+      }
+      if (res.needsAction > 0) {
+        toast.warning(
+          `${res.needsAction} queued report${res.needsAction === 1 ? "" : "s"} look like duplicates and need your confirmation.`,
+        );
       }
       if (res.dropped > 0) {
         toast.error(
@@ -105,6 +121,7 @@ export function SyncManager() {
 
   if (jobs.length === 0) return null;
 
+  const needsActionJobs = jobs.filter((j) => j.needsAction);
   const anyFailed = jobs.some((j) => j.attempts > 0);
   const Icon = syncing ? RefreshCw : anyFailed && !online ? AlertTriangle : online ? Check : CloudUpload;
   const color = syncing
@@ -131,6 +148,19 @@ export function SyncManager() {
               : `${jobs.length} change${jobs.length === 1 ? "" : "s"} queued — will upload when online`}
         </span>
       </div>
+      {needsActionJobs.length > 0 && (
+        <button
+          type="button"
+          onClick={() => {
+            for (const j of needsActionJobs) removeJob(j.id);
+            toast.message("Removed queued duplicates. Re-submit the report if it is genuinely new.");
+            refresh();
+          }}
+          className="shrink-0 h-6 px-2 rounded border border-current/40 hover:bg-current/10"
+        >
+          {needsActionJobs.length} need{needsActionJobs.length === 1 ? "s" : ""} review — discard
+        </button>
+      )}
       <button
         type="button"
         onClick={() => void drain()}
