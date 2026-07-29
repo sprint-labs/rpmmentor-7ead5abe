@@ -17,6 +17,8 @@ import {
   computeReportUid,
   parseSheetRows,
   matchesReportId,
+  baseReportUid,
+
   identityForRowIndex,
   formatSheetDate,
   COLUMN_INDEX,
@@ -607,13 +609,20 @@ export const deleteMatchReport = createServerFn({ method: "POST" })
     // Capture a STABLE, content-based signature of the raw row before deleting.
     // Occurrence-derived ids (…~2) reindex when a row is removed, so they can
     // never be used to prove an ambiguous delete landed.
-    const { rawRowSignature, countSignature, classifyDeleteReadback } = await import(
-      "./delete-verify"
-    );
+    const { rawRowSignature, countSignature, classifyDeleteReadback, hasDuplicateIdentityGroup } =
+      await import("./delete-verify");
     const rawRow = rows[matchedRowIndex - firstDataRow] ?? [];
     const signature = rawRowSignature(rawRow);
     const countBefore = countSignature(rows, signature);
-    const hadDuplicates = countBefore > 1;
+    // Reindex risk is an IDENTITY question: rows sharing the same match key
+    // (goalkeeper/team/opponent/date) get base/~2 ids even when their comments
+    // or scores differ. Raw-row signatures only prove whether a delete landed.
+    const hadDuplicates = hasDuplicateIdentityGroup(
+      parsedRows,
+      target?.report_id ?? data.reportId,
+      baseReportUid,
+    );
+
 
     // Delete sheet row first — SINGLE attempt. An ambiguous outcome must never
     // trigger a second delete (that would remove the following report); we read
@@ -658,7 +667,7 @@ export const deleteMatchReport = createServerFn({ method: "POST" })
         terminal: true,
         reason: "duplicate_reindexed" as const,
         message:
-          "The row was deleted. Because identical duplicate rows exist for this fixture, their identities have shifted — cached records were left untouched and no further delete was attempted. Do not retry in the app; refresh to re-sync.",
+          "The row was deleted. Because duplicate match-key rows exist for this fixture (same goalkeeper, team, opponent and date), the remaining report identities have reindexed — cached records were left untouched and no further delete was attempted. Do not retry in the app; refresh to re-sync.",
       };
     }
 
