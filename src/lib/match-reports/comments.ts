@@ -147,13 +147,16 @@ export function validateComments(text: string): CommentValidation {
     return { ok: false, message: "Placeholder or test text isn't accepted — add real match notes." };
   }
 
-  // A repeated phrase such as "testing, testing" or "same, same".
-  if (frags.length >= 2 && new Set(frags).size === 1) {
+  // A repeated deterministic TEST/PLACEHOLDER phrase such as "testing, testing"
+  // (any case/whitespace variation). Legitimate repeated football terminology
+  // ("save, save") is NOT rejected here.
+  if (frags.length >= 2 && new Set(frags).size === 1 && PLACEHOLDER_RE.test(frags[0])) {
     return {
       ok: false,
-      message: "Comments repeat the same phrase — add real match detail.",
+      message: "Comments repeat the same test phrase — add real match detail.",
     };
   }
+
 
   // ANY duplicated paragraph (A / B / A) is rejected, not just all-identical.
   const paragraphs = body
