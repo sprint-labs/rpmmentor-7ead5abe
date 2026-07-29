@@ -5,12 +5,9 @@ import {
 } from "lucide-react";
 import { goalkeepers } from "@/lib/mock-data";
 import {
-  RPM7_METRICS,
   insertMentorInteractionRow,
-  insertMatchReportRow,
   selectAssignedPlayers,
   selectPlayer,
-  type Rpm7Scores,
   type WellbeingFlag,
 } from "@/lib/mentor-domain";
 import {
@@ -18,6 +15,7 @@ import {
   InvalidInteractionTypeError,
 } from "@/lib/mentor-session-store";
 import { Avatar } from "@/components/primitives";
+import { Link } from "@tanstack/react-router";
 
 // -----------------------------------------------------------------------------
 // Types & shared UI
@@ -45,14 +43,6 @@ const OUTCOMES = [
   "Below expectation",
   "Needs follow-up",
   "Action plan agreed",
-];
-
-const RECOMMENDATIONS = [
-  "Continue current programme",
-  "Monitor closely",
-  "Recommend for pathway",
-  "Development gap — action needed",
-  "Escalate to head coach",
 ];
 
 const inputCls =
