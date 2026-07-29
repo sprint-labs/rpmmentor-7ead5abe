@@ -68,3 +68,31 @@ export function classifyDeleteReadback(args: {
     detail: `row count for this content went from ${countBefore} to ${countAfter}`,
   };
 }
+
+/**
+ * Duplicate/reindex risk is a question of *identity*, not raw content.
+ *
+ * `computeReportUid` keys on Goalkeeper + Team + Opponent + Match Date only, so
+ * two confirmed duplicates whose comments or scores differ still receive
+ * `base` / `~2` identities. Deleting either one reindexes the survivor, which
+ * makes identity-based cache/ledger cleanup unsafe even though the raw rows are
+ * not identical. Count the parsed reports sharing the target's *base* uid.
+ */
+export function countBaseGroup(
+  reports: readonly { report_id: string }[],
+  baseUid: string,
+  baseOf: (id: string) => string,
+): number {
+  let n = 0;
+  for (const r of reports) if (baseOf(r.report_id) === baseUid) n += 1;
+  return n;
+}
+
+/** True when deleting this row would reindex sibling identities. */
+export function hasDuplicateIdentityGroup(
+  reports: readonly { report_id: string }[],
+  targetReportId: string,
+  baseOf: (id: string) => string,
+): boolean {
+  return countBaseGroup(reports, baseOf(targetReportId), baseOf) > 1;
+}
