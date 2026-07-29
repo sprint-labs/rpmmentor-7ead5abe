@@ -593,20 +593,24 @@ export const deleteMatchReport = createServerFn({ method: "POST" })
     // Delete sheet row first — if it fails we leave the cache alone.
     await deleteRow(matchedRowIndex);
 
-    // Then remove the cache record so /reports reflects the deletion.
+    // Then remove ONLY this occurrence's cache/ledger records. An explicitly
+    // confirmed duplicate has its own suffixed identity (…~2) and must not
+    // take the base report's rows with it.
+    const exactId = target?.report_id ?? data.reportId;
     try {
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
       await supabaseAdmin
         .from("match_reports_cache")
         .delete()
-        .eq("report_id", data.reportId);
+        .eq("report_id", exactId);
       await supabaseAdmin
         .from("match_report_submissions")
         .delete()
-        .eq("report_id", data.reportId);
+        .eq("report_id", exactId);
     } catch (e) {
       console.error("[match-reports] cache delete after sheet delete failed:", e);
     }
+
 
     return { deleted: true, row_index: matchedRowIndex };
   });
