@@ -667,7 +667,7 @@ export const deleteMatchReport = createServerFn({ method: "POST" })
         terminal: true,
         reason: "duplicate_reindexed" as const,
         message:
-          "The row was deleted. Because identical duplicate rows exist for this fixture, their identities have shifted — cached records were left untouched and no further delete was attempted. Do not retry in the app; refresh to re-sync.",
+          "The row was deleted. Because duplicate match-key rows exist for this fixture (same goalkeeper, team, opponent and date), the remaining report identities have reindexed — cached records were left untouched and no further delete was attempted. Do not retry in the app; refresh to re-sync.",
       };
     }
 
