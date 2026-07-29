@@ -14,19 +14,23 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import {
   matchReportSubmitSchema,
   averageOfScores,
-  computeReportId,
-  rowToMatchReport,
+  computeReportUid,
+  parseSheetRows,
+  matchesReportId,
   formatSheetDate,
   COLUMN_INDEX,
   PILLAR_IDS,
   type MatchReportRow,
 } from "./schema";
 import { ensureSections, validateComments } from "./comments";
+import { submissionFingerprint, duplicateMessage } from "./duplicates";
 import {
-  submissionFingerprint,
-  classifyDuplicateWindow,
-  duplicateMessage,
-} from "./duplicates";
+  decideForSubmissionKey,
+  duplicateWindowForRecords,
+  ensureSubmissionKey,
+  isPendingExpired,
+  type LedgerRecord,
+} from "./ledger";
 
 // NOTE: helpers used inside `createServerFn` handlers must be declared inside the
 // handler or in a separate imported module — the splitter deletes sibling module-
@@ -43,11 +47,7 @@ export const listMatchReports = createServerFn({ method: "GET" })
 
   const { readAllRows } = await import("./sheets.server");
   const { rows, firstDataRow } = await readAllRows();
-  const parsed: MatchReportRow[] = [];
-  rows.forEach((row, i) => {
-    const r = rowToMatchReport(row, firstDataRow + i);
-    if (r) parsed.push(r);
-  });
+  const parsed: MatchReportRow[] = parseSheetRows(rows, firstDataRow);
   // Newest first (by match_date, missing dates last).
   parsed.sort((a, b) => {
     if (!a.match_date && !b.match_date) return 0;
@@ -120,11 +120,13 @@ export const getMatchReport = createServerFn({ method: "GET" })
   .handler(async ({ data }) => {
     const { readAllRows } = await import("./sheets.server");
     const { rows, firstDataRow } = await readAllRows();
-    for (let i = 0; i < rows.length; i++) {
-      const r = rowToMatchReport(rows[i], firstDataRow + i);
-      if (r && r.report_id === data.reportId) return { report: r };
-    }
-    return { report: null };
+    const parsed = parseSheetRows(rows, firstDataRow);
+    // Exact current identity first, then the legacy (pre-Team) identity so
+    // historic detail URLs keep resolving.
+    const exact = parsed.find((r) => r.report_id === data.reportId);
+    if (exact) return { report: exact };
+    const compat = parsed.find((r) => matchesReportId(r, data.reportId));
+    return { report: compat ?? null };
   });
 
 // ---------------------------------------------------------------------------
@@ -363,14 +365,11 @@ export const deleteMatchReport = createServerFn({ method: "POST" })
     // Locate the row in the sheet (source of truth).
     const { readAllRows, deleteRow } = await import("./sheets.server");
     const { rows, firstDataRow } = await readAllRows();
-    let matchedRowIndex = -1;
-    for (let i = 0; i < rows.length; i++) {
-      const r = rowToMatchReport(rows[i], firstDataRow + i);
-      if (r && r.report_id === data.reportId) {
-        matchedRowIndex = firstDataRow + i;
-        break;
-      }
-    }
+    const parsedRows = parseSheetRows(rows, firstDataRow);
+    const target =
+      parsedRows.find((r) => r.report_id === data.reportId) ??
+      parsedRows.find((r) => matchesReportId(r, data.reportId));
+    const matchedRowIndex = target?.row_index ?? -1;
     if (matchedRowIndex < 0) {
       // Sheet row already gone — still purge any stale cache entry.
       try {
