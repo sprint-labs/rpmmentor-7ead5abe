@@ -15,19 +15,16 @@ import { parseSheetRows, baseReportUid, COLUMN_INDEX } from "./schema";
  */
 function row(comment: string, score: string): string[] {
   const r = new Array(15).fill("");
-  r[COLUMN_INDEX.date] = "2026-03-01";
   r[COLUMN_INDEX.coach] = "Luke Corrigan";
   r[COLUMN_INDEX.goalkeeper] = "Sam Keeper";
   r[COLUMN_INDEX.team] = "Rovers";
   r[COLUMN_INDEX.opponent] = "United";
+  r[COLUMN_INDEX.match_date] = "2026-03-01";
   r[COLUMN_INDEX.comments] = comment;
   r[COLUMN_INDEX.competition] = "League";
-  const first = PILLAR_START;
-  r[first] = score;
+  r[COLUMN_INDEX.protect_goal] = score;
   return r;
 }
-// pillar scores live between opponent and comments; pick a known numeric column
-const PILLAR_START = COLUMN_INDEX.shot_stopping ?? 5;
 
 describe("duplicate-delete identity safety (differing content, same match key)", () => {
   const rowA = row("Strong first half, commanding on crosses throughout the game.", "4");
