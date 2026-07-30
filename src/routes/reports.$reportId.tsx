@@ -3,11 +3,13 @@ import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { PageHeader, Card, Pill } from "@/components/primitives";
 import { useCallback, useEffect, useState } from "react";
-import { ArrowLeft, FileText, Video, Image as ImageIcon, Mic, ExternalLink } from "lucide-react";
+import { ArrowLeft, FileText, Video, Image as ImageIcon, Mic, ExternalLink, Loader2, Sparkles, Copy } from "lucide-react";
+import { toast } from "sonner";
 import { listReportAttachmentsForIds, openAsset, type MediaAsset } from "@/lib/media-store";
 import { useAuth } from "@/lib/auth";
 import { getMatchReport } from "@/lib/match-reports/reports.functions";
 import { PILLAR_IDS, PILLAR_LABELS } from "@/lib/match-reports/schema";
+import { analyzeReport, type StructuredAnalysis } from "@/lib/api/summarize.functions";
 
 export const Route = createFileRoute("/reports/$reportId")({
   component: ReportDetail,
@@ -31,6 +33,7 @@ function ReportDetail() {
   const { reportId } = Route.useParams();
   const { user } = useAuth();
   const getFn = useServerFn(getMatchReport);
+  const analyzeFn = useServerFn(analyzeReport);
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["match-report", reportId],
@@ -41,6 +44,9 @@ function ReportDetail() {
 
   const [attachments, setAttachments] = useState<MediaAsset[]>([]);
   const [loadingAttachments, setLoadingAttachments] = useState(true);
+  const [analysis, setAnalysis] = useState<StructuredAnalysis | null>(null);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
 
   // Load attachments for EVERY identity this report has ever had: the route id
   // the user arrived on, its current resolved id, and its legacy id. Historic
@@ -56,6 +62,50 @@ function ReportDetail() {
   }, [reportId, currentId, legacyId]);
 
   useEffect(() => { loadAttachments(); }, [loadAttachments]);
+
+  const generateAnalysis = async () => {
+    if (!r?.comments?.trim()) return;
+    setAnalyzing(true);
+    setAnalysisError(null);
+    try {
+      const result = await analyzeFn({
+        data: {
+          reportText: r.comments,
+          context: {
+            goalkeeper: r.goalkeeper,
+            team: r.team ?? "",
+            opponent: r.opponent ?? "",
+            competition: r.competition ?? "",
+            matchDate: r.match_date ?? "",
+          },
+        },
+      });
+      if (!result.ok) {
+        setAnalysisError(result.error);
+        return;
+      }
+      setAnalysis(result.analysis);
+    } catch (analysisFailure) {
+      setAnalysisError(
+        analysisFailure instanceof Error
+          ? analysisFailure.message
+          : "Could not generate structured analysis.",
+      );
+    } finally {
+      setAnalyzing(false);
+    }
+  };
+
+  const copyAnalysis = () => {
+    if (!analysis) return;
+    const text = [
+      `Summary:\n${analysis.summary}`,
+      `Key Moments:\n${analysis.keyMoments.join("\n")}`,
+      `Development Focus:\n${analysis.developmentFocus.join("\n")}`,
+    ].join("\n\n");
+    void navigator.clipboard?.writeText(text);
+    toast.success("Structured analysis copied");
+  };
 
   if (isLoading) {
     return <Card className="p-10 text-center text-sm text-muted-foreground">Loading report…</Card>;
@@ -113,6 +163,83 @@ function ReportDetail() {
           </ul>
         </Card>
       </div>
+
+      {user?.actualRole === "super_admin" && (
+        <Card className="p-4 space-y-3">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <div className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
+                Super Admin · Structured Analysis
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Optional private analysis. Generating or editing this does not change the mentor's report or the Google Sheet.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              {analysis && (
+                <button
+                  type="button"
+                  onClick={copyAnalysis}
+                  className="h-8 px-3 rounded-md border border-border text-xs font-medium inline-flex items-center gap-1.5 hover:bg-accent"
+                >
+                  <Copy className="size-3.5" />Copy
+                </button>
+              )}
+              <button
+                type="button"
+                disabled={analyzing || (r.comments?.trim().length ?? 0) < 40}
+                onClick={() => void generateAnalysis()}
+                className="h-8 px-3 rounded-md border border-primary/40 text-primary text-xs font-medium inline-flex items-center gap-1.5 hover:bg-primary/10 disabled:opacity-40"
+              >
+                {analyzing ? <Loader2 className="size-3.5 animate-spin" /> : <Sparkles className="size-3.5" />}
+                {analysis ? "Regenerate analysis" : "Generate structured analysis"}
+              </button>
+            </div>
+          </div>
+
+          {analysisError && (
+            <div className="text-xs text-destructive" role="alert">{analysisError}</div>
+          )}
+
+          {analysis && (
+            <div className="grid md:grid-cols-3 gap-3">
+              <label className="space-y-1">
+                <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Summary</span>
+                <textarea
+                  value={analysis.summary}
+                  onChange={(event) => setAnalysis((current) => current ? { ...current, summary: event.target.value } : current)}
+                  rows={7}
+                  className="w-full px-3 py-2 rounded-md bg-input/60 border border-border text-sm leading-relaxed focus:outline-none focus:ring-2 focus:ring-ring/40 resize-y"
+                />
+              </label>
+              <label className="space-y-1">
+                <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Key Moments</span>
+                <textarea
+                  value={analysis.keyMoments.join("\n")}
+                  onChange={(event) => setAnalysis((current) => current ? {
+                    ...current,
+                    keyMoments: event.target.value.split("\n").map((line) => line.trim()).filter(Boolean),
+                  } : current)}
+                  rows={7}
+                  className="w-full px-3 py-2 rounded-md bg-input/60 border border-border text-sm leading-relaxed focus:outline-none focus:ring-2 focus:ring-ring/40 resize-y"
+                />
+              </label>
+              <label className="space-y-1">
+                <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Development Focus</span>
+                <textarea
+                  value={analysis.developmentFocus.join("\n")}
+                  onChange={(event) => setAnalysis((current) => current ? {
+                    ...current,
+                    developmentFocus: event.target.value.split("\n").map((line) => line.trim()).filter(Boolean),
+                  } : current)}
+                  rows={7}
+                  className="w-full px-3 py-2 rounded-md bg-input/60 border border-border text-sm leading-relaxed focus:outline-none focus:ring-2 focus:ring-ring/40 resize-y"
+                />
+              </label>
+            </div>
+          )}
+        </Card>
+      )}
 
       <Card className="p-4">
         <div className="flex items-center justify-between mb-3">

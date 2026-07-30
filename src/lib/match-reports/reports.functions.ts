@@ -25,7 +25,7 @@ import {
   PILLAR_IDS,
   type MatchReportRow,
 } from "./schema";
-import { ensureSections, validateComments } from "./comments";
+import { validateComments } from "./comments";
 import { submissionFingerprint, duplicateMessage } from "./duplicates";
 import {
   decideForSubmissionKey,
@@ -225,7 +225,7 @@ export const submitMatchReport = createServerFn({ method: "POST" })
     }
 
     // ---- Comments validation (server enforcement) ------------------------
-    const comments = ensureSections(payload.comments ?? "");
+    const comments = (payload.comments ?? "").trim();
     const commentCheck = validateComments(comments);
     if (!commentCheck.ok) {
       throw new Error(`Comments: ${commentCheck.message}`);

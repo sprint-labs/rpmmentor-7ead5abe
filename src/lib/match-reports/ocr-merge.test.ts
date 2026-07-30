@@ -1,32 +1,30 @@
 import { describe, expect, it } from "vitest";
-import { mergeOcrText, ensureSections, BLANK_COMMENTS_TEMPLATE } from "./comments";
+import { mergeOcrText } from "./comments";
 
 describe("handwritten OCR merge — user-controlled replace/append", () => {
-  const EXISTING = ensureSections("Summary:\nCommanding display.\n\nKey Moments:\nSave at 20'.");
+  const EXISTING = "Commanding display with a strong save at 20 minutes.";
 
-  it("replace swaps content but keeps the section structure", () => {
+  it("replace swaps content without adding section labels", () => {
     const out = mergeOcrText(EXISTING, "Kept a clean sheet and organised the back four.", "replace");
     expect(out).not.toContain("Commanding display");
-    expect(out).toContain("Summary:");
-    expect(out).toContain("Key Moments:");
+    expect(out).not.toContain("Summary:");
     expect(out).toContain("clean sheet");
   });
 
   it("append never deletes existing mentor text", () => {
     const out = mergeOcrText(EXISTING, "Extra note from the handwritten page.", "append");
     expect(out).toContain("Commanding display");
-    expect(out).toContain("Save at 20'");
+    expect(out).toContain("save at 20 minutes");
     expect(out).toContain("Extra note from the handwritten page.");
   });
 
-  it("appending into empty comments seeds the template sections", () => {
+  it("appending into empty comments keeps the text free-form", () => {
     const out = mergeOcrText("", "First observation.", "append");
-    expect(out).toContain("Summary:");
-    expect(out).toContain("First observation.");
+    expect(out).toBe("First observation.");
   });
 
   it("blank OCR output is a no-op", () => {
     expect(mergeOcrText(EXISTING, "   \n ", "replace")).toBe(EXISTING);
-    expect(mergeOcrText(BLANK_COMMENTS_TEMPLATE, "", "append")).toBe(BLANK_COMMENTS_TEMPLATE);
+    expect(mergeOcrText("", "", "append")).toBe("");
   });
 });
