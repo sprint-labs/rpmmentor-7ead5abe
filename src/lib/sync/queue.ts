@@ -130,17 +130,7 @@ function isTransient(err: unknown): boolean {
   return /network|failed to fetch|load failed|timeout|fetch|econn|offline/i.test(msg);
 }
 
-export interface DrainOptions {
-  /** Only drain jobs of these types (default: all). */
-  types?: string[];
-  /** Ignore per-job exponential backoff — for an explicit user-triggered retry. */
-  ignoreBackoff?: boolean;
-}
-
-export async function drainQueue(
-  handlers: Record<string, SyncHandler>,
-  options: DrainOptions = {},
-): Promise<{
+export async function drainQueue(handlers: Record<string, SyncHandler>): Promise<{
   processed: number;
   failed: number;
   dropped: number;
@@ -156,8 +146,7 @@ export async function drainQueue(
   for (const job of jobs) {
     // Awaiting an explicit user decision — never auto-submit or drop.
     if (job.needsAction) continue;
-    if (options.types && !options.types.includes(job.type)) continue;
-    if (!options.ignoreBackoff && job.attempts > 0 && nextRetryAt(job) > now) continue;
+    if (job.attempts > 0 && nextRetryAt(job) > now) continue;
     const handler = handlers[job.type];
     if (!handler) {
       // Unknown type — leave for a future release that knows how to run it.

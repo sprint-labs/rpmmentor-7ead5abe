@@ -61,13 +61,13 @@ export function SyncManager() {
 
   const refresh = useCallback(() => setJobs(listJobs()), []);
 
-  const drain = useCallback(async (opts?: { types?: string[]; ignoreBackoff?: boolean }) => {
+  const drain = useCallback(async () => {
     if (syncing) return;
     if (typeof navigator !== "undefined" && !navigator.onLine) return;
     if (listJobs().length === 0) return;
     setSyncing(true);
     try {
-      const res = await drainQueue(handlers, opts ?? {});
+      const res = await drainQueue(handlers);
       if (res.processed > 0) {
         toast.success(
           res.processed === 1
@@ -107,13 +107,8 @@ export function SyncManager() {
     const on = () => { setOnline(true); void drain(); };
     const off = () => setOnline(false);
     const vis = () => { if (document.visibilityState === "visible") void drain(); };
-    // Explicit user-triggered re-sync (e.g. the Integrations page button).
-    const manual = () => {
-      void drain({ types: ["submitMatchReport"], ignoreBackoff: true });
-    };
     window.addEventListener("online", on);
     window.addEventListener("offline", off);
-    window.addEventListener("rpm:sync-drain-request", manual);
     document.addEventListener("visibilitychange", vis);
     // Attempt one drain on mount (e.g. reload after being offline).
     void drain();
@@ -122,7 +117,6 @@ export function SyncManager() {
     return () => {
       window.removeEventListener("online", on);
       window.removeEventListener("offline", off);
-      window.removeEventListener("rpm:sync-drain-request", manual);
       document.removeEventListener("visibilitychange", vis);
       window.clearInterval(timer);
     };
