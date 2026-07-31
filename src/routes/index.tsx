@@ -107,7 +107,6 @@ function Dashboard() {
             value={stats.upcomingInteractions}
             hint="Next 14 days"
             accent="info"
-            emptyMessage="None scheduled"
           />
         </Link>
         <Link
@@ -120,7 +119,6 @@ function Dashboard() {
             value={stats.overdueInteractions}
             hint="Action required"
             accent="destructive"
-            emptyMessage="None overdue"
           />
         </Link>
         <Link
