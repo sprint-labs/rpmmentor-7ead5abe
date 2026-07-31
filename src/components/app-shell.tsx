@@ -47,7 +47,7 @@ export function AppShell() {
 
   useEffect(() => {
     if (!user && !isPublic) {
-      navigate({ to: "/login" as never, search: { redirect: path } as never, replace: true });
+      navigate({ to: "/login" as never, search: { next: path } as never, replace: true });
     }
   }, [user, isPublic, navigate, path]);
 
@@ -275,4 +275,3 @@ function ThemeToggle() {
     </button>
   );
 }
-
