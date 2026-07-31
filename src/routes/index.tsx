@@ -41,11 +41,56 @@ function Dashboard() {
 
 
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
-        <StatCard label="Total Goalkeepers" value={stats.totalGks} hint="Across all tiers" />
-        <StatCard label="Upcoming Interactions" value={stats.upcomingInteractions} hint="Next 14 days" accent="info" />
-        <StatCard label="Overdue Interactions" value={stats.overdueInteractions} hint="Action required" accent="destructive" />
-        <StatCard label="Reports This Week" value={stats.reportsThisWeek} hint="Submitted" accent="primary" />
-        <StatCard label="Active Mentors" value={stats.activeMentors} hint="In rotation" />
+        <Link
+          to="/goalkeepers"
+          className="block rounded-lg transition-transform hover:-translate-y-0.5 hover:ring-1 hover:ring-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          aria-label="View goalkeepers"
+        >
+          <StatCard label="Total Goalkeepers" value={stats.totalGks} hint="Across all tiers" />
+        </Link>
+        <Link
+          to="/interactions"
+          className="block rounded-lg transition-transform hover:-translate-y-0.5 hover:ring-1 hover:ring-info/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-info"
+          aria-label="View upcoming interactions"
+        >
+          <StatCard
+            label="Upcoming Interactions"
+            value={stats.upcomingInteractions}
+            hint="Next 14 days"
+            accent="info"
+          />
+        </Link>
+        <Link
+          to="/interactions"
+          className="block rounded-lg transition-transform hover:-translate-y-0.5 hover:ring-1 hover:ring-destructive/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive"
+          aria-label="View overdue interactions"
+        >
+          <StatCard
+            label="Overdue Interactions"
+            value={stats.overdueInteractions}
+            hint="Action required"
+            accent="destructive"
+          />
+        </Link>
+        <Link
+          to="/reports"
+          className="block rounded-lg transition-transform hover:-translate-y-0.5 hover:ring-1 hover:ring-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          aria-label="View match reports"
+        >
+          <StatCard
+            label="Reports This Week"
+            value={stats.reportsThisWeek}
+            hint="Submitted"
+            accent="primary"
+          />
+        </Link>
+        <Link
+          to="/mentors"
+          className="block rounded-lg transition-transform hover:-translate-y-0.5 hover:ring-1 hover:ring-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          aria-label="View mentors"
+        >
+          <StatCard label="Active Mentors" value={stats.activeMentors} hint="In rotation" />
+        </Link>
       </div>
       <Card className="p-4">
         <SectionTitle action={<Link to="/goalkeepers" className="text-xs text-primary inline-flex items-center gap-1">View goalkeepers <ArrowUpRight className="size-3" /></Link>}>
