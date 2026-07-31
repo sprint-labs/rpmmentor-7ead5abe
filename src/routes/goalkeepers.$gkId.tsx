@@ -174,11 +174,12 @@ function GkDetail() {
             <div className="flex items-center gap-2.5 flex-wrap">
               <h1 className="text-2xl font-semibold tracking-tight">{gk.name}</h1>
               <TierBadge tier={gk.tier} />
+              {gk.tags.map((tag) => <TierBadge key={tag} tier={tag} />)}
               {gk.onLoan && <Pill tone="info">On loan{gk.parentClub ? ` from ${gk.parentClub}` : ""}</Pill>}
             </div>
             <div className="text-sm text-muted-foreground mt-1">
-              {gk.club || "Free Agent"}
-              {gk.league ? ` · ${gk.league}` : ""}
+              {gk.tags.includes("Free Agent") ? "Free Agent" : (gk.club || "Club not recorded")}
+              {!gk.tags.includes("Free Agent") && gk.league ? ` · ${gk.league}` : ""}
               {" · "}{gk.nationality || "Nationality not recorded"}
               {" · "}{gk.age} yrs · {gk.height} · {gk.foot} foot
             </div>

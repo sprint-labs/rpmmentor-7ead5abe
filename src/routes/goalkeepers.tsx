@@ -4,11 +4,11 @@ import { useQuery } from "@tanstack/react-query";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
 import { PageHeader, Card, TierBadge, Avatar, TrafficLight, DutyBadge, StatCard, Pill } from "@/components/primitives";
-import { goalkeepers, dutyStatusForGk, dutyOverview, DUTY_LABELS, type DutyLevel, type Status } from "@/lib/mock-data";
+import { goalkeepers, dutyStatusForGk, dutyOverview, DUTY_LABELS, type DutyLevel, type Goalkeeper, type TierLevelLabel } from "@/lib/mock-data";
 import { listMatchReports } from "@/lib/match-reports/reports.functions";
 import { useMemo, useState } from "react";
 import { withPermission } from "@/components/require-permission";
-import { ChevronDown, ChevronUp, X } from "lucide-react";
+import { ChevronDown, ChevronUp, ChevronsUpDown, X } from "lucide-react";
 
 // ---------- URL search-param schema ----------
 // Values are stored as CSV strings for multi-selects to keep URLs short and
@@ -40,7 +40,7 @@ function GoalkeepersLayout() {
 }
 
 const CATS = ["All", "UK Based", "Overseas", "Academy", "Tier 1-2", "Tier 3-4", "Free Agents"] as const;
-const TIER_OPTIONS: Status[] = ["Tier 1", "Tier 2", "Tier 3", "Tier 4", "Academy", "Free Agent"];
+const TIER_OPTIONS: TierLevelLabel[] = ["Tier 1", "Tier 2", "Tier 3", "Tier 4"];
 const CONTRACT_OPTIONS: { id: string; label: string }[] = [
   { id: "any", label: "Any contract" },
   { id: "expired", label: "Expired / free agent" },
@@ -65,10 +65,79 @@ function isValidScore(v: unknown): v is number {
   return typeof v === "number" && Number.isFinite(v) && v >= 1 && v <= 5;
 }
 
+type SortKey = "goalkeeper" | "tier" | "tags" | "club" | "league" | "age" | "nationality" | "contract" | "duty" | "rating";
+type SortDirection = "asc" | "desc";
+type Sort = { key: SortKey; direction: SortDirection };
+
+const collator = new Intl.Collator("en", { numeric: true, sensitivity: "base" });
+
+function formatContractExpiry(value: string): string {
+  if (value === "—") return "-";
+  const match = value.match(/^(\d{4})-(\d{2})-\d{2}$/);
+  if (!match) return "-";
+  return new Intl.DateTimeFormat("en-GB", { month: "long", year: "numeric", timeZone: "UTC" })
+    .format(new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, 1)));
+}
+
+function contractTimestamp(value: string): number | null {
+  if (value === "—") return null;
+  const timestamp = Date.parse(`${value}T00:00:00Z`);
+  return Number.isNaN(timestamp) ? null : timestamp;
+}
+
+function compareNullable(a: string | number | null, b: string | number | null, direction: SortDirection) {
+  if (a == null && b == null) return 0;
+  if (a == null) return 1;
+  if (b == null) return -1;
+  const comparison = typeof a === "string" && typeof b === "string"
+    ? collator.compare(a, b)
+    : Number(a) - Number(b);
+  return direction === "asc" ? comparison : -comparison;
+}
+
+function tagsLabel(gk: Goalkeeper): string | null {
+  return gk.tags.length ? gk.tags.join(", ") : null;
+}
+
+function SortableHeader({
+  label,
+  sortKey,
+  sort,
+  onSort,
+  className = "",
+}: {
+  label: string;
+  sortKey: SortKey;
+  sort: Sort | null;
+  onSort: (key: SortKey) => void;
+  className?: string;
+}) {
+  const direction = sort?.key === sortKey ? sort.direction : null;
+  return (
+    <th
+      className={`font-medium px-2 py-2.5 ${className}`}
+      aria-sort={direction === "asc" ? "ascending" : direction === "desc" ? "descending" : "none"}
+    >
+      <button
+        type="button"
+        onClick={() => onSort(sortKey)}
+        className="inline-flex items-center gap-1 hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
+        title={`Sort by ${label}${direction ? ` (${direction === "asc" ? "ascending" : "descending"})` : ""}`}
+      >
+        {label}
+        {direction === "asc" ? <ChevronUp className="size-3" aria-hidden="true" />
+          : direction === "desc" ? <ChevronDown className="size-3" aria-hidden="true" />
+            : <ChevronsUpDown className="size-3 opacity-55" aria-hidden="true" />}
+      </button>
+    </th>
+  );
+}
+
 function GoalkeepersList() {
   const search = Route.useSearch();
   const navigate = useNavigate({ from: "/goalkeepers" });
   const [advOpen, setAdvOpen] = useState(false);
+  const [sort, setSort] = useState<Sort | null>(null);
   const listFn = useServerFn(listMatchReports);
   const { data: reportsData, isError: reportsUnavailable } = useQuery({
     queryKey: ["match-reports"],
@@ -126,6 +195,12 @@ function GoalkeepersList() {
   const toggleFrom = (list: string[], value: string) =>
     list.includes(value) ? list.filter((v) => v !== value) : [...list, value];
 
+  const toggleSort = (key: SortKey) => {
+    setSort((current) => current?.key === key
+      ? { key, direction: current.direction === "asc" ? "desc" : "asc" }
+      : { key, direction: "asc" });
+  };
+
   // Filtering
   const now = Date.now();
   const MS_YEAR = 365 * 24 * 60 * 60 * 1000;
@@ -133,17 +208,17 @@ function GoalkeepersList() {
     // Quick category chips
     if (search.cat === "UK Based" && g.region !== "UK Based") return false;
     if (search.cat === "Overseas" && g.region !== "Overseas") return false;
-    if (search.cat === "Free Agents" && g.status !== "Free Agent") return false;
-    if (search.cat === "Academy" && g.status !== "Academy") return false;
-    if (search.cat === "Tier 1-2" && g.status !== "Tier 1" && g.status !== "Tier 2") return false;
-    if (search.cat === "Tier 3-4" && g.status !== "Tier 3" && g.status !== "Tier 4") return false;
+    if (search.cat === "Free Agents" && !g.tags.includes("Free Agent")) return false;
+    if (search.cat === "Academy" && !g.tags.includes("Academy")) return false;
+    if (search.cat === "Tier 1-2" && g.tier !== "Tier 1" && g.tier !== "Tier 2") return false;
+    if (search.cat === "Tier 3-4" && g.tier !== "Tier 3" && g.tier !== "Tier 4") return false;
 
     if (search.duty !== "all" && dutyStatusForGk(g).level !== (search.duty as DutyLevel)) return false;
 
     if (search.q && !`${g.name} ${g.club} ${g.nationality} ${g.league}`.toLowerCase().includes(search.q.toLowerCase())) return false;
 
     // Advanced multi-selects
-    if (selectedTiers.length && !selectedTiers.includes(g.status)) return false;
+    if (selectedTiers.length && !selectedTiers.includes(g.tier)) return false;
     if (selectedLeagues.length && !selectedLeagues.includes(g.league)) return false;
     if (selectedNats.length && !selectedNats.includes(g.nationality)) return false;
 
@@ -183,6 +258,30 @@ function GoalkeepersList() {
 
     return true;
   });
+
+  const sorted = useMemo(() => {
+    if (!sort) return filtered;
+
+    return [...filtered].sort((a, b) => {
+      const aRating = ratingsByGoalkeeper.get(normaliseName(a.name))?.average ?? null;
+      const bRating = ratingsByGoalkeeper.get(normaliseName(b.name))?.average ?? null;
+      const aDuty = dutyStatusForGk(a).label;
+      const bDuty = dutyStatusForGk(b).label;
+
+      switch (sort.key) {
+        case "goalkeeper": return compareNullable(a.name, b.name, sort.direction);
+        case "tier": return compareNullable(a.tierLevel, b.tierLevel, sort.direction);
+        case "tags": return compareNullable(tagsLabel(a), tagsLabel(b), sort.direction);
+        case "club": return compareNullable(a.club === "Free Agent" ? null : a.club, b.club === "Free Agent" ? null : b.club, sort.direction);
+        case "league": return compareNullable(a.league === "Free Agent" ? null : a.league, b.league === "Free Agent" ? null : b.league, sort.direction);
+        case "age": return compareNullable(a.age, b.age, sort.direction);
+        case "nationality": return compareNullable(a.nationality || null, b.nationality || null, sort.direction);
+        case "contract": return compareNullable(contractTimestamp(a.contractUntil), contractTimestamp(b.contractUntil), sort.direction);
+        case "duty": return compareNullable(aDuty, bDuty, sort.direction);
+        case "rating": return compareNullable(aRating, bRating, sort.direction);
+      }
+    });
+  }, [filtered, ratingsByGoalkeeper, sort]);
 
   const CATS_LIST = CATS;
   const DUTIES: { id: "all" | DutyLevel; label: string; count: number }[] = [
@@ -420,26 +519,27 @@ function GoalkeepersList() {
           <thead>
             <tr className="text-left text-[11px] uppercase tracking-wider text-muted-foreground border-b border-border">
               <th className="font-medium px-3 py-2.5 w-6"></th>
-              <th className="font-medium px-2 py-2.5">Goalkeeper</th>
-              <th className="font-medium px-2 py-2.5">Status</th>
-              <th className="font-medium px-2 py-2.5">Club</th>
-              <th className="font-medium px-2 py-2.5">League</th>
-              <th className="font-medium px-2 py-2.5">Age</th>
-              <th className="font-medium px-2 py-2.5">Nationality</th>
-              <th className="font-medium px-2 py-2.5">Contract</th>
-              <th className="font-medium px-2 py-2.5">Duty of Care</th>
-              <th className="font-medium px-4 py-2.5 text-right">Rating</th>
+              <SortableHeader label="Goalkeeper" sortKey="goalkeeper" sort={sort} onSort={toggleSort} />
+              <SortableHeader label="Tier" sortKey="tier" sort={sort} onSort={toggleSort} />
+              <SortableHeader label="Tags" sortKey="tags" sort={sort} onSort={toggleSort} />
+              <SortableHeader label="Club" sortKey="club" sort={sort} onSort={toggleSort} />
+              <SortableHeader label="League" sortKey="league" sort={sort} onSort={toggleSort} />
+              <SortableHeader label="Age" sortKey="age" sort={sort} onSort={toggleSort} />
+              <SortableHeader label="Nationality" sortKey="nationality" sort={sort} onSort={toggleSort} />
+              <SortableHeader label="Contract Expiry" sortKey="contract" sort={sort} onSort={toggleSort} />
+              <SortableHeader label="Duty of Care" sortKey="duty" sort={sort} onSort={toggleSort} />
+              <SortableHeader label="Rating" sortKey="rating" sort={sort} onSort={toggleSort} className="text-right" />
             </tr>
           </thead>
           <tbody>
-            {filtered.length === 0 ? (
+            {sorted.length === 0 ? (
               <tr>
-                <td colSpan={10} className="px-4 py-8 text-center text-xs text-muted-foreground">
+                <td colSpan={11} className="px-4 py-8 text-center text-xs text-muted-foreground">
                   No goalkeepers match the current filters.{" "}
                   <button onClick={resetAll} className="text-primary hover:underline">Reset filters</button>
                 </td>
               </tr>
-            ) : filtered.map((gk) => {
+            ) : sorted.map((gk) => {
               const d = dutyStatusForGk(gk);
               const rating = ratingsByGoalkeeper.get(normaliseName(gk.name));
               return (
@@ -451,19 +551,26 @@ function GoalkeepersList() {
                       <span className="font-medium">{gk.name}</span>
                     </Link>
                   </td>
-                  <td className="px-2"><TierBadge tier={gk.status} /></td>
+                  <td className="px-2"><TierBadge tier={gk.tier} /></td>
+                  <td className="px-2">
+                    {gk.tags.length ? (
+                      <div className="flex flex-wrap gap-1">
+                        {gk.tags.map((tag) => <TierBadge key={tag} tier={tag} />)}
+                      </div>
+                    ) : "-"}
+                  </td>
                   <td className="px-2 text-muted-foreground">
                     <div className="flex flex-col">
-                      <span>{gk.club || "Free Agent"}</span>
+                      <span>{gk.tags.includes("Free Agent") ? "-" : gk.club || "-"}</span>
                       {gk.onLoan && gk.parentClub && (
                         <span className="text-[10px] text-muted-foreground/80 italic">on loan from {gk.parentClub}</span>
                       )}
                     </div>
                   </td>
-                  <td className="px-2 text-muted-foreground text-xs">{gk.league}</td>
+                  <td className="px-2 text-muted-foreground text-xs">{gk.tags.includes("Free Agent") ? "-" : gk.league || "-"}</td>
                   <td className="px-2 tabular-nums font-mono">{gk.age}</td>
                   <td className="px-2 text-muted-foreground">{gk.nationality || "—"}</td>
-                  <td className="px-2 text-muted-foreground tabular-nums font-mono">{gk.contractUntil === "—" ? "—" : gk.contractUntil.slice(0, 4)}</td>
+                  <td className="px-2 text-muted-foreground">{formatContractExpiry(gk.contractUntil)}</td>
                   <td className="px-2">
                     <DutyBadge level={d.level} label={d.label} />
                   </td>

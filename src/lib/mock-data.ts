@@ -5,7 +5,11 @@
 // src/lib/data-classification.tsx.
 
 
-export type Status = "Tier 1" | "Tier 2" | "Tier 3" | "Tier 4" | "Academy" | "Free Agent";
+export type TierLevelLabel = "Tier 1" | "Tier 2" | "Tier 3" | "Tier 4";
+export type GoalkeeperTag = "Academy" | "Free Agent";
+// Status is retained for older surfaces that still present a goalkeeper's
+// primary category. New roster views should use `tier` plus `tags` instead.
+export type Status = TierLevelLabel | GoalkeeperTag;
 // Legacy alias — many components still import Tier.
 export type Tier = Status;
 
@@ -91,7 +95,8 @@ export interface Goalkeeper {
   name: string;
   initials: string;
   status: Status;
-  tier: Status; // alias for back-compat
+  tier: TierLevelLabel;
+  tags: GoalkeeperTag[];
   tierLevel: TierLevel;
   region: Region;
   mentorId: string;
@@ -336,6 +341,12 @@ function deriveStatus(s: Seed): Status {
   if (s.age <= 18) return "Academy";
   return `Tier ${deriveTierLevel(s)}` as Status;
 }
+function deriveTags(s: Seed): GoalkeeperTag[] {
+  const tags: GoalkeeperTag[] = [];
+  if (s.age <= 18) tags.push("Academy");
+  if (s.league === "Free Agent") tags.push("Free Agent");
+  return tags;
+}
 function deriveRegion(s: Seed): Region {
   if (s.league === "Free Agent") return "Free Agent";
   return OVERSEAS_LEAGUES.has(s.league) ? "Overseas" : "UK Based";
@@ -379,15 +390,17 @@ const RATING_OVERRIDE: Record<string, { rating: number; potential: number; recom
 
 export const goalkeepers: Goalkeeper[] = SEED.map((s, i) => {
   const status = deriveStatus(s);
+  const tier = `Tier ${deriveTierLevel(s)}` as TierLevelLabel;
+  const tags = deriveTags(s);
   const region = deriveRegion(s);
-  const mentorId = status === "Free Agent" ? "m-david-rouse" : ASSIGN_POOL[i % ASSIGN_POOL.length];
+  const mentorId = tags.includes("Free Agent") ? "m-david-rouse" : ASSIGN_POOL[i % ASSIGN_POOL.length];
   const o = RATING_OVERRIDE[s.name];
   const baseRating = status === "Tier 1" ? between(78, 90) : status === "Tier 2" ? between(70, 84) : status === "Tier 3" ? between(64, 78) : status === "Academy" ? between(58, 72) : between(60, 75);
   const gk: Goalkeeper = {
     id: `gk-${s.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`,
     name: s.name,
     initials: initialsOf(s.name),
-    status, tier: status,
+    status, tier, tags,
     tierLevel: deriveTierLevel(s),
     region,
     mentorId,
