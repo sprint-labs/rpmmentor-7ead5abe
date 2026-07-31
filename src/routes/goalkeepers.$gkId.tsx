@@ -75,15 +75,15 @@ function GkDetail() {
   const last5 = useMemo(() => gkReports.slice(0, 5), [gkReports]);
 
   const averageRating = useMemo(() => {
-    const vals = last5.map((r) => r.average).filter(isValidScore);
-    if (vals.length < 5) return null;
+    const vals = gkReports.map((r) => r.average).filter(isValidScore);
+    if (!vals.length) return null;
     const mean = vals.reduce((a, b) => a + b, 0) / vals.length;
     return Math.round(mean * 10) / 10;
-  }, [last5]);
+  }, [gkReports]);
 
   const ratingContributors = useMemo(
-    () => last5.filter((r) => isValidScore(r.average)),
-    [last5],
+    () => gkReports.filter((r) => isValidScore(r.average)),
+    [gkReports],
   );
 
   const pillarAverages = useMemo(() => {
@@ -212,86 +212,16 @@ function GkDetail() {
 
       <div className="grid grid-cols-2 md:grid-cols-2 gap-3">
         <Card className="p-3">
-          <div className="text-[10px] uppercase text-muted-foreground">Rating (avg of last 5 Match Reports)</div>
-          {!isLoading && !isError && (
-            <div className="flex gap-1.5 mt-1.5" aria-label={`Rating status: ${ratingContributors.length} of 5 reports submitted`}>
-              <Pill tone="success">{ratingContributors.length} submitted</Pill>
-              <Pill tone={5 - ratingContributors.length > 0 ? "warning" : "muted"}>{5 - ratingContributors.length} missing</Pill>
-            </div>
-          )}
+          <div className="text-[10px] uppercase text-muted-foreground">Rating (avg of Match Reports)</div>
           <div className="text-xl font-semibold tabular-nums font-mono mt-1">
             {isLoading ? <span className="text-muted-foreground text-sm font-sans font-normal">Loading…</span>
               : isError ? <span className="text-destructive text-sm font-sans font-normal">Unavailable</span>
               : averageRating != null ? `${averageRating.toFixed(1)}/5`
-              : <span className="text-muted-foreground text-sm font-sans font-normal">Not enough data</span>}
+              : <span className="text-muted-foreground">-</span>}
           </div>
-          {averageRating != null && ratingContributors.length >= 5 && (
-            <div className="mt-1.5">
-              <div className="text-[10px] uppercase text-muted-foreground mb-1">
-                Included ({ratingContributors.length})
-              </div>
-              <div className="flex flex-wrap gap-1">
-                {ratingContributors.map((r) => (
-                  <button
-                    key={r.report_id}
-                    type="button"
-                    onClick={() => setPreviewId(r.report_id)}
-                    title={reportTooltip(r, `Overall: ${r.average!.toFixed(1)}/5\nClick to preview`)}
-                    aria-label={`Preview match report for ${r.match_date ? formatDate(r.match_date) : "undated match"} versus ${r.opponent?.trim() || "opponent TBC"}, overall rating ${r.average!.toFixed(1)} of 5`}
-                    className="px-1.5 py-0.5 rounded border border-border/60 bg-accent/20 text-[10px] text-muted-foreground hover:text-foreground hover:border-primary/40 tabular-nums focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:border-primary"
-                  >
-                    {reportRef(r)}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-          {averageRating == null && !isLoading && !isError && (
-            <div className="mt-1.5 space-y-1.5">
-              <div className="text-[11px] text-muted-foreground leading-snug">
-                <span className="font-medium text-foreground">{ratingContributors.length} of 5</span> scored reports available.
-                Need <span className="font-medium text-foreground">{5 - ratingContributors.length}</span> more with a valid overall score (1–5) to calculate a rating.
-              </div>
-              <ValidityHint>
-                A valid scored report has an overall <span className="font-medium text-foreground">Match Rating</span> between 1 and 5.
-              </ValidityHint>
-
-              {ratingContributors.length > 0 && (
-                <div>
-                  <div className="text-[10px] uppercase text-muted-foreground mb-1">Available so far</div>
-                  <div className="flex flex-wrap gap-1">
-                    {ratingContributors.map((r) => (
-                      <button
-                        key={r.report_id}
-                        type="button"
-                        onClick={() => setPreviewId(r.report_id)}
-                        title={reportTooltip(r, `Overall: ${r.average!.toFixed(1)}/5\nClick to preview`)}
-                        aria-label={`Preview match report for ${r.match_date ? formatDate(r.match_date) : "undated match"} versus ${r.opponent?.trim() || "opponent TBC"}, overall rating ${r.average!.toFixed(1)} of 5`}
-                        className="px-1.5 py-0.5 rounded border border-border/60 bg-accent/20 text-[10px] text-muted-foreground hover:text-foreground hover:border-primary/40 tabular-nums focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                      >
-                        {reportRef(r)}
-                      </button>
-                    ))}
-                    {Array.from({ length: 5 - ratingContributors.length }).map((_, i) => (
-                      <span
-                        key={`missing-${i}`}
-                        className="px-1.5 py-0.5 rounded border border-dashed border-border/60 text-[10px] text-muted-foreground/70 italic"
-                        title="Missing scored report needed to calculate a rating"
-                      >
-                        missing report
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                <Link to="/reports" search={{ from: "", to: "", coach: "", mentorProfileId: "", source: "", gk: gk.name, openSubmit: "1", last5Gk: "" }} className="text-[11px] text-primary hover:underline inline-flex items-center gap-0.5">
-                  Submit a Match Report for {gk.name}
-                </Link>
-                <Link to="/calendar" search={{ gkId: gk.id }} className="text-[11px] text-muted-foreground hover:text-foreground hover:underline inline-flex items-center gap-0.5">
-                  <CalendarIcon className="size-3.5" /> See upcoming matches
-                </Link>
-              </div>
+          {!isLoading && !isError && averageRating != null && (
+            <div className="mt-1 text-[11px] text-muted-foreground">
+              Based on {ratingContributors.length} scored Match Report{ratingContributors.length === 1 ? "" : "s"}
             </div>
           )}
         </Card>

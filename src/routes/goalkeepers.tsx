@@ -1,8 +1,11 @@
 import { createFileRoute, Link, Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
+import { useQuery } from "@tanstack/react-query";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
 import { PageHeader, Card, TierBadge, Avatar, TrafficLight, DutyBadge, StatCard, Pill } from "@/components/primitives";
 import { goalkeepers, dutyStatusForGk, dutyOverview, DUTY_LABELS, type DutyLevel, type Status } from "@/lib/mock-data";
+import { listMatchReports } from "@/lib/match-reports/reports.functions";
 import { useMemo, useState } from "react";
 import { withPermission } from "@/components/require-permission";
 import { ChevronDown, ChevronUp, X } from "lucide-react";
@@ -19,8 +22,8 @@ const searchSchema = z.object({
   nats: fallback(z.string(), "").default(""),
   club: fallback(z.string(), "").default(""),
   contract: fallback(z.string(), "any").default("any"),
-  ratingMin: fallback(z.number(), 50).default(50),
-  ratingMax: fallback(z.number(), 99).default(99),
+  ratingMin: fallback(z.number(), 1).default(1),
+  ratingMax: fallback(z.number(), 5).default(5),
   loan: fallback(z.string(), "any").default("any"),
 });
 
@@ -52,12 +55,26 @@ const LOAN_OPTIONS: { id: string; label: string }[] = [
 
 const csv = (s: string) => s.split(",").map((x) => x.trim()).filter(Boolean);
 const toCsv = (arr: string[]) => arr.join(",");
-const clampRating = (n: number) => Math.max(50, Math.min(99, Math.round(n)));
+const clampRating = (n: number) => Math.max(1, Math.min(5, Math.round(n * 10) / 10));
+
+function normaliseName(s: string): string {
+  return s.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+function isValidScore(v: unknown): v is number {
+  return typeof v === "number" && Number.isFinite(v) && v >= 1 && v <= 5;
+}
 
 function GoalkeepersList() {
   const search = Route.useSearch();
   const navigate = useNavigate({ from: "/goalkeepers" });
   const [advOpen, setAdvOpen] = useState(false);
+  const listFn = useServerFn(listMatchReports);
+  const { data: reportsData, isError: reportsUnavailable } = useQuery({
+    queryKey: ["match-reports"],
+    queryFn: () => listFn(),
+    staleTime: 60_000,
+  });
 
   // Distinct dropdown options derived from the live roster.
   const { allLeagues, allNats, contractYears } = useMemo(() => {
@@ -81,6 +98,26 @@ function GoalkeepersList() {
   const selectedNats = csv(search.nats);
   const ratingMin = clampRating(search.ratingMin);
   const ratingMax = clampRating(Math.max(search.ratingMax, ratingMin));
+  const ratingFilterActive = ratingMin !== 1 || ratingMax !== 5;
+
+  const ratingsByGoalkeeper = useMemo(() => {
+    const totals = new Map<string, { total: number; count: number }>();
+    for (const report of reportsData?.reports ?? []) {
+      if (!isValidScore(report.average)) continue;
+      const key = normaliseName(report.goalkeeper);
+      const existing = totals.get(key) ?? { total: 0, count: 0 };
+      existing.total += report.average;
+      existing.count += 1;
+      totals.set(key, existing);
+    }
+
+    return new Map(
+      [...totals].map(([name, { total, count }]) => [name, {
+        average: Math.round((total / count) * 10) / 10,
+        reportCount: count,
+      }]),
+    );
+  }, [reportsData]);
 
   const update = (patch: Partial<z.infer<typeof searchSchema>>) => {
     navigate({ search: (prev: z.infer<typeof searchSchema>) => ({ ...prev, ...patch }), replace: true });
@@ -138,8 +175,11 @@ function GoalkeepersList() {
       }
     }
 
-    // Rating range
-    if (g.rating < ratingMin || g.rating > ratingMax) return false;
+    // Rating range only filters when the user has narrowed the default 1–5 range.
+    if (ratingFilterActive) {
+      const rating = ratingsByGoalkeeper.get(normaliseName(g.name))?.average;
+      if (rating == null || rating < ratingMin || rating > ratingMax) return false;
+    }
 
     return true;
   });
@@ -160,14 +200,14 @@ function GoalkeepersList() {
     (search.club ? 1 : 0) +
     (search.contract !== "any" ? 1 : 0) +
     (search.loan !== "any" ? 1 : 0) +
-    (ratingMin !== 50 || ratingMax !== 99 ? 1 : 0);
+    (ratingFilterActive ? 1 : 0);
 
   const resetAll = () =>
     navigate({
       search: {
         q: "", cat: "All", duty: "all",
         tiers: "", leagues: "", nats: "", club: "",
-        contract: "any", ratingMin: 50, ratingMax: 99, loan: "any",
+        contract: "any", ratingMin: 1, ratingMax: 5, loan: "any",
       },
       replace: true,
     });
@@ -335,28 +375,28 @@ function GoalkeepersList() {
             {/* Rating range */}
             <div className="md:col-span-2 lg:col-span-3">
               <div className="text-[11px] uppercase text-muted-foreground mb-1.5">
-                Rating range <span className="tabular-nums font-mono text-foreground">{ratingMin}–{ratingMax}</span>
+                Rating range <span className="tabular-nums font-mono text-foreground">{ratingMin.toFixed(1)}–{ratingMax.toFixed(1)}</span>
               </div>
               <div className="flex items-center gap-3">
                 <label className="flex items-center gap-2 text-[11px] text-muted-foreground flex-1">
                   <span className="w-8 tabular-nums">Min</span>
                   <input
-                    type="range" min={50} max={99} value={ratingMin}
+                    type="range" min={1} max={5} step={0.1} value={ratingMin}
                     onChange={(e) => update({ ratingMin: clampRating(Number(e.target.value)) })}
                     className="flex-1"
                     aria-label="Minimum rating"
                   />
-                  <span className="w-6 tabular-nums font-mono text-foreground">{ratingMin}</span>
+                  <span className="w-8 tabular-nums font-mono text-foreground">{ratingMin.toFixed(1)}</span>
                 </label>
                 <label className="flex items-center gap-2 text-[11px] text-muted-foreground flex-1">
                   <span className="w-8 tabular-nums">Max</span>
                   <input
-                    type="range" min={50} max={99} value={ratingMax}
+                    type="range" min={1} max={5} step={0.1} value={ratingMax}
                     onChange={(e) => update({ ratingMax: clampRating(Number(e.target.value)) })}
                     className="flex-1"
                     aria-label="Maximum rating"
                   />
-                  <span className="w-6 tabular-nums font-mono text-foreground">{ratingMax}</span>
+                  <span className="w-8 tabular-nums font-mono text-foreground">{ratingMax.toFixed(1)}</span>
                 </label>
               </div>
             </div>
@@ -401,6 +441,7 @@ function GoalkeepersList() {
               </tr>
             ) : filtered.map((gk) => {
               const d = dutyStatusForGk(gk);
+              const rating = ratingsByGoalkeeper.get(normaliseName(gk.name));
               return (
                 <tr key={gk.id} className="border-b border-border/60 last:border-0 hover:bg-accent/20 transition-colors">
                   <td className="pl-4 pr-1"><TrafficLight level={d.level} /></td>
@@ -426,7 +467,16 @@ function GoalkeepersList() {
                   <td className="px-2">
                     <DutyBadge level={d.level} label={d.label} />
                   </td>
-                  <td className="px-4 text-right tabular-nums font-mono font-medium">{gk.rating}</td>
+                  <td
+                    className="px-4 text-right tabular-nums font-mono font-medium"
+                    title={rating
+                      ? `Average of ${rating.reportCount} valid Match Report score${rating.reportCount === 1 ? "" : "s"}`
+                      : reportsUnavailable
+                        ? "Match Report scores are unavailable"
+                        : "No valid Match Report score recorded"}
+                  >
+                    {rating ? `${rating.average.toFixed(1)}/5` : "-"}
+                  </td>
                 </tr>
               );
             })}
