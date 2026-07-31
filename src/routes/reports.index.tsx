@@ -4,7 +4,6 @@ import { z } from "zod";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { PageHeader, Card, Pill, SectionTitle, EmptyState } from "@/components/primitives";
-import { DataSourceBanner } from "@/lib/data-classification";
 import { useEffect, useMemo, useState } from "react";
 import { FileText, ChevronRight, RefreshCw, X, FilePlus2 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
@@ -180,11 +179,6 @@ function ReportsPage() {
         }
       />
 
-
-      <DataSourceBanner
-        classification="transitional"
-        extra="Match report submission uses a transitional Google Sheets connection. Successful persistence has not yet been verified in this environment."
-      />
 
       {error ? (
         <Card className="p-4 text-sm text-destructive">

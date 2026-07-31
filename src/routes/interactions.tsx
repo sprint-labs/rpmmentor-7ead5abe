@@ -2,7 +2,6 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
 import { PageHeader, Card, Pill, Avatar, EmptyState } from "@/components/primitives";
-import { DataSourceBanner } from "@/lib/data-classification";
 import { interactions, getGk, getMentor, formatDate, formatRelative } from "@/lib/mock-data";
 import { useEffect, useMemo, useState } from "react";
 import { X, MessageSquarePlus, Filter } from "lucide-react";
@@ -77,7 +76,6 @@ function InteractionsPage() {
         description="Every logged touchpoint between mentors and goalkeepers."
         action={<button className="h-9 px-3 rounded-md bg-primary text-primary-foreground text-sm font-medium">Log Interaction</button>}
       />
-      <DataSourceBanner classification="mock" extra="Interaction histories shown here are illustrative — not a record of real logged touchpoints." />
       <div className="flex flex-wrap gap-1.5">
         {TYPES.map((t) => (
           <button key={t} onClick={() => setType(t)} className={`px-3 py-1.5 rounded-md border text-xs transition-colors ${type === t ? "bg-accent border-accent text-accent-foreground" : "border-border hover:bg-accent/40 text-muted-foreground"}`}>{t}</button>

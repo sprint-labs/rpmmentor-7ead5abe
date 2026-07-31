@@ -2,7 +2,6 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
 import { PageHeader, Card, Pill } from "@/components/primitives";
-import { DataSourceBanner } from "@/lib/data-classification";
 import { calendarEvents, formatDate, goalkeepers } from "@/lib/mock-data";
 import { useEffect, useState } from "react";
 import { withPermission } from "@/components/require-permission";
@@ -135,7 +134,6 @@ function CalendarPage() {
           </div>
         }
       />
-      <DataSourceBanner classification="mock" extra="Calendar events shown here are illustrative and are not synced to any live scheduling source." />
 
       {filteredGoalkeeper && (
         <div className="flex items-center justify-between gap-3 rounded-md border border-border/60 bg-accent/30 px-3 py-2.5">

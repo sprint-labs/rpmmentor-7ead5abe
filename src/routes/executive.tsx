@@ -1,6 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { PageHeader, Card, StatCard, SectionTitle, TierBadge, ProgressBar, Pill } from "@/components/primitives";
-import { DataSourceBanner } from "@/lib/data-classification";
 import { goalkeepers, mentors, reports, interactions, stats } from "@/lib/mock-data";
 import { withPermission } from "@/components/require-permission";
 
@@ -31,7 +30,6 @@ function Executive() {
   return (
     <div className="space-y-6">
       <PageHeader title="Executive Dashboard" description="Strategic overview for directors and Head of Goalkeeping." />
-      <DataSourceBanner classification="mock" extra="Executive figures, pipeline counts, activity leaderboard and coverage percentages are illustrative." />
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <StatCard label="GK Coverage (30d)" value={`${coverage}%`} hint="Observed in last month" accent="primary" />

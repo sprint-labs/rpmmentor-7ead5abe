@@ -203,19 +203,6 @@ function GkDetail() {
         </div>
       </div>
 
-      <div
-        role="note"
-        className="flex items-start gap-2.5 rounded-md border border-border/60 bg-muted/30 px-3 py-2 text-[12px] leading-snug text-muted-foreground"
-      >
-        <Info className="size-4 mt-0.5 shrink-0" />
-        <div className="min-w-0">
-          <div className="font-semibold text-[12px] leading-snug text-foreground">Data sources on this profile</div>
-          <div className="opacity-90 mt-0.5">
-            Rating, Match Reports and Skill Scores are live data from the GKHQ Match Reports source. The remaining profile fields (bio, club/league/age, contract, interaction history and media library) are preview data and not real operational records.
-          </div>
-        </div>
-      </div>
-
       {gk.bio && (
         <Card className="p-4">
           <SectionTitle>Profile</SectionTitle>
