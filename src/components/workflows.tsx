@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
+import { useNavigate } from "@tanstack/react-router";
 import { X, CheckCircle2, Upload, AlertCircle, Paperclip, Search, Trash2, Loader2, RotateCcw } from "lucide-react";
 import { goalkeepers } from "@/lib/mock-data";
 import { listPlayers, type PlayerRosterRow } from "@/lib/players.functions";
@@ -152,12 +153,40 @@ const inputCls = "w-full h-9 px-3 rounded-md bg-input/60 border border-border te
 const selectCls = inputCls;
 const taCls = "w-full px-3 py-2 rounded-md bg-input/60 border border-border text-sm focus:outline-none focus:ring-2 focus:ring-ring/40 resize-none";
 
-function Submitted({ message, onDone }: { message: string; onDone: () => void }) {
+function Submitted({
+  message,
+  onDone,
+  action,
+  pending = false,
+}: {
+  message: string;
+  onDone: () => void;
+  action?: { label: string; onClick: () => void };
+  pending?: boolean;
+}) {
   return (
     <div className="text-center py-6">
-      <CheckCircle2 className="size-10 text-primary mx-auto" />
+      {pending ? (
+        <AlertCircle className="size-10 text-amber-500 mx-auto" />
+      ) : (
+        <CheckCircle2 className="size-10 text-primary mx-auto" />
+      )}
       <p className="text-sm font-medium mt-3">{message}</p>
-      <button onClick={onDone} className="mt-4 h-9 px-4 rounded-md bg-primary text-primary-foreground text-sm font-medium">Close</button>
+      <div className="mt-4 flex flex-wrap justify-center gap-2">
+        {action && (
+          <button onClick={action.onClick} className="h-9 px-4 rounded-md bg-primary text-primary-foreground text-sm font-medium">
+            {action.label}
+          </button>
+        )}
+        <button
+          onClick={onDone}
+          className={`h-9 px-4 rounded-md text-sm font-medium ${
+            action ? "border border-border hover:bg-accent" : "bg-primary text-primary-foreground"
+          }`}
+        >
+          Close
+        </button>
+      </div>
     </div>
   );
 }
@@ -267,6 +296,7 @@ function InteractionForm({ onDone }: { onDone: () => void }) {
  */
 function ReportForm({ onDone, prefillGoalkeeper, prefillMatchDate, prefillOpponent }: { onDone: () => void; prefillGoalkeeper?: string; prefillMatchDate?: string; prefillOpponent?: string }) {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const submitFn = useServerFn(submitMatchReport);
   const listPlayersFn = useServerFn(listPlayers);
   const playersQuery = useQuery({
@@ -284,7 +314,11 @@ function ReportForm({ onDone, prefillGoalkeeper, prefillMatchDate, prefillOppone
   const autoFilledTeamRef = useRef<string | null>(null);
   const [teamAutoFilled, setTeamAutoFilled] = useState(false);
 
-  const [done, setDone] = useState<{ report_id: string; average: number } | null>(null);
+  const [done, setDone] = useState<
+    | { status: "submitted"; reportId: string; average: number }
+    | { status: "queued" }
+    | null
+  >(null);
   const [goalkeeper, setGoalkeeper] = useState("");
   const coach = user?.name ?? "";
   const [competition, setCompetition] = useState("");
@@ -668,13 +702,26 @@ function ReportForm({ onDone, prefillGoalkeeper, prefillMatchDate, prefillOppone
   const liveAverage = useMemo(() => averageOfScores(scores), [scores]);
 
   if (done) {
-    const queued = (done as unknown as { queued?: boolean }).queued;
+    if (done.status === "queued") {
+      return (
+        <Submitted
+          pending
+          message="This report is queued locally. It has not yet been submitted to the RPM Match Reports Google Sheet, so it is not available to view yet."
+          onDone={onDone}
+        />
+      );
+    }
     return (
       <Submitted
-        message={queued
-          ? "You're offline — this match report is queued and will upload automatically as soon as you're back online."
-          : `Match report submitted to the RPM Match Reports Google Sheet · Average ${done.average.toFixed(1)}.`}
+        message={`Match report submitted to the RPM Match Reports Google Sheet · Average ${done.average.toFixed(1)}.`}
         onDone={onDone}
+        action={{
+          label: "Open submitted report",
+          onClick: () => {
+            onDone();
+            void navigate({ to: "/reports/$reportId", params: { reportId: done.reportId } });
+          },
+        }}
       />
     );
   }
@@ -787,7 +834,7 @@ function ReportForm({ onDone, prefillGoalkeeper, prefillMatchDate, prefillOppone
         }
       }
       if (user) clearDraft(user.id);
-      setDone({ report_id: res.report_id, average: res.average });
+      setDone({ status: "submitted", reportId: res.report_id, average: res.average });
       try { window.dispatchEvent(new CustomEvent("rpm:report-submitted", { detail: res })); } catch { /* ignore */ }
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Submission failed. Please try again.";
@@ -807,7 +854,7 @@ function ReportForm({ onDone, prefillGoalkeeper, prefillMatchDate, prefillOppone
             label: `Match report — ${payload.goalkeeper || "Unknown"} vs ${payload.opponent || "Unknown"}`,
           });
           if (user) clearDraft(user.id);
-          setDone({ report_id: "queued", average: 0, queued: true } as unknown as { report_id: string; average: number });
+          setDone({ status: "queued" });
           try { window.dispatchEvent(new CustomEvent("rpm:report-queued")); } catch { /* ignore */ }
         } catch {
           setError(msg);
