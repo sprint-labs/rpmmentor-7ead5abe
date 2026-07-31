@@ -44,7 +44,7 @@ export function AppShell() {
 
   useEffect(() => {
     if (!user && !isPublic) {
-      navigate({ to: "/login" as never, search: { redirect: path } as never, replace: true });
+      navigate({ to: "/login" as never, search: { next: path } as never, replace: true });
     }
   }, [user, isPublic, navigate, path]);
 
@@ -60,8 +60,8 @@ export function AppShell() {
   return (
     <div className="flex min-h-screen bg-background text-foreground">
       <div className="flex flex-1 flex-col min-w-0">
-        <header className="h-14 flex items-center gap-3 px-4 md:px-6 border-b border-border bg-sidebar/95 backdrop-blur sticky top-0 z-10">
-          <Link to="/" className="flex items-center gap-2.5 shrink-0">
+        <header className="h-16 md:h-14 flex items-center gap-2 md:gap-3 px-3 sm:px-4 md:px-6 border-b border-border bg-sidebar/95 backdrop-blur sticky top-0 z-10">
+          <Link to="/" className="size-11 md:w-auto md:h-auto flex items-center justify-center md:justify-start gap-2.5 shrink-0 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
             <BrandMark className="size-9 shrink-0" alt="Mentor Hub" />
             <span className="hidden sm:inline font-semibold text-foreground tracking-tight">Mentor Hub</span>
           </Link>
@@ -106,7 +106,7 @@ export function AppShell() {
           <ThemeToggle />
           {can("alerts.view") && (
             <div ref={bellRef} className="relative">
-              <button onClick={() => setBellOpen((v) => !v)} className="relative size-9 grid place-items-center rounded-md border border-border hover:bg-accent">
+              <button onClick={() => setBellOpen((v) => !v)} className="relative size-11 md:size-9 grid place-items-center rounded-md border border-border hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
                 <BellRing className="size-4" />
                 {notif.unread > 0 && (
                   <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-destructive text-destructive-foreground text-[10px] font-mono font-semibold grid place-items-center">
@@ -117,12 +117,12 @@ export function AppShell() {
               {bellOpen && (
                 <>
                   <div className="fixed inset-0 z-20" onClick={() => setBellOpen(false)} />
-                  <div className="absolute right-0 mt-2 w-[360px] rounded-md border border-border bg-popover shadow-xl z-30 overflow-hidden">
+                  <div className="fixed inset-x-3 top-16 z-30 w-auto rounded-md border border-border bg-popover shadow-xl overflow-hidden md:absolute md:inset-x-auto md:top-auto md:right-0 md:mt-2 md:w-[360px]">
                     <div className="flex items-center justify-between px-3 py-2 border-b border-border">
                       <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Duty Notifications</div>
                       <div className="flex items-center gap-1">
-                        <button onClick={() => notif.markAllRead()} title="Mark all read" className="p-1 rounded hover:bg-accent text-muted-foreground"><Check className="size-3.5" /></button>
-                        <button onClick={() => notif.clearAll()} title="Clear" className="p-1 rounded hover:bg-accent text-muted-foreground"><Trash2 className="size-3.5" /></button>
+                        <button onClick={() => notif.markAllRead()} title="Mark all read" className="size-11 grid place-items-center rounded hover:bg-accent text-muted-foreground"><Check className="size-3.5" /></button>
+                        <button onClick={() => notif.clearAll()} title="Clear" className="size-11 grid place-items-center rounded hover:bg-accent text-muted-foreground"><Trash2 className="size-3.5" /></button>
                       </div>
                     </div>
                     <div className="max-h-[420px] overflow-y-auto">
@@ -165,7 +165,7 @@ export function AppShell() {
             onClick={() => setNavOpen(true)}
             title="Open menu"
             aria-label="Open menu"
-            className="inline-flex items-center gap-1.5 h-9 px-2.5 md:px-3 rounded-md border border-border text-xs uppercase tracking-[0.06em] font-semibold hover:bg-accent"
+            className="inline-flex size-11 md:w-auto md:h-9 md:px-3 items-center justify-center gap-1.5 rounded-md border border-border text-xs uppercase tracking-[0.06em] font-semibold hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           >
             <Menu className="size-4" />
             <span className="hidden md:inline">Menu</span>
@@ -183,8 +183,8 @@ export function AppShell() {
       {navOpen && (
         <>
           <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm" onClick={() => setNavOpen(false)} />
-          <aside className="fixed inset-y-0 right-0 z-50 w-72 flex flex-col border-l border-sidebar-border bg-sidebar shadow-2xl">
-            <div className="flex items-center gap-2.5 px-5 h-14 border-b border-sidebar-border">
+          <aside className="fixed inset-y-0 right-0 z-50 w-[min(22rem,calc(100vw-1rem))] md:w-72 flex flex-col border-l border-sidebar-border bg-sidebar shadow-2xl">
+            <div className="flex items-center gap-2.5 px-4 min-h-16 md:h-14 border-b border-sidebar-border">
               <BrandMark className="size-7 shrink-0" alt="Mentor Hub" />
               <div className="flex flex-col leading-tight min-w-0 flex-1">
                 <span className="text-sm font-semibold tracking-tight truncate">{user.name}</span>
@@ -193,12 +193,12 @@ export function AppShell() {
               <button
                 onClick={() => setNavOpen(false)}
                 aria-label="Close menu"
-                className="size-8 grid place-items-center rounded-md hover:bg-sidebar-accent/60 text-muted-foreground"
+                className="size-11 md:size-8 grid place-items-center rounded-md hover:bg-sidebar-accent/60 text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <X className="size-4" />
               </button>
             </div>
-            <nav className="flex-1 p-2 space-y-0.5 overflow-y-auto">
+            <nav className="flex-1 p-3 md:p-2 space-y-1 md:space-y-0.5 overflow-y-auto">
               {visible.map((n) => {
                 const active = n.exact ? path === n.to : path.startsWith(n.to);
                 const Icon = n.icon;
@@ -207,7 +207,7 @@ export function AppShell() {
                     key={n.to}
                     to={n.to as never}
                     className={cn(
-                      "flex items-center gap-2.5 px-3 py-2 rounded-[6px] text-[12.5px] font-semibold uppercase tracking-[0.05em] transition-colors",
+                      "flex min-h-11 items-center gap-2.5 px-3 py-2 rounded-[6px] text-[13px] md:text-[12.5px] font-semibold uppercase tracking-[0.05em] transition-colors",
                       active
                         ? "bg-sidebar-accent text-sidebar-accent-foreground"
                         : "text-sidebar-foreground/75 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground",
@@ -223,13 +223,13 @@ export function AppShell() {
               <Link
                 to={"/account" as never}
                 onClick={() => setNavOpen(false)}
-                className="w-full flex items-center gap-2 px-3 py-2 rounded-md border border-border text-xs uppercase tracking-[0.06em] font-semibold hover:bg-accent"
+                className="w-full min-h-11 flex items-center gap-2 px-3 py-2 rounded-md border border-border text-xs uppercase tracking-[0.06em] font-semibold hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <KeyRound className="size-4" />Account
               </Link>
               <button
                 onClick={() => { signOut(); setNavOpen(false); navigate({ to: "/login" as never }); }}
-                className="w-full flex items-center gap-2 px-3 py-2 rounded-md border border-border text-xs uppercase tracking-[0.06em] font-semibold hover:bg-accent"
+                className="w-full min-h-11 flex items-center gap-2 px-3 py-2 rounded-md border border-border text-xs uppercase tracking-[0.06em] font-semibold hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <LogOut className="size-4" />Sign out
               </button>
@@ -249,7 +249,7 @@ function ThemeToggle() {
       onClick={toggle}
       title={isDark ? "Switch to light mode" : "Switch to dark mode"}
       aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
-      className="size-9 grid place-items-center rounded-md border border-border hover:bg-accent text-foreground/80"
+      className="size-11 md:size-9 grid place-items-center rounded-md border border-border hover:bg-accent text-foreground/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
     >
       {isDark ? <Sun className="size-4" /> : <Moon className="size-4" />}
     </button>

@@ -69,6 +69,15 @@ type SortKey = "goalkeeper" | "tier" | "tags" | "club" | "league" | "age" | "nat
 type SortDirection = "asc" | "desc";
 type Sort = { key: SortKey; direction: SortDirection };
 
+const MOBILE_SORT_OPTIONS: { key: SortKey; label: string }[] = [
+  { key: "goalkeeper", label: "Goalkeeper" },
+  { key: "tier", label: "Tier" },
+  { key: "club", label: "Club" },
+  { key: "age", label: "Age" },
+  { key: "contract", label: "Contract expiry" },
+  { key: "rating", label: "Rating" },
+];
+
 const collator = new Intl.Collator("en", { numeric: true, sensitivity: "base" });
 
 function formatContractExpiry(value: string): string {
@@ -130,6 +139,67 @@ function SortableHeader({
             : <ChevronsUpDown className="size-3 opacity-55" aria-hidden="true" />}
       </button>
     </th>
+  );
+}
+
+function MobileGoalkeeperCard({
+  gk,
+  rating,
+}: {
+  gk: Goalkeeper;
+  rating: { average: number; reportCount: number } | undefined;
+}) {
+  const duty = dutyStatusForGk(gk);
+  const club = gk.tags.includes("Free Agent") ? "Free Agent" : gk.club || "Not recorded";
+  const league = gk.tags.includes("Free Agent") ? "—" : gk.league || "Not recorded";
+
+  return (
+    <article className="p-4">
+      <div className="flex items-start gap-3">
+        <TrafficLight level={duty.level} />
+        <Link to="/goalkeepers/$gkId" params={{ gkId: gk.id }} className="flex min-w-0 flex-1 items-center gap-2.5 rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+          <Avatar initials={gk.initials} size={36} imageUrl={gk.profileImage} alt={`${gk.name} portrait`} />
+          <span className="min-w-0">
+            <span className="block truncate text-base font-medium">{gk.name}</span>
+            <span className="block truncate text-xs text-muted-foreground">{club}</span>
+          </span>
+        </Link>
+        <TierBadge tier={gk.tier} />
+      </div>
+
+      <div className="mt-3 flex flex-wrap gap-1">
+        {gk.tags.map((tag) => <TierBadge key={tag} tier={tag} />)}
+        {gk.onLoan && <Pill tone="info">On loan{gk.parentClub ? ` from ${gk.parentClub}` : ""}</Pill>}
+      </div>
+
+      <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 text-xs">
+        <div className="min-w-0">
+          <dt className="uppercase tracking-wider text-[10px] text-muted-foreground">League</dt>
+          <dd className="mt-0.5 truncate text-sm text-foreground">{league}</dd>
+        </div>
+        <div className="min-w-0">
+          <dt className="uppercase tracking-wider text-[10px] text-muted-foreground">Nationality</dt>
+          <dd className="mt-0.5 truncate text-sm text-foreground">{gk.nationality || "—"}</dd>
+        </div>
+        <div>
+          <dt className="uppercase tracking-wider text-[10px] text-muted-foreground">Contract expiry</dt>
+          <dd className="mt-0.5 text-sm text-foreground">{formatContractExpiry(gk.contractUntil)}</dd>
+        </div>
+        <div>
+          <dt className="uppercase tracking-wider text-[10px] text-muted-foreground">Rating</dt>
+          <dd className="mt-0.5 font-mono text-sm font-medium text-foreground" title={rating ? `Average of ${rating.reportCount} valid Match Report score${rating.reportCount === 1 ? "" : "s"}` : "No valid Match Report score recorded"}>
+            {rating ? `${rating.average.toFixed(1)}/5` : "-"}
+          </dd>
+        </div>
+      </dl>
+
+      <div className="mt-4 flex items-center justify-between gap-3 border-t border-border/60 pt-3">
+        <DutyBadge level={duty.level} label={duty.label} />
+        <Link to="/goalkeepers/$gkId" params={{ gkId: gk.id }} className="inline-flex min-h-11 items-center text-sm font-medium text-primary hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+          Open profile →
+        </Link>
+      </div>
+    </article>
   );
 }
 
@@ -315,7 +385,7 @@ function GoalkeepersList() {
     <div className="space-y-5">
       <PageHeader title="Goalkeepers" description={`${goalkeepers.length} RPM clients under management across the UK and internationally.`} />
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-4">
         <StatCard label="Total Under Care" value={dutyOverview.total} />
         <StatCard label="Up to date" value={dutyOverview.up_to_date} hint="Duty fulfilled" />
         <StatCard label="Due soon" value={dutyOverview.due_soon} hint="Approaching cadence" accent="warning" />
@@ -328,17 +398,17 @@ function GoalkeepersList() {
           value={search.q}
           onChange={(e) => update({ q: e.target.value })}
           placeholder="Search name, club, league, nationality…"
-          className="h-9 px-3 rounded-md bg-input/60 border border-border text-sm w-80"
+          className="h-11 w-full rounded-md border border-border bg-input/60 px-3 text-sm sm:h-9 sm:w-80"
           aria-label="Search goalkeepers"
         />
-        <div className="flex flex-wrap rounded-md border border-border overflow-hidden text-xs">
+        <div className="flex w-full flex-nowrap overflow-x-auto rounded-md border border-border text-xs sm:w-auto sm:flex-wrap sm:overflow-visible">
           {CATS_LIST.map((t) => (
-            <button key={t} onClick={() => update({ cat: t })} className={`px-3 py-1.5 transition-colors border-r border-border last:border-r-0 ${search.cat === t ? "bg-accent text-accent-foreground" : "hover:bg-accent/40 text-muted-foreground"}`}>{t}</button>
+            <button key={t} onClick={() => update({ cat: t })} className={`min-h-11 shrink-0 border-r border-border px-3 transition-colors last:border-r-0 sm:min-h-0 sm:py-1.5 ${search.cat === t ? "bg-accent text-accent-foreground" : "hover:bg-accent/40 text-muted-foreground"}`}>{t}</button>
           ))}
         </div>
-        <div className="flex flex-wrap rounded-md border border-border overflow-hidden text-xs">
+        <div className="flex w-full flex-nowrap overflow-x-auto rounded-md border border-border text-xs sm:w-auto sm:flex-wrap sm:overflow-visible">
           {DUTIES.map((d) => (
-            <button key={d.id} onClick={() => update({ duty: d.id })} className={`px-3 py-1.5 inline-flex items-center gap-1.5 transition-colors border-r border-border last:border-r-0 ${search.duty === d.id ? "bg-accent text-accent-foreground" : "hover:bg-accent/40 text-muted-foreground"}`}>
+            <button key={d.id} onClick={() => update({ duty: d.id })} className={`inline-flex min-h-11 shrink-0 items-center gap-1.5 border-r border-border px-3 transition-colors last:border-r-0 sm:min-h-0 sm:py-1.5 ${search.duty === d.id ? "bg-accent text-accent-foreground" : "hover:bg-accent/40 text-muted-foreground"}`}>
               {d.id !== "all" && <TrafficLight level={d.id as DutyLevel} size={7} />}
               {d.label}
               <span className="tabular-nums font-mono text-[10px] opacity-70">{d.count}</span>
@@ -348,14 +418,14 @@ function GoalkeepersList() {
         <button
           type="button"
           onClick={() => setAdvOpen((v) => !v)}
-          className="ml-auto inline-flex items-center gap-1.5 h-9 px-3 rounded-md border border-border text-xs hover:bg-accent/40"
+          className="inline-flex h-11 w-full items-center justify-center gap-1.5 rounded-md border border-border px-3 text-xs hover:bg-accent/40 sm:ml-auto sm:h-9 sm:w-auto"
           aria-expanded={advOpen}
         >
           {advOpen ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}
           Advanced filters
           {activeAdv > 0 && <Pill tone="info">{activeAdv}</Pill>}
         </button>
-        <div className="text-xs text-muted-foreground tabular-nums font-mono">{filtered.length} results</div>
+        <div className="w-full text-right font-mono text-xs tabular-nums text-muted-foreground sm:w-auto sm:text-left">{filtered.length} results</div>
       </div>
 
       {/* Advanced filters panel */}
@@ -373,7 +443,7 @@ function GoalkeepersList() {
                       key={t}
                       type="button"
                       onClick={() => update({ tiers: toCsv(toggleFrom(selectedTiers, t)) })}
-                      className={`px-2 py-1 rounded-md border text-[11px] transition-colors ${on ? "bg-primary/15 border-primary/50 text-foreground" : "border-border text-muted-foreground hover:bg-accent/40"}`}
+                        className={`min-h-10 rounded-md border px-2 text-[11px] transition-colors sm:min-h-0 sm:py-1 ${on ? "bg-primary/15 border-primary/50 text-foreground" : "border-border text-muted-foreground hover:bg-accent/40"}`}
                       aria-pressed={on}
                     >
                       {t}
@@ -392,7 +462,7 @@ function GoalkeepersList() {
                     key={o.id}
                     type="button"
                     onClick={() => update({ loan: o.id })}
-                    className={`px-2 py-1 rounded-md border text-[11px] transition-colors ${search.loan === o.id ? "bg-primary/15 border-primary/50 text-foreground" : "border-border text-muted-foreground hover:bg-accent/40"}`}
+                      className={`min-h-10 rounded-md border px-2 text-[11px] transition-colors sm:min-h-0 sm:py-1 ${search.loan === o.id ? "bg-primary/15 border-primary/50 text-foreground" : "border-border text-muted-foreground hover:bg-accent/40"}`}
                     aria-pressed={search.loan === o.id}
                   >
                     {o.label}
@@ -407,7 +477,7 @@ function GoalkeepersList() {
               <select
                 value={search.contract}
                 onChange={(e) => update({ contract: e.target.value })}
-                className="h-9 w-full px-2 rounded-md bg-input/60 border border-border text-sm"
+                className="h-11 w-full rounded-md border border-border bg-input/60 px-2 text-sm sm:h-9"
                 aria-label="Contract filter"
               >
                 {CONTRACT_OPTIONS.map((o) => (<option key={o.id} value={o.id}>{o.label}</option>))}
@@ -424,7 +494,7 @@ function GoalkeepersList() {
                 value={search.club}
                 onChange={(e) => update({ club: e.target.value })}
                 placeholder="e.g. Brighton, Wolves…"
-                className="h-9 w-full px-2 rounded-md bg-input/60 border border-border text-sm"
+                className="h-11 w-full rounded-md border border-border bg-input/60 px-2 text-sm sm:h-9"
                 aria-label="Club filter"
               />
             </div>
@@ -440,7 +510,7 @@ function GoalkeepersList() {
                       key={l}
                       type="button"
                       onClick={() => update({ leagues: toCsv(toggleFrom(selectedLeagues, l)) })}
-                      className={`px-2 py-0.5 rounded border text-[10px] transition-colors ${on ? "bg-primary/15 border-primary/50 text-foreground" : "border-border/60 text-muted-foreground hover:bg-accent/40"}`}
+                      className={`min-h-8 rounded border px-2 text-[10px] transition-colors sm:min-h-0 sm:py-0.5 ${on ? "bg-primary/15 border-primary/50 text-foreground" : "border-border/60 text-muted-foreground hover:bg-accent/40"}`}
                       aria-pressed={on}
                     >
                       {l}
@@ -461,7 +531,7 @@ function GoalkeepersList() {
                       key={n}
                       type="button"
                       onClick={() => update({ nats: toCsv(toggleFrom(selectedNats, n)) })}
-                      className={`px-2 py-0.5 rounded border text-[10px] transition-colors ${on ? "bg-primary/15 border-primary/50 text-foreground" : "border-border/60 text-muted-foreground hover:bg-accent/40"}`}
+                      className={`min-h-8 rounded border px-2 text-[10px] transition-colors sm:min-h-0 sm:py-0.5 ${on ? "bg-primary/15 border-primary/50 text-foreground" : "border-border/60 text-muted-foreground hover:bg-accent/40"}`}
                       aria-pressed={on}
                     >
                       {n}
@@ -476,8 +546,8 @@ function GoalkeepersList() {
               <div className="text-[11px] uppercase text-muted-foreground mb-1.5">
                 Rating range <span className="tabular-nums font-mono text-foreground">{ratingMin.toFixed(1)}–{ratingMax.toFixed(1)}</span>
               </div>
-              <div className="flex items-center gap-3">
-                <label className="flex items-center gap-2 text-[11px] text-muted-foreground flex-1">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                <label className="flex flex-1 items-center gap-2 text-[11px] text-muted-foreground">
                   <span className="w-8 tabular-nums">Min</span>
                   <input
                     type="range" min={1} max={5} step={0.1} value={ratingMin}
@@ -487,7 +557,7 @@ function GoalkeepersList() {
                   />
                   <span className="w-8 tabular-nums font-mono text-foreground">{ratingMin.toFixed(1)}</span>
                 </label>
-                <label className="flex items-center gap-2 text-[11px] text-muted-foreground flex-1">
+                <label className="flex flex-1 items-center gap-2 text-[11px] text-muted-foreground">
                   <span className="w-8 tabular-nums">Max</span>
                   <input
                     type="range" min={1} max={5} step={0.1} value={ratingMax}
@@ -501,12 +571,12 @@ function GoalkeepersList() {
             </div>
           </div>
 
-          <div className="flex items-center justify-between pt-1 border-t border-border">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border pt-1">
             <div className="text-[11px] text-muted-foreground">{activeAdv} advanced filter{activeAdv === 1 ? "" : "s"} active</div>
             <button
               type="button"
               onClick={resetAll}
-              className="inline-flex items-center gap-1 h-8 px-2.5 rounded-md border border-border text-[11px] hover:bg-accent/40"
+              className="inline-flex h-10 items-center gap-1 rounded-md border border-border px-2.5 text-[11px] hover:bg-accent/40"
             >
               <X className="size-3" /> Reset all filters
             </button>
@@ -514,8 +584,47 @@ function GoalkeepersList() {
         </Card>
       )}
 
-      <Card>
-        <table className="w-full text-sm">
+      <div className="flex items-center justify-between gap-3 md:hidden">
+        <label className="text-xs text-muted-foreground" htmlFor="goalkeeper-mobile-sort">Sort by</label>
+        <div className="flex flex-1 justify-end gap-2">
+          <select
+            id="goalkeeper-mobile-sort"
+            value={sort?.key ?? ""}
+            onChange={(event) => setSort(event.target.value ? { key: event.target.value as SortKey, direction: "asc" } : null)}
+            className="h-11 min-w-0 flex-1 rounded-md border border-border bg-input/60 px-2 text-sm"
+          >
+            <option value="">Default order</option>
+            {MOBILE_SORT_OPTIONS.map((option) => <option key={option.key} value={option.key}>{option.label}</option>)}
+          </select>
+          <button
+            type="button"
+            onClick={() => sort && setSort({ ...sort, direction: sort.direction === "asc" ? "desc" : "asc" })}
+            disabled={!sort}
+            className="h-11 min-w-11 rounded-md border border-border px-3 text-xs font-medium disabled:cursor-not-allowed disabled:opacity-40"
+            aria-label={sort ? `Sort ${sort.direction === "asc" ? "descending" : "ascending"}` : "Choose a field to sort"}
+          >
+            {sort?.direction === "desc" ? "↓" : "↑"}
+          </button>
+        </div>
+      </div>
+
+      <Card className="divide-y divide-border md:hidden">
+        {sorted.length === 0 ? (
+          <div className="px-4 py-8 text-center text-xs text-muted-foreground">
+            No goalkeepers match the current filters. {" "}
+            <button onClick={resetAll} className="text-primary hover:underline">Reset filters</button>
+          </div>
+        ) : sorted.map((gk) => (
+          <MobileGoalkeeperCard
+            key={gk.id}
+            gk={gk}
+            rating={ratingsByGoalkeeper.get(normaliseName(gk.name))}
+          />
+        ))}
+      </Card>
+
+      <Card className="hidden overflow-x-auto md:block">
+        <table className="min-w-[1100px] w-full text-sm">
           <thead>
             <tr className="text-left text-[11px] uppercase tracking-wider text-muted-foreground border-b border-border">
               <th className="font-medium px-3 py-2.5 w-6"></th>

@@ -34,6 +34,14 @@ function normaliseName(s: string): string {
   return s.trim().toLowerCase().replace(/\s+/g, " ");
 }
 
+function formatContractExpiry(value: string): string {
+  if (value === "—") return "-";
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return "Not recorded";
+  const [year, month] = value.split("-").map(Number);
+  return new Intl.DateTimeFormat("en-GB", { month: "long", year: "numeric", timeZone: "UTC" })
+    .format(new Date(Date.UTC(year, month - 1, 1)));
+}
+
 /** Sort match-report dates newest-first; undated reports sink to the bottom. */
 function compareMatchDatesNewestFirst(a: string | null, b: string | null): number {
   if (!a && !b) return 0;
@@ -167,17 +175,17 @@ function GkDetail() {
     <div className="space-y-5">
       <Link to="/goalkeepers" className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"><ArrowLeft className="size-3.5" /> Goalkeepers</Link>
 
-      <div className="flex flex-wrap items-start gap-4 justify-between">
-        <div className="flex items-center gap-4">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div className="flex min-w-0 items-start gap-3 sm:gap-4">
           <Avatar initials={gk.initials} size={56} imageUrl={gk.profileImage} alt={`${gk.name} portrait`} />
-          <div>
+          <div className="min-w-0">
             <div className="flex items-center gap-2.5 flex-wrap">
-              <h1 className="text-2xl font-semibold tracking-tight">{gk.name}</h1>
+              <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">{gk.name}</h1>
               <TierBadge tier={gk.tier} />
               {gk.tags.map((tag) => <TierBadge key={tag} tier={tag} />)}
               {gk.onLoan && <Pill tone="info">On loan{gk.parentClub ? ` from ${gk.parentClub}` : ""}</Pill>}
             </div>
-            <div className="text-sm text-muted-foreground mt-1">
+            <div className="mt-1 text-sm leading-snug text-muted-foreground">
               {gk.tags.includes("Free Agent") ? "Free Agent" : (gk.club || "Club not recorded")}
               {!gk.tags.includes("Free Agent") && gk.league ? ` · ${gk.league}` : ""}
               {" · "}{gk.nationality || "Nationality not recorded"}
@@ -198,9 +206,9 @@ function GkDetail() {
             )}
           </div>
         </div>
-        <div className="flex gap-2">
-          <button className="h-9 px-3 rounded-md bg-primary text-primary-foreground text-sm font-medium">Log Interaction</button>
-          <button className="h-9 px-3 rounded-md border border-border text-sm">Submit Report</button>
+        <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto">
+          <button className="h-11 min-w-0 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground sm:flex-none">Log Interaction</button>
+          <button className="h-11 min-w-0 rounded-md border border-border px-3 text-sm sm:flex-none">Submit Report</button>
         </div>
       </div>
 
@@ -211,8 +219,8 @@ function GkDetail() {
         </Card>
       )}
 
-      <div className="grid grid-cols-2 md:grid-cols-2 gap-3">
-        <Card className="p-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <Card className="p-4">
           <div className="text-[10px] uppercase text-muted-foreground">Rating (avg of Match Reports)</div>
           <div className="text-xl font-semibold tabular-nums font-mono mt-1">
             {isLoading ? <span className="text-muted-foreground text-sm font-sans font-normal">Loading…</span>
@@ -227,7 +235,10 @@ function GkDetail() {
           )}
         </Card>
 
-        <Card className="p-3"><div className="text-[10px] uppercase text-muted-foreground">Contract</div><div className="text-sm font-medium mt-1">{gk.contractUntil}</div></Card>
+        <Card className="p-4">
+          <div className="text-[10px] uppercase text-muted-foreground">Contract expiry</div>
+          <div className="mt-1 text-sm font-medium">{formatContractExpiry(gk.contractUntil)}</div>
+        </Card>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -267,7 +278,7 @@ function GkDetail() {
                       <div className="text-[11px] text-muted-foreground tabular-nums font-mono">{formatDate(item.date)} · {formatRelative(item.date)}</div>
                     </div>
                     <div className="text-sm text-muted-foreground mt-0.5">{item.notes}</div>
-                    <div className="flex gap-1.5 mt-1.5"><Pill>{item.outcome}</Pill><Pill tone="info">↳ {item.followUp}</Pill></div>
+                    <div className="mt-1.5 flex flex-wrap gap-1.5"><Pill>{item.outcome}</Pill><Pill tone="info">↳ {item.followUp}</Pill></div>
                   </div>
                 );
               })
@@ -462,8 +473,8 @@ function GkDetail() {
             <SectionTitle>Media ({gkMedia.length})</SectionTitle>
             <div className="space-y-1.5">
               {gkMedia.map((m) => (
-                <div key={m.id} className="flex items-center justify-between text-xs gap-2">
-                  <span className="truncate">{m.title}</span>
+                <div key={m.id} className="flex items-center justify-between gap-2 text-xs">
+                  <span className="min-w-0 flex-1 truncate">{m.title}</span>
                   <Pill>{m.kind}</Pill>
                 </div>
               ))}
