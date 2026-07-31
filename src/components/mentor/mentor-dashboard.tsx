@@ -4,7 +4,7 @@ import { Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { ArrowUpRight, CalendarClock, CalendarPlus, ChevronDown, ChevronRight, FileText, Video, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Card, StatCard, SectionTitle, Avatar, TierBadge, TierLevelBadge, Pill, TierLegend } from "@/components/primitives";
+import { Card, StatCard, SectionTitle, Avatar, TierBadge, TierLevelBadge, Pill } from "@/components/primitives";
 import { getMentorDashboardStats } from "@/lib/mentor-dashboard.functions";
 import type { MentorUpcomingInteraction } from "@/lib/mentor-dashboard.functions";
 import { mentors } from "@/lib/mock-data";
@@ -470,8 +470,6 @@ export function MentorDashboard({ user }: Props) {
           </div>
         )}
       </Card>
-
-      <TierLegend />
     </div>
   );
 }
