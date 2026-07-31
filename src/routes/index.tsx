@@ -1,5 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { Card, PageHeader, StatCard, SectionTitle, Avatar, Pill, TierBadge, TrafficLight } from "@/components/primitives";
 import { DataSourceBanner } from "@/lib/data-classification";
 import { activity, alerts, goalkeepers, stats, formatRelative, getMentor, dutyOverview, dutyStatusForGk } from "@/lib/mock-data";
@@ -7,12 +9,56 @@ import { ArrowUpRight, AlertTriangle, CalendarClock, FileText, Users, UserCog } 
 import { useAuth, ROLE_LABEL } from "@/lib/auth";
 import { MentorDashboard } from "@/components/mentor/mentor-dashboard";
 import { SyncStatusChip } from "@/components/sync-status-chip";
+import { listMatchReports } from "@/lib/match-reports/reports.functions";
+
+function toLocalIsoDate(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function reportWindow(now = new Date()) {
+  const from = new Date(now);
+  from.setDate(from.getDate() - 7);
+  return { from: toLocalIsoDate(from), to: toLocalIsoDate(now) };
+}
 
 export const Route = createFileRoute("/")({ component: Dashboard });
 
 function Dashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const listReports = useServerFn(listMatchReports);
+  const { data: reportsData, isLoading: reportsLoading, isError: reportsError } = useQuery({
+    // Share the Reports page cache so the dashboard number and the
+    // destination list are based on the same Sheets read.
+    queryKey: ["match-reports"],
+    queryFn: () => listReports(),
+    enabled: Boolean(user && user.role !== "mentor"),
+    staleTime: 30_000,
+    retry: 1,
+  });
+  const reportsWindow = reportWindow();
+  const reportsThisWeek = reportsData?.reports.filter((report) => {
+    if (!report.match_date) return false;
+    const from = new Date(`${reportsWindow.from}T00:00:00`).getTime();
+    const to = new Date(`${reportsWindow.to}T23:59:59.999`).getTime();
+    const matchDate = new Date(`${report.match_date}T00:00:00`).getTime();
+    return Number.isFinite(matchDate) && matchDate >= from && matchDate <= to;
+  }).length;
+  const reportsSearch = {
+    from: reportsWindow.from,
+    to: reportsWindow.to,
+    coach: "",
+    mentorProfileId: "",
+    source: "",
+    gk: "",
+    openSubmit: "",
+    last5Gk: "",
+    matchDate: "",
+    opponent: "",
+  };
 
   useEffect(() => {
     if (!user) navigate({ to: "/login", search: { next: "/" }, replace: true });
@@ -36,7 +82,10 @@ function Dashboard() {
   return (
     <div className="space-y-6">
       <PageHeader title={greeting} description={`${ROLE_LABEL[user.role]} view · overview of goalkeeper coverage and outstanding actions.`} action={<SyncStatusChip />} />
-      <DataSourceBanner classification="mock" />
+      <DataSourceBanner
+        classification="mock"
+        extra="Goalkeeper, interaction and mentor figures use preview data. Reports This Week reads the current Match Reports Sheets data."
+      />
 
 
 
@@ -58,6 +107,7 @@ function Dashboard() {
             value={stats.upcomingInteractions}
             hint="Next 14 days"
             accent="info"
+            emptyMessage="None scheduled"
           />
         </Link>
         <Link
@@ -70,18 +120,21 @@ function Dashboard() {
             value={stats.overdueInteractions}
             hint="Action required"
             accent="destructive"
+            emptyMessage="None overdue"
           />
         </Link>
         <Link
           to="/reports"
+          search={reportsSearch}
           className="block rounded-lg transition-transform hover:-translate-y-0.5 hover:ring-1 hover:ring-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
           aria-label="View match reports"
         >
           <StatCard
             label="Reports This Week"
-            value={stats.reportsThisWeek}
-            hint="Submitted"
+            value={reportsLoading ? "…" : reportsError || reportsThisWeek === null ? "—" : reportsThisWeek}
+            hint={reportsError ? "Report count unavailable" : "Last 7 days"}
             accent="primary"
+            emptyMessage="None submitted"
           />
         </Link>
         <Link

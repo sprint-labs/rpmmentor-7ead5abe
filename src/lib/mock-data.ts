@@ -183,6 +183,10 @@ export const mentors: Mentor[] = [
   { id: "m-matt-beadle", name: "Matt Beadle", initials: "MB", region: "South Coast", role: "Goalkeeper Mentor", email: "mbeadle@gkhq.app", assignedGks: [], targetInteractions: 12, completedThisMonth: 9, yearsExperience: 15 },
 ];
 
+// The Mentors screen and dashboard metric deliberately use the same roster.
+// Directors are managed in People & Users, not counted as mentors in rotation.
+export const activeMentors = mentors.filter((mentor) => mentor.role.includes("Mentor"));
+
 // Rotation pool used only to seed each goalkeeper's most-recent-contact mentor.
 // Mentors are NOT assigned to specific goalkeepers — the whole team works the roster.
 const ASSIGN_POOL = ["m-dave-watson", "m-andy-marshall", "m-jack-stern", "m-alec-chamberlain", "m-martyn-margetson", "m-martijn-middelbeek", "m-matt-beadle", "m-david-rouse"];
@@ -602,10 +606,18 @@ const STATUSES: Status[] = ["Tier 1", "Tier 2", "Tier 3", "Tier 4", "Academy", "
 
 export const stats = {
   totalGks: goalkeepers.length,
-  upcomingInteractions: goalkeepers.filter((g) => new Date(g.nextInteraction).getTime() >= Date.now() && (new Date(g.nextInteraction).getTime() - Date.now()) / 86400000 < 14).length,
+  // Interaction Tracking is the destination for this metric. Do not derive a
+  // count from placeholder goalkeeper next-contact dates: those are not
+  // logged interactions and made the dashboard promise records that were not
+  // present on the destination screen.
+  upcomingInteractions: interactions.filter((interaction) => {
+    const time = new Date(interaction.date).getTime();
+    const now = Date.now();
+    return time >= now && time <= now + 14 * 86400000;
+  }).length,
   overdueInteractions: alerts.filter((a) => a.kind === "Overdue observation" || a.kind === "Overdue contact").length,
   reportsThisWeek: reports.filter((r) => (Date.now() - new Date(r.date).getTime()) / 86400000 < 7).length,
-  activeMentors: mentors.filter((m) => m.role === "Goalkeeper Mentor" || m.role === "Goalkeeper Intelligence Scout" || m.role === "Managing Director & Mentor").length,
+  activeMentors: activeMentors.length,
   // Back-compat: tierDistribution now reports the Status distribution
   tierDistribution: STATUSES.map((t) => ({ tier: t, count: goalkeepers.filter((g) => g.status === t).length })),
   statusDistribution: STATUSES.map((t) => ({ status: t, count: goalkeepers.filter((g) => g.status === t).length })),
