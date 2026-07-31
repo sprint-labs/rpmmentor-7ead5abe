@@ -8,6 +8,8 @@ import { ArrowLeft, Info, Video, FileText, Phone, Eye, Users as UsersIcon, Calen
 import { listMatchReports } from "@/lib/match-reports/reports.functions";
 import { PILLAR_IDS, PILLAR_LABELS, type MatchReportRow, type PillarId } from "@/lib/match-reports/schema";
 import { ReportPreviewModal } from "@/components/report-preview-modal";
+import { WorkflowDialog, type WorkflowKind } from "@/components/workflows";
+import { useAuth } from "@/lib/auth";
 
 /** Inclusive 1–5 finite numeric guard for report scores/averages. */
 function isValidScore(v: unknown): v is number {
@@ -52,9 +54,11 @@ function compareMatchDatesNewestFirst(a: string | null, b: string | null): numbe
 
 function GkDetail() {
   const { gk } = Route.useLoaderData();
+  const { can } = useAuth();
   const gkInteractions = interactions.filter((i) => i.gkId === gk.id).sort((a, b) => +new Date(b.date) - +new Date(a.date));
   const gkMedia = media.filter((m) => m.gkId === gk.id);
   const [previewId, setPreviewId] = useState<string | null>(null);
+  const [workflow, setWorkflow] = useState<WorkflowKind | null>(null);
 
   const queryClient = useQueryClient();
   const listFn = useServerFn(listMatchReports);
@@ -206,10 +210,26 @@ function GkDetail() {
             )}
           </div>
         </div>
-        <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto">
-          <button className="h-11 min-w-0 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground sm:flex-none">Log Interaction</button>
-          <button className="h-11 min-w-0 rounded-md border border-border px-3 text-sm sm:flex-none">Submit Report</button>
-        </div>
+        {(can("interactions.log") || can("reports.submit")) && (
+          <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto">
+            {can("interactions.log") && (
+              <button
+                onClick={() => setWorkflow("interaction")}
+                className="h-11 min-w-0 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground sm:flex-none"
+              >
+                Log Interaction
+              </button>
+            )}
+            {can("reports.submit") && (
+              <button
+                onClick={() => setWorkflow("report")}
+                className="h-11 min-w-0 rounded-md border border-border px-3 text-sm sm:flex-none"
+              >
+                Submit Report
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {gk.bio && (
@@ -483,6 +503,11 @@ function GkDetail() {
         </div>
       </div>
 
+      <WorkflowDialog
+        kind={workflow}
+        onClose={() => setWorkflow(null)}
+        prefillGoalkeeper={gk.name}
+      />
       <ReportPreviewModal
         reportId={previewId}
         open={previewId !== null}

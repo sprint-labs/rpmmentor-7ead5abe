@@ -7,6 +7,8 @@ import { useEffect, useMemo, useState } from "react";
 import { X, MessageSquarePlus, Filter } from "lucide-react";
 import { withPermission } from "@/components/require-permission";
 import { getNavSource } from "@/lib/nav-source";
+import { WorkflowDialog, type WorkflowKind } from "@/components/workflows";
+import { useAuth } from "@/lib/auth";
 
 const interactionsSearchSchema = z.object({
   from: fallback(z.string(), "").default(""),
@@ -36,8 +38,10 @@ function resolveType(param: string): (typeof TYPES)[number] {
 }
 
 function InteractionsPage() {
+  const { can } = useAuth();
   const { from, to, mentorId, type: typeParam, source } = Route.useSearch();
   const navSource = getNavSource(source);
+  const [workflow, setWorkflow] = useState<WorkflowKind | null>(null);
   const [type, setType] = useState<(typeof TYPES)[number]>(() => resolveType(typeParam));
   useEffect(() => {
     if (typeParam) setType(resolveType(typeParam));
@@ -74,7 +78,14 @@ function InteractionsPage() {
         }
         title={navSource?.title ?? "Interaction Tracking"}
         description="Every logged touchpoint between mentors and goalkeepers."
-        action={<button className="h-9 px-3 rounded-md bg-primary text-primary-foreground text-sm font-medium">Log Interaction</button>}
+        action={can("interactions.log") ? (
+          <button
+            onClick={() => setWorkflow("interaction")}
+            className="h-9 px-3 rounded-md bg-primary text-primary-foreground text-sm font-medium"
+          >
+            Log Interaction
+          </button>
+        ) : undefined}
       />
       <div className="flex flex-wrap gap-1.5">
         {TYPES.map((t) => (
@@ -127,11 +138,14 @@ function InteractionsPage() {
                         >
                           <X className="size-3.5" /> Clear filters
                         </Link>
-                      ) : (
-                        <button className="h-9 px-3 rounded-md bg-primary text-primary-foreground text-sm font-medium inline-flex items-center gap-1.5">
+                      ) : can("interactions.log") ? (
+                        <button
+                          onClick={() => setWorkflow("interaction")}
+                          className="h-9 px-3 rounded-md bg-primary text-primary-foreground text-sm font-medium inline-flex items-center gap-1.5"
+                        >
                           <MessageSquarePlus className="size-3.5" /> Log interaction
                         </button>
-                      )
+                      ) : undefined
                     }
                   />
                 </td>
@@ -156,6 +170,7 @@ function InteractionsPage() {
 
         </table>
       </Card>
+      <WorkflowDialog kind={workflow} onClose={() => setWorkflow(null)} />
     </div>
   );
 }
