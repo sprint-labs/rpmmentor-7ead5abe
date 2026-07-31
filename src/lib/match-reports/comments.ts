@@ -1,17 +1,9 @@
 /**
- * Structured Match Report comments.
+ * Match Report comment validation and text helpers.
  *
- * A report has exactly ONE Comments textarea. Its content is loosely
- * structured by three editable section labels:
- *
- *   Summary:
- *   Key Moments:
- *   Development Focus:
- *
- * The labels are plain text the mentor can edit; nothing here rewrites or
- * reformats what a user typed. `ensureSections` only ever ADDS a missing
- * label — it never removes, reorders or reflows existing text, so historical
- * comments read back from the sheet are left exactly as they are.
+ * New mentor reports are free-form text. The legacy three-label helpers remain
+ * here solely for backwards compatibility with already-saved structured
+ * reports and the optional Super Admin analysis view.
  */
 
 export const COMMENT_SECTIONS = ["Summary", "Key Moments", "Development Focus"] as const;
@@ -150,7 +142,7 @@ export function validateComments(text: string): CommentValidation {
   if (!compact) {
     return {
       ok: false,
-      message: "Add match notes under Summary, Key Moments and Development Focus before submitting.",
+      message: "Add a meaningful match report before submitting.",
     };
   }
 
@@ -188,17 +180,25 @@ export function validateComments(text: string): CommentValidation {
     .filter(Boolean);
 
   if (paragraphs.length >= 2 && new Set(paragraphs).size < paragraphs.length) {
-    return { ok: false, message: "Comments repeat the same text — add distinct notes for each section." };
+    return { ok: false, message: "Comments repeat the same text — add distinct match observations." };
   }
 
   if (meaningfulCharCount(text) < MIN_MEANINGFUL_CHARS) {
     return {
       ok: false,
-      message: `Comments need at least ${MIN_MEANINGFUL_CHARS} characters of match detail (headings don't count).`,
+      message: `Comments need at least ${MIN_MEANINGFUL_CHARS} characters of match detail.`,
     };
   }
 
   return { ok: true };
+}
+
+/** Append free-form text without overwriting anything the mentor already wrote. */
+export function appendCommentText(previous: string, incoming: string): string {
+  const text = incoming.trim();
+  if (!text) return previous;
+  const base = previous.trimEnd();
+  return base ? `${base}\n\n${text}` : text;
 }
 
 
@@ -367,10 +367,9 @@ export function insertAtOffset(
 /**
  * Handwritten-note OCR merge (user-controlled replace/append).
  *
- * Unlike voice transcripts — which are never allowed to overwrite and are
- * placed by section (see `resolveInsertPlacement`) — OCR keeps its original
- * behaviour where the mentor explicitly picks the mode. Both modes return text
- * that still satisfies the single-textarea section structure.
+ * OCR keeps its original user-controlled behaviour: the mentor explicitly
+ * chooses replace or append. New reports remain free-form; historical
+ * structured comments are preserved exactly when appending.
  */
 export function mergeOcrText(
   previous: string,
@@ -379,7 +378,6 @@ export function mergeOcrText(
 ): string {
   const text = incoming.trim();
   if (!text) return previous;
-  if (mode === "replace" || !previous.trim()) return ensureSections(text);
-  const base = ensureSections(previous);
-  return `${base.replace(/\s+$/, "")}\n\n${text}`;
+  if (mode === "replace" || !previous.trim()) return text;
+  return appendCommentText(previous, text);
 }

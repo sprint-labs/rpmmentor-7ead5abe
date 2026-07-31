@@ -8,6 +8,7 @@ import {
   chooseInsertSection,
   sectionAtOffset,
   insertUnderSection,
+  appendCommentText,
 } from "./comments";
 
 const GOOD =
@@ -44,6 +45,12 @@ describe("meaningfulCharCount", () => {
 });
 
 describe("validateComments", () => {
+  it("accepts a meaningful free-form mentor report without section labels", () => {
+    const report =
+      "He made two strong saves before half-time and distributed quickly to start the winning move.";
+    expect(validateComments(report)).toEqual({ ok: true });
+  });
+
   it("accepts real notes", () => {
     expect(validateComments(GOOD).ok).toBe(true);
   });
@@ -93,6 +100,25 @@ describe("validateComments", () => {
   it("rejects short but distinct notes under 40 meaningful chars", () => {
     const short = "Summary:\nGood game.\n\nKey Moments:\nOne save.\n\nDevelopment Focus:\nKicking.\n";
     expect(validateComments(short).ok).toBe(false);
+  });
+});
+
+describe("appendCommentText", () => {
+  it("appends a reviewed transcript without adding labels or losing existing notes", () => {
+    const out = appendCommentText(
+      "Existing observation.",
+      "He claimed several crosses confidently in the second half.",
+    );
+    expect(out).toBe(
+      "Existing observation.\n\nHe claimed several crosses confidently in the second half.",
+    );
+    expect(out).not.toContain("Summary:");
+  });
+
+  it("uses incoming text directly when Comments is blank", () => {
+    expect(appendCommentText("", "A complete spoken match report.")).toBe(
+      "A complete spoken match report.",
+    );
   });
 });
 

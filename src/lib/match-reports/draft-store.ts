@@ -35,6 +35,8 @@ export interface VoiceTranscriptDraft {
   tokens: Array<{ token: string; confidence: number }>;
   avgConfidence: number | null;
   reviewed: boolean;
+  /** Editable AI rewrite for Match Reports, when one has been generated. */
+  rewrite?: string | null;
   /** The AI-generated transcript, preserved verbatim for auditability. */
   original?: TranscriptVersion | null;
   /** Ordered list of subsequent versions (edits + saves), oldest first. */

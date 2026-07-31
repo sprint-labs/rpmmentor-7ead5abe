@@ -20,10 +20,18 @@ interface Props {
   onTranscribed: (text: string, mode: "replace" | "append") => void;
   /** Set false to hide the replace action (append-only consumers). */
   allowReplace?: boolean;
+  /** Name of the destination field shown in helper and action copy. */
+  destinationLabel?: "notes" | "comments";
   className?: string;
 }
 
-export function HandwrittenNotesField({ context, onTranscribed, allowReplace = true, className }: Props) {
+export function HandwrittenNotesField({
+  context,
+  onTranscribed,
+  allowReplace = true,
+  destinationLabel = "notes",
+  className,
+}: Props) {
   const fileRef = useRef<HTMLInputElement>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
   const [preview, setPreview] = useState<string | null>(null);
@@ -64,7 +72,9 @@ export function HandwrittenNotesField({ context, onTranscribed, allowReplace = t
           <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             <Sparkles className="size-3.5 text-primary" />Transcribe Handwritten Notes
           </div>
-          <p className="text-[11px] text-muted-foreground mt-0.5">Snap or upload a clear photo of your notes — AI will turn it into typed text you can drop into the notes field.</p>
+          <p className="text-[11px] text-muted-foreground mt-0.5">
+            Snap or upload a clear photo of your notes — AI will turn it into typed text you can add to {destinationLabel === "comments" ? "Comments" : "Notes"}.
+          </p>
         </div>
         {(preview || transcript) && (
           <button type="button" onClick={reset} className="size-7 grid place-items-center rounded-md hover:bg-accent text-muted-foreground" aria-label="Reset"><X className="size-3.5" /></button>
@@ -97,11 +107,11 @@ export function HandwrittenNotesField({ context, onTranscribed, allowReplace = t
                 <div className="text-xs whitespace-pre-wrap bg-background border border-border rounded-md p-2 max-h-40 overflow-y-auto">{transcript}</div>
                 <div className="flex flex-wrap gap-1.5 mt-2">
                   <button type="button" onClick={() => onTranscribed(transcript, "append")} className="inline-flex items-center gap-1 h-7 px-2 rounded-md bg-primary text-primary-foreground text-[11px] font-medium hover:opacity-90">
-                    Append to notes
+                    Append to {destinationLabel}
                   </button>
                   {allowReplace && (
                     <button type="button" onClick={() => onTranscribed(transcript, "replace")} className="inline-flex items-center gap-1 h-7 px-2 rounded-md border border-border text-[11px] font-medium hover:bg-accent">
-                      Replace notes
+                      Replace {destinationLabel}
                     </button>
                   )}
                   <button type="button" onClick={() => { navigator.clipboard?.writeText(transcript); toast.success("Copied"); }} className="inline-flex items-center gap-1 h-7 px-2 rounded-md border border-border text-[11px] font-medium hover:bg-accent">

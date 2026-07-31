@@ -23,8 +23,7 @@ import {
   type ReportDraft, type ReportDraftSnapshot,
 } from "@/lib/match-reports/draft-store";
 import {
-  BLANK_COMMENTS_TEMPLATE, SECTION_HELP, ensureSections, mergeOcrText, validateComments,
-  resolveInsertPlacement, sectionAtOffset, insertUnderSection, insertAtOffset,
+  appendCommentText, mergeOcrText, validateComments,
 } from "@/lib/match-reports/comments";
 import { newSubmissionKey } from "@/lib/match-reports/duplicates";
 
@@ -296,9 +295,8 @@ function ReportForm({ onDone, prefillGoalkeeper, prefillMatchDate, prefillOppone
     protect_goal: 3, protect_space: 3, protect_air: 3,
     control_play: 3, change_play: 3, psych: 3, physical: 3,
   });
-  const [comments, setComments] = useState(BLANK_COMMENTS_TEMPLATE);
+  const [comments, setComments] = useState("");
   const commentsRef = useRef<HTMLTextAreaElement | null>(null);
-  const commentsCaretRef = useRef<number | null>(null);
   const [commentsError, setCommentsError] = useState<string | null>(null);
   const [selectedMedia, setSelectedMedia] = useState<string[]>([]);
   const [voiceTranscript, setVoiceTranscript] = useState<import("@/lib/match-reports/draft-store").VoiceTranscriptDraft | null>(null);
@@ -460,7 +458,7 @@ function ReportForm({ onDone, prefillGoalkeeper, prefillMatchDate, prefillOppone
       protect_goal: 3, protect_space: 3, protect_air: 3,
       control_play: 3, change_play: 3, psych: 3, physical: 3,
     });
-    setComments(BLANK_COMMENTS_TEMPLATE);
+    setComments("");
     setSelectedMedia([]);
     setVoiceTranscript(null);
     setDraftSavedAt(null);
@@ -685,42 +683,32 @@ function ReportForm({ onDone, prefillGoalkeeper, prefillMatchDate, prefillOppone
     setScores((s) => ({ ...s, [id]: Math.max(1, Math.min(5, Math.round(v))) }));
 
   /**
-   * OCR / voice transcripts are ALWAYS inserted, never a replacement.
-   * A caret explicitly placed in Development Focus wins; action keywords go to
-   * Key Moments; clear overview wording goes to Summary; anything uncertain is
-   * inserted at the mentor's caret, or appended under Key Moments when there
-   * is no caret.
+   * The exact transcript appends without overwriting existing notes. An AI
+   * rewrite is inserted as the editable report body; replacing existing
+   * Comments always requires explicit confirmation.
    */
-  const insertTranscript = (text: string) => {
-    const base = ensureSections(comments);
-    const caret = commentsCaretRef.current;
-    const cursorSection = caret == null ? null : sectionAtOffset(base, caret);
-    const placement = resolveInsertPlacement(text, cursorSection, caret ?? null);
-    const result =
-      placement.kind === "cursor"
-        ? insertAtOffset(base, text, placement.offset)
-        : insertUnderSection(base, text, placement.section);
-
-    setComments(result.text);
+  const applyVoiceText = (text: string, mode: "replace" | "append") => {
+    const incoming = text.trim();
+    if (!incoming) return false;
+    if (mode === "replace") {
+      if (
+        comments.trim() &&
+        !window.confirm("Replace the current Comments with this AI rewrite? Your existing text will be removed.")
+      ) {
+        return false;
+      }
+      setComments(incoming);
+    } else {
+      setComments((previous) => appendCommentText(previous, incoming));
+    }
     setCommentsError(null);
-    // Restore the caret after the inserted text where the browser allows it.
-    requestAnimationFrame(() => {
-      const el = commentsRef.current;
-      if (!el) return;
-      try {
-        el.focus();
-        el.setSelectionRange(result.selectionStart, result.selectionEnd);
-        commentsCaretRef.current = result.selectionStart;
-      } catch { /* selection unsupported — text is still inserted */ }
-    });
+    return true;
   };
 
   /**
    * Handwritten-note OCR keeps its original user-controlled behaviour: the
-   * mentor chooses replace or append. Only the single-textarea section
-   * structure is preserved (via `ensureSections`); append never deletes text
-   * the mentor already wrote. This is deliberately NOT the voice placement
-   * path — voice transcripts must never overwrite (see `insertTranscript`).
+   * mentor chooses replace or append. Append never deletes text the mentor
+   * already wrote.
    */
   const applyOcrText = (text: string, mode: "replace" | "append") => {
     const incoming = text.trim();
@@ -740,9 +728,7 @@ function ReportForm({ onDone, prefillGoalkeeper, prefillMatchDate, prefillOppone
     setDuplicate(null);
     setFieldErrors({});
 
-    // Ensure the three section labels exist before any write, without
-    // losing text the mentor typed.
-    const normalisedComments = ensureSections(comments);
+    const normalisedComments = comments.trim();
     if (normalisedComments !== comments) setComments(normalisedComments);
     const check = validateComments(normalisedComments);
     if (!check.ok) {
@@ -918,13 +904,16 @@ function ReportForm({ onDone, prefillGoalkeeper, prefillMatchDate, prefillOppone
 
       <HandwrittenNotesField
         context={goalkeeper ? `Match notes on ${goalkeeper} vs ${opponent || "opponent"}` : undefined}
+        destinationLabel="comments"
         onTranscribed={(text, mode) => applyOcrText(text, mode)}
       />
       <VoiceNoteField
         draft={voiceTranscript}
         onDraftChange={setVoiceTranscript}
         allowReplace={false}
-        onTranscribed={(text) => insertTranscript(text)}
+        aiMode="report-rewrite"
+        rewriteContext={{ goalkeeper, team, opponent, competition, matchDate }}
+        onTranscribed={applyVoiceText}
         onAudioAttach={async ({ blob, mimeType, durationSec }) => {
           if (!user) throw new Error("Sign in required to save audio.");
           const gk = goalkeepers.find(
@@ -952,10 +941,7 @@ function ReportForm({ onDone, prefillGoalkeeper, prefillMatchDate, prefillOppone
       />
       <Field label="Comments *">
         <div className="mb-1.5 text-[10px] leading-relaxed text-muted-foreground">
-          Keep the three section labels and write under each — they stay editable.
-          <span className="block"><strong>Summary:</strong> {SECTION_HELP.Summary}</span>
-          <span className="block"><strong>Key Moments:</strong> {SECTION_HELP["Key Moments"]}</span>
-          <span className="block"><strong>Development Focus:</strong> {SECTION_HELP["Development Focus"]}</span>
+          Write a free-form match report, append the reviewed transcript, or use the editable AI rewrite above.
         </div>
         <textarea
           ref={commentsRef}
@@ -964,25 +950,14 @@ function ReportForm({ onDone, prefillGoalkeeper, prefillMatchDate, prefillOppone
           value={comments}
           onChange={(e) => {
             setComments(e.target.value);
-            commentsCaretRef.current = e.target.selectionStart;
             if (commentsError) setCommentsError(null);
           }}
-          onSelect={(e) => { commentsCaretRef.current = (e.target as HTMLTextAreaElement).selectionStart; }}
-          onKeyUp={(e) => { commentsCaretRef.current = (e.target as HTMLTextAreaElement).selectionStart; }}
-          onClick={(e) => { commentsCaretRef.current = (e.target as HTMLTextAreaElement).selectionStart; }}
           maxLength={5000}
-          placeholder={BLANK_COMMENTS_TEMPLATE}
+          placeholder="Write the mentor's match observations here…"
         />
-        <div className="mt-1 flex items-center justify-between gap-2">
-          <button
-            type="button"
-            onClick={() => setComments((prev) => ensureSections(prev))}
-            className="text-[10px] text-muted-foreground hover:text-foreground underline underline-offset-2"
-          >
-            Restore section labels
-          </button>
+        <div className="mt-1 flex items-center justify-end gap-2">
           <span className="text-[10px] text-muted-foreground">
-            Minimum 40 characters of detail (headings don't count)
+            Minimum 40 characters of match detail
           </span>
         </div>
         {commentsError && (
@@ -2048,5 +2023,3 @@ async function exportConflictPdf(summary: ConflictSummary) {
 
   doc.save(`draft-conflict-${timestampSlug()}.pdf`);
 }
-
-

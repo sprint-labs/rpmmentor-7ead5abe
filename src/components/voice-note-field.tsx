@@ -3,7 +3,13 @@ import { useServerFn } from "@tanstack/react-start";
 import { Mic, Square, Loader2, X, RotateCcw, Sparkles, CheckCircle2, AlertTriangle, History, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { transcribeVoiceNote } from "@/lib/api/transcribe.functions";
-import { summarizeTranscript, type StructuredSummary } from "@/lib/api/summarize.functions";
+import {
+  rewriteTranscript,
+  summarizeTranscript,
+  type FixtureContext,
+  type StructuredSummary,
+} from "@/lib/api/summarize.functions";
+import { LatestRequestGate } from "@/lib/async/latest-request";
 
 
 const MAX_SECONDS = 180;
@@ -59,6 +65,7 @@ interface VoiceDraft {
   tokens: Array<{ token: string; confidence: number }>;
   avgConfidence: number | null;
   reviewed: boolean;
+  rewrite?: string | null;
   original?: TranscriptVersion | null;
   versions?: TranscriptVersion[];
 }
@@ -71,18 +78,29 @@ interface AttemptLogEntry {
 }
 
 interface Props {
-  onTranscribed: (text: string, mode: "replace" | "append") => void;
+  onTranscribed: (text: string, mode: "replace" | "append") => boolean | void;
   onAudioAttach?: (audio: { blob: Blob; mimeType: string; durationSec: number }) => void | Promise<void>;
   draft?: VoiceDraft | null;
   onDraftChange?: (draft: VoiceDraft | null) => void;
-  /** Match Report comments are never replaced — hide the replace actions. */
+  rewriteContext?: FixtureContext;
+  aiMode?: "structured-summary" | "report-rewrite";
+  /** Hide raw transcript/legacy summary replace actions where required. */
   allowReplace?: boolean;
   className?: string;
 }
 
 type Phase = "idle" | "preparing" | "uploading" | "transcribing";
 
-export function VoiceNoteField({ onTranscribed, onAudioAttach, draft, onDraftChange, allowReplace = true, className }: Props) {
+export function VoiceNoteField({
+  onTranscribed,
+  onAudioAttach,
+  draft,
+  onDraftChange,
+  rewriteContext,
+  aiMode = "structured-summary",
+  allowReplace = true,
+  className,
+}: Props) {
   const [recording, setRecording] = useState(false);
   const [phase, setPhase] = useState<Phase>("idle");
   const [phaseElapsed, setPhaseElapsed] = useState(0);
@@ -90,6 +108,7 @@ export function VoiceNoteField({ onTranscribed, onAudioAttach, draft, onDraftCha
   const [tokens, setTokens] = useState<Array<{ token: string; confidence: number }>>(draft?.tokens ?? []);
   const [avgConfidence, setAvgConfidence] = useState<number | null>(draft?.avgConfidence ?? null);
   const [reviewed, setReviewed] = useState<boolean>(draft?.reviewed ?? false);
+  const [rewrite, setRewrite] = useState<string | null>(draft?.rewrite ?? null);
   const [original, setOriginal] = useState<TranscriptVersion | null>(draft?.original ?? null);
   const [versions, setVersions] = useState<TranscriptVersion[]>(draft?.versions ?? []);
   const [showHistory, setShowHistory] = useState(false);
@@ -114,6 +133,8 @@ export function VoiceNoteField({ onTranscribed, onAudioAttach, draft, onDraftCha
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const phaseTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const rewriteRequestGateRef = useRef(new LatestRequestGate());
+  const summaryRequestGateRef = useRef(new LatestRequestGate());
   const preTranscribeSnapshotRef = useRef<VoiceDraft | null>(null);
   const cancelledPhaseRef = useRef<Phase>("idle");
   const cancelledElapsedRef = useRef<number>(0);
@@ -127,17 +148,69 @@ export function VoiceNoteField({ onTranscribed, onAudioAttach, draft, onDraftCha
 
 
   const run = useServerFn(transcribeVoiceNote);
+  const runRewrite = useServerFn(rewriteTranscript);
   const runSummarize = useServerFn(summarizeTranscript);
+  const [rewriting, setRewriting] = useState(false);
+  const [rewriteError, setRewriteError] = useState<string | null>(null);
   const [summary, setSummary] = useState<StructuredSummary | null>(null);
   const [summarizing, setSummarizing] = useState(false);
   const [summaryError, setSummaryError] = useState<string | null>(null);
 
-  const formatSummary = (s: StructuredSummary): string => {
+  const invalidateAiRequests = () => {
+    rewriteRequestGateRef.current.invalidate();
+    summaryRequestGateRef.current.invalidate();
+    setRewriting(false);
+    setSummarizing(false);
+  };
+
+  const requestRewrite = async (sourceText = transcript) => {
+    if (!sourceText || sourceText.trim().length < 20) {
+      toast.error("Transcript is too short to rewrite.");
+      return;
+    }
+    const requestToken = rewriteRequestGateRef.current.begin();
+    setRewriting(true);
+    setRewriteError(null);
+    try {
+      const res = await runRewrite({
+        data: { transcript: sourceText, context: rewriteContext ?? {} },
+      });
+      if (!requestToken.isCurrent()) return;
+      if (!res.ok) {
+        setRewriteError(res.error);
+        toast.error(res.error);
+        return;
+      }
+      setRewrite(res.rewrite);
+    } catch (err) {
+      if (!requestToken.isCurrent()) return;
+      const msg = err instanceof Error ? err.message : "Failed to rewrite transcript.";
+      setRewriteError(msg);
+      toast.error(msg);
+    } finally {
+      if (requestToken.isCurrent()) setRewriting(false);
+    }
+  };
+
+  const useRewrite = () => {
+    if (!rewrite?.trim()) return;
+    const applied = onTranscribed(rewrite, "replace");
+    if (applied === false) return;
+    toast.success("AI rewrite placed in Comments — review it before submitting");
+  };
+
+  const formatSummary = (value: StructuredSummary): string => {
     const parts: string[] = [];
-    if (s.headline) parts.push(s.headline);
-    if (s.strengths.length) parts.push(`Strengths:\n${s.strengths.map((x) => `• ${x}`).join("\n")}`);
-    if (s.improvements.length) parts.push(`Areas to develop:\n${s.improvements.map((x) => `• ${x}`).join("\n")}`);
-    if (s.keyMoments.length) parts.push(`Key moments:\n${s.keyMoments.map((x) => `• ${x}`).join("\n")}`);
+    if (value.headline) parts.push(value.headline);
+    if (value.strengths.length) {
+      parts.push(`Strengths:\n${value.strengths.map((item) => `• ${item}`).join("\n")}`);
+    }
+    if (value.improvements.length) {
+      parts.push(`Areas to develop:\n${value.improvements.map((item) => `• ${item}`).join("\n")}`);
+    }
+    if (value.keyMoments.length) {
+      parts.push(`Key moments:\n${value.keyMoments.map((item) => `• ${item}`).join("\n")}`);
+    }
     return parts.join("\n\n");
   };
 
@@ -146,22 +219,25 @@ export function VoiceNoteField({ onTranscribed, onAudioAttach, draft, onDraftCha
       toast.error("Transcript is too short to summarise.");
       return;
     }
+    const requestToken = summaryRequestGateRef.current.begin();
     setSummarizing(true);
     setSummaryError(null);
     try {
-      const res = await runSummarize({ data: { transcript } });
-      if (!res.ok) {
-        setSummaryError(res.error);
-        toast.error(res.error);
+      const result = await runSummarize({ data: { transcript } });
+      if (!requestToken.isCurrent()) return;
+      if (!result.ok) {
+        setSummaryError(result.error);
+        toast.error(result.error);
         return;
       }
-      setSummary(res.summary);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Failed to summarise transcript.";
-      setSummaryError(msg);
-      toast.error(msg);
+      setSummary(result.summary);
+    } catch (error) {
+      if (!requestToken.isCurrent()) return;
+      const message = error instanceof Error ? error.message : "Failed to summarise transcript.";
+      setSummaryError(message);
+      toast.error(message);
     } finally {
-      setSummarizing(false);
+      if (requestToken.isCurrent()) setSummarizing(false);
     }
   };
 
@@ -171,11 +247,22 @@ export function VoiceNoteField({ onTranscribed, onAudioAttach, draft, onDraftCha
     toast.success(mode === "replace" ? "Comments replaced with summary" : "Summary appended to comments");
   };
 
-  const updateSummaryField = <K extends keyof StructuredSummary>(key: K, value: StructuredSummary[K]) => {
-    setSummary((s) => (s ? { ...s, [key]: value } : s));
+  const updateSummaryField = <K extends keyof StructuredSummary>(
+    key: K,
+    value: StructuredSummary[K],
+  ) => {
+    setSummary((current) => (current ? { ...current, [key]: value } : current));
   };
-  const updateSummaryLines = (key: "strengths" | "improvements" | "keyMoments", text: string) => {
-    const lines = text.split("\n").map((l) => l.replace(/^[\s•\-*]+/, "").trim()).filter(Boolean).slice(0, 5);
+
+  const updateSummaryLines = (
+    key: "strengths" | "improvements" | "keyMoments",
+    text: string,
+  ) => {
+    const lines = text
+      .split("\n")
+      .map((line) => line.replace(/^[\s•\-*]+/, "").trim())
+      .filter(Boolean)
+      .slice(0, 5);
     updateSummaryField(key, lines);
   };
   const busy = phase !== "idle";
@@ -201,9 +288,9 @@ export function VoiceNoteField({ onTranscribed, onAudioAttach, draft, onDraftCha
   useEffect(() => {
     if (!onDraftChange) return;
     if (transcript == null) onDraftChange(null);
-    else onDraftChange({ transcript, tokens, avgConfidence, reviewed, original, versions });
+    else onDraftChange({ transcript, tokens, avgConfidence, reviewed, rewrite, original, versions });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [transcript, tokens, avgConfidence, reviewed, original, versions]);
+  }, [transcript, tokens, avgConfidence, reviewed, rewrite, original, versions]);
 
   // Debounced edit versioning: 3s after the last edit, snapshot the current transcript
   // as a new version if it differs from the most recent recorded version and from the original.
@@ -254,6 +341,7 @@ export function VoiceNoteField({ onTranscribed, onAudioAttach, draft, onDraftCha
 
   const reset = () => {
     abortRef.current?.abort();
+    invalidateAiRequests();
     clearPhaseTimer();
     if (audioUrl) URL.revokeObjectURL(audioUrl);
     setAudioUrl(null);
@@ -261,6 +349,10 @@ export function VoiceNoteField({ onTranscribed, onAudioAttach, draft, onDraftCha
     setTokens([]);
     setAvgConfidence(null);
     setReviewed(false);
+    setRewrite(null);
+    setRewriteError(null);
+    setSummary(null);
+    setSummaryError(null);
     setOriginal(null);
     setVersions([]);
     setShowHistory(false);
@@ -298,15 +390,20 @@ export function VoiceNoteField({ onTranscribed, onAudioAttach, draft, onDraftCha
       logAttempt("error", TRANSCRIPTION_FAILURE_MESSAGE);
       return;
     }
+    invalidateAiRequests();
     // Snapshot the current transcript state so a subsequent cancel can be undone.
     preTranscribeSnapshotRef.current = transcript
-      ? { transcript, tokens, avgConfidence, reviewed }
+      ? { transcript, tokens, avgConfidence, reviewed, rewrite }
       : null;
     setErrorMsg(null);
     setReviewed(false);
     setTranscript(null);
     setTokens([]);
     setAvgConfidence(null);
+    setRewrite(null);
+    setRewriteError(null);
+    setSummary(null);
+    setSummaryError(null);
     setCancelled(false);
     setSkipped(false);
     logAttempt("started");
@@ -342,6 +439,7 @@ export function VoiceNoteField({ onTranscribed, onAudioAttach, draft, onDraftCha
         setVersions([]);
         logAttempt("success");
         toast.success("Voice note transcribed — review before applying");
+        if (aiMode === "report-rewrite") void requestRewrite(result.text);
       }
     } catch (e) {
       if ((e as { name?: string } | null)?.name === "AbortError") {
@@ -387,6 +485,7 @@ export function VoiceNoteField({ onTranscribed, onAudioAttach, draft, onDraftCha
       setTokens(snap.tokens);
       setAvgConfidence(snap.avgConfidence);
       setReviewed(snap.reviewed);
+      setRewrite(snap.rewrite ?? null);
       logAttempt("error", "Cancellation undone — restored previous transcript");
       toast.success("Restored previous transcript");
       return;
@@ -487,6 +586,7 @@ export function VoiceNoteField({ onTranscribed, onAudioAttach, draft, onDraftCha
   const saveWithoutTranscript = async () => {
     // Abort any in-flight transcription but keep the audio.
     abortRef.current?.abort();
+    invalidateAiRequests();
     abortRef.current = null;
     clearPhaseTimer();
     setPhase("idle");
@@ -497,6 +597,10 @@ export function VoiceNoteField({ onTranscribed, onAudioAttach, draft, onDraftCha
     setTokens([]);
     setAvgConfidence(null);
     setReviewed(false);
+    setRewrite(null);
+    setRewriteError(null);
+    setSummary(null);
+    setSummaryError(null);
     setSkipped(true);
     if (onAudioAttach && !attached && blobRef.current) {
       await attachAudio();
@@ -979,6 +1083,7 @@ export function VoiceNoteField({ onTranscribed, onAudioAttach, draft, onDraftCha
                                   ...prev,
                                   { at: now, text: v.text, source: "edit" as const, label: `Reverted to ${v.label ?? v.source}` },
                                 ].slice(-20));
+                                invalidateAiRequests();
                                 setTranscript(v.text);
                                 setTokens([]);
                                 setAvgConfidence(null);
@@ -1040,7 +1145,12 @@ export function VoiceNoteField({ onTranscribed, onAudioAttach, draft, onDraftCha
               <textarea
                 value={transcript}
                 onChange={(e) => {
+                  invalidateAiRequests();
                   setTranscript(e.target.value);
+                  setRewrite(null);
+                  setRewriteError(null);
+                  setSummary(null);
+                  setSummaryError(null);
                   if (tokens.length > 0) {
                     setTokens([]);
                     setAvgConfidence(null);
@@ -1113,24 +1223,88 @@ export function VoiceNoteField({ onTranscribed, onAudioAttach, draft, onDraftCha
                   <button type="button" onClick={retry} className="inline-flex items-center gap-1 h-7 px-2 rounded-md border border-border text-[11px] font-medium hover:bg-accent">
                     <RotateCcw className="size-3" />Retry
                   </button>
-                  <button
-                    type="button"
-                    disabled={summarizing || !transcript || transcript.trim().length < 20}
-                    onClick={requestSummary}
-                    className="inline-flex items-center gap-1 h-7 px-2 rounded-md border border-primary/40 text-primary text-[11px] font-medium hover:bg-primary/10 disabled:opacity-40 disabled:cursor-not-allowed"
-                    title="Use AI to draft a structured summary from this transcript"
-                  >
-                    {summarizing ? <Loader2 className="size-3 animate-spin" /> : <Sparkles className="size-3" />}
-                    {summary ? "Regenerate summary" : "Suggest summary"}
-                  </button>
+                  {aiMode === "report-rewrite" ? (
+                    <button
+                      type="button"
+                      disabled={rewriting || !transcript || transcript.trim().length < 20}
+                      onClick={() => void requestRewrite()}
+                      className="inline-flex items-center gap-1 h-7 px-2 rounded-md border border-primary/40 text-primary text-[11px] font-medium hover:bg-primary/10 disabled:opacity-40 disabled:cursor-not-allowed"
+                      title="Create a faithful, polished rewrite using the selected fixture details"
+                    >
+                      {rewriting ? <Loader2 className="size-3 animate-spin" /> : <Sparkles className="size-3" />}
+                      {rewrite ? "Regenerate AI rewrite" : "Generate AI rewrite"}
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={summarizing || !transcript || transcript.trim().length < 20}
+                      onClick={() => void requestSummary()}
+                      className="inline-flex items-center gap-1 h-7 px-2 rounded-md border border-primary/40 text-primary text-[11px] font-medium hover:bg-primary/10 disabled:opacity-40 disabled:cursor-not-allowed"
+                      title="Use AI to draft a structured summary from this transcript"
+                    >
+                      {summarizing ? <Loader2 className="size-3 animate-spin" /> : <Sparkles className="size-3" />}
+                      {summary ? "Regenerate summary" : "Suggest summary"}
+                    </button>
+                  )}
                 </div>
               )}
 
-              {summaryError && !summary && (
+              {aiMode === "report-rewrite" && rewriting && !rewrite && (
+                <div className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground" role="status">
+                  <Loader2 className="size-3 animate-spin" />
+                  Preparing an editable AI rewrite…
+                </div>
+              )}
+
+              {aiMode === "report-rewrite" && rewriteError && !rewrite && (
+                <div className="text-[11px] text-destructive" role="alert">{rewriteError}</div>
+              )}
+
+              {aiMode === "report-rewrite" && rewrite && (
+                <div className="rounded-md border border-primary/40 bg-primary/5 p-2 space-y-2" aria-label="AI-suggested report rewrite">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="text-[11px] font-semibold uppercase tracking-wider text-primary inline-flex items-center gap-1">
+                      <Sparkles className="size-3" /> AI rewrite — review before using
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setRewrite(null)}
+                      className="inline-flex items-center gap-1 h-5 px-1.5 rounded-md border border-border text-[10px] font-medium hover:bg-accent"
+                    >
+                      Dismiss
+                    </button>
+                  </div>
+                  <p className="text-[10px] text-muted-foreground">
+                    This keeps the mentor's observations but cleans up speech and uses the selected goalkeeper and fixture names. Edit anything before inserting.
+                  </p>
+                  <textarea
+                    value={rewrite}
+                    onChange={(e) => setRewrite(e.target.value)}
+                    rows={8}
+                    className="w-full text-xs bg-background border border-border rounded-md p-2 leading-relaxed focus:outline-none focus:ring-1 focus:ring-primary"
+                    placeholder="Editable AI rewrite"
+                    aria-label="Editable AI rewrite"
+                  />
+                  <div className="flex flex-wrap gap-1.5 pt-1">
+                    <button type="button" onClick={useRewrite} className="inline-flex items-center gap-1 h-7 px-2 rounded-md bg-primary text-primary-foreground text-[11px] font-medium hover:opacity-90">
+                      Use AI rewrite
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { navigator.clipboard?.writeText(rewrite); toast.success("AI rewrite copied"); }}
+                      className="inline-flex items-center gap-1 h-7 px-2 rounded-md border border-border text-[11px] font-medium hover:bg-accent"
+                    >
+                      Copy
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {aiMode === "structured-summary" && summaryError && !summary && (
                 <div className="text-[11px] text-destructive" role="alert">{summaryError}</div>
               )}
 
-              {summary && (
+              {aiMode === "structured-summary" && summary && (
                 <div className="rounded-md border border-primary/40 bg-primary/5 p-2 space-y-2" aria-label="AI-suggested structured summary">
                   <div className="flex items-center justify-between gap-2">
                     <div className="text-[11px] font-semibold uppercase tracking-wider text-primary inline-flex items-center gap-1">
@@ -1149,20 +1323,26 @@ export function VoiceNoteField({ onTranscribed, onAudioAttach, draft, onDraftCha
                     <input
                       type="text"
                       value={summary.headline}
-                      onChange={(e) => updateSummaryField("headline", e.target.value)}
+                      onChange={(event) => updateSummaryField("headline", event.target.value)}
                       className="w-full text-xs bg-background border border-border rounded-md p-1.5 focus:outline-none focus:ring-1 focus:ring-primary"
                       placeholder="One-sentence headline"
                     />
                   </div>
                   {(["strengths", "improvements", "keyMoments"] as const).map((key) => {
-                    const label = key === "strengths" ? "Strengths" : key === "improvements" ? "Areas to develop" : "Key moments";
-                    const value = summary[key].join("\n");
+                    const label =
+                      key === "strengths"
+                        ? "Strengths"
+                        : key === "improvements"
+                          ? "Areas to develop"
+                          : "Key moments";
                     return (
                       <div key={key} className="space-y-1">
-                        <label className="block text-[10px] uppercase tracking-wider text-muted-foreground">{label} <span className="opacity-60">· one per line</span></label>
+                        <label className="block text-[10px] uppercase tracking-wider text-muted-foreground">
+                          {label} <span className="opacity-60">· one per line</span>
+                        </label>
                         <textarea
-                          value={value}
-                          onChange={(e) => updateSummaryLines(key, e.target.value)}
+                          value={summary[key].join("\n")}
+                          onChange={(event) => updateSummaryLines(key, event.target.value)}
                           rows={Math.max(2, Math.min(5, summary[key].length + 1))}
                           className="w-full text-xs bg-background border border-border rounded-md p-1.5 leading-relaxed focus:outline-none focus:ring-1 focus:ring-primary"
                           placeholder={`Add ${label.toLowerCase()}…`}
