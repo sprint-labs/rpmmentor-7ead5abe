@@ -904,6 +904,7 @@ function ReportForm({ onDone, prefillGoalkeeper, prefillMatchDate, prefillOppone
 
       <HandwrittenNotesField
         context={goalkeeper ? `Match notes on ${goalkeeper} vs ${opponent || "opponent"}` : undefined}
+        destinationLabel="comments"
         onTranscribed={(text, mode) => applyOcrText(text, mode)}
       />
       <VoiceNoteField

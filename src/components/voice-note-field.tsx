@@ -9,6 +9,7 @@ import {
   type FixtureContext,
   type StructuredSummary,
 } from "@/lib/api/summarize.functions";
+import { LatestRequestGate } from "@/lib/async/latest-request";
 
 
 const MAX_SECONDS = 180;
@@ -132,6 +133,8 @@ export function VoiceNoteField({
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const phaseTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const rewriteRequestGateRef = useRef(new LatestRequestGate());
+  const summaryRequestGateRef = useRef(new LatestRequestGate());
   const preTranscribeSnapshotRef = useRef<VoiceDraft | null>(null);
   const cancelledPhaseRef = useRef<Phase>("idle");
   const cancelledElapsedRef = useRef<number>(0);
@@ -153,17 +156,26 @@ export function VoiceNoteField({
   const [summarizing, setSummarizing] = useState(false);
   const [summaryError, setSummaryError] = useState<string | null>(null);
 
+  const invalidateAiRequests = () => {
+    rewriteRequestGateRef.current.invalidate();
+    summaryRequestGateRef.current.invalidate();
+    setRewriting(false);
+    setSummarizing(false);
+  };
+
   const requestRewrite = async (sourceText = transcript) => {
     if (!sourceText || sourceText.trim().length < 20) {
       toast.error("Transcript is too short to rewrite.");
       return;
     }
+    const requestToken = rewriteRequestGateRef.current.begin();
     setRewriting(true);
     setRewriteError(null);
     try {
       const res = await runRewrite({
         data: { transcript: sourceText, context: rewriteContext ?? {} },
       });
+      if (!requestToken.isCurrent()) return;
       if (!res.ok) {
         setRewriteError(res.error);
         toast.error(res.error);
@@ -171,11 +183,12 @@ export function VoiceNoteField({
       }
       setRewrite(res.rewrite);
     } catch (err) {
+      if (!requestToken.isCurrent()) return;
       const msg = err instanceof Error ? err.message : "Failed to rewrite transcript.";
       setRewriteError(msg);
       toast.error(msg);
     } finally {
-      setRewriting(false);
+      if (requestToken.isCurrent()) setRewriting(false);
     }
   };
 
@@ -206,10 +219,12 @@ export function VoiceNoteField({
       toast.error("Transcript is too short to summarise.");
       return;
     }
+    const requestToken = summaryRequestGateRef.current.begin();
     setSummarizing(true);
     setSummaryError(null);
     try {
       const result = await runSummarize({ data: { transcript } });
+      if (!requestToken.isCurrent()) return;
       if (!result.ok) {
         setSummaryError(result.error);
         toast.error(result.error);
@@ -217,11 +232,12 @@ export function VoiceNoteField({
       }
       setSummary(result.summary);
     } catch (error) {
+      if (!requestToken.isCurrent()) return;
       const message = error instanceof Error ? error.message : "Failed to summarise transcript.";
       setSummaryError(message);
       toast.error(message);
     } finally {
-      setSummarizing(false);
+      if (requestToken.isCurrent()) setSummarizing(false);
     }
   };
 
@@ -325,6 +341,7 @@ export function VoiceNoteField({
 
   const reset = () => {
     abortRef.current?.abort();
+    invalidateAiRequests();
     clearPhaseTimer();
     if (audioUrl) URL.revokeObjectURL(audioUrl);
     setAudioUrl(null);
@@ -373,6 +390,7 @@ export function VoiceNoteField({
       logAttempt("error", TRANSCRIPTION_FAILURE_MESSAGE);
       return;
     }
+    invalidateAiRequests();
     // Snapshot the current transcript state so a subsequent cancel can be undone.
     preTranscribeSnapshotRef.current = transcript
       ? { transcript, tokens, avgConfidence, reviewed, rewrite }
@@ -568,6 +586,7 @@ export function VoiceNoteField({
   const saveWithoutTranscript = async () => {
     // Abort any in-flight transcription but keep the audio.
     abortRef.current?.abort();
+    invalidateAiRequests();
     abortRef.current = null;
     clearPhaseTimer();
     setPhase("idle");
@@ -1064,6 +1083,7 @@ export function VoiceNoteField({
                                   ...prev,
                                   { at: now, text: v.text, source: "edit" as const, label: `Reverted to ${v.label ?? v.source}` },
                                 ].slice(-20));
+                                invalidateAiRequests();
                                 setTranscript(v.text);
                                 setTokens([]);
                                 setAvgConfidence(null);
@@ -1125,6 +1145,7 @@ export function VoiceNoteField({
               <textarea
                 value={transcript}
                 onChange={(e) => {
+                  invalidateAiRequests();
                   setTranscript(e.target.value);
                   setRewrite(null);
                   setRewriteError(null);
