@@ -3,12 +3,14 @@ import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
-import { PageHeader, Card, TierBadge, Avatar, TrafficLight, DutyBadge, StatCard, Pill } from "@/components/primitives";
+import { PageHeader, Card, TierBadge, Avatar, TrafficLight, DutyBadge, Pill } from "@/components/primitives";
 import { goalkeepers, dutyStatusForGk, dutyOverview, DUTY_LABELS, type DutyLevel, type Goalkeeper, type TierLevelLabel } from "@/lib/mock-data";
 import { listMatchReports } from "@/lib/match-reports/reports.functions";
+import { clampRating, clearGoalkeeperFilters, countActiveGoalkeeperFilters, csv, filterGoalkeepers, normaliseGoalkeeperName, toCsv, toggleFrom, type GoalkeeperFilterState } from "@/lib/goalkeeper-filters";
 import { useMemo, useState } from "react";
 import { withPermission } from "@/components/require-permission";
-import { ChevronDown, ChevronUp, ChevronsUpDown, X } from "lucide-react";
+import { Drawer, DrawerClose, DrawerContent, DrawerDescription, DrawerFooter, DrawerHeader, DrawerTitle, DrawerTrigger } from "@/components/ui/drawer";
+import { ChevronDown, ChevronUp, ChevronsUpDown, SlidersHorizontal, X } from "lucide-react";
 
 // ---------- URL search-param schema ----------
 // Values are stored as CSV strings for multi-selects to keep URLs short and
@@ -26,6 +28,9 @@ const searchSchema = z.object({
   ratingMax: fallback(z.number(), 5).default(5),
   loan: fallback(z.string(), "any").default("any"),
 });
+
+type GoalkeeperSearch = GoalkeeperFilterState;
+type UpdateGoalkeeperSearch = (patch: Partial<GoalkeeperSearch>) => void;
 
 export const Route = createFileRoute("/goalkeepers")({
   validateSearch: zodValidator(searchSchema),
@@ -52,14 +57,6 @@ const LOAN_OPTIONS: { id: string; label: string }[] = [
   { id: "loan", label: "On loan" },
   { id: "permanent", label: "Permanent" },
 ];
-
-const csv = (s: string) => s.split(",").map((x) => x.trim()).filter(Boolean);
-const toCsv = (arr: string[]) => arr.join(",");
-const clampRating = (n: number) => Math.max(1, Math.min(5, Math.round(n * 10) / 10));
-
-function normaliseName(s: string): string {
-  return s.trim().toLowerCase().replace(/\s+/g, " ");
-}
 
 function isValidScore(v: unknown): v is number {
   return typeof v === "number" && Number.isFinite(v) && v >= 1 && v <= 5;
@@ -203,10 +200,118 @@ function MobileGoalkeeperCard({
   );
 }
 
+function TierFilterOptions({ selectedTiers, update, showLabel = true }: {
+  selectedTiers: string[];
+  update: UpdateGoalkeeperSearch;
+  showLabel?: boolean;
+}) {
+  return (
+    <div>
+      {showLabel && <div className="text-[11px] uppercase text-muted-foreground mb-1.5">Tier</div>}
+      <div className="flex flex-wrap gap-1.5">
+        {TIER_OPTIONS.map((tier) => {
+          const selected = selectedTiers.includes(tier);
+          return (
+            <button key={tier} type="button" onClick={() => update({ tiers: toCsv(toggleFrom(selectedTiers, tier)) })} className={`min-h-10 rounded-md border px-2 text-[11px] transition-colors sm:min-h-0 sm:py-1 ${selected ? "bg-primary/15 border-primary/50 text-foreground" : "border-border text-muted-foreground hover:bg-accent/40"}`} aria-pressed={selected}>
+              {tier}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function AdvancedFilterFields({
+  includeTier, search, update, selectedTiers, selectedLeagues, selectedNats, allLeagues, allNats, contractYears, ratingMin, ratingMax,
+}: {
+  includeTier: boolean;
+  search: GoalkeeperSearch;
+  update: UpdateGoalkeeperSearch;
+  selectedTiers: string[];
+  selectedLeagues: string[];
+  selectedNats: string[];
+  allLeagues: string[];
+  allNats: string[];
+  contractYears: string[];
+  ratingMin: number;
+  ratingMax: number;
+}) {
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      {includeTier && <TierFilterOptions selectedTiers={selectedTiers} update={update} />}
+
+      <div>
+        <div className="text-[11px] uppercase text-muted-foreground mb-1.5">Loan status</div>
+        <div className="flex flex-wrap gap-1.5">
+          {LOAN_OPTIONS.map((option) => (
+            <button key={option.id} type="button" onClick={() => update({ loan: option.id })} className={`min-h-10 rounded-md border px-2 text-[11px] transition-colors sm:min-h-0 sm:py-1 ${search.loan === option.id ? "bg-primary/15 border-primary/50 text-foreground" : "border-border text-muted-foreground hover:bg-accent/40"}`} aria-pressed={search.loan === option.id}>
+              {option.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <div className="text-[11px] uppercase text-muted-foreground mb-1.5">Contract</div>
+        <select value={search.contract} onChange={(event) => update({ contract: event.target.value })} className="h-11 w-full rounded-md border border-border bg-input/60 px-2 text-sm sm:h-9" aria-label="Contract filter">
+          {CONTRACT_OPTIONS.map((option) => (<option key={option.id} value={option.id}>{option.label}</option>))}
+          <optgroup label="Expires in year">
+            {contractYears.map((year) => (<option key={year} value={year}>{year}</option>))}
+          </optgroup>
+        </select>
+      </div>
+
+      <div>
+        <div className="text-[11px] uppercase text-muted-foreground mb-1.5">Club or parent club</div>
+        <input value={search.club} onChange={(event) => update({ club: event.target.value })} placeholder="e.g. Brighton, Wolves…" className="h-11 w-full rounded-md border border-border bg-input/60 px-2 text-sm sm:h-9" aria-label="Club filter" />
+      </div>
+
+      <div>
+        <div className="text-[11px] uppercase text-muted-foreground mb-1.5">League ({selectedLeagues.length} selected)</div>
+        <div className="max-h-32 overflow-y-auto rounded-md border border-border p-1.5 flex flex-wrap gap-1">
+          {allLeagues.map((league) => {
+            const selected = selectedLeagues.includes(league);
+            return <button key={league} type="button" onClick={() => update({ leagues: toCsv(toggleFrom(selectedLeagues, league)) })} className={`min-h-8 rounded border px-2 text-[10px] transition-colors sm:min-h-0 sm:py-0.5 ${selected ? "bg-primary/15 border-primary/50 text-foreground" : "border-border/60 text-muted-foreground hover:bg-accent/40"}`} aria-pressed={selected}>{league}</button>;
+          })}
+        </div>
+      </div>
+
+      <div>
+        <div className="text-[11px] uppercase text-muted-foreground mb-1.5">Nationality ({selectedNats.length} selected)</div>
+        <div className="max-h-32 overflow-y-auto rounded-md border border-border p-1.5 flex flex-wrap gap-1">
+          {allNats.map((nationality) => {
+            const selected = selectedNats.includes(nationality);
+            return <button key={nationality} type="button" onClick={() => update({ nats: toCsv(toggleFrom(selectedNats, nationality)) })} className={`min-h-8 rounded border px-2 text-[10px] transition-colors sm:min-h-0 sm:py-0.5 ${selected ? "bg-primary/15 border-primary/50 text-foreground" : "border-border/60 text-muted-foreground hover:bg-accent/40"}`} aria-pressed={selected}>{nationality}</button>;
+          })}
+        </div>
+      </div>
+
+      <div className="md:col-span-2 lg:col-span-3">
+        <div className="text-[11px] uppercase text-muted-foreground mb-1.5">Rating range <span className="tabular-nums font-mono text-foreground">{ratingMin.toFixed(1)}–{ratingMax.toFixed(1)}</span></div>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <label className="flex flex-1 items-center gap-2 text-[11px] text-muted-foreground">
+            <span className="w-8 tabular-nums">Min</span>
+            <input type="range" min={1} max={5} step={0.1} value={ratingMin} onChange={(event) => update({ ratingMin: clampRating(Number(event.target.value)) })} className="flex-1" aria-label="Minimum rating" />
+            <span className="w-8 tabular-nums font-mono text-foreground">{ratingMin.toFixed(1)}</span>
+          </label>
+          <label className="flex flex-1 items-center gap-2 text-[11px] text-muted-foreground">
+            <span className="w-8 tabular-nums">Max</span>
+            <input type="range" min={1} max={5} step={0.1} value={ratingMax} onChange={(event) => update({ ratingMax: clampRating(Number(event.target.value)) })} className="flex-1" aria-label="Maximum rating" />
+            <span className="w-8 tabular-nums font-mono text-foreground">{ratingMax.toFixed(1)}</span>
+          </label>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function GoalkeepersList() {
-  const search = Route.useSearch();
+  const search = Route.useSearch() as GoalkeeperSearch;
   const navigate = useNavigate({ from: "/goalkeepers" });
   const [advOpen, setAdvOpen] = useState(false);
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+  const [mobileAdvOpen, setMobileAdvOpen] = useState(false);
   const [sort, setSort] = useState<Sort | null>(null);
   const listFn = useServerFn(listMatchReports);
   const { data: reportsData, isError: reportsUnavailable } = useQuery({
@@ -243,7 +348,7 @@ function GoalkeepersList() {
     const totals = new Map<string, { total: number; count: number }>();
     for (const report of reportsData?.reports ?? []) {
       if (!isValidScore(report.average)) continue;
-      const key = normaliseName(report.goalkeeper);
+      const key = normaliseGoalkeeperName(report.goalkeeper);
       const existing = totals.get(key) ?? { total: 0, count: 0 };
       existing.total += report.average;
       existing.count += 1;
@@ -258,12 +363,9 @@ function GoalkeepersList() {
     );
   }, [reportsData]);
 
-  const update = (patch: Partial<z.infer<typeof searchSchema>>) => {
-    navigate({ search: (prev: z.infer<typeof searchSchema>) => ({ ...prev, ...patch }), replace: true });
+  const update = (patch: Partial<GoalkeeperSearch>) => {
+    navigate({ search: (prev) => ({ ...prev, ...patch }), replace: true });
   };
-
-  const toggleFrom = (list: string[], value: string) =>
-    list.includes(value) ? list.filter((v) => v !== value) : [...list, value];
 
   const toggleSort = (key: SortKey) => {
     setSort((current) => current?.key === key
@@ -271,70 +373,14 @@ function GoalkeepersList() {
       : { key, direction: "asc" });
   };
 
-  // Filtering
-  const now = Date.now();
-  const MS_YEAR = 365 * 24 * 60 * 60 * 1000;
-  const filtered = goalkeepers.filter((g) => {
-    // Quick category chips
-    if (search.cat === "UK Based" && g.region !== "UK Based") return false;
-    if (search.cat === "Overseas" && g.region !== "Overseas") return false;
-    if (search.cat === "Free Agents" && !g.tags.includes("Free Agent")) return false;
-    if (search.cat === "Academy" && !g.tags.includes("Academy")) return false;
-    if (search.cat === "Tier 1-2" && g.tier !== "Tier 1" && g.tier !== "Tier 2") return false;
-    if (search.cat === "Tier 3-4" && g.tier !== "Tier 3" && g.tier !== "Tier 4") return false;
-
-    if (search.duty !== "all" && dutyStatusForGk(g).level !== (search.duty as DutyLevel)) return false;
-
-    if (search.q && !`${g.name} ${g.club} ${g.nationality} ${g.league}`.toLowerCase().includes(search.q.toLowerCase())) return false;
-
-    // Advanced multi-selects
-    if (selectedTiers.length && !selectedTiers.includes(g.tier)) return false;
-    if (selectedLeagues.length && !selectedLeagues.includes(g.league)) return false;
-    if (selectedNats.length && !selectedNats.includes(g.nationality)) return false;
-
-    // Club contains
-    if (search.club) {
-      const hay = `${g.club} ${g.parentClub ?? ""}`.toLowerCase();
-      if (!hay.includes(search.club.toLowerCase())) return false;
-    }
-
-    // Loan status
-    if (search.loan === "loan" && !g.onLoan) return false;
-    if (search.loan === "permanent" && g.onLoan) return false;
-
-    // Contract
-    if (search.contract !== "any") {
-      const iso = g.contractUntil;
-      if (search.contract === "expired") {
-        if (iso !== "—" && new Date(iso).getTime() > now) return false;
-      } else if (search.contract === "expiring12") {
-        if (iso === "—") return false;
-        const t = new Date(iso).getTime();
-        if (!(t >= now && t <= now + MS_YEAR)) return false;
-      } else if (search.contract === "expiring24") {
-        if (iso === "—") return false;
-        const t = new Date(iso).getTime();
-        if (!(t >= now && t <= now + 2 * MS_YEAR)) return false;
-      } else if (/^\d{4}$/.test(search.contract)) {
-        if (iso === "—" || iso.slice(0, 4) !== search.contract) return false;
-      }
-    }
-
-    // Rating range only filters when the user has narrowed the default 1–5 range.
-    if (ratingFilterActive) {
-      const rating = ratingsByGoalkeeper.get(normaliseName(g.name))?.average;
-      if (rating == null || rating < ratingMin || rating > ratingMax) return false;
-    }
-
-    return true;
-  });
+  const filtered = filterGoalkeepers(goalkeepers, search, ratingsByGoalkeeper);
 
   const sorted = useMemo(() => {
     if (!sort) return filtered;
 
     return [...filtered].sort((a, b) => {
-      const aRating = ratingsByGoalkeeper.get(normaliseName(a.name))?.average ?? null;
-      const bRating = ratingsByGoalkeeper.get(normaliseName(b.name))?.average ?? null;
+      const aRating = ratingsByGoalkeeper.get(normaliseGoalkeeperName(a.name))?.average ?? null;
+      const bRating = ratingsByGoalkeeper.get(normaliseGoalkeeperName(b.name))?.average ?? null;
       const aDuty = dutyStatusForGk(a).label;
       const bDuty = dutyStatusForGk(b).label;
 
@@ -370,6 +416,7 @@ function GoalkeepersList() {
     (search.contract !== "any" ? 1 : 0) +
     (search.loan !== "any" ? 1 : 0) +
     (ratingFilterActive ? 1 : 0);
+  const activeFilters = countActiveGoalkeeperFilters(search);
 
   const resetAll = () =>
     navigate({
@@ -381,18 +428,12 @@ function GoalkeepersList() {
       replace: true,
     });
 
+  const clearFilters = () => update(clearGoalkeeperFilters(search));
+
   return (
     <div className="space-y-5">
       <PageHeader title="Goalkeepers" description={`${goalkeepers.length} RPM clients under management across the UK and internationally.`} />
 
-      <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-4">
-        <StatCard label="Total Under Care" value={dutyOverview.total} />
-        <StatCard label="Up to date" value={dutyOverview.up_to_date} hint="Duty fulfilled" />
-        <StatCard label="Due soon" value={dutyOverview.due_soon} hint="Approaching cadence" accent="warning" />
-        <StatCard label="Overdue" value={dutyOverview.overdue} hint="Action required" accent="destructive" />
-      </div>
-
-      {/* Primary quick filters */}
       <div className="flex flex-wrap items-center gap-2">
         <input
           value={search.q}
@@ -401,187 +442,93 @@ function GoalkeepersList() {
           className="h-11 w-full rounded-md border border-border bg-input/60 px-3 text-sm sm:h-9 sm:w-80"
           aria-label="Search goalkeepers"
         />
-        <div className="flex w-full flex-nowrap overflow-x-auto rounded-md border border-border text-xs sm:w-auto sm:flex-wrap sm:overflow-visible">
-          {CATS_LIST.map((t) => (
-            <button key={t} onClick={() => update({ cat: t })} className={`min-h-11 shrink-0 border-r border-border px-3 transition-colors last:border-r-0 sm:min-h-0 sm:py-1.5 ${search.cat === t ? "bg-accent text-accent-foreground" : "hover:bg-accent/40 text-muted-foreground"}`}>{t}</button>
-          ))}
+        <div className="flex w-full items-center justify-between gap-2 md:hidden">
+          <Drawer open={mobileFiltersOpen} onOpenChange={setMobileFiltersOpen}>
+            <DrawerTrigger asChild>
+              <button type="button" className="inline-flex h-11 items-center gap-2 rounded-md border border-border px-3 text-sm font-medium hover:bg-accent/40" aria-label={activeFilters ? `Filters, ${activeFilters} active` : "Filters"}>
+                <SlidersHorizontal className="size-4" aria-hidden="true" />
+                Filters{activeFilters ? ` (${activeFilters})` : ""}
+              </button>
+            </DrawerTrigger>
+            <DrawerContent className="h-[calc(100dvh-1rem)] max-h-[42rem]">
+              <DrawerHeader>
+                <div className="flex items-center justify-between gap-3">
+                  <DrawerTitle>Filters</DrawerTitle>
+                  <DrawerClose asChild><button type="button" className="size-11 rounded-md border border-border text-sm hover:bg-accent/40" aria-label="Close filters"><X className="mx-auto size-4" aria-hidden="true" /></button></DrawerClose>
+                </div>
+                <DrawerDescription>Refine the goalkeeper list without changing your search.</DrawerDescription>
+              </DrawerHeader>
+              <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-2">
+                <div className="space-y-5">
+                  <section aria-labelledby="mobile-primary-filters">
+                    <h2 id="mobile-primary-filters" className="mb-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">Primary filters</h2>
+                    <div className="flex flex-wrap gap-2">
+                      {CATS_LIST.filter((category) => category !== "Tier 1-2" && category !== "Tier 3-4").map((category) => {
+                        const selected = search.cat === category;
+                        return <button key={category} type="button" onClick={() => update({ cat: category })} className={`min-h-11 rounded-md border px-3 text-sm transition-colors ${selected ? "border-primary/50 bg-primary/15 text-foreground" : "border-border text-muted-foreground hover:bg-accent/40"}`} aria-pressed={selected}>{category}</button>;
+                      })}
+                    </div>
+                  </section>
+
+                  <section aria-labelledby="mobile-tier-filters">
+                    <h2 id="mobile-tier-filters" className="mb-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">Tier</h2>
+                    <TierFilterOptions selectedTiers={selectedTiers} update={update} showLabel={false} />
+                  </section>
+
+                  <section aria-labelledby="mobile-duty-filters">
+                    <h2 id="mobile-duty-filters" className="mb-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">Duty of care status</h2>
+                    <div className="flex flex-wrap gap-2">
+                      {DUTIES.map((duty) => {
+                        const selected = search.duty === duty.id;
+                        return <button key={duty.id} type="button" onClick={() => update({ duty: duty.id })} className={`inline-flex min-h-11 items-center gap-1.5 rounded-md border px-3 text-sm transition-colors ${selected ? "border-primary/50 bg-primary/15 text-foreground" : "border-border text-muted-foreground hover:bg-accent/40"}`} aria-pressed={selected}>{duty.id !== "all" && <TrafficLight level={duty.id as DutyLevel} size={7} />}{duty.label}<span className="tabular-nums font-mono text-[10px] opacity-70">{duty.count}</span></button>;
+                      })}
+                    </div>
+                  </section>
+
+                  <section className="border-t border-border pt-4">
+                    <button type="button" onClick={() => setMobileAdvOpen((open) => !open)} className="flex min-h-11 w-full items-center justify-between rounded-md border border-border px-3 text-sm font-medium hover:bg-accent/40" aria-expanded={mobileAdvOpen} aria-controls="mobile-advanced-filters">
+                      <span>Advanced filters{activeAdv ? ` (${activeAdv})` : ""}</span>
+                      {mobileAdvOpen ? <ChevronUp className="size-4" aria-hidden="true" /> : <ChevronDown className="size-4" aria-hidden="true" />}
+                    </button>
+                    {mobileAdvOpen && <div id="mobile-advanced-filters" className="pt-4"><AdvancedFilterFields includeTier={false} search={search} update={update} selectedTiers={selectedTiers} selectedLeagues={selectedLeagues} selectedNats={selectedNats} allLeagues={allLeagues} allNats={allNats} contractYears={contractYears} ratingMin={ratingMin} ratingMax={ratingMax} /></div>}
+                  </section>
+                </div>
+              </div>
+              <DrawerFooter className="border-t border-border">
+                <button type="button" onClick={clearFilters} className="inline-flex h-11 items-center justify-center gap-1.5 rounded-md border border-border px-3 text-sm hover:bg-accent/40"><X className="size-4" aria-hidden="true" /> Clear filters</button>
+                <DrawerClose asChild><button type="button" className="h-11 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground hover:bg-primary/90">Apply filters</button></DrawerClose>
+              </DrawerFooter>
+            </DrawerContent>
+          </Drawer>
+          <div className="font-mono text-xs tabular-nums text-muted-foreground">{filtered.length} results</div>
         </div>
-        <div className="flex w-full flex-nowrap overflow-x-auto rounded-md border border-border text-xs sm:w-auto sm:flex-wrap sm:overflow-visible">
-          {DUTIES.map((d) => (
-            <button key={d.id} onClick={() => update({ duty: d.id })} className={`inline-flex min-h-11 shrink-0 items-center gap-1.5 border-r border-border px-3 transition-colors last:border-r-0 sm:min-h-0 sm:py-1.5 ${search.duty === d.id ? "bg-accent text-accent-foreground" : "hover:bg-accent/40 text-muted-foreground"}`}>
-              {d.id !== "all" && <TrafficLight level={d.id as DutyLevel} size={7} />}
-              {d.label}
-              <span className="tabular-nums font-mono text-[10px] opacity-70">{d.count}</span>
-            </button>
-          ))}
+
+        <div className="hidden w-full items-center gap-2 md:flex md:flex-wrap">
+          <div className="flex flex-wrap overflow-hidden rounded-md border border-border text-xs">
+            {CATS_LIST.map((category) => <button key={category} type="button" onClick={() => update({ cat: category })} className={`min-h-9 border-r border-border px-3 transition-colors last:border-r-0 ${search.cat === category ? "bg-accent text-accent-foreground" : "hover:bg-accent/40 text-muted-foreground"}`}>{category}</button>)}
+          </div>
+          <div className="flex flex-wrap overflow-hidden rounded-md border border-border text-xs">
+            {DUTIES.map((duty) => <button key={duty.id} type="button" onClick={() => update({ duty: duty.id })} className={`inline-flex min-h-9 items-center gap-1.5 border-r border-border px-3 transition-colors last:border-r-0 ${search.duty === duty.id ? "bg-accent text-accent-foreground" : "hover:bg-accent/40 text-muted-foreground"}`}>{duty.id !== "all" && <TrafficLight level={duty.id as DutyLevel} size={7} />}{duty.label}<span className="tabular-nums font-mono text-[10px] opacity-70">{duty.count}</span></button>)}
+          </div>
+          <button type="button" onClick={() => setAdvOpen((open) => !open)} className="ml-auto inline-flex h-9 items-center justify-center gap-1.5 rounded-md border border-border px-3 text-xs hover:bg-accent/40" aria-expanded={advOpen} aria-controls="desktop-advanced-filters">
+            {advOpen ? <ChevronUp className="size-3.5" aria-hidden="true" /> : <ChevronDown className="size-3.5" aria-hidden="true" />}
+            Advanced filters
+            {activeAdv > 0 && <Pill tone="info">{activeAdv}</Pill>}
+          </button>
+          <div className="font-mono text-xs tabular-nums text-muted-foreground">{filtered.length} results</div>
         </div>
-        <button
-          type="button"
-          onClick={() => setAdvOpen((v) => !v)}
-          className="inline-flex h-11 w-full items-center justify-center gap-1.5 rounded-md border border-border px-3 text-xs hover:bg-accent/40 sm:ml-auto sm:h-9 sm:w-auto"
-          aria-expanded={advOpen}
-        >
-          {advOpen ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}
-          Advanced filters
-          {activeAdv > 0 && <Pill tone="info">{activeAdv}</Pill>}
-        </button>
-        <div className="w-full text-right font-mono text-xs tabular-nums text-muted-foreground sm:w-auto sm:text-left">{filtered.length} results</div>
       </div>
 
-      {/* Advanced filters panel */}
       {advOpen && (
-        <Card className="p-4 space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {/* Tier */}
-            <div>
-              <div className="text-[11px] uppercase text-muted-foreground mb-1.5">Tier</div>
-              <div className="flex flex-wrap gap-1.5">
-                {TIER_OPTIONS.map((t) => {
-                  const on = selectedTiers.includes(t);
-                  return (
-                    <button
-                      key={t}
-                      type="button"
-                      onClick={() => update({ tiers: toCsv(toggleFrom(selectedTiers, t)) })}
-                        className={`min-h-10 rounded-md border px-2 text-[11px] transition-colors sm:min-h-0 sm:py-1 ${on ? "bg-primary/15 border-primary/50 text-foreground" : "border-border text-muted-foreground hover:bg-accent/40"}`}
-                      aria-pressed={on}
-                    >
-                      {t}
-                    </button>
-                  );
-                })}
-              </div>
+        <div id="desktop-advanced-filters" className="hidden md:block">
+          <Card className="p-4 space-y-4">
+            <AdvancedFilterFields includeTier search={search} update={update} selectedTiers={selectedTiers} selectedLeagues={selectedLeagues} selectedNats={selectedNats} allLeagues={allLeagues} allNats={allNats} contractYears={contractYears} ratingMin={ratingMin} ratingMax={ratingMax} />
+            <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border pt-1">
+              <div className="text-[11px] text-muted-foreground">{activeAdv} advanced filter{activeAdv === 1 ? "" : "s"} active</div>
+              <button type="button" onClick={clearFilters} className="inline-flex h-9 items-center gap-1 rounded-md border border-border px-2.5 text-[11px] hover:bg-accent/40"><X className="size-3" aria-hidden="true" /> Clear filters</button>
             </div>
-
-            {/* Loan */}
-            <div>
-              <div className="text-[11px] uppercase text-muted-foreground mb-1.5">Loan status</div>
-              <div className="flex flex-wrap gap-1.5">
-                {LOAN_OPTIONS.map((o) => (
-                  <button
-                    key={o.id}
-                    type="button"
-                    onClick={() => update({ loan: o.id })}
-                      className={`min-h-10 rounded-md border px-2 text-[11px] transition-colors sm:min-h-0 sm:py-1 ${search.loan === o.id ? "bg-primary/15 border-primary/50 text-foreground" : "border-border text-muted-foreground hover:bg-accent/40"}`}
-                    aria-pressed={search.loan === o.id}
-                  >
-                    {o.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Contract */}
-            <div>
-              <div className="text-[11px] uppercase text-muted-foreground mb-1.5">Contract</div>
-              <select
-                value={search.contract}
-                onChange={(e) => update({ contract: e.target.value })}
-                className="h-11 w-full rounded-md border border-border bg-input/60 px-2 text-sm sm:h-9"
-                aria-label="Contract filter"
-              >
-                {CONTRACT_OPTIONS.map((o) => (<option key={o.id} value={o.id}>{o.label}</option>))}
-                <optgroup label="Expires in year">
-                  {contractYears.map((y) => (<option key={y} value={y}>{y}</option>))}
-                </optgroup>
-              </select>
-            </div>
-
-            {/* Club */}
-            <div>
-              <div className="text-[11px] uppercase text-muted-foreground mb-1.5">Club or parent club</div>
-              <input
-                value={search.club}
-                onChange={(e) => update({ club: e.target.value })}
-                placeholder="e.g. Brighton, Wolves…"
-                className="h-11 w-full rounded-md border border-border bg-input/60 px-2 text-sm sm:h-9"
-                aria-label="Club filter"
-              />
-            </div>
-
-            {/* League */}
-            <div>
-              <div className="text-[11px] uppercase text-muted-foreground mb-1.5">League ({selectedLeagues.length || 0} selected)</div>
-              <div className="max-h-32 overflow-y-auto rounded-md border border-border p-1.5 flex flex-wrap gap-1">
-                {allLeagues.map((l) => {
-                  const on = selectedLeagues.includes(l);
-                  return (
-                    <button
-                      key={l}
-                      type="button"
-                      onClick={() => update({ leagues: toCsv(toggleFrom(selectedLeagues, l)) })}
-                      className={`min-h-8 rounded border px-2 text-[10px] transition-colors sm:min-h-0 sm:py-0.5 ${on ? "bg-primary/15 border-primary/50 text-foreground" : "border-border/60 text-muted-foreground hover:bg-accent/40"}`}
-                      aria-pressed={on}
-                    >
-                      {l}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Nationality */}
-            <div>
-              <div className="text-[11px] uppercase text-muted-foreground mb-1.5">Nationality ({selectedNats.length || 0} selected)</div>
-              <div className="max-h-32 overflow-y-auto rounded-md border border-border p-1.5 flex flex-wrap gap-1">
-                {allNats.map((n) => {
-                  const on = selectedNats.includes(n);
-                  return (
-                    <button
-                      key={n}
-                      type="button"
-                      onClick={() => update({ nats: toCsv(toggleFrom(selectedNats, n)) })}
-                      className={`min-h-8 rounded border px-2 text-[10px] transition-colors sm:min-h-0 sm:py-0.5 ${on ? "bg-primary/15 border-primary/50 text-foreground" : "border-border/60 text-muted-foreground hover:bg-accent/40"}`}
-                      aria-pressed={on}
-                    >
-                      {n}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Rating range */}
-            <div className="md:col-span-2 lg:col-span-3">
-              <div className="text-[11px] uppercase text-muted-foreground mb-1.5">
-                Rating range <span className="tabular-nums font-mono text-foreground">{ratingMin.toFixed(1)}–{ratingMax.toFixed(1)}</span>
-              </div>
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                <label className="flex flex-1 items-center gap-2 text-[11px] text-muted-foreground">
-                  <span className="w-8 tabular-nums">Min</span>
-                  <input
-                    type="range" min={1} max={5} step={0.1} value={ratingMin}
-                    onChange={(e) => update({ ratingMin: clampRating(Number(e.target.value)) })}
-                    className="flex-1"
-                    aria-label="Minimum rating"
-                  />
-                  <span className="w-8 tabular-nums font-mono text-foreground">{ratingMin.toFixed(1)}</span>
-                </label>
-                <label className="flex flex-1 items-center gap-2 text-[11px] text-muted-foreground">
-                  <span className="w-8 tabular-nums">Max</span>
-                  <input
-                    type="range" min={1} max={5} step={0.1} value={ratingMax}
-                    onChange={(e) => update({ ratingMax: clampRating(Number(e.target.value)) })}
-                    className="flex-1"
-                    aria-label="Maximum rating"
-                  />
-                  <span className="w-8 tabular-nums font-mono text-foreground">{ratingMax.toFixed(1)}</span>
-                </label>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border pt-1">
-            <div className="text-[11px] text-muted-foreground">{activeAdv} advanced filter{activeAdv === 1 ? "" : "s"} active</div>
-            <button
-              type="button"
-              onClick={resetAll}
-              className="inline-flex h-10 items-center gap-1 rounded-md border border-border px-2.5 text-[11px] hover:bg-accent/40"
-            >
-              <X className="size-3" /> Reset all filters
-            </button>
-          </div>
-        </Card>
+          </Card>
+        </div>
       )}
 
       <div className="flex items-center justify-between gap-3 md:hidden">
@@ -618,7 +565,7 @@ function GoalkeepersList() {
           <MobileGoalkeeperCard
             key={gk.id}
             gk={gk}
-            rating={ratingsByGoalkeeper.get(normaliseName(gk.name))}
+            rating={ratingsByGoalkeeper.get(normaliseGoalkeeperName(gk.name))}
           />
         ))}
       </Card>
@@ -650,7 +597,7 @@ function GoalkeepersList() {
               </tr>
             ) : sorted.map((gk) => {
               const d = dutyStatusForGk(gk);
-              const rating = ratingsByGoalkeeper.get(normaliseName(gk.name));
+              const rating = ratingsByGoalkeeper.get(normaliseGoalkeeperName(gk.name));
               return (
                 <tr key={gk.id} className="border-b border-border/60 last:border-0 hover:bg-accent/20 transition-colors">
                   <td className="pl-4 pr-1"><TrafficLight level={d.level} /></td>
