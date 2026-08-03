@@ -280,19 +280,27 @@ function Dashboard() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <ErrorBoundary
-          fallback={
+          fallback={(reset) => (
             <Card className="lg:col-span-2 p-4">
               <SectionTitle>Recent Activity</SectionTitle>
               <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive flex items-start gap-2">
                 <AlertTriangle className="size-4 shrink-0" />
-                <div>
+                <div className="flex-1 min-w-0">
                   <p className="font-medium">Recent activity unavailable</p>
                   <p className="text-destructive/80">Something went wrong loading the latest interactions. The rest of the dashboard is still working.</p>
                 </div>
               </div>
+              <button
+                type="button"
+                onClick={reset}
+                className="mt-3 inline-flex h-8 items-center justify-center rounded-md bg-destructive px-3 text-xs font-medium text-destructive-foreground hover:bg-destructive/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              >
+                Retry
+              </button>
             </Card>
-          }
+          )}
         >
+
           <Card className="lg:col-span-2 p-4">
             <SectionTitle>Recent Activity</SectionTitle>
             <div className="space-y-2">
