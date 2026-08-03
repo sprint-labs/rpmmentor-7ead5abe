@@ -1,3 +1,5 @@
+// @vitest-environment jsdom
+
 import { describe, expect, it, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { ErrorBoundary } from "./error-boundary";
@@ -13,10 +15,10 @@ describe("ErrorBoundary", () => {
         <div data-testid="ok">content</div>
       </ErrorBoundary>,
     );
-    expect(screen.getByTestId("ok")).toBeInTheDocument();
+    expect(screen.getByTestId("ok")).toBeTruthy();
   });
 
-  it("catches render errors and renders the fallback UI", () => {
+  it("catches render errors and renders the default fallback UI", () => {
     // Suppress expected error noise in test output.
     vi.spyOn(console, "error").mockImplementation(() => {});
     render(
@@ -24,9 +26,9 @@ describe("ErrorBoundary", () => {
         <BadChild />
       </ErrorBoundary>,
     );
-    expect(screen.getByText("Something went wrong")).toBeInTheDocument();
-    expect(screen.getByText("boom")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Retry" })).toBeInTheDocument();
+    expect(screen.getByText("Something went wrong")).toBeTruthy();
+    expect(screen.getByText("boom")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Retry" })).toBeTruthy();
   });
 
   it("supports a render-prop fallback and resets when requested", () => {
@@ -51,7 +53,7 @@ describe("ErrorBoundary", () => {
       </ErrorBoundary>,
     );
 
-    expect(screen.getByText("custom fallback")).toBeInTheDocument();
+    expect(screen.getByText("custom fallback")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Reset" }));
     expect(resetHandler).toHaveBeenCalled();
 
@@ -68,6 +70,6 @@ describe("ErrorBoundary", () => {
         <MaybeBad explode={false} />
       </ErrorBoundary>,
     );
-    expect(screen.getByTestId("ok")).toBeInTheDocument();
+    expect(screen.getByTestId("ok")).toBeTruthy();
   });
 });
