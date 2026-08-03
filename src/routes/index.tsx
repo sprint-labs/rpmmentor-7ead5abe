@@ -71,8 +71,27 @@ function Dashboard() {
     return <MentorDashboard user={user} mentorProfileId={user.mentorId ?? ""} />;
   }
 
+  const { data: loggedInteractions } = useLoggedInteractions();
   const dutySource = useDutySource();
   const dutyOverview = computeDutyOverview(dutySource);
+
+  // Recent Activity merges durable interactions with other real events, so a
+  // newly logged interaction appears as soon as the shared cache refreshes.
+  const recentActivity = [
+    ...activity,
+    ...(loggedInteractions ?? []).map((i) => ({
+      id: `interaction-${i.id}`,
+      actor: i.mentorName || "Mentor",
+      actorInitials: initialsOf(i.mentorName || "Mentor"),
+      action: `logged a ${i.interactionType.toLowerCase()} with`,
+      target: i.goalkeeperName,
+      gkId: i.gkSlug,
+      date: i.occurredAt,
+    })),
+  ]
+    .sort((a, b) => +new Date(b.date) - +new Date(a.date))
+    .slice(0, 8);
+
   const pool = goalkeepers;
   const upcoming = [...pool]
     .filter((g) => new Date(g.nextInteraction).getTime() >= Date.now())
