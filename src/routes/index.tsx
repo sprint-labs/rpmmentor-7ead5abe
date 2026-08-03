@@ -260,11 +260,12 @@ function Dashboard() {
         <Card className="lg:col-span-2 p-4">
           <SectionTitle>Recent Activity</SectionTitle>
           <div className="space-y-2">
-            {activity.length === 0 ? (
+            {recentActivity.length === 0 ? (
               <div className="text-xs text-muted-foreground p-3 rounded-md border border-dashed border-border/60 text-center">
-                No recent activity yet. Report submissions, media uploads and role changes will appear here as they happen.
+                No recent activity yet. Interactions, report submissions, media uploads and role changes will appear here as they happen.
               </div>
-            ) : activity.map((a) => (
+            ) : recentActivity.map((a) => (
+
               <div key={a.id} className="flex items-start gap-3 py-1.5">
                 <Avatar initials={a.actorInitials} size={26} />
                 <div className="flex-1 min-w-0 text-sm">
