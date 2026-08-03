@@ -2,9 +2,11 @@ import { Component, type ErrorInfo, type ReactNode } from "react";
 import { AlertTriangle } from "lucide-react";
 import { reportLovableError } from "@/lib/lovable-error-reporting";
 
+type FallbackRender = (reset: () => void) => ReactNode;
+
 interface Props {
   children: ReactNode;
-  fallback?: ReactNode;
+  fallback?: ReactNode | FallbackRender;
   onReset?: () => void;
 }
 
@@ -34,6 +36,9 @@ export class ErrorBoundary extends Component<Props, State> {
 
   render() {
     if (this.state.hasError) {
+      if (typeof this.props.fallback === "function") {
+        return this.props.fallback(this.handleReset);
+      }
       if (this.props.fallback) return this.props.fallback;
 
       return (
@@ -61,3 +66,4 @@ export class ErrorBoundary extends Component<Props, State> {
     return this.props.children;
   }
 }
+
