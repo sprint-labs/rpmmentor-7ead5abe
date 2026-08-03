@@ -2,7 +2,7 @@ import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import { X, CheckCircle2, Upload, AlertCircle, Paperclip, Search, Trash2, Loader2, RotateCcw } from "lucide-react";
+import { X, CheckCircle2, Upload, AlertCircle, Paperclip, Search, Trash2, Loader2 } from "lucide-react";
 import { goalkeepers } from "@/lib/mock-data";
 import { listPlayers, type PlayerRosterRow } from "@/lib/players.functions";
 import { useAuth, type SessionUser } from "@/lib/auth";
@@ -105,7 +105,9 @@ export function WorkflowDialog({ kind, onClose, prefillGoalkeeper, prefillMatchD
                 ? "Draft autosaves locally · Submission writes to the RPM Match Reports Google Sheet"
                 : kind === "media"
                   ? "Stored in Lovable Cloud"
-                  : "Saved locally to this session"}
+                  : kind === "interaction"
+                    ? "Not available in this release · entries cannot be saved"
+                    : "Saved locally to this session"}
             </p>
           </div>
           <button onClick={onClose} className="size-8 grid place-items-center rounded-md hover:bg-accent"><X className="size-4" /></button>
@@ -207,85 +209,22 @@ function TagPicker({ value, onChange }: { value: string[]; onChange: (v: string[
   );
 }
 
-function InteractionForm({ onDone }: { onDone: () => void }) {
-  const [done, setDone] = useState(false);
-  const [notes, setNotes] = useState("");
-  const [gkId, setGkId] = useState("");
-  const [club, setClub] = useState("");
-  const [clubAutoFilled, setClubAutoFilled] = useState(false);
-  const autoFilledClubRef = useRef<string | null>(null);
-  const gk = goalkeepers.find((g) => g.id === gkId);
-
-  const listPlayersFn = useServerFn(listPlayers);
-  const playersQuery = useQuery({
-    queryKey: ["players", "roster"],
-    queryFn: () => listPlayersFn(),
-    staleTime: 5 * 60_000,
-  });
-  const players: PlayerRosterRow[] = playersQuery.data ?? [];
-  const playersByName = useMemo(() => {
-    const map = new Map<string, PlayerRosterRow>();
-    for (const p of players) map.set(p.full_name.trim().toLowerCase(), p);
-    return map;
-  }, [players]);
-
-  useEffect(() => {
-    if (!gk) return;
-    const match = playersByName.get(gk.name.trim().toLowerCase());
-    if (!match) return;
-    const canOverwrite = !club.trim() || club === autoFilledClubRef.current;
-    if (!canOverwrite) return;
-    if (club === match.current_club) return;
-    setClub(match.current_club);
-    autoFilledClubRef.current = match.current_club;
-    setClubAutoFilled(true);
-  }, [gk, playersByName, club]);
-
-  function handleClubChange(v: string) {
-    setClub(v);
-    if (v !== autoFilledClubRef.current) setClubAutoFilled(false);
-  }
-
-  function resetClub() {
-    const rosterClub = autoFilledClubRef.current;
-    if (rosterClub) {
-      setClub(rosterClub);
-      setClubAutoFilled(true);
-    }
-  }
-
-
-  if (done) return <Submitted message="Interaction logged successfully." onDone={onDone} />;
+export function InteractionForm({ onDone }: { onDone: () => void }) {
   return (
-    <form onSubmit={(e) => { e.preventDefault(); setDone(true); }} className="space-y-4">
-      <div className="grid grid-cols-2 gap-3">
-        <Field label="Goalkeeper"><select className={selectCls} required value={gkId} onChange={(e) => setGkId(e.target.value)}><option value="" disabled>Select…</option>{goalkeepers.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}</select></Field>
-        <Field label="Interaction Type"><select className={selectCls} required>{["Live Match Observation", "Training Ground Visit", "Coffee Catch Up", "Phone Call"].map((t) => <option key={t}>{t}</option>)}</select></Field>
-        <Field label="Club">
-          <input className={inputCls} value={club} onChange={(e) => handleClubChange(e.target.value)} placeholder="e.g. Brighton & Hove Albion" maxLength={80} />
-          {clubAutoFilled ? (
-            <p className="mt-1 text-[11px] text-muted-foreground">Auto-filled from roster · edit to override</p>
-          ) : autoFilledClubRef.current ? (
-            <button type="button" onClick={resetClub} className="mt-1 inline-flex items-center gap-1 text-[11px] text-primary hover:text-primary/80">
-              <RotateCcw className="size-3" /> Reset to roster club
-            </button>
-          ) : null}
-        </Field>
-
-        <Field label="Date"><input type="date" className={inputCls} defaultValue={new Date().toISOString().slice(0, 10)} required /></Field>
-        <Field label="Outcome"><select className={selectCls}>{["On track", "Above expectation", "Below expectation", "Needs follow-up", "Action plan agreed"].map((t) => <option key={t}>{t}</option>)}</select></Field>
+    <div className="text-center py-6">
+      <AlertCircle className="size-10 text-amber-500 mx-auto" />
+      <p className="text-sm font-medium mt-3">Interaction logging isn't available yet</p>
+      <p className="text-sm text-muted-foreground mt-2 max-w-md mx-auto">
+        This release cannot save interaction entries durably, so nothing you enter here
+        would appear in the dashboard, calendar, interactions list, or the goalkeeper's
+        profile. Entry has been disabled until logging is connected to real storage.
+      </p>
+      <div className="mt-4 flex justify-center">
+        <button type="button" onClick={onDone} className="h-9 px-4 rounded-md bg-primary text-primary-foreground text-sm font-medium">
+          Close
+        </button>
       </div>
-      <HandwrittenNotesField
-        context={gk ? `Session notes about ${gk.name} (${club || gk.club})` : undefined}
-        onTranscribed={(text, mode) => setNotes((prev) => mode === "replace" || !prev.trim() ? text : `${prev.trim()}\n\n${text}`)}
-      />
-      <VoiceNoteField
-        onTranscribed={(text, mode) => setNotes((prev) => mode === "replace" || !prev.trim() ? text : `${prev.trim()}\n\n${text}`)}
-      />
-      <Field label="Notes"><textarea rows={5} className={taCls} placeholder="What did you observe? Or use the camera/mic above to transcribe notes." required value={notes} onChange={(e) => setNotes(e.target.value)} /></Field>
-      <Field label="Follow-up Action"><input className={inputCls} placeholder="e.g. Schedule video review next week" /></Field>
-      <div className="flex justify-end gap-2 pt-2"><button type="button" onClick={onDone} className="h-9 px-3 rounded-md border border-border text-sm">Cancel</button><button type="submit" className="h-9 px-4 rounded-md bg-primary text-primary-foreground text-sm font-medium">Save Interaction</button></div>
-    </form>
+    </div>
   );
 }
 
