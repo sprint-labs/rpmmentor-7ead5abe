@@ -3,7 +3,7 @@ import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Card, PageHeader, StatCard, SectionTitle, Avatar, Pill, TierBadge, TrafficLight } from "@/components/primitives";
-import { activity, alerts, goalkeepers, stats, formatRelative, getMentor, computeDutyOverview, dutyStatusForGk } from "@/lib/mock-data";
+import { activity, alerts, goalkeepers, stats, formatRelative, getMentor, computeDutyOverview } from "@/lib/mock-data";
 import { useDutySource } from "@/lib/interactions/use-interactions";
 import { ArrowUpRight, AlertTriangle, CalendarClock, FileText, Users, UserCog } from "lucide-react";
 import { useAuth, ROLE_LABEL } from "@/lib/auth";
