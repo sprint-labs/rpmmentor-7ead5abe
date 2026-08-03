@@ -9,6 +9,19 @@ const listPlayersMock = vi.fn(async () => [
 
 vi.mock("@tanstack/react-start", () => ({
   useServerFn: (fn: unknown) => fn,
+  createServerFn: () => {
+    const chain: Record<string, unknown> = {};
+    chain["middleware"] = () => chain;
+    chain["inputValidator"] = () => chain;
+    chain["handler"] = (fn: unknown) => fn;
+    return chain;
+  },
+  createMiddleware: () => {
+    const chain: Record<string, unknown> = {};
+    chain["server"] = () => chain;
+    chain["client"] = () => chain;
+    return chain;
+  },
 }));
 vi.mock("@tanstack/react-router", () => ({
   useNavigate: () => vi.fn(),
