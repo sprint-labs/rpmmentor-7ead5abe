@@ -315,10 +315,10 @@ export function InteractionForm({ onDone }: { onDone: () => void }) {
         </div>
       )}
       <div className="grid grid-cols-2 gap-3">
-        <Field label="Goalkeeper"><select className={selectCls} required value={gkId} onChange={(e) => setGkId(e.target.value)}><option value="" disabled>Select…</option>{goalkeepers.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}</select></Field>
-        <Field label="Interaction Type"><select className={selectCls} required value={type} onChange={(e) => setType(e.target.value as InteractionTypeValue)}>{INTERACTION_TYPES.map((t) => <option key={t}>{t}</option>)}</select></Field>
+        <Field label="Goalkeeper"><select aria-label="Goalkeeper" className={selectCls} required value={gkId} onChange={(e) => setGkId(e.target.value)}><option value="" disabled>Select…</option>{goalkeepers.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}</select></Field>
+        <Field label="Interaction Type"><select aria-label="Interaction Type" className={selectCls} required value={type} onChange={(e) => setType(e.target.value as InteractionTypeValue)}>{INTERACTION_TYPES.map((t) => <option key={t}>{t}</option>)}</select></Field>
         <Field label="Club">
-          <input className={inputCls} value={club} onChange={(e) => handleClubChange(e.target.value)} placeholder="e.g. Brighton & Hove Albion" maxLength={80} />
+          <input aria-label="Club" className={inputCls} value={club} onChange={(e) => handleClubChange(e.target.value)} placeholder="e.g. Brighton & Hove Albion" maxLength={80} />
           {clubAutoFilled ? (
             <p className="mt-1 text-[11px] text-muted-foreground">Auto-filled from roster · edit to override</p>
           ) : autoFilledClubRef.current ? (
@@ -328,8 +328,8 @@ export function InteractionForm({ onDone }: { onDone: () => void }) {
           ) : null}
         </Field>
 
-        <Field label="Date"><input type="date" className={inputCls} value={date} onChange={(e) => setDate(e.target.value)} required /></Field>
-        <Field label="Outcome"><select className={selectCls} value={outcome} onChange={(e) => setOutcome(e.target.value)}>{INTERACTION_OUTCOMES.map((t) => <option key={t}>{t}</option>)}</select></Field>
+        <Field label="Date"><input aria-label="Date" type="date" className={inputCls} value={date} onChange={(e) => setDate(e.target.value)} required /></Field>
+        <Field label="Outcome"><select aria-label="Outcome" className={selectCls} value={outcome} onChange={(e) => setOutcome(e.target.value)}>{INTERACTION_OUTCOMES.map((t) => <option key={t}>{t}</option>)}</select></Field>
       </div>
       <HandwrittenNotesField
         context={gk ? `Session notes about ${gk.name} (${club || gk.club})` : undefined}
@@ -338,8 +338,8 @@ export function InteractionForm({ onDone }: { onDone: () => void }) {
       <VoiceNoteField
         onTranscribed={(text, mode) => setNotes((prev) => mode === "replace" || !prev.trim() ? text : `${prev.trim()}\n\n${text}`)}
       />
-      <Field label="Notes"><textarea rows={5} className={taCls} placeholder="What did you observe? Or use the camera/mic above to transcribe notes." required value={notes} onChange={(e) => setNotes(e.target.value)} /></Field>
-      <Field label="Follow-up Action"><input className={inputCls} placeholder="e.g. Schedule video review next week" value={followUp} onChange={(e) => setFollowUp(e.target.value)} maxLength={200} /></Field>
+      <Field label="Notes"><textarea aria-label="Notes" rows={5} className={taCls} placeholder="What did you observe? Or use the camera/mic above to transcribe notes." required value={notes} onChange={(e) => setNotes(e.target.value)} /></Field>
+      <Field label="Follow-up Action"><input aria-label="Follow-up Action" className={inputCls} placeholder="e.g. Schedule video review next week" value={followUp} onChange={(e) => setFollowUp(e.target.value)} maxLength={200} /></Field>
       <div className="flex justify-end gap-2 pt-2">
         <button type="button" onClick={onDone} className="h-9 px-3 rounded-md border border-border text-sm" disabled={saving}>Cancel</button>
         <button type="submit" disabled={saving} className="h-9 px-4 rounded-md bg-primary text-primary-foreground text-sm font-medium disabled:opacity-60 inline-flex items-center gap-1.5">
