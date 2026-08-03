@@ -33,7 +33,7 @@ vi.mock("@/lib/interactions.functions", () => ({
   listInteractions: vi.fn(async () => []),
 }));
 vi.mock("@/lib/players.functions", () => ({
-  listPlayers: (...args: unknown[]) => listPlayersMock(...args),
+  listPlayers: () => listPlayersMock(),
 }));
 vi.mock("@/lib/auth", () => ({
   useAuth: () => ({ user: { id: "u1", name: "Mentor" }, can: () => true }),
