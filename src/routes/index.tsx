@@ -74,6 +74,44 @@ function Dashboard() {
     if (!user) navigate({ to: "/login", search: { next: "/" }, replace: true });
   }, [user, navigate]);
 
+  // Hooks must run unconditionally — this query stays above every early return
+  // and is disabled unless a signed-in, non-mentor user is viewing the page.
+  const {
+    data: loggedInteractions,
+    isLoading: interactionsLoading,
+    isError: interactionsError,
+  } = useLoggedInteractions(Boolean(user) && user?.role !== "mentor");
+  const dutySource = useMemo(
+    () =>
+      (loggedInteractions ?? []).map((i) => ({
+        gkId: i.gkSlug,
+        type: i.interactionType,
+        date: i.occurredAt,
+      })),
+    [loggedInteractions],
+  );
+
+  // Recent Activity merges durable interactions with other real events, so a
+  // newly logged interaction appears as soon as the shared cache refreshes.
+  const recentActivity = useMemo(
+    () =>
+      [
+        ...activity,
+        ...(loggedInteractions ?? []).map((i) => ({
+          id: `interaction-${i.id}`,
+          actor: i.mentorName || "Mentor",
+          actorInitials: initialsOf(i.mentorName || "Mentor"),
+          action: `logged a ${i.interactionType.toLowerCase()} with`,
+          target: i.goalkeeperName,
+          gkId: i.gkSlug,
+          date: i.occurredAt,
+        })),
+      ]
+        .sort((a, b) => +new Date(b.date) - +new Date(a.date))
+        .slice(0, 8),
+    [loggedInteractions],
+  );
+
   if (!user) return null;
 
   // Dedicated mentor experience — only the stat cards shown below are mentor-specific.
@@ -81,26 +119,8 @@ function Dashboard() {
     return <MentorDashboard user={user} mentorProfileId={user.mentorId ?? ""} />;
   }
 
-  const { data: loggedInteractions } = useLoggedInteractions();
-  const dutySource = useDutySource();
   const dutyOverview = computeDutyOverview(dutySource);
 
-  // Recent Activity merges durable interactions with other real events, so a
-  // newly logged interaction appears as soon as the shared cache refreshes.
-  const recentActivity = [
-    ...activity,
-    ...(loggedInteractions ?? []).map((i) => ({
-      id: `interaction-${i.id}`,
-      actor: i.mentorName || "Mentor",
-      actorInitials: initialsOf(i.mentorName || "Mentor"),
-      action: `logged a ${i.interactionType.toLowerCase()} with`,
-      target: i.goalkeeperName,
-      gkId: i.gkSlug,
-      date: i.occurredAt,
-    })),
-  ]
-    .sort((a, b) => +new Date(b.date) - +new Date(a.date))
-    .slice(0, 8);
 
   const pool = goalkeepers;
   const upcoming = [...pool]
