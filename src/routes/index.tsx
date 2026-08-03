@@ -280,7 +280,15 @@ function Dashboard() {
         <Card className="lg:col-span-2 p-4">
           <SectionTitle>Recent Activity</SectionTitle>
           <div className="space-y-2">
-            {recentActivity.length === 0 ? (
+            {interactionsLoading ? (
+              <div className="text-xs text-muted-foreground p-3 rounded-md border border-dashed border-border/60 text-center">
+                Loading recent activity…
+              </div>
+            ) : interactionsError ? (
+              <div className="text-xs text-muted-foreground p-3 rounded-md border border-dashed border-border/60 text-center">
+                Recent activity is unavailable right now. Sign in again to see the latest interactions.
+              </div>
+            ) : recentActivity.length === 0 ? (
               <div className="text-xs text-muted-foreground p-3 rounded-md border border-dashed border-border/60 text-center">
                 No recent activity yet. Interactions, report submissions, media uploads and role changes will appear here as they happen.
               </div>
