@@ -1,7 +1,7 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Link } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ArrowUpRight, CalendarClock, CalendarPlus, ChevronDown, ChevronRight, FileText, Video, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Card, StatCard, SectionTitle, Avatar, TierBadge, TierLevelBadge, Pill } from "@/components/primitives";
@@ -11,6 +11,7 @@ import { mentors } from "@/lib/mock-data";
 import type { Tier } from "@/lib/mock-data";
 import type { SessionUser } from "@/lib/auth";
 import { logDashboardClick } from "@/lib/analytics.functions";
+import { mentorDashboardMetricCardLabels } from "./mentor-dashboard-cards";
 
 function lastNDaysSearch(days: number) {
   const to = new Date();
@@ -87,10 +88,20 @@ export function MentorDashboard({ user }: Props) {
   const [rangeDays, setRangeDays] = useState(14);
   const [filters, setFilters] = useState<string[]>([]);
   const fetchStats = useServerFn(getMentorDashboardStats);
+  const queryClient = useQueryClient();
+  const periodSearch = useMemo(() => lastNDaysSearch(rangeDays), [rangeDays]);
   const { data, isLoading, isError, refetch } = useQuery({
-    queryKey: ["mentor-dashboard-stats", rangeDays],
-    queryFn: () => fetchStats({ data: { days: rangeDays } }),
+    queryKey: ["mentor-dashboard-stats", rangeDays, periodSearch.from, periodSearch.to],
+    queryFn: () => fetchStats({ data: { days: rangeDays, ...periodSearch } }),
   });
+
+  useEffect(() => {
+    const handleReportSubmitted = () => {
+      void queryClient.invalidateQueries({ queryKey: ["mentor-dashboard-stats"] });
+    };
+    window.addEventListener("rpm:report-submitted", handleReportSubmitted);
+    return () => window.removeEventListener("rpm:report-submitted", handleReportSubmitted);
+  }, [queryClient]);
 
   const firstName = user.name.split(" ")[0];
   const upcoming = data?.upcomingList ?? [];
@@ -121,11 +132,9 @@ export function MentorDashboard({ user }: Props) {
     if (user.actualRole === "mentor") return user.name;
     return undefined;
   }, [data?.mentorProfileId, user.mentorId, user.actualRole, user.name]);
-  const periodSearch = useMemo(() => lastNDaysSearch(rangeDays), [rangeDays]);
   const effectiveMentorId = data?.mentorProfileId ?? user.mentorId ?? "";
-  const reportsSearch = { ...periodSearch, coach: mentorName ?? "", mentorProfileId: effectiveMentorId, source: "reports-submitted" };
+  const reportsSearch = { ...periodSearch, coach: data?.coachIdentity ?? "", mentorProfileId: effectiveMentorId, source: "reports-submitted" };
   const interactionsSearch = { ...periodSearch, mentorId: effectiveMentorId, type: filters.length === 1 ? filters[0]! : "", source: "interactions-logged" };
-  const mediaSearch = { ...periodSearch, uploaderName: mentorName ?? "", mentorProfileId: effectiveMentorId, kind: "video", source: "clips-posted" };
   const outstandingSearch = { ...periodSearch, coach: mentorName ?? "", mentorProfileId: effectiveMentorId, source: "outstanding-actions" };
 
   const toggleFilter = (type: string) => {
@@ -174,7 +183,7 @@ export function MentorDashboard({ user }: Props) {
         )}
       </header>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
         <Link
           to="/reports"
           search={reportsSearch}
@@ -183,7 +192,7 @@ export function MentorDashboard({ user }: Props) {
           aria-label="View match reports"
         >
           <StatCard
-            label="Match Reports Submitted"
+            label={mentorDashboardMetricCardLabels.matchReportsSubmitted}
             value={data?.reportsLast14 ?? 0}
             hint={period}
             accent="primary"
@@ -198,25 +207,10 @@ export function MentorDashboard({ user }: Props) {
           aria-label="View interactions"
         >
           <StatCard
-            label="Interactions Logged"
+            label={mentorDashboardMetricCardLabels.interactionsLogged}
             value={data?.interactionsLast14 ?? 0}
             hint={period}
             accent="info"
-            updatedAt={updatedAt}
-          />
-        </Link>
-        <Link
-          to="/media"
-          search={mediaSearch}
-          onClick={() => trackClick("clips-posted", "/media")}
-          className="block rounded-lg transition-transform hover:-translate-y-0.5 hover:ring-1 hover:ring-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-          aria-label="View match clips"
-        >
-          <StatCard
-            label="Match Clips Posted"
-            value={data?.clipsLast14 ?? 0}
-            hint={period}
-            accent="primary"
             updatedAt={updatedAt}
           />
         </Link>
@@ -228,7 +222,7 @@ export function MentorDashboard({ user }: Props) {
           aria-label="View outstanding actions"
         >
           <StatCard
-            label="Outstanding Actions"
+            label={mentorDashboardMetricCardLabels.outstandingActions}
             value={data?.outstandingActions ?? 0}
             hint="Overdue reports & clip uploads"
             accent="destructive"
