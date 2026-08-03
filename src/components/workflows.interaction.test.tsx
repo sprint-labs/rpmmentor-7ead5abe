@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
-import { describe, expect, it, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
+import { cleanup, render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 const createInteractionMock = vi.fn();
@@ -71,6 +71,8 @@ describe("InteractionForm (durable)", () => {
     createInteractionMock.mockReset();
     listPlayersMock.mockClear();
   });
+
+  afterEach(() => cleanup());
 
   it("renders a real entry form with every collected value", () => {
     renderForm();
