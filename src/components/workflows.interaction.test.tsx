@@ -123,11 +123,11 @@ describe("InteractionForm (durable)", () => {
 
   it("auto-fills the club from the roster but keeps it editable and resettable", async () => {
     createInteractionMock.mockResolvedValue({ id: "i1" });
-    renderForm();
-    const gk = goalkeepers.find((g) => g.name === "Demo Keeper") ?? goalkeepers[0]!;
+    const gk = goalkeepers[0]!;
     listPlayersMock.mockResolvedValue([
       { id: "p1", full_name: gk.name, current_club: "Roster FC" },
     ]);
+    renderForm();
     fireEvent.change(screen.getByLabelText("Goalkeeper"), { target: { value: gk.id } });
 
     const club = () => screen.getByLabelText("Club") as HTMLInputElement;
