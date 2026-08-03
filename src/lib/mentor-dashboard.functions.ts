@@ -3,6 +3,14 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
 import { goalkeepers, interactions, reports, media, calendarEvents, mentors } from "@/lib/mock-data";
 import type { TierLevel } from "@/lib/mock-data";
+import { parseSheetRows } from "@/lib/match-reports/schema";
+import {
+  countCanonicalReportsForCoach,
+  FALLBACK_MENTOR_ID,
+  resolveCoachIdentity,
+  selectCoachProfileForDashboard,
+  type DashboardCoachProfile,
+} from "@/lib/mentor-dashboard-report-count";
 
 export type UpcomingPlannedType =
   | "Coffee Catch Up"
@@ -48,6 +56,7 @@ export interface OutstandingActionItem {
 
 export interface MentorDashboardStats {
   mentorProfileId: string | null;
+  coachIdentity: string;
   reportsLast14: number;
   interactionsLast14: number;
   clipsLast14: number;
@@ -84,8 +93,12 @@ function mapPlannedType(type: string): UpcomingPlannedType | null {
 const dashboardInputSchema = z
   .object({
     days: z.coerce.number().int().min(1).max(60).default(14),
+    from: z.string().datetime({ offset: true }),
+    to: z.string().datetime({ offset: true }),
   })
-  .default({ days: 14 });
+  .refine((period) => new Date(period.from).getTime() <= new Date(period.to).getTime(), {
+    message: "The reporting period must end after it starts.",
+  });
 
 export const getMentorDashboardStats = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
@@ -94,15 +107,21 @@ export const getMentorDashboardStats = createServerFn({ method: "GET" })
     const { supabase, userId } = context;
 
     const [{ data: profile }, { data: roles }] = await Promise.all([
-      supabase.from("profiles").select("mentor_id").eq("id", userId).maybeSingle(),
+      supabase
+        .from("profiles")
+        .select("mentor_id,name,email")
+        .eq("id", userId)
+        .maybeSingle<DashboardCoachProfile & { mentor_id: string | null }>(),
       supabase.from("user_roles").select("role").eq("user_id", userId),
     ]);
 
     let mentorId = profile?.mentor_id ?? null;
+    const usingSuperAdminFallbackMentor =
+      !mentorId && (roles ?? []).some((r) => r.role === "super_admin");
 
     // Allow super admins previewing the mentor view to see populated data.
-    if (!mentorId && (roles ?? []).some((r) => r.role === "super_admin")) {
-      mentorId = "m-david-rouse";
+    if (usingSuperAdminFallbackMentor) {
+      mentorId = FALLBACK_MENTOR_ID;
     }
 
     const days = data.days;
@@ -113,6 +132,7 @@ export const getMentorDashboardStats = createServerFn({ method: "GET" })
     if (!mentorId) {
       return {
         mentorProfileId: null,
+        coachIdentity: "",
         reportsLast14: 0,
         interactionsLast14: 0,
         clipsLast14: 0,
@@ -126,10 +146,34 @@ export const getMentorDashboardStats = createServerFn({ method: "GET" })
     const mentorName = mentors.find((m) => m.id === mentorId)?.name;
     const gkById = new Map(goalkeepers.map((g) => [g.id, g]));
 
-    // Activity by this mentor in the last 14 days.
-    const reportsLast14 = reports.filter(
-      (r) => r.authorId === mentorId && +new Date(r.date) >= ago14 && +new Date(r.date) <= now,
-    ).length;
+    const { data: fallbackMentorProfile } = usingSuperAdminFallbackMentor
+      ? await supabase
+          .from("profiles")
+          .select("name,email")
+          .eq("mentor_id", FALLBACK_MENTOR_ID)
+          .maybeSingle<DashboardCoachProfile>()
+      : { data: null };
+    const coachIdentity = resolveCoachIdentity(
+      selectCoachProfileForDashboard(
+        profile ?? null,
+        fallbackMentorProfile ?? null,
+        usingSuperAdminFallbackMentor,
+      ),
+    );
+
+    // Match Reports are read from the same canonical Sheets pipeline as the
+    // report centre, then scoped to the authenticated coach identity.
+    let reportsLast14 = 0;
+    if (coachIdentity) {
+      const { readAllRows } = await import("@/lib/match-reports/sheets.server");
+      const { rows, firstDataRow } = await readAllRows();
+      reportsLast14 = countCanonicalReportsForCoach(
+        parseSheetRows(rows, firstDataRow),
+        coachIdentity,
+        data.from,
+        data.to,
+      );
+    }
 
     const mentorInteractions14 = interactions.filter(
       (i) => i.mentorId === mentorId && +new Date(i.date) >= ago14 && +new Date(i.date) <= now,
@@ -233,6 +277,7 @@ export const getMentorDashboardStats = createServerFn({ method: "GET" })
 
     return {
       mentorProfileId: mentorId,
+      coachIdentity,
       reportsLast14,
       interactionsLast14,
       clipsLast14,
