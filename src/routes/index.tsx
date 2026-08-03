@@ -4,7 +4,17 @@ import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Card, PageHeader, StatCard, SectionTitle, Avatar, Pill, TierBadge, TrafficLight } from "@/components/primitives";
 import { activity, alerts, goalkeepers, stats, formatRelative, getMentor, computeDutyOverview } from "@/lib/mock-data";
-import { useDutySource } from "@/lib/interactions/use-interactions";
+import { useDutySource, useLoggedInteractions } from "@/lib/interactions/use-interactions";
+
+function initialsOf(name: string) {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((p) => p[0]?.toUpperCase() ?? "")
+    .join("") || "?";
+}
+
 import { ArrowUpRight, AlertTriangle, CalendarClock, FileText, Users, UserCog } from "lucide-react";
 import { useAuth, ROLE_LABEL } from "@/lib/auth";
 import { MentorDashboard } from "@/components/mentor/mentor-dashboard";
