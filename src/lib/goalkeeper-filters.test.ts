@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { dutyStatusForGk, goalkeepers } from "./mock-data";
 import {
+  canonicaliseLegacyTierCategory,
   clearGoalkeeperFilters,
   countActiveGoalkeeperFilters,
   filterGoalkeepers,
@@ -68,6 +69,37 @@ describe("goalkeeper filter behaviour", () => {
     );
 
     expect(results).toEqual(expected);
+  });
+
+  it.each([
+    ["Tier 1-2", "Tier 1,Tier 2"],
+    ["Tier 3-4", "Tier 3,Tier 4"],
+  ])("canonicalises legacy %s URLs to the equivalent canonical tiers on mobile", (cat, tiers) => {
+    expect(canonicaliseLegacyTierCategory({ ...defaultFilters, cat })).toEqual({
+      ...defaultFilters,
+      cat: "All",
+      tiers,
+    });
+  });
+
+  it("preserves the legacy category result set when an existing tier is compatible", () => {
+    const legacyFilters = { ...defaultFilters, cat: "Tier 1-2", tiers: "Tier 1" };
+    const canonicalFilters = canonicaliseLegacyTierCategory(legacyFilters);
+
+    expect(canonicalFilters).toEqual({ ...defaultFilters, cat: "All", tiers: "Tier 1" });
+    expect(filterGoalkeepers(goalkeepers, canonicalFilters!, noRatings)).toEqual(
+      filterGoalkeepers(goalkeepers, legacyFilters, noRatings),
+    );
+  });
+
+  it("does not rewrite a conflicting legacy category because that would widen an empty result set", () => {
+    expect(
+      canonicaliseLegacyTierCategory({
+        ...defaultFilters,
+        cat: "Tier 1-2",
+        tiers: "Tier 3",
+      }),
+    ).toBeNull();
   });
 
   it("clears filters but preserves the separately visible search term", () => {

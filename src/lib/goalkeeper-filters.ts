@@ -26,6 +26,11 @@ export const toggleFrom = (values: string[], value: string) =>
   values.includes(value) ? values.filter((item) => item !== value) : [...values, value];
 export const clampRating = (value: number) => Math.max(1, Math.min(5, Math.round(value * 10) / 10));
 
+const LEGACY_TIER_CATEGORY_TIERS = {
+  "Tier 1-2": ["Tier 1", "Tier 2"],
+  "Tier 3-4": ["Tier 3", "Tier 4"],
+} as const;
+
 export function normaliseGoalkeeperName(value: string): string {
   return value.trim().toLowerCase().replace(/\s+/g, " ");
 }
@@ -43,6 +48,34 @@ export function clearGoalkeeperFilters(filters: GoalkeeperFilterState): Goalkeep
     ratingMin: 1,
     ratingMax: 5,
     loan: "any",
+  };
+}
+
+/**
+ * Rewrites the retired grouped category URL values to the canonical tier
+ * multi-select without changing the set of results. A conflicting existing
+ * tier selection intentionally remains untouched: an empty tier CSV means no
+ * tier constraint, which would widen a currently empty result set.
+ */
+export function canonicaliseLegacyTierCategory(
+  filters: GoalkeeperFilterState,
+): GoalkeeperFilterState | null {
+  const categoryTiers =
+    LEGACY_TIER_CATEGORY_TIERS[filters.cat as keyof typeof LEGACY_TIER_CATEGORY_TIERS];
+
+  if (!categoryTiers) return null;
+
+  const selectedTiers = csv(filters.tiers);
+  const canonicalTiers = selectedTiers.length
+    ? categoryTiers.filter((tier) => selectedTiers.includes(tier))
+    : [...categoryTiers];
+
+  if (selectedTiers.length && canonicalTiers.length === 0) return null;
+
+  return {
+    ...filters,
+    cat: "All",
+    tiers: toCsv(canonicalTiers),
   };
 }
 

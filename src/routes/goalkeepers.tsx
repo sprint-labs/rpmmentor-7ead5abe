@@ -6,10 +6,11 @@ import { z } from "zod";
 import { PageHeader, Card, TierBadge, Avatar, TrafficLight, DutyBadge, Pill } from "@/components/primitives";
 import { goalkeepers, dutyStatusForGk, dutyOverview, DUTY_LABELS, type DutyLevel, type Goalkeeper, type TierLevelLabel } from "@/lib/mock-data";
 import { listMatchReports } from "@/lib/match-reports/reports.functions";
-import { clampRating, clearGoalkeeperFilters, countActiveGoalkeeperFilters, csv, filterGoalkeepers, normaliseGoalkeeperName, toCsv, toggleFrom, type GoalkeeperFilterState } from "@/lib/goalkeeper-filters";
-import { useMemo, useState } from "react";
+import { canonicaliseLegacyTierCategory, clampRating, clearGoalkeeperFilters, countActiveGoalkeeperFilters, csv, filterGoalkeepers, normaliseGoalkeeperName, toCsv, toggleFrom, type GoalkeeperFilterState } from "@/lib/goalkeeper-filters";
+import { useEffect, useMemo, useState } from "react";
 import { withPermission } from "@/components/require-permission";
 import { Drawer, DrawerClose, DrawerContent, DrawerDescription, DrawerFooter, DrawerHeader, DrawerTitle, DrawerTrigger } from "@/components/ui/drawer";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { ChevronDown, ChevronUp, ChevronsUpDown, SlidersHorizontal, X } from "lucide-react";
 
 // ---------- URL search-param schema ----------
@@ -309,6 +310,7 @@ function AdvancedFilterFields({
 function GoalkeepersList() {
   const search = Route.useSearch() as GoalkeeperSearch;
   const navigate = useNavigate({ from: "/goalkeepers" });
+  const isMobile = useIsMobile();
   const [advOpen, setAdvOpen] = useState(false);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [mobileAdvOpen, setMobileAdvOpen] = useState(false);
@@ -364,8 +366,17 @@ function GoalkeepersList() {
   }, [reportsData]);
 
   const update = (patch: Partial<GoalkeeperSearch>) => {
-    navigate({ search: (prev) => ({ ...prev, ...patch }), replace: true });
+    navigate({ search: (prev) => ({ ...prev, ...patch }), replace: true, resetScroll: false });
   };
+
+  useEffect(() => {
+    if (!isMobile) return;
+
+    const canonicalFilters = canonicaliseLegacyTierCategory(search);
+    if (!canonicalFilters) return;
+
+    navigate({ search: canonicalFilters, replace: true, resetScroll: false });
+  }, [isMobile, navigate, search]);
 
   const toggleSort = (key: SortKey) => {
     setSort((current) => current?.key === key
@@ -417,6 +428,10 @@ function GoalkeepersList() {
     (search.loan !== "any" ? 1 : 0) +
     (ratingFilterActive ? 1 : 0);
   const activeFilters = countActiveGoalkeeperFilters(search);
+  const legacyTierCategory =
+    search.cat === "Tier 1-2" || search.cat === "Tier 3-4" ? search.cat : null;
+  const hasLegacyTierConflict =
+    isMobile && legacyTierCategory !== null && canonicaliseLegacyTierCategory(search) === null;
 
   const resetAll = () =>
     navigate({
@@ -460,6 +475,30 @@ function GoalkeepersList() {
               </DrawerHeader>
               <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-2">
                 <div className="space-y-5">
+                  {hasLegacyTierConflict && (
+                    <section
+                      className="rounded-md border border-border p-3"
+                      aria-labelledby="mobile-legacy-tier-filter"
+                    >
+                      <h2
+                        id="mobile-legacy-tier-filter"
+                        className="text-xs font-medium uppercase tracking-wider text-muted-foreground"
+                      >
+                        Legacy tier filter
+                      </h2>
+                      <p className="mt-1.5 text-sm text-muted-foreground">
+                        This older link combines {legacyTierCategory} with an incompatible
+                        individual tier selection.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => update({ cat: "All" })}
+                        className="mt-3 min-h-11 rounded-md border border-border px-3 text-sm font-medium hover:bg-accent/40"
+                      >
+                        Remove grouped tier filter
+                      </button>
+                    </section>
+                  )}
                   <section aria-labelledby="mobile-primary-filters">
                     <h2 id="mobile-primary-filters" className="mb-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">Primary filters</h2>
                     <div className="flex flex-wrap gap-2">
@@ -505,10 +544,10 @@ function GoalkeepersList() {
 
         <div className="hidden w-full items-center gap-2 md:flex md:flex-wrap">
           <div className="flex flex-wrap overflow-hidden rounded-md border border-border text-xs">
-            {CATS_LIST.map((category) => <button key={category} type="button" onClick={() => update({ cat: category })} className={`min-h-9 border-r border-border px-3 transition-colors last:border-r-0 ${search.cat === category ? "bg-accent text-accent-foreground" : "hover:bg-accent/40 text-muted-foreground"}`}>{category}</button>)}
+            {CATS_LIST.map((category) => <button key={category} type="button" onClick={() => update({ cat: category })} className={`min-h-9 border-r border-border px-3 transition-colors last:border-r-0 ${search.cat === category ? "bg-accent text-accent-foreground" : "hover:bg-accent/40 text-muted-foreground"}`} aria-pressed={search.cat === category}>{category}</button>)}
           </div>
           <div className="flex flex-wrap overflow-hidden rounded-md border border-border text-xs">
-            {DUTIES.map((duty) => <button key={duty.id} type="button" onClick={() => update({ duty: duty.id })} className={`inline-flex min-h-9 items-center gap-1.5 border-r border-border px-3 transition-colors last:border-r-0 ${search.duty === duty.id ? "bg-accent text-accent-foreground" : "hover:bg-accent/40 text-muted-foreground"}`}>{duty.id !== "all" && <TrafficLight level={duty.id as DutyLevel} size={7} />}{duty.label}<span className="tabular-nums font-mono text-[10px] opacity-70">{duty.count}</span></button>)}
+            {DUTIES.map((duty) => <button key={duty.id} type="button" onClick={() => update({ duty: duty.id })} className={`inline-flex min-h-9 items-center gap-1.5 border-r border-border px-3 transition-colors last:border-r-0 ${search.duty === duty.id ? "bg-accent text-accent-foreground" : "hover:bg-accent/40 text-muted-foreground"}`} aria-pressed={search.duty === duty.id}>{duty.id !== "all" && <TrafficLight level={duty.id as DutyLevel} size={7} />}{duty.label}<span className="tabular-nums font-mono text-[10px] opacity-70">{duty.count}</span></button>)}
           </div>
           <button type="button" onClick={() => setAdvOpen((open) => !open)} className="ml-auto inline-flex h-9 items-center justify-center gap-1.5 rounded-md border border-border px-3 text-xs hover:bg-accent/40" aria-expanded={advOpen} aria-controls="desktop-advanced-filters">
             {advOpen ? <ChevronUp className="size-3.5" aria-hidden="true" /> : <ChevronDown className="size-3.5" aria-hidden="true" />}
@@ -559,7 +598,7 @@ function GoalkeepersList() {
         {sorted.length === 0 ? (
           <div className="px-4 py-8 text-center text-xs text-muted-foreground">
             No goalkeepers match the current filters. {" "}
-            <button onClick={resetAll} className="text-primary hover:underline">Reset filters</button>
+            <button onClick={resetAll} className="text-primary hover:underline">Clear search and filters</button>
           </div>
         ) : sorted.map((gk) => (
           <MobileGoalkeeperCard
@@ -592,7 +631,7 @@ function GoalkeepersList() {
               <tr>
                 <td colSpan={11} className="px-4 py-8 text-center text-xs text-muted-foreground">
                   No goalkeepers match the current filters.{" "}
-                  <button onClick={resetAll} className="text-primary hover:underline">Reset filters</button>
+                  <button onClick={resetAll} className="text-primary hover:underline">Clear search and filters</button>
                 </td>
               </tr>
             ) : sorted.map((gk) => {
