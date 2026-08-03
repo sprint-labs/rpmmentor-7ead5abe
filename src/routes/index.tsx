@@ -4,7 +4,17 @@ import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Card, PageHeader, StatCard, SectionTitle, Avatar, Pill, TierBadge, TrafficLight } from "@/components/primitives";
 import { activity, alerts, goalkeepers, stats, formatRelative, getMentor, computeDutyOverview } from "@/lib/mock-data";
-import { useDutySource } from "@/lib/interactions/use-interactions";
+import { useDutySource, useLoggedInteractions } from "@/lib/interactions/use-interactions";
+
+function initialsOf(name: string) {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((p) => p[0]?.toUpperCase() ?? "")
+    .join("") || "?";
+}
+
 import { ArrowUpRight, AlertTriangle, CalendarClock, FileText, Users, UserCog } from "lucide-react";
 import { useAuth, ROLE_LABEL } from "@/lib/auth";
 import { MentorDashboard } from "@/components/mentor/mentor-dashboard";
@@ -71,8 +81,27 @@ function Dashboard() {
     return <MentorDashboard user={user} mentorProfileId={user.mentorId ?? ""} />;
   }
 
+  const { data: loggedInteractions } = useLoggedInteractions();
   const dutySource = useDutySource();
   const dutyOverview = computeDutyOverview(dutySource);
+
+  // Recent Activity merges durable interactions with other real events, so a
+  // newly logged interaction appears as soon as the shared cache refreshes.
+  const recentActivity = [
+    ...activity,
+    ...(loggedInteractions ?? []).map((i) => ({
+      id: `interaction-${i.id}`,
+      actor: i.mentorName || "Mentor",
+      actorInitials: initialsOf(i.mentorName || "Mentor"),
+      action: `logged a ${i.interactionType.toLowerCase()} with`,
+      target: i.goalkeeperName,
+      gkId: i.gkSlug,
+      date: i.occurredAt,
+    })),
+  ]
+    .sort((a, b) => +new Date(b.date) - +new Date(a.date))
+    .slice(0, 8);
+
   const pool = goalkeepers;
   const upcoming = [...pool]
     .filter((g) => new Date(g.nextInteraction).getTime() >= Date.now())
@@ -231,11 +260,12 @@ function Dashboard() {
         <Card className="lg:col-span-2 p-4">
           <SectionTitle>Recent Activity</SectionTitle>
           <div className="space-y-2">
-            {activity.length === 0 ? (
+            {recentActivity.length === 0 ? (
               <div className="text-xs text-muted-foreground p-3 rounded-md border border-dashed border-border/60 text-center">
-                No recent activity yet. Report submissions, media uploads and role changes will appear here as they happen.
+                No recent activity yet. Interactions, report submissions, media uploads and role changes will appear here as they happen.
               </div>
-            ) : activity.map((a) => (
+            ) : recentActivity.map((a) => (
+
               <div key={a.id} className="flex items-start gap-3 py-1.5">
                 <Avatar initials={a.actorInitials} size={26} />
                 <div className="flex-1 min-w-0 text-sm">
