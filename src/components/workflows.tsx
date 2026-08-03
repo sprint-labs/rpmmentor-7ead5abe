@@ -1,10 +1,16 @@
 import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import { X, CheckCircle2, Upload, AlertCircle, Paperclip, Search, Trash2, Loader2 } from "lucide-react";
+import { X, CheckCircle2, Upload, AlertCircle, Paperclip, Search, Trash2, Loader2, RotateCcw } from "lucide-react";
 import { goalkeepers } from "@/lib/mock-data";
 import { listPlayers, type PlayerRosterRow } from "@/lib/players.functions";
+import { createInteraction } from "@/lib/interactions.functions";
+import { interactionsQueryKey } from "@/lib/interactions/use-interactions";
+import {
+  INTERACTION_TYPES, INTERACTION_OUTCOMES, todayDateOnly,
+  type InteractionTypeValue,
+} from "@/lib/interactions/schema";
 import { useAuth, type SessionUser } from "@/lib/auth";
 import {
   ACCEPT_BY_KIND, MAX_FILE_BYTES, detectKind, formatBytes, uploadMedia,
@@ -209,22 +215,138 @@ function TagPicker({ value, onChange }: { value: string[]; onChange: (v: string[
   );
 }
 
+/**
+ * Interaction form — writes durably to `public.interactions` via
+ * `createInteraction`. Success is only shown after the server returns the
+ * confirmed inserted row; on failure every entered value is retained.
+ */
 export function InteractionForm({ onDone }: { onDone: () => void }) {
+  const queryClient = useQueryClient();
+  const createFn = useServerFn(createInteraction);
+
+  const [done, setDone] = useState(false);
+  const [notes, setNotes] = useState("");
+  const [gkId, setGkId] = useState("");
+  const [type, setType] = useState<InteractionTypeValue>(INTERACTION_TYPES[0]);
+  const [club, setClub] = useState("");
+  const [date, setDate] = useState(() => todayDateOnly());
+  const [outcome, setOutcome] = useState<string>(INTERACTION_OUTCOMES[0]);
+  const [followUp, setFollowUp] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [clubAutoFilled, setClubAutoFilled] = useState(false);
+  const autoFilledClubRef = useRef<string | null>(null);
+  const gk = goalkeepers.find((g) => g.id === gkId);
+
+  const listPlayersFn = useServerFn(listPlayers);
+  const playersQuery = useQuery({
+    queryKey: ["players", "roster"],
+    queryFn: () => listPlayersFn(),
+    staleTime: 5 * 60_000,
+  });
+  const players: PlayerRosterRow[] = playersQuery.data ?? [];
+  const playersByName = useMemo(() => {
+    const map = new Map<string, PlayerRosterRow>();
+    for (const p of players) map.set(p.full_name.trim().toLowerCase(), p);
+    return map;
+  }, [players]);
+
+  useEffect(() => {
+    if (!gk) return;
+    const match = playersByName.get(gk.name.trim().toLowerCase());
+    if (!match) return;
+    const canOverwrite = !club.trim() || club === autoFilledClubRef.current;
+    if (!canOverwrite) return;
+    if (club === match.current_club) return;
+    setClub(match.current_club);
+    autoFilledClubRef.current = match.current_club;
+    setClubAutoFilled(true);
+  }, [gk, playersByName, club]);
+
+  function handleClubChange(v: string) {
+    setClub(v);
+    if (v !== autoFilledClubRef.current) setClubAutoFilled(false);
+  }
+
+  function resetClub() {
+    const rosterClub = autoFilledClubRef.current;
+    if (rosterClub) {
+      setClub(rosterClub);
+      setClubAutoFilled(true);
+    }
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (saving || !gk) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const saved = await createFn({
+        data: {
+          gkSlug: gk.id,
+          goalkeeperName: gk.name,
+          interactionType: type,
+          club: club.trim(),
+          occurredAt: date,
+          notes: notes.trim(),
+          outcome,
+          followUp: followUp.trim(),
+        },
+      });
+      // Only a confirmed inserted row counts as success.
+      if (!saved?.id) throw new Error("The interaction could not be confirmed as saved.");
+      await queryClient.invalidateQueries({ queryKey: interactionsQueryKey });
+      setDone(true);
+    } catch (err) {
+      // Retain every entered value — no success state without a read-back.
+      setError(err instanceof Error ? err.message : "Could not save the interaction. Please try again.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (done) return <Submitted message="Interaction logged successfully." onDone={onDone} />;
   return (
-    <div className="text-center py-6">
-      <AlertCircle className="size-10 text-amber-500 mx-auto" />
-      <p className="text-sm font-medium mt-3">Interaction logging isn't available yet</p>
-      <p className="text-sm text-muted-foreground mt-2 max-w-md mx-auto">
-        This release cannot save interaction entries durably, so nothing you enter here
-        would appear in the dashboard, calendar, interactions list, or the goalkeeper's
-        profile. Entry has been disabled until logging is connected to real storage.
-      </p>
-      <div className="mt-4 flex justify-center">
-        <button type="button" onClick={onDone} className="h-9 px-4 rounded-md bg-primary text-primary-foreground text-sm font-medium">
-          Close
+    <form onSubmit={handleSubmit} className="space-y-4">
+      {error && (
+        <div role="alert" className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+          {error}
+        </div>
+      )}
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="Goalkeeper"><select className={selectCls} required value={gkId} onChange={(e) => setGkId(e.target.value)}><option value="" disabled>Select…</option>{goalkeepers.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}</select></Field>
+        <Field label="Interaction Type"><select className={selectCls} required value={type} onChange={(e) => setType(e.target.value as InteractionTypeValue)}>{INTERACTION_TYPES.map((t) => <option key={t}>{t}</option>)}</select></Field>
+        <Field label="Club">
+          <input className={inputCls} value={club} onChange={(e) => handleClubChange(e.target.value)} placeholder="e.g. Brighton & Hove Albion" maxLength={80} />
+          {clubAutoFilled ? (
+            <p className="mt-1 text-[11px] text-muted-foreground">Auto-filled from roster · edit to override</p>
+          ) : autoFilledClubRef.current ? (
+            <button type="button" onClick={resetClub} className="mt-1 inline-flex items-center gap-1 text-[11px] text-primary hover:text-primary/80">
+              <RotateCcw className="size-3" /> Reset to roster club
+            </button>
+          ) : null}
+        </Field>
+
+        <Field label="Date"><input type="date" className={inputCls} value={date} onChange={(e) => setDate(e.target.value)} required /></Field>
+        <Field label="Outcome"><select className={selectCls} value={outcome} onChange={(e) => setOutcome(e.target.value)}>{INTERACTION_OUTCOMES.map((t) => <option key={t}>{t}</option>)}</select></Field>
+      </div>
+      <HandwrittenNotesField
+        context={gk ? `Session notes about ${gk.name} (${club || gk.club})` : undefined}
+        onTranscribed={(text, mode) => setNotes((prev) => mode === "replace" || !prev.trim() ? text : `${prev.trim()}\n\n${text}`)}
+      />
+      <VoiceNoteField
+        onTranscribed={(text, mode) => setNotes((prev) => mode === "replace" || !prev.trim() ? text : `${prev.trim()}\n\n${text}`)}
+      />
+      <Field label="Notes"><textarea rows={5} className={taCls} placeholder="What did you observe? Or use the camera/mic above to transcribe notes." required value={notes} onChange={(e) => setNotes(e.target.value)} /></Field>
+      <Field label="Follow-up Action"><input className={inputCls} placeholder="e.g. Schedule video review next week" value={followUp} onChange={(e) => setFollowUp(e.target.value)} maxLength={200} /></Field>
+      <div className="flex justify-end gap-2 pt-2">
+        <button type="button" onClick={onDone} className="h-9 px-3 rounded-md border border-border text-sm" disabled={saving}>Cancel</button>
+        <button type="submit" disabled={saving} className="h-9 px-4 rounded-md bg-primary text-primary-foreground text-sm font-medium disabled:opacity-60 inline-flex items-center gap-1.5">
+          {saving && <Loader2 className="size-3.5 animate-spin" />}{saving ? "Saving…" : "Save Interaction"}
         </button>
       </div>
-    </div>
+    </form>
   );
 }
 

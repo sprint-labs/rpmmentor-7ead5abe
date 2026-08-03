@@ -2,7 +2,9 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
 import { PageHeader, Card, Pill, Avatar, EmptyState } from "@/components/primitives";
-import { interactions, getGk, getMentor, formatDate, formatRelative } from "@/lib/mock-data";
+import { getGk, getMentor, formatRelative } from "@/lib/mock-data";
+import { useLoggedInteractions } from "@/lib/interactions/use-interactions";
+import { formatDateOnly, dateOnlyToLocalMs } from "@/lib/interactions/schema";
 import { useEffect, useMemo, useState } from "react";
 import { X, MessageSquarePlus, Filter } from "lucide-react";
 import { withPermission } from "@/components/require-permission";
@@ -46,21 +48,30 @@ function InteractionsPage() {
   useEffect(() => {
     if (typeParam) setType(resolveType(typeParam));
   }, [typeParam]);
-  const sorted = useMemo(() => [...interactions].sort((a, b) => +new Date(b.date) - +new Date(a.date)), []);
+  const { data: logged, isLoading, isError } = useLoggedInteractions();
+  const sorted = useMemo(
+    () => [...(logged ?? [])].sort((a, b) => dateOnlyToLocalMs(b.occurredAt) - dateOnlyToLocalMs(a.occurredAt)),
+    [logged],
+  );
+  const mentorName = mentorId ? getMentor(mentorId)?.name ?? "" : "";
   const filtered = useMemo(() => {
     let list = sorted;
-    if (mentorId) list = list.filter((i) => i.mentorId === mentorId);
+    if (mentorId) {
+      list = list.filter(
+        (i) => i.mentorId === mentorId || (mentorName && i.mentorName === mentorName),
+      );
+    }
     if (from && to) {
-      const start = new Date(from).getTime();
-      const end = new Date(to).getTime();
+      const start = dateOnlyToLocalMs(from.slice(0, 10));
+      const end = dateOnlyToLocalMs(to.slice(0, 10));
       list = list.filter((i) => {
-        const t = new Date(i.date).getTime();
+        const t = dateOnlyToLocalMs(i.occurredAt);
         return t >= start && t <= end;
       });
     }
-    if (type !== "All") list = list.filter((i) => i.type === type);
+    if (type !== "All") list = list.filter((i) => i.interactionType === type);
     return list;
-  }, [sorted, mentorId, from, to, type]);
+  }, [sorted, mentorId, mentorName, from, to, type]);
 
   const hasFilters = Boolean(mentorId) || (Boolean(from) && Boolean(to)) || Boolean(typeParam);
   const clearSearch = { from: "", to: "", mentorId: "", type: "", source: "" };
@@ -118,7 +129,14 @@ function InteractionsPage() {
             </tr>
           </thead>
           <tbody>
-            {filtered.length === 0 && (
+            {(isLoading || isError) && (
+              <tr>
+                <td colSpan={7} className="px-4 py-6 text-sm text-muted-foreground">
+                  {isLoading ? "Loading logged interactions…" : "Interactions could not be loaded. Please retry."}
+                </td>
+              </tr>
+            )}
+            {!isLoading && !isError && filtered.length === 0 && (
               <tr>
                 <td colSpan={7} className="px-4 py-2">
                   <EmptyState
@@ -152,17 +170,18 @@ function InteractionsPage() {
               </tr>
             )}
             {filtered.slice(0, 80).map((i) => {
-              const gk = getGk(i.gkId);
-              const m = getMentor(i.mentorId);
+              const gk = getGk(i.gkSlug);
+              const name = gk?.name ?? i.goalkeeperName;
+              const initials = gk?.initials ?? (i.goalkeeperName.slice(0, 1).toUpperCase() || "?");
               return (
                 <tr key={i.id} className="border-b border-border/60 last:border-0 hover:bg-accent/20">
-                  <td className="px-4 py-2.5 text-muted-foreground tabular-nums font-mono">{formatDate(i.date)}<div className="text-[10px] opacity-60">{formatRelative(i.date)}</div></td>
-                  <td className="px-2"><Pill tone="info">{i.type}</Pill></td>
-                  <td className="px-2"><div className="flex items-center gap-2"><Avatar initials={gk?.initials ?? "?"} size={22} /><span className="font-medium">{gk?.name}</span></div></td>
-                  <td className="px-2 text-muted-foreground">{m?.name}</td>
+                  <td className="px-4 py-2.5 text-muted-foreground tabular-nums font-mono">{formatDateOnly(i.occurredAt)}<div className="text-[10px] opacity-60">{formatRelative(`${i.occurredAt}T12:00:00`)}</div></td>
+                  <td className="px-2"><Pill tone="info">{i.interactionType}</Pill></td>
+                  <td className="px-2"><div className="flex items-center gap-2"><Avatar initials={initials} size={22} /><span className="font-medium">{name}</span>{i.club && <span className="text-[11px] text-muted-foreground">{i.club}</span>}</div></td>
+                  <td className="px-2 text-muted-foreground">{i.mentorName || "—"}</td>
                   <td className="px-2 text-muted-foreground max-w-md"><span className="line-clamp-1">{i.notes}</span></td>
-                  <td className="px-2"><Pill>{i.outcome}</Pill></td>
-                  <td className="px-4 text-muted-foreground"><span className="line-clamp-1">{i.followUp}</span></td>
+                  <td className="px-2"><Pill>{i.outcome || "—"}</Pill></td>
+                  <td className="px-4 text-muted-foreground"><span className="line-clamp-1">{i.followUp || "—"}</span></td>
                 </tr>
               );
             })}

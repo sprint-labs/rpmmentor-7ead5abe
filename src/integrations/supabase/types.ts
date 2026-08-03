@@ -101,6 +101,72 @@ export type Database = {
         }
         Relationships: []
       }
+      interactions: {
+        Row: {
+          club: string
+          created_at: string
+          follow_up: string
+          gk_slug: string
+          goalkeeper_name: string
+          id: string
+          interaction_type: string
+          mentor_id: string
+          mentor_name: string
+          notes: string
+          occurred_at: string
+          outcome: string
+          player_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          club?: string
+          created_at?: string
+          follow_up?: string
+          gk_slug?: string
+          goalkeeper_name: string
+          id?: string
+          interaction_type: string
+          mentor_id: string
+          mentor_name?: string
+          notes?: string
+          occurred_at: string
+          outcome?: string
+          player_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          club?: string
+          created_at?: string
+          follow_up?: string
+          gk_slug?: string
+          goalkeeper_name?: string
+          id?: string
+          interaction_type?: string
+          mentor_id?: string
+          mentor_name?: string
+          notes?: string
+          occurred_at?: string
+          outcome?: string
+          player_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "interactions_mentor_id_fkey"
+            columns: ["mentor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "interactions_player_id_fkey"
+            columns: ["player_id"]
+            isOneToOne: false
+            referencedRelation: "players"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       match_report_submissions: {
         Row: {
           confirmed_duplicate: boolean

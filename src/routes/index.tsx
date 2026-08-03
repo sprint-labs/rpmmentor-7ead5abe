@@ -123,7 +123,7 @@ function Dashboard() {
         >
           <StatCard
             label="Reports This Week"
-            value={reportsLoading ? "…" : reportsError || reportsThisWeek === null ? "—" : reportsThisWeek}
+            value={reportsLoading ? "…" : reportsError || reportsThisWeek == null ? "—" : reportsThisWeek}
             hint={reportsError ? "Report count unavailable" : "Last 7 days"}
             accent="primary"
             emptyMessage="None submitted"

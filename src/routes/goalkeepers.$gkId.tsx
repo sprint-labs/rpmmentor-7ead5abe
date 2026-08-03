@@ -3,7 +3,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { Card, TierBadge, Avatar, Pill, SectionTitle, ProgressBar } from "@/components/primitives";
-import { goalkeepers, interactions, media, formatDate, formatRelative } from "@/lib/mock-data";
+import { goalkeepers, interactions, media, formatDate, formatRelative, type Tier } from "@/lib/mock-data";
 import { ArrowLeft, Info, Video, FileText, Phone, Eye, Users as UsersIcon, Calendar as CalendarIcon } from "lucide-react";
 import { listMatchReports } from "@/lib/match-reports/reports.functions";
 import { PILLAR_IDS, PILLAR_LABELS, type MatchReportRow, type PillarId } from "@/lib/match-reports/schema";
@@ -186,7 +186,7 @@ function GkDetail() {
             <div className="flex items-center gap-2.5 flex-wrap">
               <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">{gk.name}</h1>
               <TierBadge tier={gk.tier} />
-              {gk.tags.map((tag) => <TierBadge key={tag} tier={tag} />)}
+              {gk.tags.map((tag: string) => <TierBadge key={tag} tier={tag as Tier} />)}
               {gk.onLoan && <Pill tone="info">On loan{gk.parentClub ? ` from ${gk.parentClub}` : ""}</Pill>}
             </div>
             <div className="mt-1 text-sm leading-snug text-muted-foreground">
