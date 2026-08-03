@@ -163,7 +163,6 @@ async function loadSessionUser(session: Session | null): Promise<SessionUser | n
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<SessionUser | null>(null);
   const [loading, setLoading] = useState(true);
-  const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -182,12 +181,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (cancelled) return;
         setUser(u);
         setLoading(false);
-        setHydrated(true);
       });
     }).catch(() => {
       if (cancelled) return;
       setLoading(false);
-      setHydrated(true);
     });
 
     return () => { cancelled = true; sub.subscription.unsubscribe(); };
@@ -224,14 +221,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
   };
 
-  if (!hydrated) return <div className="min-h-screen bg-background" />;
-
   return (
     <Ctx.Provider value={{ user, loading, signIn, signOut, can, setViewAsRole }}>
       {children}
     </Ctx.Provider>
   );
 }
+
 
 
 export function useAuth() {

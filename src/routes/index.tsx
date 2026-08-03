@@ -5,6 +5,8 @@ import { useServerFn } from "@tanstack/react-start";
 import { Card, PageHeader, StatCard, SectionTitle, Avatar, Pill, TierBadge, TrafficLight } from "@/components/primitives";
 import { activity, alerts, goalkeepers, stats, formatRelative, getMentor, computeDutyOverview } from "@/lib/mock-data";
 import { useDutySource, useLoggedInteractions } from "@/lib/interactions/use-interactions";
+import { ErrorBoundary } from "@/components/error-boundary";
+
 
 function initialsOf(name: string) {
   return name
@@ -277,36 +279,60 @@ function Dashboard() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <Card className="lg:col-span-2 p-4">
-          <SectionTitle>Recent Activity</SectionTitle>
-          <div className="space-y-2">
-            {interactionsLoading ? (
-              <div className="text-xs text-muted-foreground p-3 rounded-md border border-dashed border-border/60 text-center">
-                Loading recent activity…
-              </div>
-            ) : interactionsError ? (
-              <div className="text-xs text-muted-foreground p-3 rounded-md border border-dashed border-border/60 text-center">
-                Recent activity is unavailable right now. Sign in again to see the latest interactions.
-              </div>
-            ) : recentActivity.length === 0 ? (
-              <div className="text-xs text-muted-foreground p-3 rounded-md border border-dashed border-border/60 text-center">
-                No recent activity yet. Interactions, report submissions, media uploads and role changes will appear here as they happen.
-              </div>
-            ) : recentActivity.map((a) => (
-
-              <div key={a.id} className="flex items-start gap-3 py-1.5">
-                <Avatar initials={a.actorInitials} size={26} />
-                <div className="flex-1 min-w-0 text-sm">
-                  <span className="font-medium">{a.actor}</span>{" "}
-                  <span className="text-muted-foreground">{a.action}</span>{" "}
-                  <span className="font-medium">{a.target}</span>
-                  <div className="text-[11px] text-muted-foreground">{formatRelative(a.date)}</div>
+        <ErrorBoundary
+          fallback={(reset) => (
+            <Card className="lg:col-span-2 p-4">
+              <SectionTitle>Recent Activity</SectionTitle>
+              <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive flex items-start gap-2">
+                <AlertTriangle className="size-4 shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium">Recent activity unavailable</p>
+                  <p className="text-destructive/80">Something went wrong loading the latest interactions. The rest of the dashboard is still working.</p>
                 </div>
               </div>
-            ))}
-          </div>
+              <button
+                type="button"
+                onClick={reset}
+                className="mt-3 inline-flex h-8 items-center justify-center rounded-md bg-destructive px-3 text-xs font-medium text-destructive-foreground hover:bg-destructive/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              >
+                Retry
+              </button>
+            </Card>
+          )}
+        >
 
-        </Card>
+          <Card className="lg:col-span-2 p-4">
+            <SectionTitle>Recent Activity</SectionTitle>
+            <div className="space-y-2">
+              {interactionsLoading ? (
+                <div className="text-xs text-muted-foreground p-3 rounded-md border border-dashed border-border/60 text-center">
+                  Loading recent activity…
+                </div>
+              ) : interactionsError ? (
+                <div className="text-xs text-muted-foreground p-3 rounded-md border border-dashed border-border/60 text-center">
+                  Recent activity is unavailable right now. Sign in again to see the latest interactions.
+                </div>
+              ) : recentActivity.length === 0 ? (
+                <div className="text-xs text-muted-foreground p-3 rounded-md border border-dashed border-border/60 text-center">
+                  No recent activity yet. Interactions, report submissions, media uploads and role changes will appear here as they happen.
+                </div>
+              ) : recentActivity.map((a) => (
+
+                <div key={a.id} className="flex items-start gap-3 py-1.5">
+                  <Avatar initials={a.actorInitials} size={26} />
+                  <div className="flex-1 min-w-0 text-sm">
+                    <span className="font-medium">{a.actor}</span>{" "}
+                    <span className="text-muted-foreground">{a.action}</span>{" "}
+                    <span className="font-medium">{a.target}</span>
+                    <div className="text-[11px] text-muted-foreground">{formatRelative(a.date)}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+          </Card>
+        </ErrorBoundary>
+
 
         <Card className="p-4">
           <SectionTitle>Status Distribution</SectionTitle>
