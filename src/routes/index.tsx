@@ -3,7 +3,8 @@ import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Card, PageHeader, StatCard, SectionTitle, Avatar, Pill, TierBadge, TrafficLight } from "@/components/primitives";
-import { activity, alerts, goalkeepers, stats, formatRelative, getMentor, dutyOverview, dutyStatusForGk } from "@/lib/mock-data";
+import { activity, alerts, goalkeepers, stats, formatRelative, getMentor, computeDutyOverview } from "@/lib/mock-data";
+import { useDutySource } from "@/lib/interactions/use-interactions";
 import { ArrowUpRight, AlertTriangle, CalendarClock, FileText, Users, UserCog } from "lucide-react";
 import { useAuth, ROLE_LABEL } from "@/lib/auth";
 import { MentorDashboard } from "@/components/mentor/mentor-dashboard";
@@ -70,6 +71,8 @@ function Dashboard() {
     return <MentorDashboard user={user} mentorProfileId={user.mentorId ?? ""} />;
   }
 
+  const dutySource = useDutySource();
+  const dutyOverview = computeDutyOverview(dutySource);
   const pool = goalkeepers;
   const upcoming = [...pool]
     .filter((g) => new Date(g.nextInteraction).getTime() >= Date.now())
@@ -123,7 +126,7 @@ function Dashboard() {
         >
           <StatCard
             label="Reports This Week"
-            value={reportsLoading ? "…" : reportsError || reportsThisWeek === null ? "—" : reportsThisWeek}
+            value={reportsLoading ? "…" : reportsError || reportsThisWeek == null ? "—" : reportsThisWeek}
             hint={reportsError ? "Report count unavailable" : "Last 7 days"}
             accent="primary"
             emptyMessage="None submitted"

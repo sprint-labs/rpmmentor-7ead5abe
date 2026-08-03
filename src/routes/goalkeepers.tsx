@@ -366,7 +366,7 @@ function GoalkeepersList() {
   }, [reportsData]);
 
   const update = (patch: Partial<GoalkeeperSearch>) => {
-    navigate({ search: (prev) => ({ ...prev, ...patch }), replace: true, resetScroll: false });
+    navigate({ search: (prev: GoalkeeperSearch) => ({ ...prev, ...patch }), replace: true, resetScroll: false });
   };
 
   useEffect(() => {

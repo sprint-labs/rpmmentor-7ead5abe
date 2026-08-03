@@ -580,13 +580,26 @@ function dutyResult(level: DutyLevel, days: number): DutyStatus {
   return { level, label: DUTY_LABELS[level], days };
 }
 
-export function dutyStatusForGk(gk: Goalkeeper): DutyStatus {
+/** Minimal shape duty-of-care needs from a logged interaction. */
+export type DutySourceInteraction = { gkId: string; type: string; date: string };
+
+function dutyTimestamp(date: string): number {
+  // Date-only values ("YYYY-MM-DD") are parsed at local noon so that rendering
+  // and day-difference maths can never shift the day across timezones.
+  const iso = /^\d{4}-\d{2}-\d{2}$/.test(date) ? `${date}T12:00:00` : date;
+  return new Date(iso).getTime();
+}
+
+export function dutyStatusForGk(
+  gk: Goalkeeper,
+  source: ReadonlyArray<DutySourceInteraction> = interactions,
+): DutyStatus {
   if (gk.status === "Tier 4") return dutyResult("not_required", 0);
   const interval = DUTY_TIER_INTERVAL_DAYS[gk.status];
   if (!interval) return dutyResult("not_enough_data", 0);
-  const qualifying = interactions
-    .filter((i) => i.gkId === gk.id && DUTY_QUALIFYING_TYPES.includes(i.type))
-    .map((i) => new Date(i.date).getTime())
+  const qualifying = source
+    .filter((i) => i.gkId === gk.id && DUTY_QUALIFYING_TYPES.includes(i.type as never))
+    .map((i) => dutyTimestamp(i.date))
     .filter((t) => Number.isFinite(t));
   if (!qualifying.length) return dutyResult("not_enough_data", 0);
   const latest = Math.max(...qualifying);
@@ -596,10 +609,13 @@ export function dutyStatusForGk(gk: Goalkeeper): DutyStatus {
   return dutyResult("up_to_date", days);
 }
 
-export function dutyStatusForMentor(mentorId: string): DutyStatus {
+export function dutyStatusForMentor(
+  mentorId: string,
+  source: ReadonlyArray<DutySourceInteraction> = interactions,
+): DutyStatus {
   const gks = goalkeepers.filter((g) => g.mentorId === mentorId);
   if (!gks.length) return dutyResult("not_enough_data", 0);
-  const levels = gks.map((g) => dutyStatusForGk(g).level);
+  const levels = gks.map((g) => dutyStatusForGk(g, source).level);
   if (levels.includes("overdue")) return dutyResult("overdue", 0);
   if (levels.includes("due_soon")) return dutyResult("due_soon", 0);
   if (levels.some((l) => l === "up_to_date")) return dutyResult("up_to_date", 0);
@@ -607,13 +623,17 @@ export function dutyStatusForMentor(mentorId: string): DutyStatus {
   return dutyResult("not_enough_data", 0);
 }
 
-export const dutyOverview = (() => {
+export function computeDutyOverview(
+  source: ReadonlyArray<DutySourceInteraction> = interactions,
+) {
   const counts: Record<DutyLevel, number> = {
     up_to_date: 0, due_soon: 0, overdue: 0, not_required: 0, not_enough_data: 0,
   };
-  goalkeepers.forEach((g) => { counts[dutyStatusForGk(g).level]++; });
+  goalkeepers.forEach((g) => { counts[dutyStatusForGk(g, source).level]++; });
   return { ...counts, total: goalkeepers.length };
-})();
+}
+
+export const dutyOverview = computeDutyOverview();
 
 const STATUSES: Status[] = ["Tier 1", "Tier 2", "Tier 3", "Tier 4", "Academy", "Free Agent"];
 
