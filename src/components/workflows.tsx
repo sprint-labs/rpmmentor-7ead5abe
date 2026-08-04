@@ -314,7 +314,8 @@ export function InteractionForm({ onDone }: { onDone: () => void }) {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const validation = validate({ gkId, date, notes });
+    const validation = validate({ gkId, date, notes, outcome, followUp });
+
     if (Object.keys(validation).length > 0) {
       setErrors(validation);
       setShowErrors(true);
