@@ -397,7 +397,6 @@ export function InteractionForm({ onDone }: { onDone: () => void }) {
             value={date}
             onChange={(e) => { setDate(e.target.value); clearFieldError("date"); }}
             onBlur={() => { if (!date) setErrors((prev) => ({ ...prev, date: "Date is required" })); }}
-            required
           />
         </Field>
         <Field label="Outcome"><select aria-label="Outcome" className={selectCls} value={outcome} onChange={(e) => setOutcome(e.target.value)}>{INTERACTION_OUTCOMES.map((t) => <option key={t}>{t}</option>)}</select></Field>
