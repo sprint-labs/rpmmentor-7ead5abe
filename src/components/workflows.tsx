@@ -405,7 +405,21 @@ export function InteractionForm({ onDone }: { onDone: () => void }) {
             onBlur={() => { if (!date) setErrors((prev) => ({ ...prev, date: "Date is required" })); }}
           />
         </Field>
-        <Field label="Outcome"><select aria-label="Outcome" className={selectCls} value={outcome} onChange={(e) => setOutcome(e.target.value)}>{INTERACTION_OUTCOMES.map((t) => <option key={t}>{t}</option>)}</select></Field>
+        <Field label="Outcome" required error={showErrors ? errors.outcome : undefined}>
+          <select
+            aria-label="Outcome"
+            aria-invalid={showErrors && !!errors.outcome}
+            aria-required="true"
+            className={`${selectCls} ${showErrors && errors.outcome ? "border-destructive focus:ring-destructive/40" : ""}`}
+            value={outcome}
+            onChange={(e) => { setOutcome(e.target.value); clearFieldError("outcome"); }}
+            onBlur={() => { if (!outcome) setErrors((prev) => ({ ...prev, outcome: "Select an outcome" })); }}
+          >
+            <option value="" disabled>Select…</option>
+            {INTERACTION_OUTCOMES.map((t) => <option key={t}>{t}</option>)}
+          </select>
+        </Field>
+
       </div>
       <HandwrittenNotesField
         context={gk ? `Session notes about ${gk.name} (${club || gk.club})` : undefined}
