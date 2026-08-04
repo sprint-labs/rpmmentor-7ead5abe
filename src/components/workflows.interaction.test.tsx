@@ -163,10 +163,15 @@ describe("InteractionForm (durable)", () => {
     const gk = goalkeepers[0]!;
     fireEvent.change(screen.getByLabelText("Goalkeeper"), { target: { value: gk.id } });
     fireEvent.change(screen.getByLabelText("Date"), { target: { value: "2026-01-05" } });
+    fireEvent.change(screen.getByLabelText("Outcome"), { target: { value: "On track" } });
+    fireEvent.change(screen.getByLabelText("Follow-up Action"), { target: { value: "Schedule video review next week" } });
     fireEvent.change(screen.getByLabelText("Notes"), { target: { value: "Reviewed the recovery plan." } });
 
     await waitFor(() => expect(screen.queryByText(/Select a goalkeeper/i)).toBeNull());
     expect(screen.queryByText(/Date is required/i)).toBeNull();
+    expect(screen.queryByText(/Select an outcome/i)).toBeNull();
+    expect(screen.queryByText(/Follow-up action is required/i)).toBeNull();
     expect(screen.queryByText(/Notes are required/i)).toBeNull();
   });
+
 });
