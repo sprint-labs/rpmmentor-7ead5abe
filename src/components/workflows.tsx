@@ -289,15 +289,19 @@ export function InteractionForm({ onDone }: { onDone: () => void }) {
     }
   }
 
-  function validate(values: { gkId: string; date: string; notes: string }): Record<string, string> {
+  function validate(values: { gkId: string; date: string; notes: string; outcome: string; followUp: string }): Record<string, string> {
     const next: Record<string, string> = {};
     if (!values.gkId.trim()) next.gkId = "Select a goalkeeper";
     if (!values.date.trim()) next.date = "Date is required";
     else if (!/^\d{4}-\d{2}-\d{2}$/.test(values.date)) next.date = "Enter a valid date";
     if (!values.notes.trim()) next.notes = "Notes are required";
     else if (values.notes.trim().length > 8000) next.notes = "Notes must be under 8,000 characters";
+    if (!values.outcome.trim()) next.outcome = "Select an outcome";
+    if (!values.followUp.trim()) next.followUp = "Follow-up action is required";
+    else if (values.followUp.trim().length > 200) next.followUp = "Follow-up action must be under 200 characters";
     return next;
   }
+
 
   function clearFieldError(key: string) {
     setErrors((prev) => {
