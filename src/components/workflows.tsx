@@ -112,7 +112,7 @@ export function WorkflowDialog({ kind, onClose, prefillGoalkeeper, prefillMatchD
                 : kind === "media"
                   ? "Stored in Lovable Cloud"
                   : kind === "interaction"
-                    ? "Not available in this release · entries cannot be saved"
+                    ? "Saved to Lovable Cloud · visible in the interactions log"
                     : "Saved locally to this session"}
             </p>
           </div>
