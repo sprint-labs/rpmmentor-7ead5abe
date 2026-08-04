@@ -416,7 +416,6 @@ export function InteractionForm({ onDone }: { onDone: () => void }) {
           rows={5}
           className={`${taCls} ${showErrors && errors.notes ? "border-destructive focus:ring-destructive/40" : ""}`}
           placeholder="What did you observe? Or use the camera/mic above to transcribe notes."
-          required
           value={notes}
           onChange={(e) => { setNotes(e.target.value); clearFieldError("notes"); }}
           onBlur={() => { if (!notes.trim()) setErrors((prev) => ({ ...prev, notes: "Notes are required" })); }}
