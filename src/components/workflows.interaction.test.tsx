@@ -62,9 +62,12 @@ async function fillValidForm() {
   fireEvent.change(screen.getByLabelText("Goalkeeper"), { target: { value: gk.id } });
   fireEvent.change(screen.getByLabelText("Interaction Type"), { target: { value: "Coffee Catch Up" } });
   fireEvent.change(screen.getByLabelText("Date"), { target: { value: "2026-01-05" } });
+  fireEvent.change(screen.getByLabelText("Outcome"), { target: { value: "On track" } });
+  fireEvent.change(screen.getByLabelText("Follow-up Action"), { target: { value: "Schedule video review next week" } });
   fireEvent.change(screen.getByLabelText("Notes"), { target: { value: "Reviewed the recovery plan." } });
   return gk;
 }
+
 
 describe("InteractionForm (durable)", () => {
   beforeEach(() => {
