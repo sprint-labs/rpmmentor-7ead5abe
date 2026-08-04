@@ -147,9 +147,12 @@ describe("InteractionForm (durable)", () => {
     fireEvent.click(screen.getByRole("button", { name: /save interaction/i }));
 
     await waitFor(() => expect(screen.getByText(/Select a goalkeeper/i)).toBeTruthy());
+    expect(screen.getByText(/Select an outcome/i)).toBeTruthy();
+    expect(screen.getByText(/Follow-up action is required/i)).toBeTruthy();
     expect(screen.getByText(/Notes are required/i)).toBeTruthy();
     expect(createInteractionMock).not.toHaveBeenCalled();
   });
+
 
   it("clears inline validation errors as the user fixes each field", async () => {
     createInteractionMock.mockResolvedValue({ id: "i1" });
