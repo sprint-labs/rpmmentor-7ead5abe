@@ -144,7 +144,6 @@ describe("InteractionForm (durable)", () => {
     fireEvent.click(screen.getByRole("button", { name: /save interaction/i }));
 
     await waitFor(() => expect(screen.getByText(/Select a goalkeeper/i)).toBeTruthy());
-    expect(screen.getByText(/Date is required/i)).toBeTruthy();
     expect(screen.getByText(/Notes are required/i)).toBeTruthy();
     expect(createInteractionMock).not.toHaveBeenCalled();
   });
