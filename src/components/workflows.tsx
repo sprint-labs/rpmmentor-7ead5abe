@@ -149,11 +149,19 @@ export function EditMediaDialog({ asset, onClose }: { asset: MediaAsset | null; 
   );
 }
 
-function Field({ label, children }: { label: string; children: ReactNode }) {
+function Field({ label, required, error, children }: { label: string; required?: boolean; error?: string | null; children: ReactNode }) {
   return (
     <div>
-      <label className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">{label}</label>
+      <label className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
+        {label}
+        {required && <span className="text-destructive ml-0.5" aria-hidden="true">*</span>}
+      </label>
       <div className="mt-1">{children}</div>
+      {error && (
+        <p className="mt-1 text-[11px] text-destructive flex items-center gap-1" role="alert">
+          <AlertCircle className="size-3 shrink-0" /> {error}
+        </p>
+      )}
     </div>
   );
 }
@@ -237,6 +245,8 @@ export function InteractionForm({ onDone }: { onDone: () => void }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [clubAutoFilled, setClubAutoFilled] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [showErrors, setShowErrors] = useState(false);
   const autoFilledClubRef = useRef<string | null>(null);
   const gk = goalkeepers.find((g) => g.id === gkId);
 
@@ -278,11 +288,38 @@ export function InteractionForm({ onDone }: { onDone: () => void }) {
     }
   }
 
+  function validate(values: { gkId: string; date: string; notes: string }): Record<string, string> {
+    const next: Record<string, string> = {};
+    if (!values.gkId.trim()) next.gkId = "Select a goalkeeper";
+    if (!values.date.trim()) next.date = "Date is required";
+    else if (!/^\d{4}-\d{2}-\d{2}$/.test(values.date)) next.date = "Enter a valid date";
+    if (!values.notes.trim()) next.notes = "Notes are required";
+    else if (values.notes.trim().length > 8000) next.notes = "Notes must be under 8,000 characters";
+    return next;
+  }
+
+  function clearFieldError(key: string) {
+    setErrors((prev) => {
+      if (!prev[key]) return prev;
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    const validation = validate({ gkId, date, notes });
+    if (Object.keys(validation).length > 0) {
+      setErrors(validation);
+      setShowErrors(true);
+      setError(null);
+      return;
+    }
     if (saving || !gk) return;
     setSaving(true);
     setError(null);
+    setShowErrors(false);
     try {
       const saved = await createFn({
         data: {
@@ -320,8 +357,25 @@ export function InteractionForm({ onDone }: { onDone: () => void }) {
       )}
 
       <div className="grid grid-cols-2 gap-3">
-        <Field label="Goalkeeper"><select aria-label="Goalkeeper" className={selectCls} required value={gkId} onChange={(e) => setGkId(e.target.value)}><option value="" disabled>Select…</option>{goalkeepers.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}</select></Field>
-        <Field label="Interaction Type"><select aria-label="Interaction Type" className={selectCls} required value={type} onChange={(e) => setType(e.target.value as InteractionTypeValue)}>{INTERACTION_TYPES.map((t) => <option key={t}>{t}</option>)}</select></Field>
+        <Field label="Goalkeeper" required error={showErrors ? errors.gkId : undefined}>
+          <select
+            aria-label="Goalkeeper"
+            aria-invalid={showErrors && !!errors.gkId}
+            aria-required="true"
+            className={`${selectCls} ${showErrors && errors.gkId ? "border-destructive focus:ring-destructive/40" : ""}`}
+            value={gkId}
+            onChange={(e) => { setGkId(e.target.value); clearFieldError("gkId"); }}
+            onBlur={() => { if (!gkId) setErrors((prev) => ({ ...prev, gkId: "Select a goalkeeper" })); }}
+          >
+            <option value="" disabled>Select…</option>
+            {goalkeepers.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+          </select>
+        </Field>
+        <Field label="Interaction Type" required>
+          <select aria-label="Interaction Type" className={selectCls} required value={type} onChange={(e) => setType(e.target.value as InteractionTypeValue)}>
+            {INTERACTION_TYPES.map((t) => <option key={t}>{t}</option>)}
+          </select>
+        </Field>
         <Field label="Club">
           <input aria-label="Club" className={inputCls} value={club} onChange={(e) => handleClubChange(e.target.value)} placeholder="e.g. Brighton & Hove Albion" maxLength={80} />
           {clubAutoFilled ? (
@@ -333,17 +387,40 @@ export function InteractionForm({ onDone }: { onDone: () => void }) {
           ) : null}
         </Field>
 
-        <Field label="Date"><input aria-label="Date" type="date" className={inputCls} value={date} onChange={(e) => setDate(e.target.value)} required /></Field>
+        <Field label="Date" required error={showErrors ? errors.date : undefined}>
+          <input
+            aria-label="Date"
+            aria-invalid={showErrors && !!errors.date}
+            aria-required="true"
+            type="date"
+            className={`${inputCls} ${showErrors && errors.date ? "border-destructive focus:ring-destructive/40" : ""}`}
+            value={date}
+            onChange={(e) => { setDate(e.target.value); clearFieldError("date"); }}
+            onBlur={() => { if (!date) setErrors((prev) => ({ ...prev, date: "Date is required" })); }}
+          />
+        </Field>
         <Field label="Outcome"><select aria-label="Outcome" className={selectCls} value={outcome} onChange={(e) => setOutcome(e.target.value)}>{INTERACTION_OUTCOMES.map((t) => <option key={t}>{t}</option>)}</select></Field>
       </div>
       <HandwrittenNotesField
         context={gk ? `Session notes about ${gk.name} (${club || gk.club})` : undefined}
-        onTranscribed={(text, mode) => setNotes((prev) => mode === "replace" || !prev.trim() ? text : `${prev.trim()}\n\n${text}`)}
+        onTranscribed={(text, mode) => { setNotes((prev) => mode === "replace" || !prev.trim() ? text : `${prev.trim()}\n\n${text}`); clearFieldError("notes"); }}
       />
       <VoiceNoteField
-        onTranscribed={(text, mode) => setNotes((prev) => mode === "replace" || !prev.trim() ? text : `${prev.trim()}\n\n${text}`)}
+        onTranscribed={(text, mode) => { setNotes((prev) => mode === "replace" || !prev.trim() ? text : `${prev.trim()}\n\n${text}`); clearFieldError("notes"); }}
       />
-      <Field label="Notes"><textarea aria-label="Notes" rows={5} className={taCls} placeholder="What did you observe? Or use the camera/mic above to transcribe notes." required value={notes} onChange={(e) => setNotes(e.target.value)} /></Field>
+      <Field label="Notes" required error={showErrors ? errors.notes : undefined}>
+        <textarea
+          aria-label="Notes"
+          aria-invalid={showErrors && !!errors.notes}
+          aria-required="true"
+          rows={5}
+          className={`${taCls} ${showErrors && errors.notes ? "border-destructive focus:ring-destructive/40" : ""}`}
+          placeholder="What did you observe? Or use the camera/mic above to transcribe notes."
+          value={notes}
+          onChange={(e) => { setNotes(e.target.value); clearFieldError("notes"); }}
+          onBlur={() => { if (!notes.trim()) setErrors((prev) => ({ ...prev, notes: "Notes are required" })); }}
+        />
+      </Field>
       <Field label="Follow-up Action"><input aria-label="Follow-up Action" className={inputCls} placeholder="e.g. Schedule video review next week" value={followUp} onChange={(e) => setFollowUp(e.target.value)} maxLength={200} /></Field>
       <div className="flex justify-end gap-2 pt-2">
         <button type="button" onClick={onDone} className="h-9 px-3 rounded-md border border-border text-sm" disabled={saving}>Cancel</button>
