@@ -240,7 +240,7 @@ export function InteractionForm({ onDone }: { onDone: () => void }) {
   const [type, setType] = useState<InteractionTypeValue>(INTERACTION_TYPES[0]);
   const [club, setClub] = useState("");
   const [date, setDate] = useState(() => todayDateOnly());
-  const [outcome, setOutcome] = useState<string>(INTERACTION_OUTCOMES[0]);
+  const [outcome, setOutcome] = useState<string>("");
   const [followUp, setFollowUp] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -249,6 +249,7 @@ export function InteractionForm({ onDone }: { onDone: () => void }) {
   const [showErrors, setShowErrors] = useState(false);
   const autoFilledClubRef = useRef<string | null>(null);
   const gk = goalkeepers.find((g) => g.id === gkId);
+
 
   const listPlayersFn = useServerFn(listPlayers);
   const playersQuery = useQuery({
