@@ -240,7 +240,7 @@ export function InteractionForm({ onDone }: { onDone: () => void }) {
   const [type, setType] = useState<InteractionTypeValue>(INTERACTION_TYPES[0]);
   const [club, setClub] = useState("");
   const [date, setDate] = useState(() => todayDateOnly());
-  const [outcome, setOutcome] = useState<string>(INTERACTION_OUTCOMES[0]);
+  const [outcome, setOutcome] = useState<string>("");
   const [followUp, setFollowUp] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -249,6 +249,7 @@ export function InteractionForm({ onDone }: { onDone: () => void }) {
   const [showErrors, setShowErrors] = useState(false);
   const autoFilledClubRef = useRef<string | null>(null);
   const gk = goalkeepers.find((g) => g.id === gkId);
+
 
   const listPlayersFn = useServerFn(listPlayers);
   const playersQuery = useQuery({
@@ -288,15 +289,19 @@ export function InteractionForm({ onDone }: { onDone: () => void }) {
     }
   }
 
-  function validate(values: { gkId: string; date: string; notes: string }): Record<string, string> {
+  function validate(values: { gkId: string; date: string; notes: string; outcome: string; followUp: string }): Record<string, string> {
     const next: Record<string, string> = {};
     if (!values.gkId.trim()) next.gkId = "Select a goalkeeper";
     if (!values.date.trim()) next.date = "Date is required";
     else if (!/^\d{4}-\d{2}-\d{2}$/.test(values.date)) next.date = "Enter a valid date";
     if (!values.notes.trim()) next.notes = "Notes are required";
     else if (values.notes.trim().length > 8000) next.notes = "Notes must be under 8,000 characters";
+    if (!values.outcome.trim()) next.outcome = "Select an outcome";
+    if (!values.followUp.trim()) next.followUp = "Follow-up action is required";
+    else if (values.followUp.trim().length > 200) next.followUp = "Follow-up action must be under 200 characters";
     return next;
   }
+
 
   function clearFieldError(key: string) {
     setErrors((prev) => {
@@ -309,7 +314,8 @@ export function InteractionForm({ onDone }: { onDone: () => void }) {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const validation = validate({ gkId, date, notes });
+    const validation = validate({ gkId, date, notes, outcome, followUp });
+
     if (Object.keys(validation).length > 0) {
       setErrors(validation);
       setShowErrors(true);
@@ -399,7 +405,21 @@ export function InteractionForm({ onDone }: { onDone: () => void }) {
             onBlur={() => { if (!date) setErrors((prev) => ({ ...prev, date: "Date is required" })); }}
           />
         </Field>
-        <Field label="Outcome"><select aria-label="Outcome" className={selectCls} value={outcome} onChange={(e) => setOutcome(e.target.value)}>{INTERACTION_OUTCOMES.map((t) => <option key={t}>{t}</option>)}</select></Field>
+        <Field label="Outcome" required error={showErrors ? errors.outcome : undefined}>
+          <select
+            aria-label="Outcome"
+            aria-invalid={showErrors && !!errors.outcome}
+            aria-required="true"
+            className={`${selectCls} ${showErrors && errors.outcome ? "border-destructive focus:ring-destructive/40" : ""}`}
+            value={outcome}
+            onChange={(e) => { setOutcome(e.target.value); clearFieldError("outcome"); }}
+            onBlur={() => { if (!outcome) setErrors((prev) => ({ ...prev, outcome: "Select an outcome" })); }}
+          >
+            <option value="" disabled>Select…</option>
+            {INTERACTION_OUTCOMES.map((t) => <option key={t}>{t}</option>)}
+          </select>
+        </Field>
+
       </div>
       <HandwrittenNotesField
         context={gk ? `Session notes about ${gk.name} (${club || gk.club})` : undefined}
@@ -421,7 +441,20 @@ export function InteractionForm({ onDone }: { onDone: () => void }) {
           onBlur={() => { if (!notes.trim()) setErrors((prev) => ({ ...prev, notes: "Notes are required" })); }}
         />
       </Field>
-      <Field label="Follow-up Action"><input aria-label="Follow-up Action" className={inputCls} placeholder="e.g. Schedule video review next week" value={followUp} onChange={(e) => setFollowUp(e.target.value)} maxLength={200} /></Field>
+      <Field label="Follow-up Action" required error={showErrors ? errors.followUp : undefined}>
+        <input
+          aria-label="Follow-up Action"
+          aria-invalid={showErrors && !!errors.followUp}
+          aria-required="true"
+          className={`${inputCls} ${showErrors && errors.followUp ? "border-destructive focus:ring-destructive/40" : ""}`}
+          placeholder="e.g. Schedule video review next week"
+          value={followUp}
+          onChange={(e) => { setFollowUp(e.target.value); clearFieldError("followUp"); }}
+          onBlur={() => { if (!followUp.trim()) setErrors((prev) => ({ ...prev, followUp: "Follow-up action is required" })); }}
+          maxLength={200}
+        />
+      </Field>
+
       <div className="flex justify-end gap-2 pt-2">
         <button type="button" onClick={onDone} className="h-9 px-3 rounded-md border border-border text-sm" disabled={saving}>Cancel</button>
         <button type="submit" disabled={saving} className="h-9 px-4 rounded-md bg-primary text-primary-foreground text-sm font-medium disabled:opacity-60 inline-flex items-center gap-1.5">
