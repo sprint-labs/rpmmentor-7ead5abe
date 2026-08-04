@@ -441,7 +441,20 @@ export function InteractionForm({ onDone }: { onDone: () => void }) {
           onBlur={() => { if (!notes.trim()) setErrors((prev) => ({ ...prev, notes: "Notes are required" })); }}
         />
       </Field>
-      <Field label="Follow-up Action"><input aria-label="Follow-up Action" className={inputCls} placeholder="e.g. Schedule video review next week" value={followUp} onChange={(e) => setFollowUp(e.target.value)} maxLength={200} /></Field>
+      <Field label="Follow-up Action" required error={showErrors ? errors.followUp : undefined}>
+        <input
+          aria-label="Follow-up Action"
+          aria-invalid={showErrors && !!errors.followUp}
+          aria-required="true"
+          className={`${inputCls} ${showErrors && errors.followUp ? "border-destructive focus:ring-destructive/40" : ""}`}
+          placeholder="e.g. Schedule video review next week"
+          value={followUp}
+          onChange={(e) => { setFollowUp(e.target.value); clearFieldError("followUp"); }}
+          onBlur={() => { if (!followUp.trim()) setErrors((prev) => ({ ...prev, followUp: "Follow-up action is required" })); }}
+          maxLength={200}
+        />
+      </Field>
+
       <div className="flex justify-end gap-2 pt-2">
         <button type="button" onClick={onDone} className="h-9 px-3 rounded-md border border-border text-sm" disabled={saving}>Cancel</button>
         <button type="submit" disabled={saving} className="h-9 px-4 rounded-md bg-primary text-primary-foreground text-sm font-medium disabled:opacity-60 inline-flex items-center gap-1.5">
