@@ -225,6 +225,8 @@ export function InteractionForm({ onDone }: { onDone: () => void }) {
   const createFn = useServerFn(createInteraction);
 
   const [done, setDone] = useState(false);
+  const [savedSummary, setSavedSummary] = useState<string | null>(null);
+
   const [notes, setNotes] = useState("");
   const [gkId, setGkId] = useState("");
   const [type, setType] = useState<InteractionTypeValue>(INTERACTION_TYPES[0]);
