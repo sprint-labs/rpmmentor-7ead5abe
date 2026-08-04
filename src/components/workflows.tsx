@@ -225,6 +225,8 @@ export function InteractionForm({ onDone }: { onDone: () => void }) {
   const createFn = useServerFn(createInteraction);
 
   const [done, setDone] = useState(false);
+  const [savedSummary, setSavedSummary] = useState<string | null>(null);
+
   const [notes, setNotes] = useState("");
   const [gkId, setGkId] = useState("");
   const [type, setType] = useState<InteractionTypeValue>(INTERACTION_TYPES[0]);
@@ -297,7 +299,9 @@ export function InteractionForm({ onDone }: { onDone: () => void }) {
       // Only a confirmed inserted row counts as success.
       if (!saved?.id) throw new Error("The interaction could not be confirmed as saved.");
       await queryClient.invalidateQueries({ queryKey: interactionsQueryKey });
+      setSavedSummary(`Interaction logged successfully — ${type} with ${gk.name} on ${date}. It's now in the interactions log.`);
       setDone(true);
+
     } catch (err) {
       // Retain every entered value — no success state without a read-back.
       setError(err instanceof Error ? err.message : "Could not save the interaction. Please try again.");
@@ -306,14 +310,15 @@ export function InteractionForm({ onDone }: { onDone: () => void }) {
     }
   }
 
-  if (done) return <Submitted message="Interaction logged successfully." onDone={onDone} />;
+  if (done) return <Submitted message={savedSummary ?? "Interaction logged successfully."} onDone={onDone} />;
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       {error && (
         <div role="alert" className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
-          {error}
+          <span className="font-medium">Not saved.</span> {error} Your entries have been kept — fix the issue and try again.
         </div>
       )}
+
       <div className="grid grid-cols-2 gap-3">
         <Field label="Goalkeeper"><select aria-label="Goalkeeper" className={selectCls} required value={gkId} onChange={(e) => setGkId(e.target.value)}><option value="" disabled>Select…</option>{goalkeepers.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}</select></Field>
         <Field label="Interaction Type"><select aria-label="Interaction Type" className={selectCls} required value={type} onChange={(e) => setType(e.target.value as InteractionTypeValue)}>{INTERACTION_TYPES.map((t) => <option key={t}>{t}</option>)}</select></Field>
