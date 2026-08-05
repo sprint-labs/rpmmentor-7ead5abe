@@ -198,7 +198,8 @@ export const getMentorDashboardStats = createServerFn({ method: "GET" })
       const { readAllRows } = await import("@/lib/match-reports/sheets.server");
       const { rows, firstDataRow } = await readAllRows();
       const parsed = parseSheetRows(rows, firstDataRow);
-      reportsLast14 = countCanonicalReportsForCoach(parsed, coachIdentity, data.from, data.to);
+      // Same calendar-day window as the Interactions card.
+      reportsLast14 = countCanonicalReportsForCoach(parsed, coachIdentity, periodFrom, periodTo);
       const needle = coachIdentity.trim().toLowerCase();
       coachReports = parsed
         .filter((r) => (r.coach ?? "").trim().toLowerCase() === needle)
