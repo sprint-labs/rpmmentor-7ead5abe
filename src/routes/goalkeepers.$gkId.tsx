@@ -63,7 +63,7 @@ function GkDetail() {
     () => (loggedInteractions ?? []).filter((i) => i.gkSlug === gk.id).sort((a, b) => +new Date(b.occurredAt) - +new Date(a.occurredAt)),
     [loggedInteractions, gk.id],
   );
-  const { user } = useAuth();
+  
   const [gkMedia, setGkMedia] = useState<MediaAsset[]>([]);
   const [mediaLoading, setMediaLoading] = useState(true);
   const [mediaError, setMediaError] = useState<string | null>(null);
