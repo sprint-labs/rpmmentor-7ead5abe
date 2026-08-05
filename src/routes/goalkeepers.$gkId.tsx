@@ -57,7 +57,7 @@ function compareMatchDatesNewestFirst(a: string | null, b: string | null): numbe
 
 function GkDetail() {
   const { gk } = Route.useLoaderData();
-  const { can } = useAuth();
+  const { can, user } = useAuth();
   const { data: loggedInteractions } = useLoggedInteractions();
   const gkInteractions = useMemo(
     () => (loggedInteractions ?? []).filter((i) => i.gkSlug === gk.id).sort((a, b) => +new Date(b.occurredAt) - +new Date(a.occurredAt)),
