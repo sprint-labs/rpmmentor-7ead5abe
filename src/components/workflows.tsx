@@ -8,6 +8,7 @@ import { goalkeepers } from "@/lib/mock-data";
 import { listPlayers, type PlayerRosterRow } from "@/lib/players.functions";
 import { createInteraction } from "@/lib/interactions.functions";
 import { interactionsQueryKey } from "@/lib/interactions/use-interactions";
+import type { LoggedInteraction } from "@/lib/interactions/schema";
 import {
   INTERACTION_TYPES, INTERACTION_OUTCOMES, todayDateOnly,
   type InteractionTypeValue,
@@ -333,6 +334,32 @@ export function InteractionForm({ onDone }: { onDone: () => void }) {
     setSaving(true);
     setError(null);
     setShowErrors(false);
+
+    // Optimistic timeline update: show the interaction immediately, roll back on failure.
+    const optimisticId = `optimistic-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const optimisticRow = {
+      id: optimisticId,
+      gkSlug: gk.id,
+      goalkeeperName: gk.name,
+      playerId: null,
+      mentorId: "",
+      mentorName: "",
+      interactionType: type,
+      club: club.trim(),
+      occurredAt: date,
+      notes: notes.trim(),
+      outcome,
+      followUp: followUp.trim(),
+      createdAt: new Date().toISOString(),
+      optimistic: true,
+    } as unknown as LoggedInteraction;
+
+    await queryClient.cancelQueries({ queryKey: interactionsQueryKey });
+    const previous = queryClient.getQueryData<LoggedInteraction[]>(interactionsQueryKey);
+    if (previous) {
+      queryClient.setQueryData<LoggedInteraction[]>(interactionsQueryKey, [optimisticRow, ...previous]);
+    }
+
     try {
       const saved = await createFn({
         data: {
@@ -348,6 +375,10 @@ export function InteractionForm({ onDone }: { onDone: () => void }) {
       });
       // Only a confirmed inserted row counts as success.
       if (!saved?.id) throw new Error("The interaction could not be confirmed as saved.");
+      // Swap the optimistic row for the confirmed one, then reconcile with the server.
+      queryClient.setQueryData<LoggedInteraction[]>(interactionsQueryKey, (curr) =>
+        curr ? curr.map((i) => (i.id === optimisticId ? saved : i)) : curr,
+      );
       await queryClient.invalidateQueries({ queryKey: interactionsQueryKey });
       toast.success("Interaction saved", {
         description: `${type} with ${gk.name} on ${date} — now on the timeline.`,
@@ -356,12 +387,18 @@ export function InteractionForm({ onDone }: { onDone: () => void }) {
       setDone(true);
 
     } catch (err) {
+      // Roll the optimistic timeline entry back.
+      if (previous) queryClient.setQueryData<LoggedInteraction[]>(interactionsQueryKey, previous);
+      else queryClient.setQueryData<LoggedInteraction[]>(interactionsQueryKey, (curr) =>
+        curr ? curr.filter((i) => i.id !== optimisticId) : curr,
+      );
       // Retain every entered value — no success state without a read-back.
       setError(err instanceof Error ? err.message : "Could not save the interaction. Please try again.");
     } finally {
       setSaving(false);
     }
   }
+
 
   if (done) return <Submitted message={savedSummary ?? "Interaction logged successfully."} onDone={onDone} />;
   return (
