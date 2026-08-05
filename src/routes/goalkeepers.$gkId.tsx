@@ -3,7 +3,8 @@ import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { Card, TierBadge, Avatar, Pill, SectionTitle, ProgressBar } from "@/components/primitives";
-import { goalkeepers, interactions, media, formatDate, formatRelative, type Tier } from "@/lib/mock-data";
+import { goalkeepers, media, formatDate, formatRelative, type Tier } from "@/lib/mock-data";
+import { useLoggedInteractions } from "@/lib/interactions/use-interactions";
 import { ArrowLeft, Info, Video, FileText, Phone, Eye, Users as UsersIcon, Calendar as CalendarIcon } from "lucide-react";
 import { listMatchReports } from "@/lib/match-reports/reports.functions";
 import { PILLAR_IDS, PILLAR_LABELS, type MatchReportRow, type PillarId } from "@/lib/match-reports/schema";
@@ -55,7 +56,11 @@ function compareMatchDatesNewestFirst(a: string | null, b: string | null): numbe
 function GkDetail() {
   const { gk } = Route.useLoaderData();
   const { can } = useAuth();
-  const gkInteractions = interactions.filter((i) => i.gkId === gk.id).sort((a, b) => +new Date(b.date) - +new Date(a.date));
+  const { data: loggedInteractions } = useLoggedInteractions();
+  const gkInteractions = useMemo(
+    () => (loggedInteractions ?? []).filter((i) => i.gkSlug === gk.id).sort((a, b) => +new Date(b.occurredAt) - +new Date(a.occurredAt)),
+    [loggedInteractions, gk.id],
+  );
   const gkMedia = media.filter((m) => m.gkId === gk.id);
   const [previewId, setPreviewId] = useState<string | null>(null);
   const [workflow, setWorkflow] = useState<WorkflowKind | null>(null);
@@ -147,8 +152,8 @@ function GkDetail() {
       ...gkInteractions.map((i) => ({
         kind: "interaction" as const,
         id: i.id,
-        date: i.date,
-        type: i.type,
+        date: i.occurredAt,
+        type: i.interactionType,
         notes: i.notes,
         outcome: i.outcome,
         followUp: i.followUp,
