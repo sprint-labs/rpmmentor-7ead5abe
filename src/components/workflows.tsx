@@ -1837,14 +1837,14 @@ const KIND_LABELS: { value: MediaKind; label: string }[] = [
   { value: "audio", label: "Voice note" },
 ];
 
-function MediaForm({ onDone }: { onDone: () => void }) {
+function MediaForm({ onDone, prefillGkId }: { onDone: () => void; prefillGkId?: string }) {
   const { user, can } = useAuth();
   const [done, setDone] = useState(false);
   const [kind, setKind] = useState<MediaKind>("video");
   const [file, setFile] = useState<File | null>(null);
   const [title, setTitle] = useState("");
   const [notes, setNotes] = useState("");
-  const [gkId, setGkId] = useState("");
+  const [gkId, setGkId] = useState(prefillGkId ?? "");
   const [tags, setTags] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
