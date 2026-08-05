@@ -38,3 +38,41 @@ export function mapInteractionRow(row: InteractionDbRow): LoggedInteraction {
     createdAt: row.created_at,
   };
 }
+
+/**
+ * Replace an optimistic placeholder with the server-confirmed row.
+ *
+ * The server row is authoritative for id, timestamps and every persisted
+ * field (mentor identity, player link, normalised outcome/follow-up). Any
+ * field the server returned empty falls back to the optimistic value so the
+ * timeline never regresses to blanks while a refetch is in flight.
+ * The result is de-duplicated by id and re-sorted the same way
+ * `listInteractions` orders rows: occurredAt desc, then createdAt desc.
+ */
+export function reconcileInteraction(
+  list: LoggedInteraction[] | undefined,
+  optimisticId: string,
+  saved: LoggedInteraction,
+): LoggedInteraction[] {
+  const current = list ?? [];
+  const optimistic = current.find((i) => i.id === optimisticId);
+  const merged: LoggedInteraction = {
+    ...saved,
+    gkSlug: saved.gkSlug || optimistic?.gkSlug || "",
+    goalkeeperName: saved.goalkeeperName || optimistic?.goalkeeperName || "",
+    club: saved.club || optimistic?.club || "",
+    notes: saved.notes || optimistic?.notes || "",
+    outcome: saved.outcome || optimistic?.outcome || "",
+    followUp: saved.followUp || optimistic?.followUp || "",
+    occurredAt: saved.occurredAt || optimistic?.occurredAt || "",
+    createdAt: saved.createdAt || optimistic?.createdAt || new Date().toISOString(),
+  };
+
+  const next = current.filter((i) => i.id !== optimisticId && i.id !== merged.id);
+  next.unshift(merged);
+  return next.sort((a, b) => {
+    if (a.occurredAt !== b.occurredAt) return a.occurredAt < b.occurredAt ? 1 : -1;
+    if (a.createdAt !== b.createdAt) return a.createdAt < b.createdAt ? 1 : -1;
+    return 0;
+  });
+}
