@@ -114,6 +114,14 @@ export const updateInteraction = createServerFn({ method: "POST" })
   .handler(async ({ data, context }): Promise<LoggedInteraction> => {
     const { supabase, userId } = context;
 
+    if (!isLoggableInteractionType(data.interactionType)) {
+      throw new Error(
+        `"${MATCH_REPORT_INTERACTION_TYPE}" is recorded by submitting a Match Report, not by logging an interaction.`,
+      );
+    }
+
+
+
     const { data: existing, error: loadError } = await supabase
       .from("interactions")
       .select("id, mentor_id")
