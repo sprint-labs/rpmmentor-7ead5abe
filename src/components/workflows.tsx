@@ -464,13 +464,14 @@ export function InteractionForm({ onDone }: { onDone: () => void }) {
 
       <div className="flex justify-end gap-2 pt-2">
         <button type="button" onClick={onDone} className="h-9 px-3 rounded-md border border-border text-sm" disabled={saving}>Cancel</button>
-        <button type="submit" disabled={saving} className="h-9 px-4 rounded-md bg-primary text-primary-foreground text-sm font-medium disabled:opacity-60 inline-flex items-center gap-1.5">
+        <button type="submit" disabled={!canSubmit} className="h-9 px-4 rounded-md bg-primary text-primary-foreground text-sm font-medium disabled:opacity-60 inline-flex items-center gap-1.5">
           {saving && <Loader2 className="size-3.5 animate-spin" />}{saving ? "Saving…" : "Save Interaction"}
         </button>
       </div>
     </form>
   );
 }
+
 
 
 /**
