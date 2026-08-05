@@ -149,30 +149,37 @@ function Dashboard() {
           className="block rounded-lg transition-transform hover:-translate-y-0.5 hover:ring-1 hover:ring-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
           aria-label="View goalkeepers"
         >
-          <StatCard label="Total Goalkeepers" value={stats.totalGks} hint="Across all tiers" />
-        </Link>
-        <Link
-          to="/interactions"
-          className="block rounded-lg transition-transform hover:-translate-y-0.5 hover:ring-1 hover:ring-info/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-info"
-          aria-label="View upcoming interactions"
-        >
           <StatCard
-            label="Upcoming Interactions"
-            value={stats.upcomingInteractions}
-            hint="Next 14 days"
-            accent="info"
+            label="Total Goalkeepers"
+            value={overview?.totalGoalkeepers ?? "…"}
+            hint="Player records on file"
           />
         </Link>
         <Link
           to="/interactions"
-          className="block rounded-lg transition-transform hover:-translate-y-0.5 hover:ring-1 hover:ring-destructive/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive"
-          aria-label="View overdue interactions"
+          search={interactionsSearch}
+          className="block rounded-lg transition-transform hover:-translate-y-0.5 hover:ring-1 hover:ring-info/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-info"
+          aria-label="View interactions logged"
         >
           <StatCard
-            label="Overdue Interactions"
-            value={stats.overdueInteractions}
-            hint="Action required"
+            label="Interactions Logged"
+            value={overview?.interactionsInPeriod ?? "…"}
+            hint={`Last ${OVERVIEW_PERIOD_DAYS} days`}
+            accent="info"
+            emptyMessage="None logged"
+          />
+        </Link>
+        <Link
+          to="/goalkeepers"
+          className="block rounded-lg transition-transform hover:-translate-y-0.5 hover:ring-1 hover:ring-destructive/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive"
+          aria-label="View overdue goalkeepers"
+        >
+          <StatCard
+            label="Overdue Duty of Care"
+            value={interactionsLoading ? "…" : interactionsError ? "—" : dutyOverview.overdue}
+            hint={interactionsError ? "Count unavailable" : "Past tier cadence"}
             accent="destructive"
+            emptyMessage="All caught up"
           />
         </Link>
         <Link
@@ -182,9 +189,9 @@ function Dashboard() {
           aria-label="View match reports"
         >
           <StatCard
-            label="Reports This Week"
-            value={reportsLoading ? "…" : reportsError || reportsThisWeek == null ? "—" : reportsThisWeek}
-            hint={reportsError ? "Report count unavailable" : "Last 7 days"}
+            label="Match Reports Submitted"
+            value={reportsLoading ? "…" : reportsError || reportsInPeriod == null ? "—" : reportsInPeriod}
+            hint={reportsError ? "Report count unavailable" : `Last ${OVERVIEW_PERIOD_DAYS} days`}
             accent="primary"
             emptyMessage="None submitted"
           />
@@ -194,8 +201,13 @@ function Dashboard() {
           className="block rounded-lg transition-transform hover:-translate-y-0.5 hover:ring-1 hover:ring-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
           aria-label="View mentors"
         >
-          <StatCard label="Active Mentors" value={stats.activeMentors} hint="In rotation" />
+          <StatCard
+            label="Active Mentors"
+            value={overview?.activeMentors ?? "…"}
+            hint="Accounts with mentor access"
+          />
         </Link>
+
       </div>
       <Card className="p-4">
         <SectionTitle action={<Link to="/goalkeepers" className="text-xs text-primary inline-flex items-center gap-1">View goalkeepers <ArrowUpRight className="size-3" /></Link>}>
