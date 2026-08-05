@@ -375,15 +375,22 @@ export function InteractionForm({ onDone }: { onDone: () => void }) {
       });
       // Only a confirmed inserted row counts as success.
       if (!saved?.id) throw new Error("The interaction could not be confirmed as saved.");
-      // Swap the optimistic row for the confirmed one, then reconcile with the server.
-      queryClient.setQueryData<LoggedInteraction[]>(interactionsQueryKey, (curr) =>
-        curr ? curr.map((i) => (i.id === optimisticId ? saved : i)) : curr,
-      );
-      await queryClient.invalidateQueries({ queryKey: interactionsQueryKey });
-      toast.success("Interaction saved", {
-        description: `${type} with ${gk.name} on ${date} — now on the timeline.`,
+      // Reconcile: the server row is authoritative for id, timestamps, mentor
+      // identity, player link and the outcome/follow-up fields.
+      let confirmed = saved;
+      queryClient.setQueryData<LoggedInteraction[]>(interactionsQueryKey, (curr) => {
+        const next = reconcileInteraction(curr, optimisticId, saved);
+        confirmed = next.find((i) => i.id === saved.id) ?? saved;
+        return next;
       });
-      setSavedSummary(`Interaction logged successfully — ${type} with ${gk.name} on ${date}. It's now in the interactions log.`);
+      await queryClient.invalidateQueries({ queryKey: interactionsQueryKey });
+      const shownName = confirmed.goalkeeperName || gk.name;
+      const shownType = confirmed.interactionType || type;
+      const shownDate = formatDateOnly(confirmed.occurredAt || date);
+      toast.success("Interaction saved", {
+        description: `${shownType} with ${shownName} on ${shownDate} — now on the timeline.`,
+      });
+      setSavedSummary(`Interaction logged successfully — ${shownType} with ${shownName} on ${shownDate}. It's now in the interactions log.`);
       setDone(true);
 
     } catch (err) {
