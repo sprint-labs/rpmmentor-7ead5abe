@@ -9,6 +9,8 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import {
   createInteractionInput,
+  listInteractionsQuery,
+  type InteractionsPage,
   type LoggedInteraction,
 } from "@/lib/interactions/schema";
 import { mapInteractionRow } from "@/lib/interactions/map";
@@ -82,4 +84,54 @@ export const createInteraction = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     if (!inserted) throw new Error("The interaction could not be confirmed as saved.");
     return mapInteractionRow(inserted);
+  });
+
+/**
+ * Paged, server-filtered interactions log.
+ *
+ * Every filter is applied in Postgres and only one page of rows crosses the
+ * wire, so the log stays fast regardless of how many interactions exist.
+ * RLS still scopes what the signed-in user may read.
+ */
+export const listInteractionsPage = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data) => listInteractionsQuery.parse(data))
+  .handler(async ({ data, context }): Promise<InteractionsPage> => {
+    const pageSize = data.pageSize;
+    const page = data.page;
+    const fromRow = (page - 1) * pageSize;
+
+    const columns =
+      "id, gk_slug, goalkeeper_name, player_id, mentor_id, mentor_name, interaction_type, club, occurred_at, notes, outcome, follow_up, created_at";
+
+    let query = context.supabase
+      .from("interactions")
+      .select(columns, { count: "exact" });
+
+    if (data.from) query = query.gte("occurred_at", data.from);
+    if (data.to) query = query.lte("occurred_at", data.to);
+    if (data.mentorId) query = query.eq("mentor_id", data.mentorId);
+    else if (data.mentorName) query = query.eq("mentor_name", data.mentorName);
+    if (data.interactionType) query = query.eq("interaction_type", data.interactionType);
+    if (data.search) {
+      const term = data.search.replace(/[%,()]/g, " ").trim();
+      if (term) {
+        query = query.or(`goalkeeper_name.ilike.%${term}%,club.ilike.%${term}%`);
+      }
+    }
+
+    const { data: rows, error, count } = await query
+      .order("occurred_at", { ascending: false })
+      .order("created_at", { ascending: false })
+      .range(fromRow, fromRow + pageSize - 1);
+
+    if (error) throw new Error(error.message);
+    const total = count ?? 0;
+    return {
+      rows: (rows ?? []).map(mapInteractionRow),
+      total,
+      page,
+      pageSize,
+      pageCount: Math.max(1, Math.ceil(total / pageSize)),
+    };
   });
