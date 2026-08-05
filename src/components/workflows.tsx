@@ -110,7 +110,7 @@ export interface MatchReportHandoff {
   club: string;
 }
 
-export function WorkflowDialog({ kind, onClose, prefillGoalkeeper, prefillMatchDate, prefillOpponent, editingInteraction }: { kind: WorkflowKind | null; onClose: () => void; prefillGoalkeeper?: string; prefillMatchDate?: string; prefillOpponent?: string; editingInteraction?: LoggedInteraction | null }) {
+export function WorkflowDialog({ kind, onClose, prefillGoalkeeper, prefillMatchDate, prefillOpponent, prefillGkId, editingInteraction }: { kind: WorkflowKind | null; onClose: () => void; prefillGoalkeeper?: string; prefillMatchDate?: string; prefillOpponent?: string; prefillGkId?: string; editingInteraction?: LoggedInteraction | null }) {
   /**
    * Change #1: choosing Live Match Observation in Log Interaction hands over to
    * the Match Report workflow in place, carrying the goalkeeper, date and club
