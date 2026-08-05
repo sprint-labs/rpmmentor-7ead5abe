@@ -65,10 +65,10 @@ function InteractionsPage() {
   useEffect(() => {
     if (searchDraft === q) return;
     const id = setTimeout(() => {
-      navigate({ search: (prev) => ({ ...prev, q: searchDraft, page: 1 }), replace: true });
+      navigate({ search: { from, to, mentorId, type: typeParam, source, q: searchDraft, page: 1 }, replace: true });
     }, 300);
     return () => clearTimeout(id);
-  }, [searchDraft, q, navigate]);
+  }, [searchDraft, q, navigate, from, to, mentorId, typeParam, source]);
 
   const mentorName = mentorId ? getMentor(mentorId)?.name ?? "" : "";
   const safePage = Math.max(1, page);
@@ -95,9 +95,19 @@ function InteractionsPage() {
   const clearSearch = { from: "", to: "", mentorId: "", type: "", source: "", q: "", page: 1 };
 
   const setType = (t: TypeChip) =>
-    navigate({ search: (prev) => ({ ...prev, type: t === "All" ? "" : t, page: 1 }) });
+    navigate({ search: { from, to, mentorId, source, q, type: t === "All" ? "" : t, page: 1 } });
   const goToPage = (next: number) =>
-    navigate({ search: (prev) => ({ ...prev, page: Math.min(Math.max(1, next), pageCount) }) });
+    navigate({
+      search: {
+        from,
+        to,
+        mentorId,
+        source,
+        q,
+        type: typeParam,
+        page: Math.min(Math.max(1, next), pageCount),
+      },
+    });
 
   const firstOnPage = total === 0 ? 0 : (safePage - 1) * INTERACTIONS_PAGE_SIZE + 1;
   const lastOnPage = Math.min(total, (safePage - 1) * INTERACTIONS_PAGE_SIZE + rows.length);
