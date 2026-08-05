@@ -44,10 +44,17 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
  */
 export const MATCH_REPORT_INTERACTION_TYPE = "Live Match Observation" as const;
 
-/** Types that are still logged manually through the Log Interaction dialog. */
-export const MANUAL_INTERACTION_TYPES: readonly InteractionTypeValue[] = INTERACTION_TYPES.filter(
+/**
+ * Types that are still logged manually through the Log Interaction dialog.
+ *
+ * This tuple is the SINGLE source of truth for what a client may store: the
+ * create/update validators and the log filter all derive their enum from it,
+ * so a Live Match Observation can never be written or counted through the
+ * interaction-logging path.
+ */
+export const MANUAL_INTERACTION_TYPES = INTERACTION_TYPES.filter(
   (t) => t !== MATCH_REPORT_INTERACTION_TYPE,
-);
+) as unknown as readonly [InteractionTypeValue, ...InteractionTypeValue[]];
 
 /**
  * Types that drive dashboard KPI counts, charts and filter chips.
@@ -57,13 +64,18 @@ export const MANUAL_INTERACTION_TYPES: readonly InteractionTypeValue[] = INTERAC
  * the same activity already reported by the Reports cards. Every dashboard
  * reads this list against the SAME `occurred_at` calendar-day window.
  */
-export const DASHBOARD_INTERACTION_TYPES: readonly InteractionTypeValue[] =
-  MANUAL_INTERACTION_TYPES;
+export const DASHBOARD_INTERACTION_TYPES = MANUAL_INTERACTION_TYPES;
 
-/** Types excluded from dashboard KPI counts and filters. */
+/** Types excluded from dashboard KPI counts, filters and manual logging. */
 export const DASHBOARD_EXCLUDED_INTERACTION_TYPES: readonly InteractionTypeValue[] = [
   MATCH_REPORT_INTERACTION_TYPE,
 ];
+
+/** True when a type may be stored by the interaction-logging server functions. */
+export function isLoggableInteractionType(value: string): value is InteractionTypeValue {
+  return (MANUAL_INTERACTION_TYPES as readonly string[]).includes(value);
+}
+
 
 export const createInteractionInput = z.object({
   /**
