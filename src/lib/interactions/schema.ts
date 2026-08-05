@@ -112,3 +112,36 @@ export function daysSinceDateOnly(value: string, now: number = Date.now()): numb
   if (!Number.isFinite(ms)) return NaN;
   return Math.max(0, Math.floor((now - ms) / 86400000));
 }
+
+/**
+ * Server-side query contract for the interactions log. Filtering and paging
+ * happen in Postgres so the page stays fast as the table grows — the client
+ * never downloads the full table to filter it.
+ */
+export const INTERACTIONS_PAGE_SIZE = 25;
+
+export const listInteractionsQuery = z.object({
+  /** Inclusive calendar-date lower bound. */
+  from: z.string().regex(DATE_ONLY).optional(),
+  /** Inclusive calendar-date upper bound. */
+  to: z.string().regex(DATE_ONLY).optional(),
+  /** Canonical mentor (profiles.id) filter. */
+  mentorId: z.string().regex(UUID).optional(),
+  /** Legacy/display mentor filter, matched against the stored snapshot. */
+  mentorName: z.string().trim().max(120).optional(),
+  interactionType: z.enum(INTERACTION_TYPES).optional(),
+  /** Free-text match on goalkeeper name or club. */
+  search: z.string().trim().max(120).optional(),
+  page: z.number().int().min(1).default(1),
+  pageSize: z.number().int().min(1).max(100).default(INTERACTIONS_PAGE_SIZE),
+});
+export type ListInteractionsQuery = z.input<typeof listInteractionsQuery>;
+
+export interface InteractionsPage {
+  rows: LoggedInteraction[];
+  /** Total rows matching the filters, across all pages. */
+  total: number;
+  page: number;
+  pageSize: number;
+  pageCount: number;
+}
