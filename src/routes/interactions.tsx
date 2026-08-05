@@ -13,7 +13,15 @@ import {
   type LoggedInteraction,
 } from "@/lib/interactions/schema";
 import { useEffect, useMemo, useState } from "react";
-import { X, MessageSquarePlus, Filter, ChevronLeft, ChevronRight, Search, Pencil } from "lucide-react";
+import {
+  X,
+  MessageSquarePlus,
+  Filter,
+  ChevronLeft,
+  ChevronRight,
+  Search,
+  Pencil,
+} from "lucide-react";
 import { withPermission } from "@/components/require-permission";
 import { getNavSource } from "@/lib/nav-source";
 import { WorkflowDialog, type WorkflowKind } from "@/components/workflows";
@@ -67,12 +75,15 @@ function InteractionsPage() {
   useEffect(() => {
     if (searchDraft === q) return;
     const id = setTimeout(() => {
-      navigate({ search: { from, to, mentorId, type: typeParam, source, q: searchDraft, page: 1 }, replace: true });
+      navigate({
+        search: { from, to, mentorId, type: typeParam, source, q: searchDraft, page: 1 },
+        replace: true,
+      });
     }, 300);
     return () => clearTimeout(id);
   }, [searchDraft, q, navigate, from, to, mentorId, typeParam, source]);
 
-  const mentorName = mentorId ? getMentor(mentorId)?.name ?? "" : "";
+  const mentorName = mentorId ? (getMentor(mentorId)?.name ?? "") : "";
   const safePage = Math.max(1, page);
 
   // Every filter below is executed in Postgres — only one page is fetched.
@@ -118,27 +129,30 @@ function InteractionsPage() {
     <div className="space-y-5">
       <PageHeader
         breadcrumbs={
-          navSource
-            ? [
-                { label: "Dashboard", to: "/" },
-                { label: navSource.label },
-              ]
-            : undefined
+          navSource ? [{ label: "Dashboard", to: "/" }, { label: navSource.label }] : undefined
         }
         title={navSource?.title ?? "Interaction Tracking"}
         description="Every logged touchpoint between mentors and goalkeepers."
-        action={can("interactions.log") ? (
-          <button
-            onClick={() => setWorkflow("interaction")}
-            className="h-9 px-3 rounded-md bg-primary text-primary-foreground text-sm font-medium"
-          >
-            Log Interaction
-          </button>
-        ) : undefined}
+        action={
+          can("interactions.log") ? (
+            <button
+              onClick={() => setWorkflow("interaction")}
+              className="h-9 px-3 rounded-md bg-primary text-primary-foreground text-sm font-medium"
+            >
+              Log Interaction
+            </button>
+          ) : undefined
+        }
       />
       <div className="flex flex-wrap items-center gap-1.5">
         {TYPES.map((t) => (
-          <button key={t} onClick={() => setType(t)} className={`px-3 py-1.5 rounded-md border text-xs transition-colors ${type === t ? "bg-accent border-accent text-accent-foreground" : "border-border hover:bg-accent/40 text-muted-foreground"}`}>{t}</button>
+          <button
+            key={t}
+            onClick={() => setType(t)}
+            className={`px-3 py-1.5 rounded-md border text-xs transition-colors ${type === t ? "bg-accent border-accent text-accent-foreground" : "border-border hover:bg-accent/40 text-muted-foreground"}`}
+          >
+            {t}
+          </button>
         ))}
         <div className="relative ml-auto">
           <Search className="size-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
@@ -158,8 +172,17 @@ function InteractionsPage() {
           <span className="text-muted-foreground uppercase tracking-wider">Scoped to:</span>
           {mentorId && <Pill tone="muted">{getMentor(mentorId)?.name ?? mentorId}</Pill>}
           {q && <Pill tone="muted">“{q}”</Pill>}
-          {from && to && <Pill tone="muted">{new Date(from).toLocaleDateString("en-GB", { day: "numeric", month: "short" })} – {new Date(to).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}</Pill>}
-          <Link to="/interactions" search={clearSearch} className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground ml-2">
+          {from && to && (
+            <Pill tone="muted">
+              {new Date(from).toLocaleDateString("en-GB", { day: "numeric", month: "short" })} –{" "}
+              {new Date(to).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
+            </Pill>
+          )}
+          <Link
+            to="/interactions"
+            search={clearSearch}
+            className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground ml-2"
+          >
             <X className="size-3" /> Clear
           </Link>
         </div>
@@ -176,14 +199,18 @@ function InteractionsPage() {
               <th className="px-2 py-2.5 font-medium">Notes</th>
               <th className="px-2 py-2.5 font-medium">Outcome</th>
               <th className="px-4 py-2.5 font-medium">Follow-up</th>
-              <th className="px-4 py-2.5 font-medium"><span className="sr-only">Actions</span></th>
+              <th className="px-4 py-2.5 font-medium">
+                <span className="sr-only">Actions</span>
+              </th>
             </tr>
           </thead>
           <tbody>
             {(isLoading || isError) && (
               <tr>
                 <td colSpan={7} className="px-4 py-6 text-sm text-muted-foreground">
-                  {isLoading ? "Loading logged interactions…" : "Interactions could not be loaded. Please retry."}
+                  {isLoading
+                    ? "Loading logged interactions…"
+                    : "Interactions could not be loaded. Please retry."}
                 </td>
               </tr>
             )}
@@ -192,7 +219,11 @@ function InteractionsPage() {
                 <td colSpan={7} className="px-4 py-2">
                   <EmptyState
                     icon={hasFilters ? Filter : MessageSquarePlus}
-                    title={hasFilters ? "No interactions match these filters" : "No interactions logged yet"}
+                    title={
+                      hasFilters
+                        ? "No interactions match these filters"
+                        : "No interactions logged yet"
+                    }
                     description={
                       hasFilters
                         ? "Try broadening the date range, mentor, search or type filter to see more touchpoints."
@@ -225,14 +256,38 @@ function InteractionsPage() {
               const name = gk?.name ?? i.goalkeeperName;
               const initials = gk?.initials ?? (i.goalkeeperName.slice(0, 1).toUpperCase() || "?");
               return (
-                <tr key={i.id} className="border-b border-border/60 last:border-0 hover:bg-accent/20">
-                  <td className="px-4 py-2.5 text-muted-foreground tabular-nums font-mono">{formatDateOnly(i.occurredAt)}<div className="text-[10px] opacity-60">{formatRelative(`${i.occurredAt}T12:00:00`)}</div></td>
-                  <td className="px-2"><Pill tone="info">{i.interactionType}</Pill></td>
-                  <td className="px-2"><div className="flex items-center gap-2"><Avatar initials={initials} size={22} /><span className="font-medium">{name}</span>{i.club && <span className="text-[11px] text-muted-foreground">{i.club}</span>}</div></td>
+                <tr
+                  key={i.id}
+                  className="border-b border-border/60 last:border-0 hover:bg-accent/20"
+                >
+                  <td className="px-4 py-2.5 text-muted-foreground tabular-nums font-mono">
+                    {formatDateOnly(i.occurredAt)}
+                    <div className="text-[10px] opacity-60">
+                      {formatRelative(`${i.occurredAt}T12:00:00`)}
+                    </div>
+                  </td>
+                  <td className="px-2">
+                    <Pill tone="info">{i.interactionType}</Pill>
+                  </td>
+                  <td className="px-2">
+                    <div className="flex items-center gap-2">
+                      <Avatar initials={initials} size={22} />
+                      <span className="font-medium">{name}</span>
+                      {i.club && (
+                        <span className="text-[11px] text-muted-foreground">{i.club}</span>
+                      )}
+                    </div>
+                  </td>
                   <td className="px-2 text-muted-foreground">{i.mentorName || "—"}</td>
-                  <td className="px-2 text-muted-foreground max-w-md"><span className="line-clamp-1">{i.notes}</span></td>
-                  <td className="px-2"><Pill>{i.outcome || "—"}</Pill></td>
-                  <td className="px-4 text-muted-foreground"><span className="line-clamp-1">{i.followUp || "—"}</span></td>
+                  <td className="px-2 text-muted-foreground max-w-md">
+                    <span className="line-clamp-1">{i.notes}</span>
+                  </td>
+                  <td className="px-2">
+                    <Pill>{i.outcome || "—"}</Pill>
+                  </td>
+                  <td className="px-4 text-muted-foreground">
+                    <span className="line-clamp-1">{i.followUp || "—"}</span>
+                  </td>
                   <td className="px-4 text-right whitespace-nowrap">
                     {/*
                       Offered to the mentor who logged it and to managers/admins.
@@ -254,7 +309,6 @@ function InteractionsPage() {
               );
             })}
           </tbody>
-
         </table>
         {!isError && total > 0 && (
           <div className="flex items-center justify-between gap-3 border-t border-border px-4 py-2.5 text-xs text-muted-foreground">
@@ -271,7 +325,9 @@ function InteractionsPage() {
               >
                 <ChevronLeft className="size-3.5" /> Previous
               </button>
-              <span className="tabular-nums">Page {safePage} of {pageCount}</span>
+              <span className="tabular-nums">
+                Page {safePage} of {pageCount}
+              </span>
               <button
                 type="button"
                 onClick={() => goToPage(safePage + 1)}

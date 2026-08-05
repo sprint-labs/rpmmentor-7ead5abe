@@ -299,7 +299,19 @@ export function InteractionForm({
   const [savedSummary, setSavedSummary] = useState<string | null>(null);
 
   const [notes, setNotes] = useState(editing?.notes ?? "");
-  const [gkId, setGkId] = useState(editing?.playerId ?? editing?.gkSlug ?? "");
+  /**
+   * Older interactions were stored with only a goalkeeper name — no player id
+   * and no slug — so fall back to matching the name. Without this the selector
+   * would open empty and the mentor would have to re-identify the goalkeeper
+   * just to correct a date.
+   */
+  const [gkId, setGkId] = useState(() => {
+    if (!editing) return "";
+    if (editing.playerId) return editing.playerId;
+    if (editing.gkSlug) return editing.gkSlug;
+    const target = editing.goalkeeperName.trim().toLowerCase();
+    return goalkeepers.find((g) => g.name.trim().toLowerCase() === target)?.id ?? "";
+  });
   // Defaults to a type that can actually be logged here. Live Match Observation
   // is still selectable, but it hands over to the Match Report rather than
   // creating an observation with no report behind it.

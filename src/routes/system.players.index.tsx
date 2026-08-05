@@ -12,9 +12,16 @@ export const Route = createFileRoute("/system/players/")({
   head: () => ({
     meta: [
       { title: "Player Records · Mentor Hub" },
-      { name: "description", content: "Canonical player records from the Mentor Hub database, with editable current club." },
+      {
+        name: "description",
+        content:
+          "Canonical player records from the Mentor Hub database, with editable current club.",
+      },
       { property: "og:title", content: "Player Records · Mentor Hub" },
-      { property: "og:description", content: "Canonical player records with editable current club." },
+      {
+        property: "og:description",
+        content: "Canonical player records with editable current club.",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
     ],
@@ -43,7 +50,8 @@ function PlayerRecordsInner() {
     const needle = q.trim().toLowerCase();
     if (!needle) return list;
     return list.filter(
-      (p) => p.full_name.toLowerCase().includes(needle) || p.current_club.toLowerCase().includes(needle),
+      (p) =>
+        p.full_name.toLowerCase().includes(needle) || p.current_club.toLowerCase().includes(needle),
     );
   }, [data, q]);
 
@@ -83,7 +91,9 @@ function PlayerRecordsInner() {
               <li key={p.id} className="flex items-center justify-between gap-3 px-4 py-2.5">
                 <div className="min-w-0">
                   <p className="text-sm font-medium truncate">{p.full_name}</p>
-                  <p className="text-xs text-muted-foreground truncate">{p.current_club || "No club recorded"}</p>
+                  <p className="text-xs text-muted-foreground truncate">
+                    {p.current_club || "No club recorded"}
+                  </p>
                 </div>
                 <Link
                   to="/system/players/$playerId"
