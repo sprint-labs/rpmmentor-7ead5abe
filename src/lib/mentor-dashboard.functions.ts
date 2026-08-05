@@ -288,8 +288,9 @@ export const getMentorDashboardStats = createServerFn({ method: "GET" })
         title: e.title,
         type: e.type,
         plannedType: mapPlannedType(e.type),
-        gkId: gk?.id ?? obs.gk_slug ?? null,
-        gkName: gk?.name ?? obs.goalkeeper_name ?? null,
+        gkId: gk?.id ?? null,
+        gkName: gk?.name ?? null,
+
         gkInitials: gk?.initials ?? null,
         gkStatus: gk?.status ?? null,
         gkTierLevel: gk?.tierLevel ?? null,
