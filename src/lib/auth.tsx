@@ -90,8 +90,8 @@ const ADMIN: Permission[] = [
   "goalkeepers.view", "goalkeepers.edit", "goalkeepers.create",
   "players.edit_club",
   "mentors.view",
-  "interactions.view", "interactions.manage",
-  "reports.view", "reports.manage",
+  "interactions.view", "interactions.log", "interactions.manage",
+  "reports.view", "reports.submit", "reports.manage",
   "media.view", "media.edit",
   "alerts.view", "calendar.view",
   "executive.view", "audit.view",
@@ -109,6 +109,11 @@ const MATRIX: Record<Role, Permission[]> = {
   mentor_manager: MENTOR_MANAGER,
   mentor: MENTOR,
 };
+
+/** One canonical client-side permission check for role-gated UI. */
+export function roleHasPermission(role: Role, permission: Permission): boolean {
+  return MATRIX[role].includes(permission);
+}
 
 interface AuthState {
   user: SessionUser | null;
@@ -217,7 +222,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
   };
 
-  const can = (p: Permission) => !!user && MATRIX[user.role].includes(p);
+  const can = (p: Permission) => !!user && roleHasPermission(user.role, p);
 
   const setViewAsRole: AuthState["setViewAsRole"] = (role) => {
     if (typeof window === "undefined") return;

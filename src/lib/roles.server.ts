@@ -23,6 +23,14 @@ export const INTERACTION_MANAGE_ROLES: readonly AppRole[] = [
   "super_admin",
 ];
 
+/** Every operational role may submit a Match Report. */
+export const REPORT_SUBMIT_ROLES: readonly AppRole[] = [
+  "super_admin",
+  "admin",
+  "mentor_manager",
+  "mentor",
+];
+
 /* eslint-disable @typescript-eslint/no-explicit-any */
 export async function getUserRoles(
   supabase: SupabaseClient<any, any, any>,

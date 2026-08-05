@@ -40,6 +40,11 @@ import {
   classifyLedgerWriteError,
   type LedgerRecord,
 } from "./ledger";
+import {
+  hasAnyRole,
+  REPORT_SUBMIT_ROLES,
+  type AppRole,
+} from "@/lib/roles.server";
 
 
 // NOTE: helpers used inside `createServerFn` handlers must be declared inside the
@@ -213,9 +218,8 @@ export const submitMatchReport = createServerFn({ method: "POST" })
       .eq("user_id", userId);
     if (roleErr) throw new Error("Unable to verify caller role.");
 
-    const roles = (roleRows ?? []).map((r) => r.role as string);
-    const CAN_SUBMIT = ["super_admin", "mentor_manager", "mentor"];
-    if (!roles.some((r) => CAN_SUBMIT.includes(r))) {
+    const roles = (roleRows ?? []).map((r) => r.role as AppRole);
+    if (!hasAnyRole(roles, REPORT_SUBMIT_ROLES)) {
       throw new Error("You don't have permission to submit reports.");
     }
 
