@@ -125,8 +125,10 @@ CREATE TABLE IF NOT EXISTS public.interaction_audit (
   changed_by uuid,
   changed_at timestamptz NOT NULL DEFAULT now(),
   action text NOT NULL,
-  before jsonb,
-  after jsonb
+  -- Named *_values rather than before/after: bare `before`/`after` are SQL
+  -- keywords and resolve unpredictably in queries that join this table.
+  before_values jsonb,
+  after_values jsonb
 );
 
 CREATE INDEX IF NOT EXISTS interaction_audit_interaction_id_idx
@@ -181,7 +183,7 @@ DECLARE
   after_doc jsonb;
 BEGIN
   IF TG_OP = 'INSERT' THEN
-    INSERT INTO public.interaction_audit (interaction_id, changed_by, action, before, after)
+    INSERT INTO public.interaction_audit (interaction_id, changed_by, action, before_values, after_values)
     VALUES (
       NEW.id,
       NEW.mentor_id,
@@ -197,7 +199,7 @@ BEGIN
 
   -- Only record genuine content changes.
   IF before_doc IS DISTINCT FROM after_doc THEN
-    INSERT INTO public.interaction_audit (interaction_id, changed_by, action, before, after)
+    INSERT INTO public.interaction_audit (interaction_id, changed_by, action, before_values, after_values)
     VALUES (NEW.id, COALESCE(NEW.updated_by, auth.uid()), 'update', before_doc, after_doc);
   END IF;
 
