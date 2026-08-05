@@ -227,18 +227,23 @@ export const getMentorDashboardStats = createServerFn({ method: "GET" })
     const outstandingItems: OutstandingActionItem[] = [];
     const mentorDisplay = mentors.find((m) => m.id === mentorId)?.name ?? "You";
     for (const obs of mentorObservations) {
-      const hasReport = mentorReports.some(
-        (r) => r.gkId === obs.gkId && within3d(r.date, obs.date),
+      const gkNameKey = (obs.goalkeeper_name ?? "").trim().toLowerCase();
+      const hasReport = coachReports.some(
+        (r) =>
+          (r.goalkeeper ?? "").trim().toLowerCase() === gkNameKey &&
+          r.match_date != null &&
+          within3d(r.match_date, obs.occurred_at),
       );
-      const hasClip = mentorClips.some(
-        (m) => m.gkId === obs.gkId && within3d(m.date, obs.date),
+      const hasClip = (allClipRows ?? []).some(
+        (m) => m.gk_id === obs.gk_slug && within3d(m.created_at, obs.occurred_at),
       );
-      const gk = obs.gkId ? gkById.get(obs.gkId) ?? null : null;
-      const due = +new Date(obs.date) + 3 * 86400000;
+      const gk = obs.gk_slug ? gkById.get(obs.gk_slug) ?? null : null;
+      const due = +new Date(obs.occurred_at) + 3 * 86400000;
       const daysOverdue = Math.max(0, Math.floor((now - due) / 86400000));
       const base = {
         observationId: obs.id,
-        observationDate: obs.date,
+        observationDate: obs.occurred_at,
+
         dueDate: new Date(due).toISOString(),
         daysOverdue,
         gkId: gk?.id ?? null,
