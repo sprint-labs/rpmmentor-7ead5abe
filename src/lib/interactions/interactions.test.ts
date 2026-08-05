@@ -25,15 +25,34 @@ const validInput = {
 };
 
 describe("interaction input validation", () => {
-  it("accepts the four permitted interaction types", () => {
-    for (const t of INTERACTION_TYPES) {
+  it("accepts every manually loggable interaction type", () => {
+    for (const t of MANUAL_INTERACTION_TYPES) {
       expect(createInteractionInput.parse({ ...validInput, interactionType: t }).interactionType).toBe(t);
     }
+  });
+
+  it("keeps the allowed types identical to the dashboard list", () => {
+    expect([...DASHBOARD_INTERACTION_TYPES]).toEqual([...MANUAL_INTERACTION_TYPES]);
+    expect(MANUAL_INTERACTION_TYPES).not.toContain(MATCH_REPORT_INTERACTION_TYPE);
+  });
+
+  it("rejects Live Match Observation on create and update", () => {
+    expect(() =>
+      createInteractionInput.parse({ ...validInput, interactionType: MATCH_REPORT_INTERACTION_TYPE }),
+    ).toThrow();
+    expect(() =>
+      updateInteractionInput.parse({
+        ...validInput,
+        id: "11111111-1111-4111-8111-111111111111",
+        interactionType: MATCH_REPORT_INTERACTION_TYPE,
+      }),
+    ).toThrow();
   });
 
   it("rejects an unknown interaction type", () => {
     expect(() => createInteractionInput.parse({ ...validInput, interactionType: "Face to Face" })).toThrow();
   });
+
 
   it("rejects a timestamp in the calendar-date field", () => {
     expect(() => createInteractionInput.parse({ ...validInput, occurredAt: "2026-01-05T22:30:00Z" })).toThrow();
