@@ -28,6 +28,10 @@ import {
 import { validateComments } from "./comments";
 import { submissionFingerprint, duplicateMessage } from "./duplicates";
 import {
+  ensureMatchReportInteraction,
+  matchReportInteractionNotes,
+} from "@/lib/interactions/match-report-link";
+import {
   decideForSubmissionKey,
   duplicateWindowForRecords,
   ensureSubmissionKey,
@@ -147,6 +151,12 @@ export type SubmitMatchReportResult =
       average: number;
       /** True when the same submission key had already been written. */
       idempotent: boolean;
+      /**
+       * Set when the report was written but its Live Match Observation
+       * interaction could not be. The submission is NOT a clean success and the
+       * UI must say so rather than reporting everything went through.
+       */
+      interaction_error?: string;
     }
   | {
       status: "duplicate";
@@ -267,12 +277,30 @@ export const submitMatchReport = createServerFn({ method: "POST" })
     const existingRow = (byKey ?? null) as LedgerRecord | null;
     const decision = decideForSubmissionKey(existingRow, now);
     if (decision.action === "return_success") {
+      const replayedReportId = decision.report_id ?? report_id;
+      // Self-healing: a retry of an already-written report still guarantees the
+      // interaction exists. The unique index makes this a no-op if it does.
+      const link = await ensureMatchReportInteraction(supabase, {
+        reportId: replayedReportId,
+        goalkeeperName: payload.goalkeeper,
+        club: payload.team,
+        matchDate: payload.match_date,
+        mentorId: userId,
+        mentorName: resolvedCoach,
+        notes: matchReportInteractionNotes({
+          opponent: payload.opponent,
+          competition: payload.competition,
+          average,
+          comments,
+        }),
+      });
       return {
         status: "ok",
-        report_id: decision.report_id ?? report_id,
+        report_id: replayedReportId,
         row_index: decision.row_index ?? -1,
         average,
         idempotent: true,
+        ...(link.ok ? {} : { interaction_error: link.message }),
       };
     }
     if (decision.action === "in_progress") {
@@ -556,7 +584,37 @@ export const submitMatchReport = createServerFn({ method: "POST" })
       console.error("[match-reports] cache mirror on submit failed:", e);
     }
 
-    return { status: "ok", report_id: finalReportId, row_index: rowIndex, average, idempotent: false };
+    // ---- The Live Match Observation interaction ---------------------------
+    // Change #1: the report and its interaction are written by this one
+    // server-controlled call, keyed on the canonical report id. The database's
+    // partial unique index on `match_report_id` guarantees exactly one
+    // interaction per report however many times submission is retried.
+    const link = await ensureMatchReportInteraction(supabase, {
+      reportId: finalReportId,
+      goalkeeperName: payload.goalkeeper,
+      club: payload.team,
+      matchDate: payload.match_date,
+      mentorId: userId,
+      mentorName: resolvedCoach,
+      notes: matchReportInteractionNotes({
+        opponent: payload.opponent,
+        competition: payload.competition,
+        average,
+        comments,
+      }),
+    });
+    if (!link.ok) {
+      console.error("[match-reports] interaction link failed:", link.message);
+    }
+
+    return {
+      status: "ok",
+      report_id: finalReportId,
+      row_index: rowIndex,
+      average,
+      idempotent: false,
+      ...(link.ok ? {} : { interaction_error: link.message }),
+    };
   });
 
 

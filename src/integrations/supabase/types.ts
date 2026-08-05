@@ -113,10 +113,12 @@ export type Database = {
           mentor_id: string
           mentor_name: string
           notes: string
+          match_report_id: string | null
           occurred_at: string
           outcome: string
           player_id: string | null
           updated_at: string
+          updated_by: string | null
         }
         Insert: {
           club?: string
@@ -126,6 +128,7 @@ export type Database = {
           goalkeeper_name: string
           id?: string
           interaction_type: string
+          match_report_id?: string | null
           mentor_id: string
           mentor_name?: string
           notes?: string
@@ -133,6 +136,7 @@ export type Database = {
           outcome?: string
           player_id?: string | null
           updated_at?: string
+          updated_by?: string | null
         }
         Update: {
           club?: string
@@ -142,6 +146,7 @@ export type Database = {
           goalkeeper_name?: string
           id?: string
           interaction_type?: string
+          match_report_id?: string | null
           mentor_id?: string
           mentor_name?: string
           notes?: string
@@ -149,6 +154,7 @@ export type Database = {
           outcome?: string
           player_id?: string | null
           updated_at?: string
+          updated_by?: string | null
         }
         Relationships: [
           {
