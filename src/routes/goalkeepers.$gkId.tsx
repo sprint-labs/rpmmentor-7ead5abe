@@ -152,8 +152,8 @@ function GkDetail() {
       ...gkInteractions.map((i) => ({
         kind: "interaction" as const,
         id: i.id,
-        date: i.date,
-        type: i.type,
+        date: i.occurredAt,
+        type: i.interactionType,
         notes: i.notes,
         outcome: i.outcome,
         followUp: i.followUp,
