@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
+import { DASHBOARD_INTERACTION_TYPES } from "@/lib/interactions/schema";
 
 export interface OverviewDashboardStats {
   /** Canonical player records — public.players. */
@@ -35,12 +36,14 @@ export const getOverviewDashboardStats = createServerFn({ method: "GET" })
       supabase
         .from("interactions")
         .select("id", { count: "exact", head: true })
+        .in("interaction_type", DASHBOARD_INTERACTION_TYPES as string[])
         .gte("occurred_at", data.fromDate)
         .lte("occurred_at", data.toDate),
       supabase
         .from("interactions")
         .select("id", { count: "exact", head: true })
         .eq("mentor_id", userId)
+        .in("interaction_type", DASHBOARD_INTERACTION_TYPES as string[])
         .gte("occurred_at", data.fromDate)
         .lte("occurred_at", data.toDate),
       supabase.from("user_roles").select("user_id").eq("role", "mentor"),

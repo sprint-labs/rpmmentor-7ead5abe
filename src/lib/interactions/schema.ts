@@ -49,6 +49,22 @@ export const MANUAL_INTERACTION_TYPES: readonly InteractionTypeValue[] = INTERAC
   (t) => t !== MATCH_REPORT_INTERACTION_TYPE,
 );
 
+/**
+ * Types that drive dashboard KPI counts, charts and filter chips.
+ *
+ * Live Match Observation is excluded everywhere: it is created as a by-product
+ * of a Match Report submission, so counting it as an interaction double-counts
+ * the same activity already reported by the Reports cards. Every dashboard
+ * reads this list against the SAME `occurred_at` calendar-day window.
+ */
+export const DASHBOARD_INTERACTION_TYPES: readonly InteractionTypeValue[] =
+  MANUAL_INTERACTION_TYPES;
+
+/** Types excluded from dashboard KPI counts and filters. */
+export const DASHBOARD_EXCLUDED_INTERACTION_TYPES: readonly InteractionTypeValue[] = [
+  MATCH_REPORT_INTERACTION_TYPE,
+];
+
 export const createInteractionInput = z.object({
   /**
    * Canonical `public.players.id`, present ONLY when the submitted selection

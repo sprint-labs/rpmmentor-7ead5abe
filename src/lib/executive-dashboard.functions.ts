@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
 import { parseSheetRows } from "@/lib/match-reports/schema";
+import { DASHBOARD_INTERACTION_TYPES } from "@/lib/interactions/schema";
 
 export interface ExecutiveBar {
   label: string;
@@ -73,11 +74,13 @@ export const getExecutiveDashboardStats = createServerFn({ method: "GET" })
       supabase
         .from("interactions")
         .select("id, mentor_name, interaction_type")
+        .in("interaction_type", DASHBOARD_INTERACTION_TYPES as string[])
         .gte("occurred_at", data.fromDate)
         .lte("occurred_at", data.toDate),
       supabase
         .from("interactions")
         .select("player_id, gk_slug")
+        .in("interaction_type", DASHBOARD_INTERACTION_TYPES as string[])
         .gte("occurred_at", coverageFromDate)
         .lte("occurred_at", data.toDate),
       supabase.from("user_roles").select("user_id").eq("role", "mentor"),

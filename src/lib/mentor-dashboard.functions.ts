@@ -11,6 +11,7 @@ import {
   selectCoachProfileForDashboard,
   type DashboardCoachProfile,
 } from "@/lib/mentor-dashboard-report-count";
+import { DASHBOARD_INTERACTION_TYPES } from "@/lib/interactions/schema";
 
 export type UpcomingPlannedType =
   | "Coffee Catch Up"
@@ -147,6 +148,7 @@ export const getMentorDashboardStats = createServerFn({ method: "GET" })
           .from("interactions")
           .select("id")
           .eq("mentor_id", userId)
+          .in("interaction_type", DASHBOARD_INTERACTION_TYPES as string[])
           .gte("occurred_at", periodFrom)
           .lte("occurred_at", periodTo),
         supabase
