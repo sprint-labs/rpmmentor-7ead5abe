@@ -139,6 +139,52 @@ export type Database = {
           },
         ]
       }
+      interaction_media: {
+        Row: {
+          attached_by: string | null
+          created_at: string
+          id: string
+          interaction_id: string
+          media_id: string
+        }
+        Insert: {
+          attached_by?: string | null
+          created_at?: string
+          id?: string
+          interaction_id: string
+          media_id: string
+        }
+        Update: {
+          attached_by?: string | null
+          created_at?: string
+          id?: string
+          interaction_id?: string
+          media_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "interaction_media_interaction_id_fkey"
+            columns: ["interaction_id"]
+            isOneToOne: false
+            referencedRelation: "interactions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "interaction_media_media_id_fkey"
+            columns: ["media_id"]
+            isOneToOne: false
+            referencedRelation: "media_assets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "interaction_media_attached_by_fkey"
+            columns: ["attached_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       interactions: {
         Row: {
           club: string

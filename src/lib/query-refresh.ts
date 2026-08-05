@@ -11,13 +11,15 @@ import { interactionsQueryKey } from "@/lib/interactions/use-interactions";
 
 /**
  * Everything that reflects an interaction: the interactions log (shared cache
- * and paged queries), the dashboard Recent Activity card, goalkeeper profile
- * timelines, and the mentor dashboard stats that drive Duty of Care.
+ * and paged queries), the attached voice recordings, the dashboard Recent
+ * Activity card, goalkeeper profile timelines, and the mentor dashboard stats
+ * that drive Duty of Care.
  */
 export async function refreshInteractionViews(queryClient: QueryClient): Promise<void> {
   await Promise.all([
     queryClient.invalidateQueries({ queryKey: interactionsQueryKey }),
     queryClient.invalidateQueries({ queryKey: ["interactions", "page"] }),
+    queryClient.invalidateQueries({ queryKey: ["interactions", "audio"] }),
     queryClient.invalidateQueries({ queryKey: ["mentor-dashboard-stats"] }),
   ]);
 }

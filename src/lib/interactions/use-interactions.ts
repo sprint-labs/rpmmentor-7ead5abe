@@ -2,8 +2,13 @@ import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
-import { listInteractions, listInteractionsPage } from "@/lib/interactions.functions";
+import {
+  listInteractionAudio,
+  listInteractions,
+  listInteractionsPage,
+} from "@/lib/interactions.functions";
 import type {
+  InteractionAudioClip,
   InteractionsPage,
   ListInteractionsQuery,
   LoggedInteraction,
@@ -91,4 +96,36 @@ export function useInteractionsPage(params: ListInteractionsQuery) {
     staleTime: 30_000,
     retry: false,
   });
+}
+
+/**
+ * Voice recordings attached to the interactions currently on screen, keyed by
+ * interaction id and ready to play.
+ *
+ * Playback URLs are signed for an hour, so this is refetched well inside that
+ * window rather than being cached indefinitely.
+ */
+export function useInteractionAudio(interactionIds: string[]) {
+  const fetchAudio = useServerFn(listInteractionAudio);
+  const hasSession = useHasSupabaseSession();
+  // Sorted so the cache key is stable regardless of row order.
+  const ids = useMemo(() => [...new Set(interactionIds)].sort(), [interactionIds]);
+
+  const query = useQuery<InteractionAudioClip[]>({
+    queryKey: ["interactions", "audio", ids],
+    queryFn: () => fetchAudio({ data: { interactionIds: ids } }),
+    enabled: hasSession && ids.length > 0,
+    staleTime: 5 * 60_000,
+    retry: false,
+  });
+
+  return useMemo(() => {
+    const byInteraction = new Map<string, InteractionAudioClip[]>();
+    for (const clip of query.data ?? []) {
+      const existing = byInteraction.get(clip.interactionId);
+      if (existing) existing.push(clip);
+      else byInteraction.set(clip.interactionId, [clip]);
+    }
+    return byInteraction;
+  }, [query.data]);
 }

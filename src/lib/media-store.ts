@@ -1,6 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { SessionUser } from "@/lib/auth";
 import { attachmentLookupIds, mergeAttachments } from "@/lib/report-attachments";
+import { MEDIA_BUCKET } from "@/lib/storage/bucket";
 
 export { attachmentLookupIds, mergeAttachments };
 
@@ -47,7 +48,7 @@ export interface ReportAttachment {
 }
 
 export const MAX_FILE_BYTES = 200 * 1024 * 1024;
-export const BUCKET = "gk-media";
+export const BUCKET = MEDIA_BUCKET;
 
 export const ACCEPT_BY_KIND: Record<MediaKind, string> = {
   video: "video/mp4,video/quicktime,video/webm,video/x-matroska",

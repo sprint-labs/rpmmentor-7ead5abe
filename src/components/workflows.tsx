@@ -6,8 +6,19 @@ import { useNavigate } from "@tanstack/react-router";
 import { X, CheckCircle2, Upload, AlertCircle, Paperclip, Search, Trash2, Loader2, RotateCcw } from "lucide-react";
 import { goalkeepers } from "@/lib/mock-data";
 import { listPlayers, type PlayerRosterRow } from "@/lib/players.functions";
-import { createInteraction, updateInteraction } from "@/lib/interactions.functions";
+import {
+  attachInteractionAudio,
+  createInteraction,
+  updateInteraction,
+} from "@/lib/interactions.functions";
 import { interactionsQueryKey } from "@/lib/interactions/use-interactions";
+import {
+  interactionAudioFileName,
+  interactionAudioNotes,
+  interactionAudioTitle,
+  persistInteractionAudio,
+  type InteractionRecording,
+} from "@/lib/interactions/audio";
 import type { LoggedInteraction } from "@/lib/interactions/schema";
 import {
   INTERACTION_OUTCOMES, todayDateOnly, formatDateOnly,
@@ -219,11 +230,14 @@ function Submitted({
   onDone,
   action,
   pending = false,
+  detail,
 }: {
   message: string;
   onDone: () => void;
   action?: { label: string; onClick: () => void };
   pending?: boolean;
+  /** Secondary status shown under the message, e.g. how the audio upload went. */
+  detail?: ReactNode;
 }) {
   return (
     <div className="text-center py-6">
@@ -233,6 +247,7 @@ function Submitted({
         <CheckCircle2 className="size-10 text-primary mx-auto" />
       )}
       <p className="text-sm font-medium mt-3">{message}</p>
+      {detail && <div className="mt-3">{detail}</div>}
       <div className="mt-4 flex flex-wrap justify-center gap-2">
         {action && (
           <button onClick={action.onClick} className="h-9 px-4 rounded-md bg-primary text-primary-foreground text-sm font-medium">
@@ -280,7 +295,60 @@ function TagPicker({ value, onChange }: { value: string[]; onChange: (v: string[
  *     interaction together in one server-controlled call (change #1).
  *   - Passing `editing` switches the form into correction mode. It updates the
  *     ORIGINAL row and never creates a replacement (change #3).
+ *
+ * A voice recording is saved as a SECOND, separate step, after the interaction
+ * row is confirmed. Doing it in that order means a failed interaction can never
+ * leave an orphaned media record, and a failed upload can never be reported as
+ * a failed interaction.
  */
+
+/** Shown only when the interaction was written but its recording was not. */
+const AUDIO_PARTIAL_FAILURE_MESSAGE = "Interaction saved — audio was not saved";
+
+type AudioSaveStatus = "idle" | "saving" | "saved" | "failed";
+
+/**
+ * Reports the recording's fate separately from the interaction's. "Audio saved"
+ * appears only for `saved`, which is set solely when the upload AND the
+ * database link both succeeded.
+ */
+function AudioSaveStatusNote({
+  status,
+  error,
+  summary,
+}: {
+  status: AudioSaveStatus;
+  error: string | null;
+  summary: string | null;
+}) {
+  if (status === "idle") return null;
+  if (status === "saving") {
+    return (
+      <p role="status" className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+        <Loader2 className="size-3.5 animate-spin" /> Saving audio recording…
+      </p>
+    );
+  }
+  if (status === "saved") {
+    return (
+      <p className="inline-flex items-center gap-1.5 text-xs text-primary">
+        <CheckCircle2 className="size-3.5" /> Audio saved
+      </p>
+    );
+  }
+  return (
+    <div
+      role="alert"
+      className="mx-auto max-w-sm rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-left text-xs"
+    >
+      {summary && <p className="text-muted-foreground">{summary}</p>}
+      <p className={summary ? "mt-1" : undefined}>
+        The recording is still here and has not been lost.{error ? ` ${error}` : ""}
+      </p>
+    </div>
+  );
+}
+
 export function InteractionForm({
   onDone,
   editing = null,
@@ -293,6 +361,8 @@ export function InteractionForm({
   const queryClient = useQueryClient();
   const createFn = useServerFn(createInteraction);
   const updateFn = useServerFn(updateInteraction);
+  const attachAudioFn = useServerFn(attachInteractionAudio);
+  const { user } = useAuth();
   const isEditing = !!editing;
 
   const [done, setDone] = useState(false);
@@ -329,6 +399,22 @@ export function InteractionForm({
   const [showErrors, setShowErrors] = useState(false);
   const autoFilledClubRef = useRef<string | null>(null);
   const gk = goalkeepers.find((g) => g.id === gkId);
+
+  /**
+   * The recording is held here, not uploaded on the spot, because the
+   * interaction it must be linked to does not exist until Save. It is kept
+   * after a failed upload so Retry has something to send.
+   */
+  const [recording, setRecording] = useState<InteractionRecording | null>(null);
+  const [audioStatus, setAudioStatus] = useState<AudioSaveStatus>("idle");
+  const [audioError, setAudioError] = useState<string | null>(null);
+  const [savedInteraction, setSavedInteraction] = useState<LoggedInteraction | null>(null);
+  /**
+   * Media asset created by an earlier attempt. Reusing it is what makes Retry
+   * idempotent: the recording is uploaded at most once however many times the
+   * link is retried.
+   */
+  const uploadedMediaIdRef = useRef<string | null>(null);
 
   /**
    * Change #4. The transcript lives inside VoiceNoteField until it is applied,
@@ -454,6 +540,94 @@ export function InteractionForm({
     onOpenMatchReport?.({ goalkeeper: selection.name, matchDate: date, club: club.trim() });
   }
 
+  /**
+   * Upload the recording through the shared media/storage path and link it to
+   * the confirmed interaction. Returns whether BOTH steps succeeded — the only
+   * condition under which the audio may be reported as saved.
+   */
+  async function saveRecording(
+    interaction: LoggedInteraction,
+    audio: InteractionRecording,
+  ): Promise<boolean> {
+    setAudioStatus("saving");
+    setAudioError(null);
+
+    // Media library grouping only. A canonical players.id when there is one,
+    // otherwise the roster slug — never the goalkeeper's name.
+    const gkMediaId = interaction.playerId || interaction.gkSlug || selection?.slug || "";
+
+    const result = await persistInteractionAudio({
+      uploadedMediaId: uploadedMediaIdRef.current,
+      upload: async () => {
+        if (!user) throw new Error("Sign in required to save the recording.");
+        const name = interactionAudioFileName(audio.mimeType);
+        const asset = await uploadMedia({
+          file: new File([audio.blob], name, { type: audio.mimeType }),
+          gkId: gkMediaId,
+          title: interactionAudioTitle(interaction.goalkeeperName, interaction.occurredAt),
+          notes: interactionAudioNotes(audio.durationSec),
+          kind: "audio",
+          user,
+        });
+        return asset.id;
+      },
+      link: async (mediaId) => {
+        const link = await attachAudioFn({
+          data: { interactionId: interaction.id, mediaId },
+        });
+        if (!link?.mediaId) {
+          throw new Error("The recording could not be confirmed as linked to this interaction.");
+        }
+      },
+    });
+
+    uploadedMediaIdRef.current = result.mediaId;
+    if (!result.ok) {
+      setAudioStatus("failed");
+      setAudioError(result.message);
+      return false;
+    }
+    setAudioStatus("saved");
+    await refreshInteractionViews(queryClient);
+    return true;
+  }
+
+  /**
+   * Retry only the audio. The interaction is already written, so this never
+   * calls the interaction server functions again and can never duplicate it.
+   */
+  async function retryAudio() {
+    if (!savedInteraction || !recording || audioStatus === "saving") return;
+    const ok = await saveRecording(savedInteraction, recording);
+    if (ok) {
+      toast.success("Audio saved", {
+        description: "The recording is attached to this interaction.",
+      });
+    }
+  }
+
+  /**
+   * Save the recording and report the outcome separately from the interaction.
+   * A failed recording is never allowed to read as a failed interaction.
+   */
+  async function saveRecordingAndReport(interaction: LoggedInteraction) {
+    if (!recording) return;
+    let ok = false;
+    try {
+      ok = await saveRecording(interaction, recording);
+    } catch (err) {
+      // Nothing that happens to the recording may escape into the interaction's
+      // own error path — the interaction is already confirmed written.
+      setAudioStatus("failed");
+      setAudioError(err instanceof Error ? err.message : null);
+    }
+    if (!ok) {
+      toast.error(AUDIO_PARTIAL_FAILURE_MESSAGE, {
+        description: "Your recording is kept — use Retry saving audio to try again.",
+      });
+    }
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     // Read the latest notes, not the value captured when this render began, so
@@ -502,6 +676,9 @@ export function InteractionForm({
         setSavedSummary(
           `Interaction updated — ${saved.interactionType} with ${saved.goalkeeperName} on ${shownDate}. The log, timeline and Duty of Care now show the corrected values.`,
         );
+        setSavedInteraction(saved);
+        // Reported separately: the correction is already stored either way.
+        if (recording) await saveRecordingAndReport(saved);
         setDone(true);
       } catch (err) {
         setError(
@@ -573,6 +750,10 @@ export function InteractionForm({
         description: `${shownType} with ${shownName} on ${shownDate} — now on the timeline.`,
       });
       setSavedSummary(`Interaction logged successfully — ${shownType} with ${shownName} on ${shownDate}. It's now in the interactions log.`);
+      setSavedInteraction(confirmed);
+      // Only now, with a confirmed interaction id to link to, is the recording
+      // uploaded — so a failed interaction can never orphan a media record.
+      if (recording) await saveRecordingAndReport(confirmed);
       setDone(true);
 
     } catch (err) {
@@ -589,7 +770,32 @@ export function InteractionForm({
   }
 
 
-  if (done) return <Submitted message={savedSummary ?? "Interaction logged successfully."} onDone={onDone} />;
+  if (done) {
+    const audioFailed = audioStatus === "failed";
+    return (
+      <Submitted
+        message={
+          audioFailed
+            ? AUDIO_PARTIAL_FAILURE_MESSAGE
+            : (savedSummary ?? "Interaction logged successfully.")
+        }
+        pending={audioFailed}
+        onDone={onDone}
+        action={
+          audioFailed
+            ? { label: "Retry saving audio", onClick: () => void retryAudio() }
+            : undefined
+        }
+        detail={
+          <AudioSaveStatusNote
+            status={audioStatus}
+            error={audioError}
+            summary={audioFailed ? savedSummary : null}
+          />
+        }
+      />
+    );
+  }
   return (
     <form aria-label="Log interaction form" onSubmit={handleSubmit} className="space-y-4">
       {error && (
@@ -687,7 +893,17 @@ export function InteractionForm({
           transcript now lands in Notes as soon as it arrives, where it is
           visible, editable and — most importantly — actually submitted.
         */}
-        <VoiceNoteField autoApply onTranscribed={applyTranscribedText} />
+        {/*
+          `onRecordingReady` keeps the raw recording in this form's state. It is
+          uploaded and linked after the interaction is confirmed saved, so the
+          spoken note survives a refresh instead of dying with the page — and a
+          failed upload leaves the recording here, ready to retry.
+        */}
+        <VoiceNoteField
+          autoApply
+          onTranscribed={applyTranscribedText}
+          onRecordingReady={setRecording}
+        />
         <Field label="Notes" required error={showErrors ? errors.notes : undefined}>
           <textarea
             aria-label="Notes"
@@ -741,7 +957,13 @@ export function InteractionForm({
         ) : (
           <button type="submit" disabled={saving} aria-disabled={!canSubmit} className={`h-9 px-4 rounded-md bg-primary text-primary-foreground text-sm font-medium inline-flex items-center gap-1.5 ${canSubmit ? "" : "opacity-60"}`}>
             {saving && <Loader2 className="size-3.5 animate-spin" />}
-            {saving ? "Saving…" : isEditing ? "Save Changes" : "Save Interaction"}
+            {saving
+              ? audioStatus === "saving"
+                ? "Saving audio…"
+                : "Saving…"
+              : isEditing
+                ? "Save Changes"
+                : "Save Interaction"}
           </button>
         )}
       </div>

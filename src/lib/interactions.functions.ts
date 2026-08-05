@@ -8,17 +8,23 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import {
+  attachInteractionAudioInput,
   createInteractionInput,
   isLoggableInteractionType,
+  listInteractionAudioQuery,
   listInteractionsQuery,
   updateInteractionInput,
   MATCH_REPORT_INTERACTION_TYPE,
+  type InteractionAudioClip,
+  type InteractionAudioLink,
   type InteractionsPage,
   type LoggedInteraction,
 } from "@/lib/interactions/schema";
 
 import { INTERACTION_COLUMNS, mapInteractionRow } from "@/lib/interactions/map";
+import { linkInteractionAudio } from "@/lib/interactions/audio-link";
 import { getUserRoles, hasAnyRole, INTERACTION_MANAGE_ROLES } from "@/lib/roles.server";
+import { MEDIA_BUCKET } from "@/lib/storage/bucket";
 
 export const listInteractions = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
@@ -235,4 +241,81 @@ export const listInteractionsPage = createServerFn({ method: "GET" })
       pageSize,
       pageCount: Math.max(1, Math.ceil(total / pageSize)),
     };
+  });
+
+/**
+ * Attach an uploaded voice recording to an interaction.
+ *
+ * Called only after the interaction itself has been confirmed saved, so a
+ * failure here can never leave a media record pointing at nothing. Repeating
+ * the call with the same media asset returns the existing link rather than
+ * creating a second one.
+ */
+export const attachInteractionAudio = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data) => attachInteractionAudioInput.parse(data))
+  .handler(async ({ data, context }): Promise<InteractionAudioLink> => {
+    const { supabase, userId } = context;
+    const roles = await getUserRoles(supabase, userId);
+    return linkInteractionAudio(supabase, {
+      interactionId: data.interactionId,
+      mediaId: data.mediaId,
+      userId,
+      canManageAny: hasAnyRole(roles, INTERACTION_MANAGE_ROLES),
+    });
+  });
+
+/**
+ * Persisted recordings for a set of interactions, with short-lived playback
+ * URLs. RLS scopes the rows; a clip is only returned for an interaction the
+ * caller is allowed to read.
+ */
+export const listInteractionAudio = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data) => listInteractionAudioQuery.parse(data))
+  .handler(async ({ data, context }): Promise<InteractionAudioClip[]> => {
+    if (data.interactionIds.length === 0) return [];
+
+    const { data: rows, error } = await context.supabase
+      .from("interaction_media")
+      .select(
+        "interaction_id, media_id, created_at, media_assets:media_id(title, file_path, mime_type, file_size)",
+      )
+      .in("interaction_id", data.interactionIds)
+      .order("created_at", { ascending: false });
+    if (error) throw new Error(error.message);
+
+    type AssetRow = {
+      title: string;
+      file_path: string;
+      mime_type: string | null;
+      file_size: number | null;
+    };
+    const clips = (rows ?? [])
+      .map((row) => {
+        const asset = row.media_assets as AssetRow | null;
+        if (!asset?.file_path) return null;
+        return {
+          interactionId: row.interaction_id,
+          mediaId: row.media_id,
+          title: asset.title,
+          filePath: asset.file_path,
+          mimeType: asset.mime_type,
+          fileSize: asset.file_size,
+          createdAt: row.created_at,
+          signedUrl: null as string | null,
+        };
+      })
+      .filter((clip): clip is InteractionAudioClip => clip !== null);
+    if (clips.length === 0) return [];
+
+    // One batch call rather than one round trip per clip.
+    const { data: signed } = await context.supabase.storage.from(MEDIA_BUCKET).createSignedUrls(
+      clips.map((c) => c.filePath),
+      3600,
+    );
+    const urlByPath = new Map((signed ?? []).map((s) => [s.path ?? "", s.signedUrl ?? null]));
+    // A missing URL is reported as null rather than hidden — the clip still
+    // exists, it just could not be signed on this request.
+    return clips.map((clip) => ({ ...clip, signedUrl: urlByPath.get(clip.filePath) ?? null }));
   });

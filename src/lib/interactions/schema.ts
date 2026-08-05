@@ -181,6 +181,49 @@ export function daysSinceDateOnly(value: string, now: number = Date.now()): numb
 }
 
 /**
+ * Voice recordings attached to an interaction.
+ *
+ * The audio itself lives in the existing `gk-media` bucket with a
+ * `media_assets` row, exactly like every other upload. `interaction_media`
+ * links that row to the interaction by primary key — never by goalkeeper name
+ * or file name — so the recording survives a refresh and can be played back
+ * from the log.
+ */
+export const attachInteractionAudioInput = z.object({
+  interactionId: z.string().regex(UUID, "interactionId must be an interactions.id"),
+  mediaId: z.string().regex(UUID, "mediaId must be a media_assets.id"),
+});
+export type AttachInteractionAudioInput = z.input<typeof attachInteractionAudioInput>;
+
+export const listInteractionAudioQuery = z.object({
+  interactionIds: z.array(z.string().regex(UUID)).max(100).default([]),
+});
+export type ListInteractionAudioQuery = z.input<typeof listInteractionAudioQuery>;
+
+/** A confirmed `interaction_media` row. */
+export interface InteractionAudioLink {
+  id: string;
+  interactionId: string;
+  mediaId: string;
+  createdAt: string;
+  /** False when an identical link already existed — a retry, not a duplicate. */
+  created: boolean;
+}
+
+/** A persisted recording, ready to play. */
+export interface InteractionAudioClip {
+  interactionId: string;
+  mediaId: string;
+  title: string;
+  filePath: string;
+  mimeType: string | null;
+  fileSize: number | null;
+  createdAt: string;
+  /** Short-lived playback URL. Null when one could not be signed. */
+  signedUrl: string | null;
+}
+
+/**
  * Server-side query contract for the interactions log. Filtering and paging
  * happen in Postgres so the page stays fast as the table grows — the client
  * never downloads the full table to filter it.

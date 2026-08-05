@@ -3,7 +3,7 @@ import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
 import { PageHeader, Card, Pill, Avatar, EmptyState } from "@/components/primitives";
 import { getGk, getMentor, formatRelative } from "@/lib/mock-data";
-import { useInteractionsPage } from "@/lib/interactions/use-interactions";
+import { useInteractionAudio, useInteractionsPage } from "@/lib/interactions/use-interactions";
 import {
   formatDateOnly,
   DASHBOARD_INTERACTION_TYPES,
@@ -100,9 +100,14 @@ function InteractionsPage() {
   }, [safePage, from, to, mentorId, mentorName, type, q]);
 
   const { data, isLoading, isError, isFetching } = useInteractionsPage(query);
-  const rows = data?.rows ?? [];
+  const rows = useMemo(() => data?.rows ?? [], [data]);
   const total = data?.total ?? 0;
   const pageCount = data?.pageCount ?? 1;
+
+  // Voice recordings saved with these interactions, loaded from the database so
+  // they are still playable after a full refresh.
+  const rowIds = useMemo(() => rows.map((r) => r.id), [rows]);
+  const audioByInteraction = useInteractionAudio(rowIds);
 
   const hasFilters =
     Boolean(mentorId) || (Boolean(from) && Boolean(to)) || Boolean(typeParam) || Boolean(q);
@@ -256,6 +261,7 @@ function InteractionsPage() {
               const gk = getGk(i.gkSlug);
               const name = gk?.name ?? i.goalkeeperName;
               const initials = gk?.initials ?? (i.goalkeeperName.slice(0, 1).toUpperCase() || "?");
+              const clips = audioByInteraction.get(i.id) ?? [];
               return (
                 <tr
                   key={i.id}
@@ -280,8 +286,27 @@ function InteractionsPage() {
                     </div>
                   </td>
                   <td className="px-2 text-muted-foreground">{i.mentorName || "—"}</td>
-                  <td className="px-2 text-muted-foreground max-w-md">
+                  <td className="px-2 py-2 text-muted-foreground max-w-md">
                     <span className="line-clamp-1">{i.notes}</span>
+                    {clips.map((clip) =>
+                      clip.signedUrl ? (
+                        <audio
+                          key={clip.mediaId}
+                          src={clip.signedUrl}
+                          controls
+                          preload="none"
+                          aria-label={`Voice recording for the interaction with ${name} on ${formatDateOnly(i.occurredAt)}`}
+                          className="mt-1.5 h-8 w-full max-w-[240px]"
+                        />
+                      ) : (
+                        <span
+                          key={clip.mediaId}
+                          className="mt-1 block text-[11px] text-muted-foreground"
+                        >
+                          Voice recording saved — playback link unavailable, refresh to retry.
+                        </span>
+                      ),
+                    )}
                   </td>
                   <td className="px-2">
                     <Pill>{i.outcome || "—"}</Pill>

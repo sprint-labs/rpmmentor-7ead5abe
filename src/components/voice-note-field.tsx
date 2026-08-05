@@ -10,6 +10,7 @@ import {
   type StructuredSummary,
 } from "@/lib/api/summarize.functions";
 import { LatestRequestGate } from "@/lib/async/latest-request";
+import type { InteractionRecording } from "@/lib/interactions/audio";
 
 
 const MAX_SECONDS = 180;
@@ -80,6 +81,17 @@ interface AttemptLogEntry {
 interface Props {
   onTranscribed: (text: string, mode: "replace" | "append") => boolean | void;
   onAudioAttach?: (audio: { blob: Blob; mimeType: string; durationSec: number }) => void | Promise<void>;
+  /**
+   * Hand the raw recording to the parent as soon as it exists, and `null` when
+   * it is discarded.
+   *
+   * Distinct from `onAudioAttach`, which uploads immediately: the interaction
+   * form cannot upload yet, because the interaction it must be linked to does
+   * not exist until Save. Holding the recording in the parent's form state lets
+   * it be uploaded after the interaction is confirmed — and kept for a retry if
+   * that upload fails.
+   */
+  onRecordingReady?: (recording: InteractionRecording | null) => void;
   draft?: VoiceDraft | null;
   onDraftChange?: (draft: VoiceDraft | null) => void;
   rewriteContext?: FixtureContext;
@@ -107,6 +119,7 @@ type Phase = "idle" | "preparing" | "uploading" | "transcribing";
 export function VoiceNoteField({
   onTranscribed,
   onAudioAttach,
+  onRecordingReady,
   draft,
   onDraftChange,
   rewriteContext,
@@ -144,6 +157,11 @@ export function VoiceNoteField({
   const mimeRef = useRef<string>("audio/webm");
   const fileNameRef = useRef<string>("voice-note.webm");
   const durationRef = useRef<number>(0);
+  const startedAtRef = useRef<number>(0);
+  // Always call the newest callback: `rec.onstop` closes over the render that
+  // started the recording, which can be many renders ago.
+  const onRecordingReadyRef = useRef(onRecordingReady);
+  onRecordingReadyRef.current = onRecordingReady;
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const phaseTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -381,6 +399,7 @@ export function VoiceNoteField({
     blobRef.current = null;
     fileNameRef.current = "voice-note.webm";
     durationRef.current = 0;
+    onRecordingReadyRef.current?.(null);
     setAttached(false);
     setElapsed(0);
     setRestoredFromDraft(false);
@@ -557,6 +576,7 @@ export function VoiceNoteField({
       // Anything larger, keep — user can still tap Transcribe or Save.
       if (blob.size < 512) {
         toast.error("That recording was too short — please hold to record for at least a second.");
+        onRecordingReadyRef.current?.(null);
         return;
       }
       const url = URL.createObjectURL(blob);
@@ -564,10 +584,12 @@ export function VoiceNoteField({
       blobRef.current = blob;
       mimeRef.current = type;
       fileNameRef.current = deriveAudioFileName(type);
-      durationRef.current = elapsed;
+      durationRef.current = Math.max(1, Math.round((Date.now() - startedAtRef.current) / 1000));
+      onRecordingReadyRef.current?.({ blob, mimeType: type, durationSec: durationRef.current });
       // Do NOT auto-transcribe. Show explicit Transcribe / Save without transcript
       // buttons so mobile users always see an actionable next step.
     };
+    startedAtRef.current = Date.now();
     rec.start();
     setRecording(true);
     setElapsed(0);
