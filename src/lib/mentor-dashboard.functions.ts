@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
-import { goalkeepers, interactions, reports, media, calendarEvents, mentors } from "@/lib/mock-data";
+import { goalkeepers, calendarEvents, mentors } from "@/lib/mock-data";
 import type { TierLevel } from "@/lib/mock-data";
 import { parseSheetRows } from "@/lib/match-reports/schema";
 import {
@@ -246,8 +246,8 @@ export const getMentorDashboardStats = createServerFn({ method: "GET" })
 
         dueDate: new Date(due).toISOString(),
         daysOverdue,
-        gkId: gk?.id ?? null,
-        gkName: gk?.name ?? null,
+        gkId: gk?.id ?? obs.gk_slug ?? null,
+        gkName: gk?.name ?? obs.goalkeeper_name ?? null,
         gkInitials: gk?.initials ?? null,
         gkStatus: gk?.status ?? null,
         gkTierLevel: gk?.tierLevel ?? null,
@@ -260,7 +260,7 @@ export const getMentorDashboardStats = createServerFn({ method: "GET" })
           ...base,
           id: `${obs.id}:report`,
           kind: "missing_report",
-          label: `Submit match report for ${gk?.name ?? "goalkeeper"}`,
+          label: `Submit match report for ${gk?.name ?? obs.goalkeeper_name ?? "goalkeeper"}`,
         });
       }
       if (!hasClip) {
@@ -268,7 +268,7 @@ export const getMentorDashboardStats = createServerFn({ method: "GET" })
           ...base,
           id: `${obs.id}:clip`,
           kind: "missing_clip",
-          label: `Upload match clip for ${gk?.name ?? "goalkeeper"}`,
+          label: `Upload match clip for ${gk?.name ?? obs.goalkeeper_name ?? "goalkeeper"}`,
         });
       }
     }
@@ -288,8 +288,8 @@ export const getMentorDashboardStats = createServerFn({ method: "GET" })
         title: e.title,
         type: e.type,
         plannedType: mapPlannedType(e.type),
-        gkId: gk?.id ?? null,
-        gkName: gk?.name ?? null,
+        gkId: gk?.id ?? obs.gk_slug ?? null,
+        gkName: gk?.name ?? obs.goalkeeper_name ?? null,
         gkInitials: gk?.initials ?? null,
         gkStatus: gk?.status ?? null,
         gkTierLevel: gk?.tierLevel ?? null,
