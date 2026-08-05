@@ -9,11 +9,14 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import {
   createInteractionInput,
+  isLoggableInteractionType,
   listInteractionsQuery,
   updateInteractionInput,
+  MATCH_REPORT_INTERACTION_TYPE,
   type InteractionsPage,
   type LoggedInteraction,
 } from "@/lib/interactions/schema";
+
 import { INTERACTION_COLUMNS, mapInteractionRow } from "@/lib/interactions/map";
 import { getUserRoles, hasAnyRole, INTERACTION_MANAGE_ROLES } from "@/lib/roles.server";
 
@@ -35,6 +38,16 @@ export const createInteraction = createServerFn({ method: "POST" })
   .inputValidator((data) => createInteractionInput.parse(data))
   .handler(async ({ data, context }): Promise<LoggedInteraction> => {
     const { supabase, userId } = context;
+
+    // Defence in depth behind the validator: a manually logged interaction can
+    // never be a Match Report observation, so it can never inflate the counts.
+    if (!isLoggableInteractionType(data.interactionType)) {
+      throw new Error(
+        `"${MATCH_REPORT_INTERACTION_TYPE}" is recorded by submitting a Match Report, not by logging an interaction.`,
+      );
+    }
+
+
 
     // Mentor identity: derived server-side, never client-supplied.
     const { data: profile, error: profileError } = await supabase
@@ -100,6 +113,14 @@ export const updateInteraction = createServerFn({ method: "POST" })
   .inputValidator((data) => updateInteractionInput.parse(data))
   .handler(async ({ data, context }): Promise<LoggedInteraction> => {
     const { supabase, userId } = context;
+
+    if (!isLoggableInteractionType(data.interactionType)) {
+      throw new Error(
+        `"${MATCH_REPORT_INTERACTION_TYPE}" is recorded by submitting a Match Report, not by logging an interaction.`,
+      );
+    }
+
+
 
     const { data: existing, error: loadError } = await supabase
       .from("interactions")
