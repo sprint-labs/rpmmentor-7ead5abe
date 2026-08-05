@@ -193,9 +193,8 @@ describe("InteractionForm (durable)", () => {
     expect(submitBtn.disabled).toBe(true);
     expect(submitBtn.querySelector("svg")).toBeTruthy();
 
-    expect((screen.getByLabelText("Goalkeeper") as HTMLSelectElement).disabled).toBe(true);
-    expect((screen.getByLabelText("Notes") as HTMLTextAreaElement).disabled).toBe(true);
-    expect((screen.getByLabelText("Follow-up Action") as HTMLInputElement).disabled).toBe(true);
+    const fieldset = document.querySelector("form[aria-label='Log interaction form'] fieldset") as HTMLFieldSetElement;
+    expect(fieldset.disabled).toBe(true);
     expect((screen.getByRole("button", { name: /cancel/i }) as HTMLButtonElement).disabled).toBe(true);
   });
 
