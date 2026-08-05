@@ -63,7 +63,31 @@ function GkDetail() {
     () => (loggedInteractions ?? []).filter((i) => i.gkSlug === gk.id).sort((a, b) => +new Date(b.occurredAt) - +new Date(a.occurredAt)),
     [loggedInteractions, gk.id],
   );
-  const gkMedia = media.filter((m) => m.gkId === gk.id);
+  const { user } = useAuth();
+  const [gkMedia, setGkMedia] = useState<MediaAsset[]>([]);
+  const [mediaLoading, setMediaLoading] = useState(true);
+  const [mediaError, setMediaError] = useState<string | null>(null);
+  const loadMedia = useCallback(async () => {
+    setMediaLoading(true);
+    setMediaError(null);
+    try {
+      setGkMedia(await listMedia({ gkId: gk.id }));
+    } catch (e) {
+      setMediaError(e instanceof Error ? e.message : "Could not load media");
+    } finally {
+      setMediaLoading(false);
+    }
+  }, [gk.id]);
+  useEffect(() => { void loadMedia(); }, [loadMedia]);
+  useEffect(() => {
+    const h = () => { void loadMedia(); };
+    window.addEventListener("rpm:media-uploaded", h);
+    window.addEventListener("rpm:media-updated", h);
+    return () => {
+      window.removeEventListener("rpm:media-uploaded", h);
+      window.removeEventListener("rpm:media-updated", h);
+    };
+  }, [loadMedia]);
   const [previewId, setPreviewId] = useState<string | null>(null);
   const [workflow, setWorkflow] = useState<WorkflowKind | null>(null);
 
