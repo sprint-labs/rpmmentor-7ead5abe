@@ -1,16 +1,17 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Card, TierBadge, Avatar, Pill, SectionTitle, ProgressBar } from "@/components/primitives";
-import { goalkeepers, media, formatDate, formatRelative, type Tier } from "@/lib/mock-data";
+import { goalkeepers, formatDate, formatRelative, type Tier } from "@/lib/mock-data";
 import { useLoggedInteractions } from "@/lib/interactions/use-interactions";
-import { ArrowLeft, Info, Video, FileText, Phone, Eye, Users as UsersIcon, Calendar as CalendarIcon } from "lucide-react";
+import { ArrowLeft, Info, Video, FileText, Phone, Eye, Users as UsersIcon, Calendar as CalendarIcon, Upload, ExternalLink } from "lucide-react";
 import { listMatchReports } from "@/lib/match-reports/reports.functions";
 import { PILLAR_IDS, PILLAR_LABELS, type MatchReportRow, type PillarId } from "@/lib/match-reports/schema";
 import { ReportPreviewModal } from "@/components/report-preview-modal";
 import { WorkflowDialog, type WorkflowKind } from "@/components/workflows";
 import { useAuth } from "@/lib/auth";
+import { listMedia, openAsset, formatBytes, type MediaAsset } from "@/lib/media-store";
 import { UpdateClubButton } from "@/components/update-club-dialog";
 
 /** Inclusive 1–5 finite numeric guard for report scores/averages. */
@@ -56,13 +57,37 @@ function compareMatchDatesNewestFirst(a: string | null, b: string | null): numbe
 
 function GkDetail() {
   const { gk } = Route.useLoaderData();
-  const { can } = useAuth();
+  const { can, user } = useAuth();
   const { data: loggedInteractions } = useLoggedInteractions();
   const gkInteractions = useMemo(
     () => (loggedInteractions ?? []).filter((i) => i.gkSlug === gk.id).sort((a, b) => +new Date(b.occurredAt) - +new Date(a.occurredAt)),
     [loggedInteractions, gk.id],
   );
-  const gkMedia = media.filter((m) => m.gkId === gk.id);
+  
+  const [gkMedia, setGkMedia] = useState<MediaAsset[]>([]);
+  const [mediaLoading, setMediaLoading] = useState(true);
+  const [mediaError, setMediaError] = useState<string | null>(null);
+  const loadMedia = useCallback(async () => {
+    setMediaLoading(true);
+    setMediaError(null);
+    try {
+      setGkMedia(await listMedia({ gkId: gk.id }));
+    } catch (e) {
+      setMediaError(e instanceof Error ? e.message : "Could not load media");
+    } finally {
+      setMediaLoading(false);
+    }
+  }, [gk.id]);
+  useEffect(() => { void loadMedia(); }, [loadMedia]);
+  useEffect(() => {
+    const h = () => { void loadMedia(); };
+    window.addEventListener("rpm:media-uploaded", h);
+    window.addEventListener("rpm:media-updated", h);
+    return () => {
+      window.removeEventListener("rpm:media-uploaded", h);
+      window.removeEventListener("rpm:media-updated", h);
+    };
+  }, [loadMedia]);
   const [previewId, setPreviewId] = useState<string | null>(null);
   const [workflow, setWorkflow] = useState<WorkflowKind | null>(null);
 
@@ -517,12 +542,34 @@ function GkDetail() {
           </Card>
 
           <Card className="p-4">
-            <SectionTitle>Media ({gkMedia.length})</SectionTitle>
+            <div className="flex items-center justify-between gap-2">
+              <SectionTitle>Media ({gkMedia.length})</SectionTitle>
+              {can("media.upload") && (
+                <button
+                  onClick={() => setWorkflow("media")}
+                  className="inline-flex items-center gap-1 h-7 px-2 rounded-md border border-border text-[11px] hover:bg-accent"
+                >
+                  <Upload className="size-3.5" /> Upload
+                </button>
+              )}
+            </div>
             <div className="space-y-1.5">
+              {mediaLoading && <p className="text-xs text-muted-foreground">Loading media…</p>}
+              {mediaError && <p className="text-xs text-destructive">{mediaError}</p>}
+              {!mediaLoading && !mediaError && gkMedia.length === 0 && (
+                <p className="text-xs text-muted-foreground">No media linked to {gk.name} yet.</p>
+              )}
               {gkMedia.map((m) => (
                 <div key={m.id} className="flex items-center justify-between gap-2 text-xs">
-                  <span className="min-w-0 flex-1 truncate">{m.title}</span>
-                  <Pill>{m.kind}</Pill>
+                  <button
+                    onClick={() => { void openAsset(m, user); }}
+                    className="min-w-0 flex-1 truncate text-left hover:underline inline-flex items-center gap-1"
+                    title={`${m.title} · ${formatBytes(m.file_size)}`}
+                  >
+                    <ExternalLink className="size-3 shrink-0 text-muted-foreground" />
+                    <span className="truncate">{m.title}</span>
+                  </button>
+                  <Pill>{m.media_type}</Pill>
                 </div>
               ))}
             </div>
@@ -534,6 +581,7 @@ function GkDetail() {
         kind={workflow}
         onClose={() => setWorkflow(null)}
         prefillGoalkeeper={gk.name}
+        prefillGkId={gk.id}
       />
       <ReportPreviewModal
         reportId={previewId}

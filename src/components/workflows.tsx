@@ -110,7 +110,7 @@ export interface MatchReportHandoff {
   club: string;
 }
 
-export function WorkflowDialog({ kind, onClose, prefillGoalkeeper, prefillMatchDate, prefillOpponent, editingInteraction }: { kind: WorkflowKind | null; onClose: () => void; prefillGoalkeeper?: string; prefillMatchDate?: string; prefillOpponent?: string; editingInteraction?: LoggedInteraction | null }) {
+export function WorkflowDialog({ kind, onClose, prefillGoalkeeper, prefillMatchDate, prefillOpponent, prefillGkId, editingInteraction }: { kind: WorkflowKind | null; onClose: () => void; prefillGoalkeeper?: string; prefillMatchDate?: string; prefillOpponent?: string; prefillGkId?: string; editingInteraction?: LoggedInteraction | null }) {
   /**
    * Change #1: choosing Live Match Observation in Log Interaction hands over to
    * the Match Report workflow in place, carrying the goalkeeper, date and club
@@ -166,7 +166,7 @@ export function WorkflowDialog({ kind, onClose, prefillGoalkeeper, prefillMatchD
               prefillTeam={handoff?.club}
             />
           )}
-          {activeKind === "media" && <MediaForm onDone={onClose} />}
+          {activeKind === "media" && <MediaForm onDone={onClose} prefillGkId={prefillGkId} />}
           {activeKind === "goalkeeper" && <GoalkeeperForm onDone={onClose} />}
         </div>
       </div>
@@ -1837,14 +1837,14 @@ const KIND_LABELS: { value: MediaKind; label: string }[] = [
   { value: "audio", label: "Voice note" },
 ];
 
-function MediaForm({ onDone }: { onDone: () => void }) {
+function MediaForm({ onDone, prefillGkId }: { onDone: () => void; prefillGkId?: string }) {
   const { user, can } = useAuth();
   const [done, setDone] = useState(false);
   const [kind, setKind] = useState<MediaKind>("video");
   const [file, setFile] = useState<File | null>(null);
   const [title, setTitle] = useState("");
   const [notes, setNotes] = useState("");
-  const [gkId, setGkId] = useState("");
+  const [gkId, setGkId] = useState(prefillGkId ?? "");
   const [tags, setTags] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
