@@ -23,7 +23,7 @@ import { MentorDashboard } from "@/components/mentor/mentor-dashboard";
 import { SyncStatusChip } from "@/components/sync-status-chip";
 import { listMatchReports } from "@/lib/match-reports/reports.functions";
 
-import { lastNDaysPeriod } from "@/lib/dashboard-period";
+import { isDateOnlyInPeriod, lastNDaysPeriod } from "@/lib/dashboard-period";
 import { getOverviewDashboardStats } from "@/lib/overview-dashboard.functions";
 
 const OVERVIEW_PERIOD_DAYS = 14;
