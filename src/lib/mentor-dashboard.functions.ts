@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
-import { goalkeepers, interactions, reports, media, calendarEvents, mentors } from "@/lib/mock-data";
+import { goalkeepers, calendarEvents, mentors } from "@/lib/mock-data";
 import type { TierLevel } from "@/lib/mock-data";
 import { parseSheetRows } from "@/lib/match-reports/schema";
 import {
@@ -127,24 +127,46 @@ export const getMentorDashboardStats = createServerFn({ method: "GET" })
     const days = data.days;
     const now = Date.now();
     const inRange = now + days * 86400000;
-    const ago14 = now - 14 * 86400000;
+    const periodFrom = data.from.slice(0, 10);
+    const periodTo = data.to.slice(0, 10);
+    const thirtyDaysAgo = new Date(now - 30 * 86400000).toISOString().slice(0, 10);
 
-    if (!mentorId) {
-      return {
-        mentorProfileId: null,
-        coachIdentity: "",
-        reportsLast14: 0,
-        interactionsLast14: 0,
-        clipsLast14: 0,
-        outstandingActions: 0,
-        outstandingItems: [],
-        upcomingList: [],
-        lastUpdatedAt: new Date().toISOString(),
-      };
-    }
+    // Real, durable activity for the signed-in user. These are the numbers the
+    // dashboard cards claim to show, so they are read from the database rather
+    // than from any sample data.
+    const [{ data: periodInteractions }, { data: observationRows }, { data: clipRows }] =
+      await Promise.all([
+        supabase
+          .from("interactions")
+          .select("id")
+          .eq("mentor_id", userId)
+          .gte("occurred_at", periodFrom)
+          .lte("occurred_at", periodTo),
+        supabase
+          .from("interactions")
+          .select("id, goalkeeper_name, gk_slug, player_id, occurred_at, interaction_type")
+          .eq("mentor_id", userId)
+          .eq("interaction_type", "Live Match Observation")
+          .gte("occurred_at", thirtyDaysAgo),
+        supabase
+          .from("media_assets")
+          .select("id, gk_id, media_type, created_at")
+          .eq("uploaded_by_id", userId)
+          .eq("media_type", "video")
+          .gte("created_at", data.from)
+          .lte("created_at", data.to),
+      ]);
 
-    const mentorName = mentors.find((m) => m.id === mentorId)?.name;
-    const gkById = new Map(goalkeepers.map((g) => [g.id, g]));
+    const interactionsLast14 = periodInteractions?.length ?? 0;
+    const clipsLast14 = clipRows?.length ?? 0;
+
+    // Every clip this user has uploaded, used to decide whether an observation
+    // still needs follow-up media.
+    const { data: allClipRows } = await supabase
+      .from("media_assets")
+      .select("gk_id, created_at")
+      .eq("uploaded_by_id", userId)
+      .eq("media_type", "video");
 
     const { data: fallbackMentorProfile } = usingSuperAdminFallbackMentor
       ? await supabase
@@ -164,66 +186,68 @@ export const getMentorDashboardStats = createServerFn({ method: "GET" })
     // Match Reports are read from the same canonical Sheets pipeline as the
     // report centre, then scoped to the authenticated coach identity.
     let reportsLast14 = 0;
+    let coachReports: { goalkeeper: string; match_date: string | null }[] = [];
     if (coachIdentity) {
       const { readAllRows } = await import("@/lib/match-reports/sheets.server");
       const { rows, firstDataRow } = await readAllRows();
-      reportsLast14 = countCanonicalReportsForCoach(
-        parseSheetRows(rows, firstDataRow),
-        coachIdentity,
-        data.from,
-        data.to,
-      );
+      const parsed = parseSheetRows(rows, firstDataRow);
+      reportsLast14 = countCanonicalReportsForCoach(parsed, coachIdentity, data.from, data.to);
+      const needle = coachIdentity.trim().toLowerCase();
+      coachReports = parsed
+        .filter((r) => (r.coach ?? "").trim().toLowerCase() === needle)
+        .map((r) => ({ goalkeeper: r.goalkeeper, match_date: r.match_date }));
     }
 
-    const mentorInteractions14 = interactions.filter(
-      (i) => i.mentorId === mentorId && +new Date(i.date) >= ago14 && +new Date(i.date) <= now,
-    );
-    const interactionsLast14 = mentorInteractions14.length;
+    if (!mentorId) {
+      return {
+        mentorProfileId: null,
+        coachIdentity,
+        reportsLast14,
+        interactionsLast14,
+        clipsLast14,
+        outstandingActions: 0,
+        outstandingItems: [],
+        upcomingList: [],
+        lastUpdatedAt: new Date().toISOString(),
+      };
+    }
 
-    const clipsLast14 = media.filter(
-      (m) =>
-        m.kind === "video" &&
-        (mentorName ? m.uploadedBy === mentorName : false) &&
-        +new Date(m.date) >= ago14 &&
-        +new Date(m.date) <= now,
-    ).length;
+    const gkById = new Map(goalkeepers.map((g) => [g.id, g]));
 
-    // Outstanding actions: live match observations logged by this mentor
-    // in the last 30 days that lack either a follow-up match report or a
-    // matching video clip within ±3 days of the observation date.
-    const mentorObservations = interactions.filter(
-      (i) =>
-        i.mentorId === mentorId &&
-        i.type === "Live Match Observation" &&
-        +new Date(i.date) >= now - 30 * 86400000 &&
-        +new Date(i.date) <= now - 3 * 86400000,
-    );
-    const mentorReports = reports.filter((r) => r.authorId === mentorId);
-    const mentorClips = media.filter(
-      (m) => m.kind === "video" && (mentorName ? m.uploadedBy === mentorName : false),
+    // Outstanding actions: live match observations logged by this user in the
+    // last 30 days that lack either a follow-up match report or a matching
+    // video clip within ±3 days of the observation date.
+    const mentorObservations = (observationRows ?? []).filter(
+      (i) => +new Date(i.occurred_at) <= now - 3 * 86400000,
     );
     const within3d = (a: string, b: string) =>
       Math.abs(+new Date(a) - +new Date(b)) <= 3 * 86400000;
 
+
     const outstandingItems: OutstandingActionItem[] = [];
     const mentorDisplay = mentors.find((m) => m.id === mentorId)?.name ?? "You";
     for (const obs of mentorObservations) {
-      const hasReport = mentorReports.some(
-        (r) => r.gkId === obs.gkId && within3d(r.date, obs.date),
+      const gkNameKey = (obs.goalkeeper_name ?? "").trim().toLowerCase();
+      const hasReport = coachReports.some(
+        (r) =>
+          (r.goalkeeper ?? "").trim().toLowerCase() === gkNameKey &&
+          r.match_date != null &&
+          within3d(r.match_date, obs.occurred_at),
       );
-      const hasClip = mentorClips.some(
-        (m) => m.gkId === obs.gkId && within3d(m.date, obs.date),
+      const hasClip = (allClipRows ?? []).some(
+        (m) => m.gk_id === obs.gk_slug && within3d(m.created_at, obs.occurred_at),
       );
-      const gk = obs.gkId ? gkById.get(obs.gkId) ?? null : null;
-      const due = +new Date(obs.date) + 3 * 86400000;
+      const gk = obs.gk_slug ? gkById.get(obs.gk_slug) ?? null : null;
+      const due = +new Date(obs.occurred_at) + 3 * 86400000;
       const daysOverdue = Math.max(0, Math.floor((now - due) / 86400000));
       const base = {
         observationId: obs.id,
-        observationDate: obs.date,
+        observationDate: obs.occurred_at,
+
         dueDate: new Date(due).toISOString(),
         daysOverdue,
-        gkId: gk?.id ?? null,
-        gkName: gk?.name ?? null,
+        gkId: gk?.id ?? obs.gk_slug ?? null,
+        gkName: gk?.name ?? obs.goalkeeper_name ?? null,
         gkInitials: gk?.initials ?? null,
         gkStatus: gk?.status ?? null,
         gkTierLevel: gk?.tierLevel ?? null,
@@ -236,7 +260,7 @@ export const getMentorDashboardStats = createServerFn({ method: "GET" })
           ...base,
           id: `${obs.id}:report`,
           kind: "missing_report",
-          label: `Submit match report for ${gk?.name ?? "goalkeeper"}`,
+          label: `Submit match report for ${gk?.name ?? obs.goalkeeper_name ?? "goalkeeper"}`,
         });
       }
       if (!hasClip) {
@@ -244,7 +268,7 @@ export const getMentorDashboardStats = createServerFn({ method: "GET" })
           ...base,
           id: `${obs.id}:clip`,
           kind: "missing_clip",
-          label: `Upload match clip for ${gk?.name ?? "goalkeeper"}`,
+          label: `Upload match clip for ${gk?.name ?? obs.goalkeeper_name ?? "goalkeeper"}`,
         });
       }
     }
@@ -266,6 +290,7 @@ export const getMentorDashboardStats = createServerFn({ method: "GET" })
         plannedType: mapPlannedType(e.type),
         gkId: gk?.id ?? null,
         gkName: gk?.name ?? null,
+
         gkInitials: gk?.initials ?? null,
         gkStatus: gk?.status ?? null,
         gkTierLevel: gk?.tierLevel ?? null,
