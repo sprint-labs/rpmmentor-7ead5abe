@@ -87,7 +87,7 @@ function ResetPasswordPage() {
     // the new password.
     await supabase.auth.signOut();
     setStatus("done");
-    setTimeout(() => navigate({ to: "/login", replace: true }), 1600);
+    setTimeout(() => navigate({ to: "/login", search: { next: "" }, replace: true }), 1600);
   }
 
   return (
@@ -114,6 +114,7 @@ function ResetPasswordPage() {
             </div>
             <Link
               to="/login"
+              search={{ next: "" }}
               className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-border bg-card hover:bg-accent/30 text-sm font-medium"
             >
               <ArrowLeft className="size-4" />

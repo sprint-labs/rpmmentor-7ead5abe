@@ -48,7 +48,7 @@ export const Route = createFileRoute("/account")({
 
 function AccountPage() {
   const { user } = useAuth();
-  if (!user) return <Navigate to="/login" />;
+  if (!user) return <Navigate to="/login" search={{ next: "" }} />;
 
   const changePasswordFn = useServerFn(changePassword);
 
