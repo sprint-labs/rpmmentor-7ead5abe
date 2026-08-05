@@ -132,8 +132,10 @@ export const getMentorDashboardStats = createServerFn({ method: "GET" })
     const days = data.days;
     const now = Date.now();
     const inRange = now + days * 86400000;
-    const periodFrom = data.from.slice(0, 10);
-    const periodTo = data.to.slice(0, 10);
+    // `occurred_at`/`match_date` are DATE columns: compare them against the
+    // caller's local calendar days, not the UTC slice of the instant.
+    const periodFrom = data.fromDate ?? data.from.slice(0, 10);
+    const periodTo = data.toDate ?? data.to.slice(0, 10);
     const thirtyDaysAgo = new Date(now - 30 * 86400000).toISOString().slice(0, 10);
 
     // Real, durable activity for the signed-in user. These are the numbers the
