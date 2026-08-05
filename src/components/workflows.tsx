@@ -166,7 +166,7 @@ export function WorkflowDialog({ kind, onClose, prefillGoalkeeper, prefillMatchD
               prefillTeam={handoff?.club}
             />
           )}
-          {activeKind === "media" && <MediaForm onDone={onClose} />}
+          {activeKind === "media" && <MediaForm onDone={onClose} prefillGkId={prefillGkId} />}
           {activeKind === "goalkeeper" && <GoalkeeperForm onDone={onClose} />}
         </div>
       </div>
