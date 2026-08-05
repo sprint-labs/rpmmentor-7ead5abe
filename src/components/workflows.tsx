@@ -361,12 +361,13 @@ export function InteractionForm({ onDone }: { onDone: () => void }) {
 
   if (done) return <Submitted message={savedSummary ?? "Interaction logged successfully."} onDone={onDone} />;
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form aria-label="Log interaction form" onSubmit={handleSubmit} className="space-y-4">
       {error && (
         <div role="alert" className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
           <span className="font-medium">Not saved.</span> {error} Your entries have been kept — fix the issue and try again.
         </div>
       )}
+
 
       <div className="grid grid-cols-2 gap-3">
         <Field label="Goalkeeper" required error={showErrors ? errors.gkId : undefined}>
