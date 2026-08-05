@@ -85,6 +85,15 @@ describe("InteractionForm (durable)", () => {
     expect(screen.getByRole("button", { name: /save interaction/i })).toBeTruthy();
   });
 
+  it("disables the submit button until all required fields are valid", () => {
+    renderForm();
+    const submitBtn = screen.getByRole("button", { name: /save interaction/i }) as HTMLButtonElement;
+    expect(submitBtn.disabled).toBe(true);
+    fillValidForm();
+    expect(submitBtn.disabled).toBe(false);
+  });
+
+
   it("shows success only after a confirmed inserted row is returned", async () => {
     createInteractionMock.mockResolvedValue({ id: "i1", occurredAt: "2026-01-05" });
     renderForm();
