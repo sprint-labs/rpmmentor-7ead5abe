@@ -1,7 +1,0 @@
-{
-  "plugins": {
-    "google-drive": {
-      "enabled": true
-    }
-  }
-}

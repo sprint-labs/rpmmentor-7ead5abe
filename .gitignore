@@ -33,3 +33,6 @@ supabase/.temp/
 *.njsproj
 *.sln
 *.sw?
+
+# Local editor settings
+.cursor/settings.json
