@@ -86,6 +86,19 @@ interface Props {
   aiMode?: "structured-summary" | "report-rewrite";
   /** Hide raw transcript/legacy summary replace actions where required. */
   allowReplace?: boolean;
+  /**
+   * Push the transcript into the parent field as soon as it arrives, instead of
+   * holding it here until the reviewed checkbox and the apply/confirm steps are
+   * completed.
+   *
+   * The multi-step gate suits the Match Report, where a transcript is rewritten
+   * before it becomes the report's comments. It is wrong for the interaction
+   * form: there, an unapplied transcript leaves Notes empty, so the save is
+   * silently blocked and the spoken note is lost. The text still lands in an
+   * editable field, so nothing is applied without the user being able to see and
+   * change it.
+   */
+  autoApply?: boolean;
   className?: string;
 }
 
@@ -99,6 +112,7 @@ export function VoiceNoteField({
   rewriteContext,
   aiMode = "structured-summary",
   allowReplace = true,
+  autoApply = false,
   className,
 }: Props) {
   const [recording, setRecording] = useState(false);
@@ -438,7 +452,15 @@ export function VoiceNoteField({
         });
         setVersions([]);
         logAttempt("success");
-        toast.success("Voice note transcribed — review before applying");
+        if (autoApply) {
+          // Straight into the parent field, where it is visible, editable and
+          // will actually be submitted. Holding it here is what caused spoken
+          // notes to be lost.
+          onTranscribed(result.text, "append");
+          toast.success("Voice note added to Notes — edit it there if needed");
+        } else {
+          toast.success("Voice note transcribed — review before applying");
+        }
         if (aiMode === "report-rewrite") void requestRewrite(result.text);
       }
     } catch (e) {

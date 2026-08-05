@@ -5,6 +5,7 @@ import { cleanup, render, screen, fireEvent, waitFor } from "@testing-library/re
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 const createInteractionMock = vi.fn();
+const updateInteractionMock = vi.fn();
 const listPlayersMock = vi.fn(async () => [
   { id: "p1", full_name: "Demo Keeper", current_club: "Roster FC" },
 ]);
@@ -30,6 +31,7 @@ vi.mock("@tanstack/react-router", () => ({
 }));
 vi.mock("@/lib/interactions.functions", () => ({
   createInteraction: (...args: unknown[]) => createInteractionMock(...args),
+  updateInteraction: (...args: unknown[]) => updateInteractionMock(...args),
   listInteractions: vi.fn(async () => []),
 }));
 vi.mock("@/lib/players.functions", () => ({
@@ -88,12 +90,26 @@ describe("InteractionForm (durable)", () => {
     expect(screen.getByRole("button", { name: /save interaction/i })).toBeTruthy();
   });
 
-  it("disables the submit button until all required fields are valid", () => {
+  /**
+   * The submit button used to be `disabled` whenever the form was incomplete.
+   * That is how a voice-entered note failed silently: the transcript never
+   * reached Notes, so pressing a greyed-out button did nothing and said nothing.
+   * It now stays pressable and explains what is missing instead.
+   */
+  it("stays pressable while incomplete and reports what is missing instead of failing silently", async () => {
     renderForm();
     const submitBtn = screen.getByRole("button", { name: /save interaction/i }) as HTMLButtonElement;
-    expect(submitBtn.disabled).toBe(true);
-    fillValidForm();
     expect(submitBtn.disabled).toBe(false);
+    expect(submitBtn.getAttribute("aria-disabled")).toBe("true");
+
+    fireEvent.click(submitBtn);
+    // Nothing is written, and the reason is shown rather than swallowed.
+    expect(createInteractionMock).not.toHaveBeenCalled();
+    await waitFor(() => expect(screen.getByText(/select a goalkeeper/i)).toBeTruthy());
+    expect(screen.getByText(/complete the highlighted fields to save/i)).toBeTruthy();
+
+    await fillValidForm();
+    await waitFor(() => expect(submitBtn.getAttribute("aria-disabled")).toBe("false"));
   });
 
 

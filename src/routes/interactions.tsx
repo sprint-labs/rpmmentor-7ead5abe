@@ -10,9 +10,10 @@ import {
   INTERACTIONS_PAGE_SIZE,
   type InteractionTypeValue,
   type ListInteractionsQuery,
+  type LoggedInteraction,
 } from "@/lib/interactions/schema";
 import { useEffect, useMemo, useState } from "react";
-import { X, MessageSquarePlus, Filter, ChevronLeft, ChevronRight, Search } from "lucide-react";
+import { X, MessageSquarePlus, Filter, ChevronLeft, ChevronRight, Search, Pencil } from "lucide-react";
 import { withPermission } from "@/components/require-permission";
 import { getNavSource } from "@/lib/nav-source";
 import { WorkflowDialog, type WorkflowKind } from "@/components/workflows";
@@ -51,11 +52,12 @@ function resolveType(param: string): TypeChip {
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function InteractionsPage() {
-  const { can } = useAuth();
+  const { can, user } = useAuth();
   const navigate = useNavigate({ from: "/interactions" });
   const { from, to, mentorId, type: typeParam, source, q, page } = Route.useSearch();
   const navSource = getNavSource(source);
   const [workflow, setWorkflow] = useState<WorkflowKind | null>(null);
+  const [editing, setEditing] = useState<LoggedInteraction | null>(null);
   const type = resolveType(typeParam);
 
   // Debounced search box: the URL (and therefore the server query) only
@@ -174,6 +176,7 @@ function InteractionsPage() {
               <th className="px-2 py-2.5 font-medium">Notes</th>
               <th className="px-2 py-2.5 font-medium">Outcome</th>
               <th className="px-4 py-2.5 font-medium">Follow-up</th>
+              <th className="px-4 py-2.5 font-medium"><span className="sr-only">Actions</span></th>
             </tr>
           </thead>
           <tbody>
@@ -230,6 +233,23 @@ function InteractionsPage() {
                   <td className="px-2 text-muted-foreground max-w-md"><span className="line-clamp-1">{i.notes}</span></td>
                   <td className="px-2"><Pill>{i.outcome || "—"}</Pill></td>
                   <td className="px-4 text-muted-foreground"><span className="line-clamp-1">{i.followUp || "—"}</span></td>
+                  <td className="px-4 text-right whitespace-nowrap">
+                    {/*
+                      Offered to the mentor who logged it and to managers/admins.
+                      Hiding it is presentation only — updateInteraction and the
+                      RLS policy both re-check before anything is written.
+                    */}
+                    {(i.mentorId === user?.id || can("interactions.manage")) && (
+                      <button
+                        type="button"
+                        onClick={() => setEditing(i)}
+                        aria-label={`Edit interaction with ${name} on ${formatDateOnly(i.occurredAt)}`}
+                        className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-[11px] hover:bg-accent/40"
+                      >
+                        <Pencil className="size-3" /> Edit
+                      </button>
+                    )}
+                  </td>
                 </tr>
               );
             })}
@@ -265,6 +285,12 @@ function InteractionsPage() {
         )}
       </Card>
       <WorkflowDialog kind={workflow} onClose={() => setWorkflow(null)} />
+      {/* Correction opens the same form, prefilled, and updates the original row. */}
+      <WorkflowDialog
+        kind={editing ? "interaction" : null}
+        editingInteraction={editing}
+        onClose={() => setEditing(null)}
+      />
     </div>
   );
 }
