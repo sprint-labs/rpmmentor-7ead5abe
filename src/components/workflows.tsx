@@ -250,6 +250,12 @@ export function InteractionForm({ onDone }: { onDone: () => void }) {
   const autoFilledClubRef = useRef<string | null>(null);
   const gk = goalkeepers.find((g) => g.id === gkId);
 
+  const canSubmit = useMemo(() => {
+    const validation = validate({ gkId, date, notes, outcome, followUp });
+    return Object.keys(validation).length === 0 && !saving;
+  }, [gkId, date, notes, outcome, followUp, saving]);
+
+
 
   const listPlayersFn = useServerFn(listPlayers);
   const playersQuery = useQuery({
