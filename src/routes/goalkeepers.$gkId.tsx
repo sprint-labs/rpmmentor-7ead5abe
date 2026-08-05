@@ -56,7 +56,11 @@ function compareMatchDatesNewestFirst(a: string | null, b: string | null): numbe
 function GkDetail() {
   const { gk } = Route.useLoaderData();
   const { can } = useAuth();
-  const gkInteractions = interactions.filter((i) => i.gkId === gk.id).sort((a, b) => +new Date(b.date) - +new Date(a.date));
+  const { data: loggedInteractions } = useLoggedInteractions();
+  const gkInteractions = useMemo(
+    () => (loggedInteractions ?? []).filter((i) => i.gkSlug === gk.id).sort((a, b) => +new Date(b.occurredAt) - +new Date(a.occurredAt)),
+    [loggedInteractions, gk.id],
+  );
   const gkMedia = media.filter((m) => m.gkId === gk.id);
   const [previewId, setPreviewId] = useState<string | null>(null);
   const [workflow, setWorkflow] = useState<WorkflowKind | null>(null);
