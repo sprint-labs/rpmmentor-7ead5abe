@@ -1,11 +1,15 @@
 import { describe, it, expect } from "vitest";
 import {
   createInteractionInput,
+  updateInteractionInput,
   formatDateOnly,
   dateOnlyToLocalMs,
   todayDateOnly,
-  INTERACTION_TYPES,
+  MANUAL_INTERACTION_TYPES,
+  DASHBOARD_INTERACTION_TYPES,
+  MATCH_REPORT_INTERACTION_TYPE,
 } from "@/lib/interactions/schema";
+
 import { mapInteractionRow, type InteractionDbRow } from "@/lib/interactions/map";
 import { computeDutyOverview, goalkeepers } from "@/lib/mock-data";
 
