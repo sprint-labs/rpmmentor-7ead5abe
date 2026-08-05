@@ -39,6 +39,16 @@ export const createInteraction = createServerFn({ method: "POST" })
   .handler(async ({ data, context }): Promise<LoggedInteraction> => {
     const { supabase, userId } = context;
 
+    // Defence in depth behind the validator: a manually logged interaction can
+    // never be a Match Report observation, so it can never inflate the counts.
+    if (!isLoggableInteractionType(data.interactionType)) {
+      throw new Error(
+        `"${MATCH_REPORT_INTERACTION_TYPE}" is recorded by submitting a Match Report, not by logging an interaction.`,
+      );
+    }
+
+
+
     // Mentor identity: derived server-side, never client-supplied.
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
