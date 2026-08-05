@@ -153,7 +153,7 @@ describe("InteractionForm (durable)", () => {
   it("shows inline validation errors for required fields without calling the server", async () => {
     createInteractionMock.mockResolvedValue({ id: "i1" });
     renderForm();
-    fireEvent.click(screen.getByRole("button", { name: /save interaction/i }));
+    fireEvent.submit(screen.getByRole("form", { name: /log interaction/i }));
 
     await waitFor(() => expect(screen.getByText(/Select a goalkeeper/i)).toBeTruthy());
     expect(screen.getByText(/Select an outcome/i)).toBeTruthy();
@@ -166,7 +166,7 @@ describe("InteractionForm (durable)", () => {
   it("clears inline validation errors as the user fixes each field", async () => {
     createInteractionMock.mockResolvedValue({ id: "i1" });
     renderForm();
-    fireEvent.click(screen.getByRole("button", { name: /save interaction/i }));
+    fireEvent.submit(screen.getByRole("form", { name: /log interaction/i }));
     await waitFor(() => expect(screen.getByText(/Select a goalkeeper/i)).toBeTruthy());
 
     const gk = goalkeepers[0]!;
@@ -182,5 +182,6 @@ describe("InteractionForm (durable)", () => {
     expect(screen.queryByText(/Follow-up action is required/i)).toBeNull();
     expect(screen.queryByText(/Notes are required/i)).toBeNull();
   });
+
 
 });
