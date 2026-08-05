@@ -70,6 +70,7 @@ export type Permission =
 
 const MENTOR: Permission[] = [
   "goalkeepers.view",
+  "mentors.view",
   "interactions.view", "interactions.log",
   "reports.view", "reports.submit",
   "media.view", "media.upload", "media.edit",

@@ -17,7 +17,7 @@ const NAV: NavItem[] = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, exact: true, perm: "goalkeepers.view" },
   { to: "/goalkeepers", label: "Goalkeepers", icon: Users, perm: "goalkeepers.view" },
   { to: "/system/players", label: "Player Records", icon: Database, perm: "players.edit_club" },
-  { to: "/mentors", label: "Mentors", icon: UserCog, perm: "mentors.view" },
+  { to: "/mentors", label: "Users & Roles", icon: UserCog, perm: "mentors.view" },
   { to: "/interactions", label: "Interactions Log", icon: MessageSquare, perm: "interactions.view" },
   { to: "/reports", label: "Match Reports", icon: FileText, perm: "reports.view" },
   
@@ -26,7 +26,7 @@ const NAV: NavItem[] = [
   { to: "/alerts", label: "Notification Centre", icon: BellRing, perm: "alerts.view" },
   { to: "/calendar", label: "Calendar", icon: Calendar, perm: "calendar.view" },
   { to: "/executive", label: "Executive", icon: BarChart3, perm: "executive.view" },
-  { to: "/system/users", label: "Users & Roles", icon: ShieldCheck, perm: "system.manage" },
+  { to: "/system/users", label: "Manage Users", icon: ShieldCheck, perm: "system.manage" },
   { to: "/system/permissions", label: "Permission Check", icon: ShieldCheck, perm: "system.manage" },
   { to: "/system/integrations", label: "Integrations", icon: Plug, perm: "system.manage" },
   { to: "/system/data-quality", label: "Data Quality", icon: Database, perm: "system.manage" },

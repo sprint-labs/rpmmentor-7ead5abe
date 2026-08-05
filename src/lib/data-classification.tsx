@@ -26,7 +26,7 @@ export const ROUTE_CLASSIFICATION: Record<string, Classification> = {
   "/": "mock",
   "/goalkeepers": "mock",
   "/goalkeepers/$gkId": "mock",
-  "/mentors": "mock",
+  "/mentors": "live",
   "/interactions": "mock",
   "/reports": "transitional",
   "/reports/$reportId": "transitional",

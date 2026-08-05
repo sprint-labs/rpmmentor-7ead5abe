@@ -199,7 +199,7 @@ function Dashboard() {
         <Link
           to="/mentors"
           className="block rounded-lg transition-transform hover:-translate-y-0.5 hover:ring-1 hover:ring-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-          aria-label="View mentors"
+          aria-label="View users and roles"
         >
           <StatCard
             label="Active Mentors"
@@ -373,7 +373,7 @@ function Dashboard() {
           </div>
           <div className="grid grid-cols-3 gap-2 mt-6 pt-4 border-t border-border">
             <Link to="/goalkeepers" className="flex flex-col items-center gap-1 p-2 rounded-md hover:bg-accent/40"><Users className="size-4 text-primary" /><span className="text-[11px]">Goalkeepers</span></Link>
-            <Link to="/mentors" className="flex flex-col items-center gap-1 p-2 rounded-md hover:bg-accent/40"><UserCog className="size-4 text-info" /><span className="text-[11px]">Mentors</span></Link>
+            <Link to="/mentors" className="flex flex-col items-center gap-1 p-2 rounded-md hover:bg-accent/40"><UserCog className="size-4 text-info" /><span className="text-[11px]">Users & Roles</span></Link>
             <Link to="/reports" className="flex flex-col items-center gap-1 p-2 rounded-md hover:bg-accent/40"><FileText className="size-4 text-warning" /><span className="text-[11px]">Reports</span></Link>
           </div>
         </Card>
