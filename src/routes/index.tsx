@@ -23,18 +23,11 @@ import { MentorDashboard } from "@/components/mentor/mentor-dashboard";
 import { SyncStatusChip } from "@/components/sync-status-chip";
 import { listMatchReports } from "@/lib/match-reports/reports.functions";
 
-function toLocalIsoDate(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
+import { lastNDaysPeriod } from "@/lib/dashboard-period";
+import { getOverviewDashboardStats } from "@/lib/overview-dashboard.functions";
 
-function reportWindow(now = new Date()) {
-  const from = new Date(now);
-  from.setDate(from.getDate() - 7);
-  return { from: toLocalIsoDate(from), to: toLocalIsoDate(now) };
-}
+const OVERVIEW_PERIOD_DAYS = 14;
+
 
 export const Route = createFileRoute("/")({ component: Dashboard });
 
