@@ -9,11 +9,14 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import {
   createInteractionInput,
+  isLoggableInteractionType,
   listInteractionsQuery,
   updateInteractionInput,
+  MATCH_REPORT_INTERACTION_TYPE,
   type InteractionsPage,
   type LoggedInteraction,
 } from "@/lib/interactions/schema";
+
 import { INTERACTION_COLUMNS, mapInteractionRow } from "@/lib/interactions/map";
 import { getUserRoles, hasAnyRole, INTERACTION_MANAGE_ROLES } from "@/lib/roles.server";
 
