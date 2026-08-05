@@ -101,6 +101,44 @@ export type Database = {
         }
         Relationships: []
       }
+      interaction_audit: {
+        Row: {
+          action: string
+          after_values: Json | null
+          before_values: Json | null
+          changed_at: string
+          changed_by: string | null
+          id: string
+          interaction_id: string
+        }
+        Insert: {
+          action: string
+          after_values?: Json | null
+          before_values?: Json | null
+          changed_at?: string
+          changed_by?: string | null
+          id?: string
+          interaction_id: string
+        }
+        Update: {
+          action?: string
+          after_values?: Json | null
+          before_values?: Json | null
+          changed_at?: string
+          changed_by?: string | null
+          id?: string
+          interaction_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "interaction_audit_interaction_id_fkey"
+            columns: ["interaction_id"]
+            isOneToOne: false
+            referencedRelation: "interactions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       interactions: {
         Row: {
           club: string
@@ -110,10 +148,10 @@ export type Database = {
           goalkeeper_name: string
           id: string
           interaction_type: string
+          match_report_id: string | null
           mentor_id: string
           mentor_name: string
           notes: string
-          match_report_id: string | null
           occurred_at: string
           outcome: string
           player_id: string | null
@@ -169,6 +207,13 @@ export type Database = {
             columns: ["player_id"]
             isOneToOne: false
             referencedRelation: "players"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "interactions_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
