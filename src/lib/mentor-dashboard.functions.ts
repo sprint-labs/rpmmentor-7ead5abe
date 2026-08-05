@@ -95,10 +95,15 @@ const dashboardInputSchema = z
     days: z.coerce.number().int().min(1).max(60).default(14),
     from: z.string().datetime({ offset: true }),
     to: z.string().datetime({ offset: true }),
+    // Local calendar days for the same window. Used for `date` columns so the
+    // window never shifts by a day for non-UTC users.
+    fromDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+    toDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   })
   .refine((period) => new Date(period.from).getTime() <= new Date(period.to).getTime(), {
     message: "The reporting period must end after it starts.",
   });
+
 
 export const getMentorDashboardStats = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
