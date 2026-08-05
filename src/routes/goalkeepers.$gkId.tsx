@@ -581,6 +581,7 @@ function GkDetail() {
         kind={workflow}
         onClose={() => setWorkflow(null)}
         prefillGoalkeeper={gk.name}
+        prefillGkId={gk.id}
       />
       <ReportPreviewModal
         reportId={previewId}
