@@ -10,7 +10,7 @@ import { createInteraction, updateInteraction } from "@/lib/interactions.functio
 import { interactionsQueryKey } from "@/lib/interactions/use-interactions";
 import type { LoggedInteraction } from "@/lib/interactions/schema";
 import {
-  INTERACTION_TYPES, INTERACTION_OUTCOMES, todayDateOnly, formatDateOnly,
+  INTERACTION_OUTCOMES, todayDateOnly, formatDateOnly,
   MATCH_REPORT_INTERACTION_TYPE, MANUAL_INTERACTION_TYPES,
   type InteractionTypeValue,
 } from "@/lib/interactions/schema";
@@ -623,7 +623,7 @@ export function InteractionForm({
           </Field>
           <Field label="Interaction Type" required>
             <select aria-label="Interaction Type" className={selectCls} required value={type} onChange={(e) => setType(e.target.value as InteractionTypeValue)}>
-              {INTERACTION_TYPES.map((t) => <option key={t}>{t}</option>)}
+              {MANUAL_INTERACTION_TYPES.map((t) => <option key={t}>{t}</option>)}
             </select>
           </Field>
           {handOffToMatchReport && (
