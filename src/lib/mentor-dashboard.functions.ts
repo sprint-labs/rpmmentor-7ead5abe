@@ -127,24 +127,46 @@ export const getMentorDashboardStats = createServerFn({ method: "GET" })
     const days = data.days;
     const now = Date.now();
     const inRange = now + days * 86400000;
-    const ago14 = now - 14 * 86400000;
+    const periodFrom = data.from.slice(0, 10);
+    const periodTo = data.to.slice(0, 10);
+    const thirtyDaysAgo = new Date(now - 30 * 86400000).toISOString().slice(0, 10);
 
-    if (!mentorId) {
-      return {
-        mentorProfileId: null,
-        coachIdentity: "",
-        reportsLast14: 0,
-        interactionsLast14: 0,
-        clipsLast14: 0,
-        outstandingActions: 0,
-        outstandingItems: [],
-        upcomingList: [],
-        lastUpdatedAt: new Date().toISOString(),
-      };
-    }
+    // Real, durable activity for the signed-in user. These are the numbers the
+    // dashboard cards claim to show, so they are read from the database rather
+    // than from any sample data.
+    const [{ data: periodInteractions }, { data: observationRows }, { data: clipRows }] =
+      await Promise.all([
+        supabase
+          .from("interactions")
+          .select("id")
+          .eq("mentor_id", userId)
+          .gte("occurred_at", periodFrom)
+          .lte("occurred_at", periodTo),
+        supabase
+          .from("interactions")
+          .select("id, goalkeeper_name, gk_slug, player_id, occurred_at, interaction_type")
+          .eq("mentor_id", userId)
+          .eq("interaction_type", "Live Match Observation")
+          .gte("occurred_at", thirtyDaysAgo),
+        supabase
+          .from("media_assets")
+          .select("id, gk_id, media_type, created_at")
+          .eq("uploaded_by_id", userId)
+          .eq("media_type", "video")
+          .gte("created_at", data.from)
+          .lte("created_at", data.to),
+      ]);
 
-    const mentorName = mentors.find((m) => m.id === mentorId)?.name;
-    const gkById = new Map(goalkeepers.map((g) => [g.id, g]));
+    const interactionsLast14 = periodInteractions?.length ?? 0;
+    const clipsLast14 = clipRows?.length ?? 0;
+
+    // Every clip this user has uploaded, used to decide whether an observation
+    // still needs follow-up media.
+    const { data: allClipRows } = await supabase
+      .from("media_assets")
+      .select("gk_id, created_at")
+      .eq("uploaded_by_id", userId)
+      .eq("media_type", "video");
 
     const { data: fallbackMentorProfile } = usingSuperAdminFallbackMentor
       ? await supabase
@@ -164,46 +186,43 @@ export const getMentorDashboardStats = createServerFn({ method: "GET" })
     // Match Reports are read from the same canonical Sheets pipeline as the
     // report centre, then scoped to the authenticated coach identity.
     let reportsLast14 = 0;
+    let coachReports: { goalkeeper: string; match_date: string | null }[] = [];
     if (coachIdentity) {
       const { readAllRows } = await import("@/lib/match-reports/sheets.server");
       const { rows, firstDataRow } = await readAllRows();
-      reportsLast14 = countCanonicalReportsForCoach(
-        parseSheetRows(rows, firstDataRow),
-        coachIdentity,
-        data.from,
-        data.to,
-      );
+      const parsed = parseSheetRows(rows, firstDataRow);
+      reportsLast14 = countCanonicalReportsForCoach(parsed, coachIdentity, data.from, data.to);
+      const needle = coachIdentity.trim().toLowerCase();
+      coachReports = parsed
+        .filter((r) => (r.coach ?? "").trim().toLowerCase() === needle)
+        .map((r) => ({ goalkeeper: r.goalkeeper, match_date: r.match_date }));
     }
 
-    const mentorInteractions14 = interactions.filter(
-      (i) => i.mentorId === mentorId && +new Date(i.date) >= ago14 && +new Date(i.date) <= now,
-    );
-    const interactionsLast14 = mentorInteractions14.length;
+    if (!mentorId) {
+      return {
+        mentorProfileId: null,
+        coachIdentity,
+        reportsLast14,
+        interactionsLast14,
+        clipsLast14,
+        outstandingActions: 0,
+        outstandingItems: [],
+        upcomingList: [],
+        lastUpdatedAt: new Date().toISOString(),
+      };
+    }
 
-    const clipsLast14 = media.filter(
-      (m) =>
-        m.kind === "video" &&
-        (mentorName ? m.uploadedBy === mentorName : false) &&
-        +new Date(m.date) >= ago14 &&
-        +new Date(m.date) <= now,
-    ).length;
+    const gkById = new Map(goalkeepers.map((g) => [g.id, g]));
 
-    // Outstanding actions: live match observations logged by this mentor
-    // in the last 30 days that lack either a follow-up match report or a
-    // matching video clip within ±3 days of the observation date.
-    const mentorObservations = interactions.filter(
-      (i) =>
-        i.mentorId === mentorId &&
-        i.type === "Live Match Observation" &&
-        +new Date(i.date) >= now - 30 * 86400000 &&
-        +new Date(i.date) <= now - 3 * 86400000,
-    );
-    const mentorReports = reports.filter((r) => r.authorId === mentorId);
-    const mentorClips = media.filter(
-      (m) => m.kind === "video" && (mentorName ? m.uploadedBy === mentorName : false),
+    // Outstanding actions: live match observations logged by this user in the
+    // last 30 days that lack either a follow-up match report or a matching
+    // video clip within ±3 days of the observation date.
+    const mentorObservations = (observationRows ?? []).filter(
+      (i) => +new Date(i.occurred_at) <= now - 3 * 86400000,
     );
     const within3d = (a: string, b: string) =>
       Math.abs(+new Date(a) - +new Date(b)) <= 3 * 86400000;
+
 
     const outstandingItems: OutstandingActionItem[] = [];
     const mentorDisplay = mentors.find((m) => m.id === mentorId)?.name ?? "You";
