@@ -13,14 +13,8 @@ import type { SessionUser } from "@/lib/auth";
 import { logDashboardClick } from "@/lib/analytics.functions";
 import { mentorDashboardMetricCardLabels } from "./mentor-dashboard-cards";
 
-function lastNDaysSearch(days: number) {
-  const to = new Date();
-  to.setHours(23, 59, 59, 999);
-  const from = new Date();
-  from.setDate(from.getDate() - days);
-  from.setHours(0, 0, 0, 0);
-  return { from: from.toISOString(), to: to.toISOString() };
-}
+import { lastNDaysPeriod } from "@/lib/dashboard-period";
+
 
 interface Props {
   user: SessionUser;
@@ -89,10 +83,20 @@ export function MentorDashboard({ user }: Props) {
   const [filters, setFilters] = useState<string[]>([]);
   const fetchStats = useServerFn(getMentorDashboardStats);
   const queryClient = useQueryClient();
-  const periodSearch = useMemo(() => lastNDaysSearch(rangeDays), [rangeDays]);
+  const period_ = useMemo(() => lastNDaysPeriod(rangeDays), [rangeDays]);
+  const periodSearch = useMemo(() => ({ from: period_.from, to: period_.to }), [period_]);
   const { data, isLoading, isError, refetch } = useQuery({
-    queryKey: ["mentor-dashboard-stats", rangeDays, periodSearch.from, periodSearch.to],
-    queryFn: () => fetchStats({ data: { days: rangeDays, ...periodSearch } }),
+    queryKey: ["mentor-dashboard-stats", rangeDays, period_.from, period_.to],
+    queryFn: () =>
+      fetchStats({
+        data: {
+          days: rangeDays,
+          from: period_.from,
+          to: period_.to,
+          fromDate: period_.fromDate,
+          toDate: period_.toDate,
+        },
+      }),
   });
 
   useEffect(() => {

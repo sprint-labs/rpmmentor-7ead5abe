@@ -23,18 +23,11 @@ import { MentorDashboard } from "@/components/mentor/mentor-dashboard";
 import { SyncStatusChip } from "@/components/sync-status-chip";
 import { listMatchReports } from "@/lib/match-reports/reports.functions";
 
-function toLocalIsoDate(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
+import { isDateOnlyInPeriod, lastNDaysPeriod } from "@/lib/dashboard-period";
+import { getOverviewDashboardStats } from "@/lib/overview-dashboard.functions";
 
-function reportWindow(now = new Date()) {
-  const from = new Date(now);
-  from.setDate(from.getDate() - 7);
-  return { from: toLocalIsoDate(from), to: toLocalIsoDate(now) };
-}
+const OVERVIEW_PERIOD_DAYS = 14;
+
 
 export const Route = createFileRoute("/")({ component: Dashboard });
 
@@ -51,17 +44,22 @@ function Dashboard() {
     staleTime: 30_000,
     retry: 1,
   });
-  const reportsWindow = reportWindow();
-  const reportsThisWeek = reportsData?.reports.filter((report) => {
-    if (!report.match_date) return false;
-    const from = new Date(`${reportsWindow.from}T00:00:00`).getTime();
-    const to = new Date(`${reportsWindow.to}T23:59:59.999`).getTime();
-    const matchDate = new Date(`${report.match_date}T00:00:00`).getTime();
-    return Number.isFinite(matchDate) && matchDate >= from && matchDate <= to;
-  }).length;
+  // One shared window for every period-scoped KPI card on this page, matching
+  // the window used by the mentor Interactions card.
+  const period = useMemo(() => lastNDaysPeriod(OVERVIEW_PERIOD_DAYS), []);
+  const fetchOverview = useServerFn(getOverviewDashboardStats);
+  const { data: overview } = useQuery({
+    queryKey: ["overview-dashboard-stats", period.fromDate, period.toDate],
+    queryFn: () => fetchOverview({ data: { fromDate: period.fromDate, toDate: period.toDate } }),
+    enabled: Boolean(user && user.role !== "mentor"),
+    staleTime: 30_000,
+  });
+  const reportsInPeriod = reportsData?.reports.filter((report) =>
+    isDateOnlyInPeriod(report.match_date, period.fromDate, period.toDate),
+  ).length;
   const reportsSearch = {
-    from: reportsWindow.from,
-    to: reportsWindow.to,
+    from: period.fromDate,
+    to: period.toDate,
     coach: "",
     mentorProfileId: "",
     source: "",
@@ -71,6 +69,14 @@ function Dashboard() {
     matchDate: "",
     opponent: "",
   };
+  const interactionsSearch = {
+    from: period.from,
+    to: period.to,
+    mentorId: "",
+    type: "",
+    source: "interactions-logged",
+  };
+
 
   useEffect(() => {
     if (!user) navigate({ to: "/login", search: { next: "/" }, replace: true });
@@ -143,30 +149,37 @@ function Dashboard() {
           className="block rounded-lg transition-transform hover:-translate-y-0.5 hover:ring-1 hover:ring-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
           aria-label="View goalkeepers"
         >
-          <StatCard label="Total Goalkeepers" value={stats.totalGks} hint="Across all tiers" />
-        </Link>
-        <Link
-          to="/interactions"
-          className="block rounded-lg transition-transform hover:-translate-y-0.5 hover:ring-1 hover:ring-info/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-info"
-          aria-label="View upcoming interactions"
-        >
           <StatCard
-            label="Upcoming Interactions"
-            value={stats.upcomingInteractions}
-            hint="Next 14 days"
-            accent="info"
+            label="Total Goalkeepers"
+            value={overview?.totalGoalkeepers ?? "…"}
+            hint="Player records on file"
           />
         </Link>
         <Link
           to="/interactions"
-          className="block rounded-lg transition-transform hover:-translate-y-0.5 hover:ring-1 hover:ring-destructive/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive"
-          aria-label="View overdue interactions"
+          search={interactionsSearch}
+          className="block rounded-lg transition-transform hover:-translate-y-0.5 hover:ring-1 hover:ring-info/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-info"
+          aria-label="View interactions logged"
         >
           <StatCard
-            label="Overdue Interactions"
-            value={stats.overdueInteractions}
-            hint="Action required"
+            label="Interactions Logged"
+            value={overview?.interactionsInPeriod ?? "…"}
+            hint={`Last ${OVERVIEW_PERIOD_DAYS} days`}
+            accent="info"
+            emptyMessage="None logged"
+          />
+        </Link>
+        <Link
+          to="/goalkeepers"
+          className="block rounded-lg transition-transform hover:-translate-y-0.5 hover:ring-1 hover:ring-destructive/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive"
+          aria-label="View overdue goalkeepers"
+        >
+          <StatCard
+            label="Overdue Duty of Care"
+            value={interactionsLoading ? "…" : interactionsError ? "—" : dutyOverview.overdue}
+            hint={interactionsError ? "Count unavailable" : "Past tier cadence"}
             accent="destructive"
+            emptyMessage="All caught up"
           />
         </Link>
         <Link
@@ -176,9 +189,9 @@ function Dashboard() {
           aria-label="View match reports"
         >
           <StatCard
-            label="Reports This Week"
-            value={reportsLoading ? "…" : reportsError || reportsThisWeek == null ? "—" : reportsThisWeek}
-            hint={reportsError ? "Report count unavailable" : "Last 7 days"}
+            label="Match Reports Submitted"
+            value={reportsLoading ? "…" : reportsError || reportsInPeriod == null ? "—" : reportsInPeriod}
+            hint={reportsError ? "Report count unavailable" : `Last ${OVERVIEW_PERIOD_DAYS} days`}
             accent="primary"
             emptyMessage="None submitted"
           />
@@ -188,8 +201,13 @@ function Dashboard() {
           className="block rounded-lg transition-transform hover:-translate-y-0.5 hover:ring-1 hover:ring-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
           aria-label="View mentors"
         >
-          <StatCard label="Active Mentors" value={stats.activeMentors} hint="In rotation" />
+          <StatCard
+            label="Active Mentors"
+            value={overview?.activeMentors ?? "…"}
+            hint="Accounts with mentor access"
+          />
         </Link>
+
       </div>
       <Card className="p-4">
         <SectionTitle action={<Link to="/goalkeepers" className="text-xs text-primary inline-flex items-center gap-1">View goalkeepers <ArrowUpRight className="size-3" /></Link>}>

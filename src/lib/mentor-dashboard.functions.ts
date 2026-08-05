@@ -95,10 +95,15 @@ const dashboardInputSchema = z
     days: z.coerce.number().int().min(1).max(60).default(14),
     from: z.string().datetime({ offset: true }),
     to: z.string().datetime({ offset: true }),
+    // Local calendar days for the same window. Used for `date` columns so the
+    // window never shifts by a day for non-UTC users.
+    fromDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+    toDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   })
   .refine((period) => new Date(period.from).getTime() <= new Date(period.to).getTime(), {
     message: "The reporting period must end after it starts.",
   });
+
 
 export const getMentorDashboardStats = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
@@ -127,8 +132,10 @@ export const getMentorDashboardStats = createServerFn({ method: "GET" })
     const days = data.days;
     const now = Date.now();
     const inRange = now + days * 86400000;
-    const periodFrom = data.from.slice(0, 10);
-    const periodTo = data.to.slice(0, 10);
+    // `occurred_at`/`match_date` are DATE columns: compare them against the
+    // caller's local calendar days, not the UTC slice of the instant.
+    const periodFrom = data.fromDate ?? data.from.slice(0, 10);
+    const periodTo = data.toDate ?? data.to.slice(0, 10);
     const thirtyDaysAgo = new Date(now - 30 * 86400000).toISOString().slice(0, 10);
 
     // Real, durable activity for the signed-in user. These are the numbers the
@@ -191,7 +198,8 @@ export const getMentorDashboardStats = createServerFn({ method: "GET" })
       const { readAllRows } = await import("@/lib/match-reports/sheets.server");
       const { rows, firstDataRow } = await readAllRows();
       const parsed = parseSheetRows(rows, firstDataRow);
-      reportsLast14 = countCanonicalReportsForCoach(parsed, coachIdentity, data.from, data.to);
+      // Same calendar-day window as the Interactions card.
+      reportsLast14 = countCanonicalReportsForCoach(parsed, coachIdentity, periodFrom, periodTo);
       const needle = coachIdentity.trim().toLowerCase();
       coachReports = parsed
         .filter((r) => (r.coach ?? "").trim().toLowerCase() === needle)
