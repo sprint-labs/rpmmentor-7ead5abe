@@ -368,99 +368,100 @@ export function InteractionForm({ onDone }: { onDone: () => void }) {
         </div>
       )}
 
+      <fieldset disabled={saving} className="space-y-4 border-0 p-0 m-0 min-w-0">
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Goalkeeper" required error={showErrors ? errors.gkId : undefined}>
+            <select
+              aria-label="Goalkeeper"
+              aria-invalid={showErrors && !!errors.gkId}
+              aria-required="true"
+              className={`${selectCls} ${showErrors && errors.gkId ? "border-destructive focus:ring-destructive/40" : ""}`}
+              value={gkId}
+              onChange={(e) => { setGkId(e.target.value); clearFieldError("gkId"); }}
+              onBlur={() => { if (!gkId) setErrors((prev) => ({ ...prev, gkId: "Select a goalkeeper" })); }}
+            >
+              <option value="" disabled>Select…</option>
+              {goalkeepers.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+            </select>
+          </Field>
+          <Field label="Interaction Type" required>
+            <select aria-label="Interaction Type" className={selectCls} required value={type} onChange={(e) => setType(e.target.value as InteractionTypeValue)}>
+              {INTERACTION_TYPES.map((t) => <option key={t}>{t}</option>)}
+            </select>
+          </Field>
+          <Field label="Club">
+            <input aria-label="Club" className={inputCls} value={club} onChange={(e) => handleClubChange(e.target.value)} placeholder="e.g. Brighton & Hove Albion" maxLength={80} />
+            {clubAutoFilled ? (
+              <p className="mt-1 text-[11px] text-muted-foreground">Auto-filled from roster · edit to override</p>
+            ) : autoFilledClubRef.current ? (
+              <button type="button" onClick={resetClub} className="mt-1 inline-flex items-center gap-1 text-[11px] text-primary hover:text-primary/80">
+                <RotateCcw className="size-3" /> Reset to roster club
+              </button>
+            ) : null}
+          </Field>
 
-      <div className="grid grid-cols-2 gap-3">
-        <Field label="Goalkeeper" required error={showErrors ? errors.gkId : undefined}>
-          <select
-            aria-label="Goalkeeper"
-            aria-invalid={showErrors && !!errors.gkId}
-            aria-required="true"
-            className={`${selectCls} ${showErrors && errors.gkId ? "border-destructive focus:ring-destructive/40" : ""}`}
-            value={gkId}
-            onChange={(e) => { setGkId(e.target.value); clearFieldError("gkId"); }}
-            onBlur={() => { if (!gkId) setErrors((prev) => ({ ...prev, gkId: "Select a goalkeeper" })); }}
-          >
-            <option value="" disabled>Select…</option>
-            {goalkeepers.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
-          </select>
-        </Field>
-        <Field label="Interaction Type" required>
-          <select aria-label="Interaction Type" className={selectCls} required value={type} onChange={(e) => setType(e.target.value as InteractionTypeValue)}>
-            {INTERACTION_TYPES.map((t) => <option key={t}>{t}</option>)}
-          </select>
-        </Field>
-        <Field label="Club">
-          <input aria-label="Club" className={inputCls} value={club} onChange={(e) => handleClubChange(e.target.value)} placeholder="e.g. Brighton & Hove Albion" maxLength={80} />
-          {clubAutoFilled ? (
-            <p className="mt-1 text-[11px] text-muted-foreground">Auto-filled from roster · edit to override</p>
-          ) : autoFilledClubRef.current ? (
-            <button type="button" onClick={resetClub} className="mt-1 inline-flex items-center gap-1 text-[11px] text-primary hover:text-primary/80">
-              <RotateCcw className="size-3" /> Reset to roster club
-            </button>
-          ) : null}
-        </Field>
+          <Field label="Date" required error={showErrors ? errors.date : undefined}>
+            <input
+              aria-label="Date"
+              aria-invalid={showErrors && !!errors.date}
+              aria-required="true"
+              type="date"
+              className={`${inputCls} ${showErrors && errors.date ? "border-destructive focus:ring-destructive/40" : ""}`}
+              value={date}
+              onChange={(e) => { setDate(e.target.value); clearFieldError("date"); }}
+              onBlur={() => { if (!date) setErrors((prev) => ({ ...prev, date: "Date is required" })); }}
+            />
+          </Field>
+          <Field label="Outcome" required error={showErrors ? errors.outcome : undefined}>
+            <select
+              aria-label="Outcome"
+              aria-invalid={showErrors && !!errors.outcome}
+              aria-required="true"
+              className={`${selectCls} ${showErrors && errors.outcome ? "border-destructive focus:ring-destructive/40" : ""}`}
+              value={outcome}
+              onChange={(e) => { setOutcome(e.target.value); clearFieldError("outcome"); }}
+              onBlur={() => { if (!outcome) setErrors((prev) => ({ ...prev, outcome: "Select an outcome" })); }}
+            >
+              <option value="" disabled>Select…</option>
+              {INTERACTION_OUTCOMES.map((t) => <option key={t}>{t}</option>)}
+            </select>
+          </Field>
 
-        <Field label="Date" required error={showErrors ? errors.date : undefined}>
-          <input
-            aria-label="Date"
-            aria-invalid={showErrors && !!errors.date}
+        </div>
+        <HandwrittenNotesField
+          context={gk ? `Session notes about ${gk.name} (${club || gk.club})` : undefined}
+          onTranscribed={(text, mode) => { setNotes((prev) => mode === "replace" || !prev.trim() ? text : `${prev.trim()}\n\n${text}`); clearFieldError("notes"); }}
+        />
+        <VoiceNoteField
+          onTranscribed={(text, mode) => { setNotes((prev) => mode === "replace" || !prev.trim() ? text : `${prev.trim()}\n\n${text}`); clearFieldError("notes"); }}
+        />
+        <Field label="Notes" required error={showErrors ? errors.notes : undefined}>
+          <textarea
+            aria-label="Notes"
+            aria-invalid={showErrors && !!errors.notes}
             aria-required="true"
-            type="date"
-            className={`${inputCls} ${showErrors && errors.date ? "border-destructive focus:ring-destructive/40" : ""}`}
-            value={date}
-            onChange={(e) => { setDate(e.target.value); clearFieldError("date"); }}
-            onBlur={() => { if (!date) setErrors((prev) => ({ ...prev, date: "Date is required" })); }}
+            rows={5}
+            className={`${taCls} ${showErrors && errors.notes ? "border-destructive focus:ring-destructive/40" : ""}`}
+            placeholder="What did you observe? Or use the camera/mic above to transcribe notes."
+            value={notes}
+            onChange={(e) => { setNotes(e.target.value); clearFieldError("notes"); }}
+            onBlur={() => { if (!notes.trim()) setErrors((prev) => ({ ...prev, notes: "Notes are required" })); }}
           />
         </Field>
-        <Field label="Outcome" required error={showErrors ? errors.outcome : undefined}>
-          <select
-            aria-label="Outcome"
-            aria-invalid={showErrors && !!errors.outcome}
+        <Field label="Follow-up Action" required error={showErrors ? errors.followUp : undefined}>
+          <input
+            aria-label="Follow-up Action"
+            aria-invalid={showErrors && !!errors.followUp}
             aria-required="true"
-            className={`${selectCls} ${showErrors && errors.outcome ? "border-destructive focus:ring-destructive/40" : ""}`}
-            value={outcome}
-            onChange={(e) => { setOutcome(e.target.value); clearFieldError("outcome"); }}
-            onBlur={() => { if (!outcome) setErrors((prev) => ({ ...prev, outcome: "Select an outcome" })); }}
-          >
-            <option value="" disabled>Select…</option>
-            {INTERACTION_OUTCOMES.map((t) => <option key={t}>{t}</option>)}
-          </select>
+            className={`${inputCls} ${showErrors && errors.followUp ? "border-destructive focus:ring-destructive/40" : ""}`}
+            placeholder="e.g. Schedule video review next week"
+            value={followUp}
+            onChange={(e) => { setFollowUp(e.target.value); clearFieldError("followUp"); }}
+            onBlur={() => { if (!followUp.trim()) setErrors((prev) => ({ ...prev, followUp: "Follow-up action is required" })); }}
+            maxLength={200}
+          />
         </Field>
-
-      </div>
-      <HandwrittenNotesField
-        context={gk ? `Session notes about ${gk.name} (${club || gk.club})` : undefined}
-        onTranscribed={(text, mode) => { setNotes((prev) => mode === "replace" || !prev.trim() ? text : `${prev.trim()}\n\n${text}`); clearFieldError("notes"); }}
-      />
-      <VoiceNoteField
-        onTranscribed={(text, mode) => { setNotes((prev) => mode === "replace" || !prev.trim() ? text : `${prev.trim()}\n\n${text}`); clearFieldError("notes"); }}
-      />
-      <Field label="Notes" required error={showErrors ? errors.notes : undefined}>
-        <textarea
-          aria-label="Notes"
-          aria-invalid={showErrors && !!errors.notes}
-          aria-required="true"
-          rows={5}
-          className={`${taCls} ${showErrors && errors.notes ? "border-destructive focus:ring-destructive/40" : ""}`}
-          placeholder="What did you observe? Or use the camera/mic above to transcribe notes."
-          value={notes}
-          onChange={(e) => { setNotes(e.target.value); clearFieldError("notes"); }}
-          onBlur={() => { if (!notes.trim()) setErrors((prev) => ({ ...prev, notes: "Notes are required" })); }}
-        />
-      </Field>
-      <Field label="Follow-up Action" required error={showErrors ? errors.followUp : undefined}>
-        <input
-          aria-label="Follow-up Action"
-          aria-invalid={showErrors && !!errors.followUp}
-          aria-required="true"
-          className={`${inputCls} ${showErrors && errors.followUp ? "border-destructive focus:ring-destructive/40" : ""}`}
-          placeholder="e.g. Schedule video review next week"
-          value={followUp}
-          onChange={(e) => { setFollowUp(e.target.value); clearFieldError("followUp"); }}
-          onBlur={() => { if (!followUp.trim()) setErrors((prev) => ({ ...prev, followUp: "Follow-up action is required" })); }}
-          maxLength={200}
-        />
-      </Field>
+      </fieldset>
 
       <div className="flex justify-end gap-2 pt-2">
         <button type="button" onClick={onDone} className="h-9 px-3 rounded-md border border-border text-sm" disabled={saving}>Cancel</button>
