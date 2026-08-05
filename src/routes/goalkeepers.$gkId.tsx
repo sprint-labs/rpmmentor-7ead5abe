@@ -542,12 +542,34 @@ function GkDetail() {
           </Card>
 
           <Card className="p-4">
-            <SectionTitle>Media ({gkMedia.length})</SectionTitle>
+            <div className="flex items-center justify-between gap-2">
+              <SectionTitle>Media ({gkMedia.length})</SectionTitle>
+              {can("media.upload") && (
+                <button
+                  onClick={() => setWorkflow("media")}
+                  className="inline-flex items-center gap-1 h-7 px-2 rounded-md border border-border text-[11px] hover:bg-accent"
+                >
+                  <Upload className="size-3.5" /> Upload
+                </button>
+              )}
+            </div>
             <div className="space-y-1.5">
+              {mediaLoading && <p className="text-xs text-muted-foreground">Loading media…</p>}
+              {mediaError && <p className="text-xs text-destructive">{mediaError}</p>}
+              {!mediaLoading && !mediaError && gkMedia.length === 0 && (
+                <p className="text-xs text-muted-foreground">No media linked to {gk.name} yet.</p>
+              )}
               {gkMedia.map((m) => (
                 <div key={m.id} className="flex items-center justify-between gap-2 text-xs">
-                  <span className="min-w-0 flex-1 truncate">{m.title}</span>
-                  <Pill>{m.kind}</Pill>
+                  <button
+                    onClick={() => { void openAsset(m, user); }}
+                    className="min-w-0 flex-1 truncate text-left hover:underline inline-flex items-center gap-1"
+                    title={`${m.title} · ${formatBytes(m.file_size)}`}
+                  >
+                    <ExternalLink className="size-3 shrink-0 text-muted-foreground" />
+                    <span className="truncate">{m.title}</span>
+                  </button>
+                  <Pill>{m.media_type}</Pill>
                 </div>
               ))}
             </div>
