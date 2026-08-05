@@ -10,9 +10,10 @@ import { createInteraction } from "@/lib/interactions.functions";
 import { interactionsQueryKey } from "@/lib/interactions/use-interactions";
 import type { LoggedInteraction } from "@/lib/interactions/schema";
 import {
-  INTERACTION_TYPES, INTERACTION_OUTCOMES, todayDateOnly,
+  INTERACTION_TYPES, INTERACTION_OUTCOMES, todayDateOnly, formatDateOnly,
   type InteractionTypeValue,
 } from "@/lib/interactions/schema";
+import { reconcileInteraction } from "@/lib/interactions/map";
 import { useAuth, type SessionUser } from "@/lib/auth";
 import {
   ACCEPT_BY_KIND, MAX_FILE_BYTES, detectKind, formatBytes, uploadMedia,
