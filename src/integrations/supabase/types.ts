@@ -503,6 +503,30 @@ export type Database = {
         }
         Relationships: []
       }
+      purged_demo_records: {
+        Row: {
+          created_at: string
+          fingerprint: string
+          id: string
+          reason: string
+          table_name: string
+        }
+        Insert: {
+          created_at?: string
+          fingerprint: string
+          id?: string
+          reason?: string
+          table_name: string
+        }
+        Update: {
+          created_at?: string
+          fingerprint?: string
+          id?: string
+          reason?: string
+          table_name?: string
+        }
+        Relationships: []
+      }
       report_attachments: {
         Row: {
           attached_by_id: string | null
@@ -570,6 +594,10 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      interaction_demo_fingerprint: {
+        Args: { _goalkeeper_name: string; _notes: string; _occurred_at: string }
+        Returns: string
       }
     }
     Enums: {
