@@ -2,11 +2,13 @@
  * Roster (players) server functions.
  *
  * `public.players` is the source of truth for the RPM goalkeeper roster.
- * Reads are available to any authenticated user; writes are restricted to
- * super admins via RLS policies on the table itself.
+ * Reads are available to any authenticated user. Club corrections are limited
+ * to mentor_manager, admin and super_admin — by role, never by name or email —
+ * and enforced by RLS on the table itself as well as by the check below.
  */
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { CLUB_EDIT_ROLES, requireRole } from "@/lib/roles.server";
 
 export interface PlayerRosterRow {
   id: string;
@@ -55,8 +57,14 @@ export const getPlayer = createServerFn({ method: "GET" })
 
 /**
  * Update ONLY `players.current_club`, targeted strictly by `players.id`.
- * Success requires an authorised read-back of the persisted value; RLS decides
- * who may write (currently super_admin only).
+ *
+ * Authorisation is enforced in three independent places, because hiding a
+ * button is not security:
+ *   1. the role check below, which produces a clear message;
+ *   2. the `players_update_club_authorised` RLS policy;
+ *   3. a database trigger that rejects any change to a column other than
+ *      `current_club` for non-super-admins.
+ * Success additionally requires a read-back confirming the persisted value.
  */
 export const updatePlayerClub = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -70,6 +78,8 @@ export const updatePlayerClub = createServerFn({ method: "POST" })
     return { id: data.id, currentClub };
   })
   .handler(async ({ data, context }): Promise<PlayerRosterRow> => {
+    await requireRole(context.supabase, context.userId, CLUB_EDIT_ROLES, "update a player's club");
+
     const { error } = await context.supabase
       .from("players")
       .update({ current_club: data.currentClub })

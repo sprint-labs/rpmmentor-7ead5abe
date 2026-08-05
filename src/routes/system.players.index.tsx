@@ -23,7 +23,7 @@ export const Route = createFileRoute("/system/players/")({
 
 function PlayerRecordsPage() {
   return (
-    <RequirePermission permission="system.manage">
+    <RequirePermission permission="players.edit_club">
       <PlayerRecordsInner />
     </RequirePermission>
   );
@@ -51,7 +51,10 @@ function PlayerRecordsInner() {
     <div className="p-4 md:p-6 space-y-4">
       <div>
         <h1 className="text-lg font-semibold">Player Records</h1>
-        <p className="text-xs text-muted-foreground">Canonical database records. Editing current club requires super admin permission.</p>
+        <p className="text-xs text-muted-foreground">
+          Canonical database records. Current club can be corrected by managers, admins and super
+          admins.
+        </p>
       </div>
 
       <div className="relative max-w-sm">

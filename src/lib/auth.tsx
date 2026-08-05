@@ -45,9 +45,17 @@ export type Permission =
   | "goalkeepers.view"
   | "goalkeepers.edit"
   | "goalkeepers.create"
+  /**
+   * Correct the club stored on a canonical player record. Mirrors the
+   * `players_update_club_authorised` RLS policy and `CLUB_EDIT_ROLES` — this
+   * only decides what the UI offers; the database decides what is allowed.
+   */
+  | "players.edit_club"
   | "mentors.view"
   | "interactions.view"
   | "interactions.log"
+  /** Correct an interaction someone else logged. */
+  | "interactions.manage"
   | "reports.view"
   | "reports.submit"
   | "reports.manage"
@@ -71,15 +79,18 @@ const MENTOR: Permission[] = [
 const MENTOR_MANAGER: Permission[] = [
   ...MENTOR,
   "goalkeepers.edit", "goalkeepers.create",
+  "players.edit_club",
   "mentors.view",
+  "interactions.manage",
   "reports.manage",
   "audit.view",
 ];
 
 const ADMIN: Permission[] = [
   "goalkeepers.view", "goalkeepers.edit", "goalkeepers.create",
+  "players.edit_club",
   "mentors.view",
-  "interactions.view",
+  "interactions.view", "interactions.manage",
   "reports.view", "reports.manage",
   "media.view", "media.edit",
   "alerts.view", "calendar.view",
