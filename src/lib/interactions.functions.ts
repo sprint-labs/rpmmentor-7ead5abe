@@ -45,19 +45,25 @@ export const createInteraction = createServerFn({ method: "POST" })
       throw new Error("No mentor profile found for the signed-in user.");
     }
 
-    // Roster link: resolved server-side by name, not trusted from the client.
-    const { data: player } = await supabase
-      .from("players")
-      .select("id, full_name")
-      .ilike("full_name", data.goalkeeperName)
-      .maybeSingle();
+    // Roster link: ONLY a submitted canonical players.id, re-confirmed to
+    // exist. No name matching of any kind — an unmatched selection saves null
+    // rather than blocking an otherwise valid interaction.
+    let playerId: string | null = null;
+    if (data.playerId) {
+      const { data: player } = await supabase
+        .from("players")
+        .select("id")
+        .eq("id", data.playerId)
+        .maybeSingle();
+      playerId = player?.id ?? null;
+    }
 
     const { data: inserted, error } = await supabase
       .from("interactions")
       .insert({
         mentor_id: userId,
         mentor_name: profile.name || profile.email || "",
-        player_id: player?.id ?? null,
+        player_id: playerId,
         goalkeeper_name: data.goalkeeperName,
         gk_slug: data.gkSlug ?? "",
         interaction_type: data.interactionType,

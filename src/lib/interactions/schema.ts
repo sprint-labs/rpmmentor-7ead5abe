@@ -34,7 +34,15 @@ export const DUTY_QUALIFYING_INTERACTION_TYPES: readonly InteractionTypeValue[] 
 
 const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export const createInteractionInput = z.object({
+  /**
+   * Canonical `public.players.id`, present ONLY when the submitted selection
+   * was a real player record. Never derived from a name. The server
+   * re-confirms the row exists before storing it; anything else saves null.
+   */
+  playerId: z.string().regex(UUID, "playerId must be a players.id").nullish(),
   /** UI roster slug (e.g. "gk-james-beadle") — display identity only. */
   gkSlug: z.string().trim().max(120).default(""),
   goalkeeperName: z.string().trim().min(1, "Select a goalkeeper").max(120),

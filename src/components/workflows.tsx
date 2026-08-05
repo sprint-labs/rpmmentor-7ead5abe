@@ -273,7 +273,26 @@ export function InteractionForm({ onDone }: { onDone: () => void }) {
     return map;
   }, [players]);
 
+  /**
+   * The selected option. A canonical `players.id` is carried ONLY when the
+   * user picked a real player record; legacy roster profiles link to nothing.
+   */
+  const selectedPlayer = useMemo(() => players.find((p) => p.id === gkId) ?? null, [players, gkId]);
+  const selection = useMemo(() => {
+    if (selectedPlayer) return { name: selectedPlayer.full_name, slug: "", playerId: selectedPlayer.id };
+    if (gk) return { name: gk.name, slug: gk.id, playerId: null as string | null };
+    return null;
+  }, [selectedPlayer, gk]);
+
   useEffect(() => {
+    if (selectedPlayer) {
+      const canOverwritePlayerClub = !club.trim() || club === autoFilledClubRef.current;
+      if (!canOverwritePlayerClub || club === selectedPlayer.current_club) return;
+      setClub(selectedPlayer.current_club);
+      autoFilledClubRef.current = selectedPlayer.current_club;
+      setClubAutoFilled(true);
+      return;
+    }
     if (!gk) return;
     const match = playersByName.get(gk.name.trim().toLowerCase());
     if (!match) return;
@@ -283,7 +302,7 @@ export function InteractionForm({ onDone }: { onDone: () => void }) {
     setClub(match.current_club);
     autoFilledClubRef.current = match.current_club;
     setClubAutoFilled(true);
-  }, [gk, playersByName, club]);
+  }, [gk, selectedPlayer, playersByName, club]);
 
   function handleClubChange(v: string) {
     setClub(v);
@@ -331,7 +350,7 @@ export function InteractionForm({ onDone }: { onDone: () => void }) {
       setError(null);
       return;
     }
-    if (saving || !gk) return;
+    if (saving || !selection) return;
     setSaving(true);
     setError(null);
     setShowErrors(false);
@@ -340,9 +359,9 @@ export function InteractionForm({ onDone }: { onDone: () => void }) {
     const optimisticId = `optimistic-${Date.now()}-${Math.random().toString(36).slice(2)}`;
     const optimisticRow = {
       id: optimisticId,
-      gkSlug: gk.id,
-      goalkeeperName: gk.name,
-      playerId: null,
+      gkSlug: selection.slug,
+      goalkeeperName: selection.name,
+      playerId: selection.playerId,
       mentorId: "",
       mentorName: "",
       interactionType: type,
@@ -364,8 +383,9 @@ export function InteractionForm({ onDone }: { onDone: () => void }) {
     try {
       const saved = await createFn({
         data: {
-          gkSlug: gk.id,
-          goalkeeperName: gk.name,
+          playerId: selection.playerId,
+          gkSlug: selection.slug,
+          goalkeeperName: selection.name,
           interactionType: type,
           club: club.trim(),
           occurredAt: date,
@@ -385,7 +405,7 @@ export function InteractionForm({ onDone }: { onDone: () => void }) {
         return next;
       });
       await queryClient.invalidateQueries({ queryKey: interactionsQueryKey });
-      const shownName = confirmed.goalkeeperName || gk.name;
+      const shownName = confirmed.goalkeeperName || selection.name;
       const shownType = confirmed.interactionType || type;
       const shownDate = formatDateOnly(confirmed.occurredAt || date);
       toast.success("Interaction saved", {
@@ -430,7 +450,14 @@ export function InteractionForm({ onDone }: { onDone: () => void }) {
               onBlur={() => { if (!gkId) setErrors((prev) => ({ ...prev, gkId: "Select a goalkeeper" })); }}
             >
               <option value="" disabled>Select…</option>
-              {goalkeepers.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+              {players.length > 0 && (
+                <optgroup label="Player records">
+                  {players.map((p) => <option key={p.id} value={p.id}>{p.full_name}</option>)}
+                </optgroup>
+              )}
+              <optgroup label="Legacy profiles (no player record)">
+                {goalkeepers.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+              </optgroup>
             </select>
           </Field>
           <Field label="Interaction Type" required>

@@ -28,6 +28,7 @@ const NAV: NavItem[] = [
   { to: "/system/users", label: "Users & Roles", icon: ShieldCheck, perm: "system.manage" },
   { to: "/system/permissions", label: "Permission Check", icon: ShieldCheck, perm: "system.manage" },
   { to: "/system/integrations", label: "Integrations", icon: Plug, perm: "system.manage" },
+  { to: "/system/players", label: "Player Records", icon: Database, perm: "system.manage" },
   { to: "/system/data-quality", label: "Data Quality", icon: Database, perm: "system.manage" },
 ];
 
