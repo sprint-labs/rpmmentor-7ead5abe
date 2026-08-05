@@ -349,6 +349,9 @@ export function InteractionForm({ onDone }: { onDone: () => void }) {
       // Only a confirmed inserted row counts as success.
       if (!saved?.id) throw new Error("The interaction could not be confirmed as saved.");
       await queryClient.invalidateQueries({ queryKey: interactionsQueryKey });
+      toast.success("Interaction saved", {
+        description: `${type} with ${gk.name} on ${date} — now on the timeline.`,
+      });
       setSavedSummary(`Interaction logged successfully — ${type} with ${gk.name} on ${date}. It's now in the interactions log.`);
       setDone(true);
 
