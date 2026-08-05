@@ -11,6 +11,7 @@ import {
   selectCoachProfileForDashboard,
   type DashboardCoachProfile,
 } from "@/lib/mentor-dashboard-report-count";
+import { DASHBOARD_INTERACTION_TYPES } from "@/lib/interactions/schema";
 
 export type UpcomingPlannedType =
   | "Coffee Catch Up"

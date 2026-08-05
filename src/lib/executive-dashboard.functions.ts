@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
 import { parseSheetRows } from "@/lib/match-reports/schema";
+import { DASHBOARD_INTERACTION_TYPES } from "@/lib/interactions/schema";
 
 export interface ExecutiveBar {
   label: string;

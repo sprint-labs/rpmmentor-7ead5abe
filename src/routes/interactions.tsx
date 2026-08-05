@@ -6,7 +6,7 @@ import { getGk, getMentor, formatRelative } from "@/lib/mock-data";
 import { useInteractionsPage } from "@/lib/interactions/use-interactions";
 import {
   formatDateOnly,
-  INTERACTION_TYPES,
+  DASHBOARD_INTERACTION_TYPES,
   INTERACTIONS_PAGE_SIZE,
   type InteractionTypeValue,
   type ListInteractionsQuery,
@@ -42,11 +42,12 @@ export const Route = createFileRoute("/interactions")({
   component: withPermission(InteractionsPage, "interactions.view"),
 });
 
-const TYPES = ["All", ...INTERACTION_TYPES] as const;
+// Live Match Observation is excluded: it is a Match Report by-product and is
+// not counted or filtered as an interaction anywhere in the dashboards.
+const TYPES = ["All", ...DASHBOARD_INTERACTION_TYPES] as const;
 type TypeChip = (typeof TYPES)[number];
 
 const PLANNED_TO_TYPE: Record<string, TypeChip> = {
-  "Attend Live Match": "Live Match Observation",
   "Training Ground Visit": "Training Ground Visit",
   "Coffee Catch Up": "Coffee Catch Up",
 };
