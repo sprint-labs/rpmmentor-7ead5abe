@@ -8,6 +8,7 @@ import { goalkeepers } from "@/lib/mock-data";
 import { listPlayers, type PlayerRosterRow } from "@/lib/players.functions";
 import { createInteraction } from "@/lib/interactions.functions";
 import { interactionsQueryKey } from "@/lib/interactions/use-interactions";
+import type { LoggedInteraction } from "@/lib/interactions/schema";
 import {
   INTERACTION_TYPES, INTERACTION_OUTCOMES, todayDateOnly,
   type InteractionTypeValue,
