@@ -13,14 +13,8 @@ import type { SessionUser } from "@/lib/auth";
 import { logDashboardClick } from "@/lib/analytics.functions";
 import { mentorDashboardMetricCardLabels } from "./mentor-dashboard-cards";
 
-function lastNDaysSearch(days: number) {
-  const to = new Date();
-  to.setHours(23, 59, 59, 999);
-  const from = new Date();
-  from.setDate(from.getDate() - days);
-  from.setHours(0, 0, 0, 0);
-  return { from: from.toISOString(), to: to.toISOString() };
-}
+import { lastNDaysPeriod } from "@/lib/dashboard-period";
+
 
 interface Props {
   user: SessionUser;
