@@ -103,6 +103,12 @@
   "overrides": {
     "@tanstack/zod-adapter": {
       "zod": "$zod"
-    }
+    },
+    "seroval": "^1.6.2",
+    "seroval-plugins": "^1.6.2"
+  },
+  "resolutions": {
+    "seroval": "^1.6.2",
+    "seroval-plugins": "^1.6.2"
   }
 }
