@@ -1,116 +1,236 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { PageHeader, Card, StatCard, SectionTitle, TierBadge, ProgressBar, Pill } from "@/components/primitives";
-import { goalkeepers, mentors, reports, interactions, stats } from "@/lib/mock-data";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { PageHeader, Card, StatCard, SectionTitle, ProgressBar } from "@/components/primitives";
 import { withPermission } from "@/components/require-permission";
+import { lastNDaysPeriod } from "@/lib/dashboard-period";
+import { getExecutiveDashboardStats } from "@/lib/executive-dashboard.functions";
 
-export const Route = createFileRoute("/executive")({ component: withPermission(Executive, "executive.view") });
+/** Same window as the Interactions card on the main dashboard. */
+const PERIOD_DAYS = 14;
+const COVERAGE_DAYS = 30;
+
+export const Route = createFileRoute("/executive")({
+  component: withPermission(Executive, "executive.view"),
+  head: () => ({
+    meta: [
+      { title: "Executive Dashboard · Mentor Hub" },
+      {
+        name: "description",
+        content:
+          "Live strategic overview of goalkeeper coverage, mentor activity and match report volume.",
+      },
+      { property: "og:title", content: "Executive Dashboard · Mentor Hub" },
+      {
+        property: "og:description",
+        content:
+          "Live strategic overview of goalkeeper coverage, mentor activity and match report volume.",
+      },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
+    ],
+  }),
+});
 
 function Executive() {
-  const reportsByType = ["Goalkeeper Development", "Match Report", "Training Report", "Opposition GK", "Recruitment"].map((t) => ({
-    type: t, count: reports.filter((r) => r.type === t).length,
-  }));
-  const pipeline = {
-    Sign: goalkeepers.filter((g) => g.recommendation === "Sign").length,
-    Monitor: goalkeepers.filter((g) => g.recommendation === "Monitor").length,
-    Loan: goalkeepers.filter((g) => g.recommendation === "Loan").length,
-    Pass: goalkeepers.filter((g) => g.recommendation === "Pass").length,
-  };
-  const coverage = Math.round((goalkeepers.filter((g) => (Date.now() - +new Date(g.lastInteraction)) / 86400000 < 30).length / goalkeepers.length) * 100);
-  const avgInteractions = (interactions.length / mentors.length).toFixed(1);
-
-  // last 8 weeks report volume
-  const weeks = Array.from({ length: 8 }).map((_, i) => {
-    const start = Date.now() - (8 - i) * 7 * 86400000;
-    const end = start + 7 * 86400000;
-    const count = reports.filter((r) => { const t = +new Date(r.date); return t >= start && t < end; }).length;
-    return { label: `W${i + 1}`, count };
+  const period = useMemo(() => lastNDaysPeriod(PERIOD_DAYS), []);
+  const fetchStats = useServerFn(getExecutiveDashboardStats);
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ["executive-dashboard-stats", period.fromDate, period.toDate],
+    queryFn: () =>
+      fetchStats({
+        data: { fromDate: period.fromDate, toDate: period.toDate, coverageDays: COVERAGE_DAYS },
+      }),
+    staleTime: 30_000,
   });
-  const maxW = Math.max(...weeks.map((w) => w.count), 1);
+
+  const placeholder = isLoading ? "…" : isError ? "—" : 0;
+  const coverage =
+    data && data.totalGoalkeepers > 0
+      ? Math.round((data.coveredGoalkeepers / data.totalGoalkeepers) * 100)
+      : null;
+  const avgInteractions =
+    data && data.activeMentors > 0
+      ? (data.interactionsInPeriod / data.activeMentors).toFixed(1)
+      : "0.0";
+  const maxWeek = Math.max(...(data?.reportWeeks.map((w) => w.count) ?? [0]), 1);
+  const maxLeader = Math.max(...(data?.mentorLeaderboard.map((m) => m.interactions) ?? [0]), 1);
+  const totalTypes = data?.interactionsByType.reduce((sum, t) => sum + t.count, 0) ?? 0;
+  const totalCompetitions = data?.reportsByCompetition.reduce((sum, t) => sum + t.count, 0) ?? 0;
+
+  const interactionsSearch = {
+    from: period.from,
+    to: period.to,
+    mentorId: "",
+    type: "",
+    source: "executive-interactions",
+  };
+  const reportsSearch = {
+    from: period.fromDate,
+    to: period.toDate,
+    coach: "",
+    mentorProfileId: "",
+    source: "executive-reports",
+    gk: "",
+    openSubmit: "",
+    last5Gk: "",
+    matchDate: "",
+    opponent: "",
+  };
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Executive Dashboard" description="Strategic overview for directors and Head of Goalkeeping." />
+      <PageHeader
+        title="Executive Dashboard"
+        description={`Strategic overview for directors and Head of Goalkeeping · live data, last ${PERIOD_DAYS} days.`}
+      />
+
+      {isError && (
+        <Card className="p-3 text-xs text-muted-foreground">
+          Live figures are unavailable right now. Try refreshing in a moment.
+        </Card>
+      )}
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <StatCard label="GK Coverage (30d)" value={`${coverage}%`} hint="Observed in last month" accent="primary" />
-        <StatCard label="Active Mentors" value={mentors.length} hint={`${avgInteractions} avg interactions ea.`} />
-        <StatCard label="Reports Submitted" value={reports.length} hint="All-time" accent="info" />
-        <StatCard label="Recruitment Targets" value={pipeline.Sign} hint="Marked as Sign" accent="warning" />
+        <Link to="/goalkeepers" className="block rounded-lg" aria-label="View goalkeepers">
+          <StatCard
+            label={`GK Coverage (${COVERAGE_DAYS}d)`}
+            value={coverage == null ? placeholder : `${coverage}%`}
+            hint={
+              data
+                ? `${data.coveredGoalkeepers} of ${data.totalGoalkeepers} player records observed`
+                : "Player records observed"
+            }
+            accent="primary"
+          />
+        </Link>
+        <Link to="/mentors" className="block rounded-lg" aria-label="View mentors">
+          <StatCard
+            label="Active Mentors"
+            value={data?.activeMentors ?? placeholder}
+            hint={`${avgInteractions} avg interactions ea. (${PERIOD_DAYS}d)`}
+          />
+        </Link>
+        <Link
+          to="/reports"
+          search={reportsSearch}
+          className="block rounded-lg"
+          aria-label="View match reports"
+        >
+          <StatCard
+            label="Reports Submitted"
+            value={data?.reportsInPeriod ?? placeholder}
+            hint={`Last ${PERIOD_DAYS} days`}
+            accent="info"
+          />
+        </Link>
+        <Link
+          to="/interactions"
+          search={interactionsSearch}
+          className="block rounded-lg"
+          aria-label="View interactions"
+        >
+          <StatCard
+            label="Interactions Logged"
+            value={data?.interactionsInPeriod ?? placeholder}
+            hint={`Last ${PERIOD_DAYS} days`}
+            accent="warning"
+          />
+        </Link>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <Card className="p-4 lg:col-span-2">
           <SectionTitle>Report Volume — Last 8 Weeks</SectionTitle>
           <div className="flex items-end gap-2 h-48">
-            {weeks.map((w) => (
+            {(data?.reportWeeks ?? []).map((w) => (
               <div key={w.label} className="flex-1 flex flex-col items-center gap-1.5">
                 <div className="text-[10px] tabular-nums font-mono text-muted-foreground">{w.count}</div>
-                <div className="w-full bg-primary/70 rounded-t hover:bg-primary transition-colors" style={{ height: `${(w.count / maxW) * 100}%` }} />
+                <div
+                  className="w-full bg-primary/70 rounded-t hover:bg-primary transition-colors"
+                  style={{ height: `${(w.count / maxWeek) * 100}%` }}
+                />
                 <div className="text-[10px] text-muted-foreground">{w.label}</div>
               </div>
             ))}
+            {!data && (
+              <div className="text-xs text-muted-foreground">
+                {isLoading ? "Loading report volume…" : "No report volume available."}
+              </div>
+            )}
           </div>
         </Card>
 
         <Card className="p-4">
-          <SectionTitle>Status Distribution</SectionTitle>
-          <div className="space-y-3">
-            {stats.tierDistribution.map((t) => {
-              const pct = Math.round((t.count / stats.totalGks) * 100);
-              const color = t.tier === "Tier 1" ? "bg-warning" : t.tier === "Tier 2" ? "bg-info" : t.tier === "Tier 3" ? "bg-primary" : t.tier === "Academy" ? "bg-tier-3" : "bg-muted-foreground/40";
-              return (
-                <div key={t.tier}>
-                  <div className="flex items-center justify-between text-xs mb-1.5"><TierBadge tier={t.tier as never} /><span className="tabular-nums font-mono">{t.count} · {pct}%</span></div>
-                  <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-                    <div className={`h-full ${color}`} style={{ width: `${pct}%` }} />
+          <SectionTitle>Interactions by Type</SectionTitle>
+          {data && data.interactionsByType.length > 0 ? (
+            <div className="space-y-2.5">
+              {data.interactionsByType.map((t) => (
+                <div key={t.label}>
+                  <div className="flex justify-between text-xs mb-1">
+                    <span className="text-muted-foreground">{t.label}</span>
+                    <span className="tabular-nums font-mono font-medium">{t.count}</span>
                   </div>
+                  <ProgressBar value={totalTypes ? (t.count / totalTypes) * 100 : 0} />
                 </div>
-              );
-            })}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-xs text-muted-foreground">
+              {isLoading ? "Loading…" : `No interactions logged in the last ${PERIOD_DAYS} days.`}
+            </p>
+          )}
         </Card>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Card className="p-4">
-          <SectionTitle>Reports by Type</SectionTitle>
-          <div className="space-y-2.5">
-            {reportsByType.map((r) => (
-              <div key={r.type}>
-                <div className="flex justify-between text-xs mb-1"><span className="text-muted-foreground">{r.type}</span><span className="tabular-nums font-mono font-medium">{r.count}</span></div>
-                <ProgressBar value={(r.count / reports.length) * 100} tone="info" />
-              </div>
-            ))}
-          </div>
+          <SectionTitle>Reports by Competition</SectionTitle>
+          {data && data.reportsByCompetition.length > 0 ? (
+            <div className="space-y-2.5">
+              {data.reportsByCompetition.map((r) => (
+                <div key={r.label}>
+                  <div className="flex justify-between text-xs mb-1">
+                    <span className="text-muted-foreground">{r.label}</span>
+                    <span className="tabular-nums font-mono font-medium">{r.count}</span>
+                  </div>
+                  <ProgressBar
+                    value={totalCompetitions ? (r.count / totalCompetitions) * 100 : 0}
+                    tone="info"
+                  />
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-xs text-muted-foreground">
+              {isLoading ? "Loading…" : `No match reports in the last ${PERIOD_DAYS} days.`}
+            </p>
+          )}
         </Card>
 
         <Card className="p-4">
-          <SectionTitle>Recruitment Pipeline</SectionTitle>
-          <div className="grid grid-cols-2 gap-3">
-            {Object.entries(pipeline).map(([k, v]) => (
-              <div key={k} className="p-3 rounded-md border border-border/60 bg-accent/20">
-                <div className="flex items-center justify-between"><Pill tone={k === "Sign" ? "success" : k === "Pass" ? "destructive" : k === "Monitor" ? "info" : "warning"}>{k}</Pill><span className="text-2xl font-semibold tabular-nums font-mono">{v}</span></div>
-                <div className="text-[11px] text-muted-foreground mt-1">{Math.round((v / goalkeepers.length) * 100)}% of pool</div>
-              </div>
-            ))}
-          </div>
+          <SectionTitle>Mentor Activity Leaderboard</SectionTitle>
+          {data && data.mentorLeaderboard.length > 0 ? (
+            <div className="space-y-2">
+              {data.mentorLeaderboard.map((m, i) => (
+                <div key={m.name} className="flex items-center gap-3">
+                  <div className="w-6 text-xs tabular-nums font-mono text-muted-foreground">{i + 1}</div>
+                  <div className="flex-1 text-sm font-medium truncate">{m.name}</div>
+                  <div className="w-32">
+                    <ProgressBar value={(m.interactions / maxLeader) * 100} />
+                  </div>
+                  <div className="text-xs tabular-nums font-mono w-8 text-right">{m.interactions}</div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-xs text-muted-foreground">
+              {isLoading ? "Loading…" : `No mentor activity in the last ${PERIOD_DAYS} days.`}
+            </p>
+          )}
         </Card>
       </div>
-
-      <Card className="p-4">
-        <SectionTitle>Mentor Activity Leaderboard</SectionTitle>
-        <div className="space-y-2">
-          {[...mentors].sort((a, b) => b.completedThisMonth - a.completedThisMonth).map((m, i) => (
-            <div key={m.id} className="flex items-center gap-3">
-              <div className="w-6 text-xs tabular-nums font-mono text-muted-foreground">{i + 1}</div>
-              <div className="w-40 text-sm font-medium truncate">{m.name}</div>
-              <div className="text-[11px] text-muted-foreground w-32 truncate">{m.region}</div>
-              <div className="flex-1"><ProgressBar value={(m.completedThisMonth / m.targetInteractions) * 100} /></div>
-              <div className="text-xs tabular-nums font-mono w-16 text-right">{m.completedThisMonth}/{m.targetInteractions}</div>
-            </div>
-          ))}
-        </div>
-      </Card>
     </div>
   );
 }
