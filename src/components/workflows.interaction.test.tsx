@@ -182,6 +182,21 @@ describe("InteractionForm (durable)", () => {
     expect(screen.queryByText(/Follow-up action is required/i)).toBeNull();
     expect(screen.queryByText(/Notes are required/i)).toBeNull();
   });
+  it("disables the form and shows a spinner on the submit button while saving", async () => {
+    createInteractionMock.mockImplementation(() => new Promise(() => {}));
+    renderForm();
+    await fillValidForm();
+    fireEvent.click(screen.getByRole("button", { name: /save interaction/i }));
 
+    await waitFor(() => expect(screen.getByRole("button", { name: /saving/i })).toBeTruthy());
+    const submitBtn = screen.getByRole("button", { name: /saving/i }) as HTMLButtonElement;
+    expect(submitBtn.disabled).toBe(true);
+    expect(submitBtn.querySelector("svg")).toBeTruthy();
+
+    expect((screen.getByLabelText("Goalkeeper") as HTMLSelectElement).disabled).toBe(true);
+    expect((screen.getByLabelText("Notes") as HTMLTextAreaElement).disabled).toBe(true);
+    expect((screen.getByLabelText("Follow-up Action") as HTMLInputElement).disabled).toBe(true);
+    expect((screen.getByRole("button", { name: /cancel/i }) as HTMLButtonElement).disabled).toBe(true);
+  });
 
 });
