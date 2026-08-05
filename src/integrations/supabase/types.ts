@@ -163,6 +163,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "interaction_media_attached_by_fkey"
+            columns: ["attached_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "interaction_media_interaction_id_fkey"
             columns: ["interaction_id"]
             isOneToOne: false
@@ -174,13 +181,6 @@ export type Database = {
             columns: ["media_id"]
             isOneToOne: false
             referencedRelation: "media_assets"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "interaction_media_attached_by_fkey"
-            columns: ["attached_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
