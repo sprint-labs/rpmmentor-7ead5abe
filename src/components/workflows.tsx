@@ -623,7 +623,7 @@ export function InteractionForm({
           </Field>
           <Field label="Interaction Type" required>
             <select aria-label="Interaction Type" className={selectCls} required value={type} onChange={(e) => setType(e.target.value as InteractionTypeValue)}>
-              {INTERACTION_TYPES.map((t) => <option key={t}>{t}</option>)}
+              {MANUAL_INTERACTION_TYPES.map((t) => <option key={t}>{t}</option>)}
             </select>
           </Field>
           {handOffToMatchReport && (
