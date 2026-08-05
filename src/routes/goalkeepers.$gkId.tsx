@@ -200,6 +200,21 @@ function GkDetail() {
               {" · "}{gk.nationality || "Nationality not recorded"}
               {" · "}{gk.age} yrs · {gk.height} · {gk.foot} foot
             </div>
+            {/* Only a genuine, stored players.id links a legacy profile to a
+                canonical Player Record. No name-based crosswalk is inferred. */}
+            {(() => {
+              const linkedPlayerId = (gk as { playerId?: string | null }).playerId ?? null;
+              return linkedPlayerId ? (
+                <div className="mt-1 text-xs">
+                  <Link to="/system/players/$playerId" params={{ playerId: linkedPlayerId }} className="text-primary hover:underline">
+                    View player record
+                  </Link>
+                </div>
+              ) : (
+                <div className="mt-1 text-xs text-muted-foreground">Player record not linked — this profile is read-only.</div>
+              );
+            })()}
+
             {gk.instagram && (
               <div className="mt-1 text-xs">
                 <a
