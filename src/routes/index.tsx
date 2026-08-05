@@ -44,17 +44,22 @@ function Dashboard() {
     staleTime: 30_000,
     retry: 1,
   });
-  const reportsWindow = reportWindow();
-  const reportsThisWeek = reportsData?.reports.filter((report) => {
-    if (!report.match_date) return false;
-    const from = new Date(`${reportsWindow.from}T00:00:00`).getTime();
-    const to = new Date(`${reportsWindow.to}T23:59:59.999`).getTime();
-    const matchDate = new Date(`${report.match_date}T00:00:00`).getTime();
-    return Number.isFinite(matchDate) && matchDate >= from && matchDate <= to;
-  }).length;
+  // One shared window for every period-scoped KPI card on this page, matching
+  // the window used by the mentor Interactions card.
+  const period = useMemo(() => lastNDaysPeriod(OVERVIEW_PERIOD_DAYS), []);
+  const fetchOverview = useServerFn(getOverviewDashboardStats);
+  const { data: overview } = useQuery({
+    queryKey: ["overview-dashboard-stats", period.fromDate, period.toDate],
+    queryFn: () => fetchOverview({ data: { fromDate: period.fromDate, toDate: period.toDate } }),
+    enabled: Boolean(user && user.role !== "mentor"),
+    staleTime: 30_000,
+  });
+  const reportsInPeriod = reportsData?.reports.filter((report) =>
+    isDateOnlyInPeriod(report.match_date, period.fromDate, period.toDate),
+  ).length;
   const reportsSearch = {
-    from: reportsWindow.from,
-    to: reportsWindow.to,
+    from: period.fromDate,
+    to: period.toDate,
     coach: "",
     mentorProfileId: "",
     source: "",
@@ -64,6 +69,14 @@ function Dashboard() {
     matchDate: "",
     opponent: "",
   };
+  const interactionsSearch = {
+    from: period.from,
+    to: period.to,
+    mentorId: "",
+    type: "",
+    source: "interactions-logged",
+  };
+
 
   useEffect(() => {
     if (!user) navigate({ to: "/login", search: { next: "/" }, replace: true });
