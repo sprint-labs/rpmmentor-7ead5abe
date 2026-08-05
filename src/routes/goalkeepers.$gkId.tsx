@@ -11,6 +11,7 @@ import { PILLAR_IDS, PILLAR_LABELS, type MatchReportRow, type PillarId } from "@
 import { ReportPreviewModal } from "@/components/report-preview-modal";
 import { WorkflowDialog, type WorkflowKind } from "@/components/workflows";
 import { useAuth } from "@/lib/auth";
+import { UpdateClubButton } from "@/components/update-club-dialog";
 
 /** Inclusive 1–5 finite numeric guard for report scores/averages. */
 function isValidScore(v: unknown): v is number {
@@ -205,10 +206,16 @@ function GkDetail() {
             {(() => {
               const linkedPlayerId = (gk as { playerId?: string | null }).playerId ?? null;
               return linkedPlayerId ? (
-                <div className="mt-1 text-xs">
+                <div className="mt-1 flex flex-wrap items-center gap-3 text-xs">
                   <Link to="/system/players/$playerId" params={{ playerId: linkedPlayerId }} className="text-primary hover:underline">
                     View player record
                   </Link>
+                  {/* Correct an out-of-date club right where it is displayed. */}
+                  <UpdateClubButton
+                    playerId={linkedPlayerId}
+                    playerName={gk.name}
+                    currentClub={gk.club ?? ""}
+                  />
                 </div>
               ) : (
                 <div className="mt-1 text-xs text-muted-foreground">Player record not linked — this profile is read-only.</div>

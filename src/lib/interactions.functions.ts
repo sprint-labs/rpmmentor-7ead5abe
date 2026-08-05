@@ -10,19 +10,19 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import {
   createInteractionInput,
   listInteractionsQuery,
+  updateInteractionInput,
   type InteractionsPage,
   type LoggedInteraction,
 } from "@/lib/interactions/schema";
-import { mapInteractionRow } from "@/lib/interactions/map";
+import { INTERACTION_COLUMNS, mapInteractionRow } from "@/lib/interactions/map";
+import { getUserRoles, hasAnyRole, INTERACTION_MANAGE_ROLES } from "@/lib/roles.server";
 
 export const listInteractions = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<LoggedInteraction[]> => {
     const { data, error } = await context.supabase
       .from("interactions")
-      .select(
-        "id, gk_slug, goalkeeper_name, player_id, mentor_id, mentor_name, interaction_type, club, occurred_at, notes, outcome, follow_up, created_at",
-      )
+      .select(INTERACTION_COLUMNS)
       .order("occurred_at", { ascending: false })
       .order("created_at", { ascending: false })
       .limit(500);
@@ -75,15 +75,94 @@ export const createInteraction = createServerFn({ method: "POST" })
         outcome: data.outcome ?? "",
         follow_up: data.followUp ?? "",
       })
-      .select(
-        "id, gk_slug, goalkeeper_name, player_id, mentor_id, mentor_name, interaction_type, club, occurred_at, notes, outcome, follow_up, created_at",
-      )
+      .select(INTERACTION_COLUMNS)
       .single();
 
     // Read-back is mandatory: no inserted row means no success.
     if (error) throw new Error(error.message);
     if (!inserted) throw new Error("The interaction could not be confirmed as saved.");
     return mapInteractionRow(inserted);
+  });
+
+/**
+ * Correct an existing interaction in place.
+ *
+ * The ORIGINAL row is updated — no replacement row is ever created. Authorship,
+ * creation time and the Match Report link are immutable (enforced by a database
+ * trigger), so an edit can only ever change the descriptive fields.
+ *
+ * Authorisation is checked twice: here against `user_roles`, and again by the
+ * `interactions_update_authorised` RLS policy. The server check exists to give a
+ * clear message; RLS is what actually protects the row.
+ */
+export const updateInteraction = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data) => updateInteractionInput.parse(data))
+  .handler(async ({ data, context }): Promise<LoggedInteraction> => {
+    const { supabase, userId } = context;
+
+    const { data: existing, error: loadError } = await supabase
+      .from("interactions")
+      .select("id, mentor_id")
+      .eq("id", data.id)
+      .maybeSingle();
+    if (loadError) throw new Error(loadError.message);
+    if (!existing) throw new Error("That interaction no longer exists.");
+
+    const roles = await getUserRoles(supabase, userId);
+    const isAuthor = existing.mentor_id === userId;
+    if (!isAuthor && !hasAnyRole(roles, INTERACTION_MANAGE_ROLES)) {
+      throw new Error("You do not have permission to edit this interaction.");
+    }
+
+    // Re-confirm the roster link rather than trusting the submitted id.
+    let playerId: string | null = null;
+    if (data.playerId) {
+      const { data: player } = await supabase
+        .from("players")
+        .select("id")
+        .eq("id", data.playerId)
+        .maybeSingle();
+      playerId = player?.id ?? null;
+    }
+
+    const { data: updated, error } = await supabase
+      .from("interactions")
+      .update({
+        player_id: playerId,
+        goalkeeper_name: data.goalkeeperName,
+        gk_slug: data.gkSlug ?? "",
+        interaction_type: data.interactionType,
+        club: data.club ?? "",
+        occurred_at: data.occurredAt,
+        notes: data.notes,
+        outcome: data.outcome ?? "",
+        follow_up: data.followUp ?? "",
+        updated_by: userId,
+      })
+      .eq("id", data.id)
+      .select(INTERACTION_COLUMNS)
+      .single();
+
+    if (error) throw new Error(error.message);
+    // A zero-row update means RLS refused it. Never report success unconfirmed.
+    if (!updated) throw new Error("The change could not be confirmed as saved.");
+
+    // Explicit read-back against the stored row, so the confirmation the user
+    // sees reflects what is actually in the database.
+    const { data: readback, error: readbackError } = await supabase
+      .from("interactions")
+      .select(INTERACTION_COLUMNS)
+      .eq("id", data.id)
+      .single();
+    if (readbackError) throw new Error(readbackError.message);
+    if (!readback) throw new Error("The change could not be confirmed as saved.");
+
+    const confirmed = mapInteractionRow(readback);
+    if (confirmed.occurredAt !== data.occurredAt || confirmed.notes !== data.notes) {
+      throw new Error("The saved interaction did not match what was submitted.");
+    }
+    return confirmed;
   });
 
 /**
@@ -101,12 +180,9 @@ export const listInteractionsPage = createServerFn({ method: "GET" })
     const page = data.page;
     const fromRow = (page - 1) * pageSize;
 
-    const columns =
-      "id, gk_slug, goalkeeper_name, player_id, mentor_id, mentor_name, interaction_type, club, occurred_at, notes, outcome, follow_up, created_at";
-
     let query = context.supabase
       .from("interactions")
-      .select(columns, { count: "exact" });
+      .select(INTERACTION_COLUMNS, { count: "exact" });
 
     if (data.from) query = query.gte("occurred_at", data.from);
     if (data.to) query = query.lte("occurred_at", data.to);
@@ -120,7 +196,11 @@ export const listInteractionsPage = createServerFn({ method: "GET" })
       }
     }
 
-    const { data: rows, error, count } = await query
+    const {
+      data: rows,
+      error,
+      count,
+    } = await query
       .order("occurred_at", { ascending: false })
       .order("created_at", { ascending: false })
       .range(fromRow, fromRow + pageSize - 1);

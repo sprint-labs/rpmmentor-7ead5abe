@@ -16,6 +16,7 @@ type NavItem = { to: string; label: string; icon: typeof LayoutDashboard; exact?
 const NAV: NavItem[] = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, exact: true, perm: "goalkeepers.view" },
   { to: "/goalkeepers", label: "Goalkeepers", icon: Users, perm: "goalkeepers.view" },
+  { to: "/system/players", label: "Player Records", icon: Database, perm: "players.edit_club" },
   { to: "/mentors", label: "Mentors", icon: UserCog, perm: "mentors.view" },
   { to: "/interactions", label: "Interactions Log", icon: MessageSquare, perm: "interactions.view" },
   { to: "/reports", label: "Match Reports", icon: FileText, perm: "reports.view" },
@@ -28,7 +29,6 @@ const NAV: NavItem[] = [
   { to: "/system/users", label: "Users & Roles", icon: ShieldCheck, perm: "system.manage" },
   { to: "/system/permissions", label: "Permission Check", icon: ShieldCheck, perm: "system.manage" },
   { to: "/system/integrations", label: "Integrations", icon: Plug, perm: "system.manage" },
-  { to: "/system/players", label: "Player Records", icon: Database, perm: "system.manage" },
   { to: "/system/data-quality", label: "Data Quality", icon: Database, perm: "system.manage" },
 ];
 

@@ -36,6 +36,19 @@ const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+/**
+ * The interaction type that a Match Report produces. Selecting this type in the
+ * Log Interaction dialog hands over to the Match Report workflow instead of
+ * writing an interaction directly — the interaction is created server-side as
+ * part of a successful report submission.
+ */
+export const MATCH_REPORT_INTERACTION_TYPE = "Live Match Observation" as const;
+
+/** Types that are still logged manually through the Log Interaction dialog. */
+export const MANUAL_INTERACTION_TYPES: readonly InteractionTypeValue[] = INTERACTION_TYPES.filter(
+  (t) => t !== MATCH_REPORT_INTERACTION_TYPE,
+);
+
 export const createInteractionInput = z.object({
   /**
    * Canonical `public.players.id`, present ONLY when the submitted selection
@@ -58,6 +71,27 @@ export const createInteractionInput = z.object({
 // server-side from the authenticated user id.
 export type CreateInteractionInput = z.input<typeof createInteractionInput>;
 
+/**
+ * Editable fields of an existing interaction.
+ *
+ * `id` identifies the ORIGINAL row — an edit always updates in place and never
+ * creates a replacement. `mentorId`, `createdAt` and `matchReportId` are absent
+ * by design: they are immutable and enforced as such by a database trigger.
+ */
+export const updateInteractionInput = z.object({
+  id: z.string().regex(UUID, "id must be an interactions.id"),
+  playerId: z.string().regex(UUID, "playerId must be a players.id").nullish(),
+  gkSlug: z.string().trim().max(120).default(""),
+  goalkeeperName: z.string().trim().min(1, "Select a goalkeeper").max(120),
+  interactionType: z.enum(INTERACTION_TYPES),
+  club: z.string().trim().max(120).default(""),
+  occurredAt: z.string().regex(DATE_ONLY, "Date must be a calendar date (YYYY-MM-DD)"),
+  notes: z.string().trim().min(1, "Notes are required").max(8000),
+  outcome: z.string().trim().max(120).default(""),
+  followUp: z.string().trim().max(500).default(""),
+});
+export type UpdateInteractionInput = z.input<typeof updateInteractionInput>;
+
 /** A durable interaction row as returned to the client. */
 export interface LoggedInteraction {
   id: string;
@@ -74,6 +108,11 @@ export interface LoggedInteraction {
   outcome: string;
   followUp: string;
   createdAt: string;
+  /** Set when this interaction was produced by a Match Report submission. */
+  matchReportId: string | null;
+  /** Present once the interaction has been edited. */
+  updatedAt: string | null;
+  updatedBy: string | null;
 }
 
 /** Today's calendar date in the viewer's local timezone. */

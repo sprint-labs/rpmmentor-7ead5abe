@@ -20,6 +20,9 @@ dist-ssr
 .wrangler/
 .dev.vars
 
+# Supabase CLI scratch
+supabase/.temp/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
@@ -30,3 +33,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Local editor settings
+.cursor/settings.json

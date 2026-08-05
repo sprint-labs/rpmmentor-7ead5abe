@@ -3,13 +3,29 @@ import { reconcileInteraction } from "@/lib/interactions/map";
 import type { LoggedInteraction } from "@/lib/interactions/schema";
 
 const base: LoggedInteraction = {
-  id: "opt-1", gkSlug: "gk-a", goalkeeperName: "Keeper A", playerId: null,
-  mentorId: "", mentorName: "", interactionType: "Phone Call", club: "Club A",
-  occurredAt: "2026-01-05", notes: "n", outcome: "On track", followUp: "f",
+  id: "opt-1",
+  gkSlug: "gk-a",
+  goalkeeperName: "Keeper A",
+  playerId: null,
+  mentorId: "",
+  mentorName: "",
+  interactionType: "Phone Call",
+  club: "Club A",
+  occurredAt: "2026-01-05",
+  notes: "n",
+  outcome: "On track",
+  followUp: "f",
   createdAt: "2026-01-05T10:00:00.000Z",
+  matchReportId: null,
+  updatedAt: null,
+  updatedBy: null,
 };
 const saved: LoggedInteraction = {
-  ...base, id: "row-1", playerId: "p1", mentorId: "u1", mentorName: "Mentor",
+  ...base,
+  id: "row-1",
+  playerId: "p1",
+  mentorId: "u1",
+  mentorName: "Mentor",
   createdAt: "2026-01-05T10:00:05.000Z",
 };
 

@@ -6,6 +6,7 @@ import { ArrowLeft, Loader2 } from "lucide-react";
 import { RequirePermission } from "@/components/require-permission";
 import { Card } from "@/components/primitives";
 import { getPlayer, updatePlayerClub } from "@/lib/players.functions";
+import { refreshClubDependentViews } from "@/lib/query-refresh";
 
 export const Route = createFileRoute("/system/players/$playerId")({
   component: PlayerRecordPage,
@@ -23,7 +24,7 @@ export const Route = createFileRoute("/system/players/$playerId")({
 
 function PlayerRecordPage() {
   return (
-    <RequirePermission permission="system.manage">
+    <RequirePermission permission="players.edit_club">
       <PlayerRecordEditor />
     </RequirePermission>
   );
@@ -67,7 +68,7 @@ function PlayerRecordEditor() {
       setSavedClub(confirmed.current_club);
       setDirty(false);
       queryClient.setQueryData(["player", playerId], confirmed);
-      await queryClient.invalidateQueries({ queryKey: ["players", "roster"] });
+      await refreshClubDependentViews(queryClient);
     } catch (err) {
       // Entered value is retained so nothing is lost on a recoverable failure.
       setSaveError(err instanceof Error ? err.message : "Club was not saved.");

@@ -1,0 +1,52 @@
+/**
+ * Server-side role lookup.
+ *
+ * Row Level Security is the backstop that actually protects the data, but every
+ * privileged server function also checks here first so an unauthorised call
+ * fails with a clear message instead of a silent zero-row write. Roles are read
+ * from `public.user_roles` using the caller's own session — never taken from
+ * client input, a display name, or an email address.
+ */
+import type { SupabaseClient } from "@supabase/supabase-js";
+
+export type AppRole = "super_admin" | "admin" | "mentor_manager" | "mentor";
+
+/**
+ * Roles that may correct a player's club, and edit any interaction rather than
+ * only their own. Mirrors the `players_update_club_authorised` and
+ * `interactions_update_authorised` policies — change both together.
+ */
+export const CLUB_EDIT_ROLES: readonly AppRole[] = ["mentor_manager", "admin", "super_admin"];
+export const INTERACTION_MANAGE_ROLES: readonly AppRole[] = [
+  "mentor_manager",
+  "admin",
+  "super_admin",
+];
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+export async function getUserRoles(
+  supabase: SupabaseClient<any, any, any>,
+  userId: string,
+): Promise<AppRole[]> {
+  const { data, error } = await supabase.from("user_roles").select("role").eq("user_id", userId);
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((r: { role: string }) => r.role as AppRole);
+}
+
+export function hasAnyRole(roles: readonly AppRole[], allowed: readonly AppRole[]): boolean {
+  return roles.some((r) => allowed.includes(r));
+}
+
+/** Throws unless the signed-in user holds one of `allowed`. */
+export async function requireRole(
+  supabase: SupabaseClient<any, any, any>,
+  userId: string,
+  allowed: readonly AppRole[],
+  action: string,
+): Promise<AppRole[]> {
+  const roles = await getUserRoles(supabase, userId);
+  if (!hasAnyRole(roles, allowed)) {
+    throw new Error(`You do not have permission to ${action}.`);
+  }
+  return roles;
+}

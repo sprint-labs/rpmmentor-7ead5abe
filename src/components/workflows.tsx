@@ -6,14 +6,16 @@ import { useNavigate } from "@tanstack/react-router";
 import { X, CheckCircle2, Upload, AlertCircle, Paperclip, Search, Trash2, Loader2, RotateCcw } from "lucide-react";
 import { goalkeepers } from "@/lib/mock-data";
 import { listPlayers, type PlayerRosterRow } from "@/lib/players.functions";
-import { createInteraction } from "@/lib/interactions.functions";
+import { createInteraction, updateInteraction } from "@/lib/interactions.functions";
 import { interactionsQueryKey } from "@/lib/interactions/use-interactions";
 import type { LoggedInteraction } from "@/lib/interactions/schema";
 import {
   INTERACTION_TYPES, INTERACTION_OUTCOMES, todayDateOnly, formatDateOnly,
+  MATCH_REPORT_INTERACTION_TYPE, MANUAL_INTERACTION_TYPES,
   type InteractionTypeValue,
 } from "@/lib/interactions/schema";
 import { reconcileInteraction } from "@/lib/interactions/map";
+import { refreshInteractionViews } from "@/lib/query-refresh";
 import { useAuth, type SessionUser } from "@/lib/auth";
 import {
   ACCEPT_BY_KIND, MAX_FILE_BYTES, detectKind, formatBytes, uploadMedia,
@@ -101,31 +103,71 @@ const TITLES: Record<WorkflowKind, string> = {
   goalkeeper: "Add Goalkeeper",
 };
 
-export function WorkflowDialog({ kind, onClose, prefillGoalkeeper, prefillMatchDate, prefillOpponent }: { kind: WorkflowKind | null; onClose: () => void; prefillGoalkeeper?: string; prefillMatchDate?: string; prefillOpponent?: string }) {
+/** Context handed from Log Interaction to the Match Report workflow. */
+export interface MatchReportHandoff {
+  goalkeeper: string;
+  matchDate: string;
+  club: string;
+}
+
+export function WorkflowDialog({ kind, onClose, prefillGoalkeeper, prefillMatchDate, prefillOpponent, editingInteraction }: { kind: WorkflowKind | null; onClose: () => void; prefillGoalkeeper?: string; prefillMatchDate?: string; prefillOpponent?: string; editingInteraction?: LoggedInteraction | null }) {
+  /**
+   * Change #1: choosing Live Match Observation in Log Interaction hands over to
+   * the Match Report workflow in place, carrying the goalkeeper, date and club
+   * across. Held here rather than in the parent so every entry point to the
+   * dialog gets the behaviour without changes of its own.
+   */
+  const [handoff, setHandoff] = useState<MatchReportHandoff | null>(null);
+  useEffect(() => {
+    if (!kind) setHandoff(null);
+  }, [kind]);
+
   if (!kind) return null;
+  const activeKind: WorkflowKind = handoff ? "report" : kind;
+  const isEditing = activeKind === "interaction" && !!editingInteraction;
+  const title = isEditing ? "Edit Interaction" : TITLES[activeKind];
+
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-background/70 backdrop-blur-sm p-4" onClick={onClose}>
       <div className="w-full max-w-2xl bg-card border border-border rounded-lg shadow-2xl max-h-[90vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-border">
           <div>
-            <h3 className="text-base font-semibold">{TITLES[kind]}</h3>
+            <h3 className="text-base font-semibold">{title}</h3>
             <p className="text-xs text-muted-foreground mt-0.5">
-              {kind === "report"
-                ? "Draft autosaves locally · Submission writes to the RPM Match Reports Google Sheet"
-                : kind === "media"
+              {activeKind === "report"
+                ? handoff
+                  ? "Live Match Observation · the interaction is created when this report is submitted"
+                  : "Draft autosaves locally · Submission writes to the RPM Match Reports Google Sheet"
+                : activeKind === "media"
                   ? "Stored in Lovable Cloud"
-                  : kind === "interaction"
-                    ? "Saved to Lovable Cloud · visible in the interactions log"
+                  : activeKind === "interaction"
+                    ? isEditing
+                      ? "Corrects the original record · visible everywhere it appears"
+                      : "Saved to Lovable Cloud · visible in the interactions log"
                     : "Saved locally to this session"}
             </p>
           </div>
           <button onClick={onClose} className="size-8 grid place-items-center rounded-md hover:bg-accent"><X className="size-4" /></button>
         </div>
         <div className="p-5 overflow-y-auto">
-          {kind === "interaction" && <InteractionForm onDone={onClose} />}
-          {kind === "report" && <ReportForm onDone={onClose} prefillGoalkeeper={prefillGoalkeeper} prefillMatchDate={prefillMatchDate} prefillOpponent={prefillOpponent} />}
-          {kind === "media" && <MediaForm onDone={onClose} />}
-          {kind === "goalkeeper" && <GoalkeeperForm onDone={onClose} />}
+          {activeKind === "interaction" && (
+            <InteractionForm
+              onDone={onClose}
+              editing={editingInteraction ?? null}
+              onOpenMatchReport={setHandoff}
+            />
+          )}
+          {activeKind === "report" && (
+            <ReportForm
+              onDone={onClose}
+              prefillGoalkeeper={handoff?.goalkeeper ?? prefillGoalkeeper}
+              prefillMatchDate={handoff?.matchDate ?? prefillMatchDate}
+              prefillOpponent={prefillOpponent}
+              prefillTeam={handoff?.club}
+            />
+          )}
+          {activeKind === "media" && <MediaForm onDone={onClose} />}
+          {activeKind === "goalkeeper" && <GoalkeeperForm onDone={onClose} />}
         </div>
       </div>
     </div>
@@ -227,24 +269,59 @@ function TagPicker({ value, onChange }: { value: string[]; onChange: (v: string[
 }
 
 /**
- * Interaction form — writes durably to `public.interactions` via
- * `createInteraction`. Success is only shown after the server returns the
- * confirmed inserted row; on failure every entered value is retained.
+ * Interaction form — logging and correcting interactions in `public.interactions`.
+ *
+ * Success is only ever shown after the server returns a confirmed row that has
+ * passed a read-back; on failure every entered value is retained.
+ *
+ * Two behaviours worth knowing about:
+ *   - Selecting Live Match Observation does not create an interaction here. It
+ *     hands over to the Match Report workflow, which creates the report and its
+ *     interaction together in one server-controlled call (change #1).
+ *   - Passing `editing` switches the form into correction mode. It updates the
+ *     ORIGINAL row and never creates a replacement (change #3).
  */
-export function InteractionForm({ onDone }: { onDone: () => void }) {
+export function InteractionForm({
+  onDone,
+  editing = null,
+  onOpenMatchReport,
+}: {
+  onDone: () => void;
+  editing?: LoggedInteraction | null;
+  onOpenMatchReport?: (ctx: MatchReportHandoff) => void;
+}) {
   const queryClient = useQueryClient();
   const createFn = useServerFn(createInteraction);
+  const updateFn = useServerFn(updateInteraction);
+  const isEditing = !!editing;
 
   const [done, setDone] = useState(false);
   const [savedSummary, setSavedSummary] = useState<string | null>(null);
 
-  const [notes, setNotes] = useState("");
-  const [gkId, setGkId] = useState("");
-  const [type, setType] = useState<InteractionTypeValue>(INTERACTION_TYPES[0]);
-  const [club, setClub] = useState("");
-  const [date, setDate] = useState(() => todayDateOnly());
-  const [outcome, setOutcome] = useState<string>("");
-  const [followUp, setFollowUp] = useState("");
+  const [notes, setNotes] = useState(editing?.notes ?? "");
+  /**
+   * Older interactions were stored with only a goalkeeper name — no player id
+   * and no slug — so fall back to matching the name. Without this the selector
+   * would open empty and the mentor would have to re-identify the goalkeeper
+   * just to correct a date.
+   */
+  const [gkId, setGkId] = useState(() => {
+    if (!editing) return "";
+    if (editing.playerId) return editing.playerId;
+    if (editing.gkSlug) return editing.gkSlug;
+    const target = editing.goalkeeperName.trim().toLowerCase();
+    return goalkeepers.find((g) => g.name.trim().toLowerCase() === target)?.id ?? "";
+  });
+  // Defaults to a type that can actually be logged here. Live Match Observation
+  // is still selectable, but it hands over to the Match Report rather than
+  // creating an observation with no report behind it.
+  const [type, setType] = useState<InteractionTypeValue>(
+    (editing?.interactionType as InteractionTypeValue) ?? MANUAL_INTERACTION_TYPES[0]!,
+  );
+  const [club, setClub] = useState(editing?.club ?? "");
+  const [date, setDate] = useState(() => editing?.occurredAt ?? todayDateOnly());
+  const [outcome, setOutcome] = useState<string>(editing?.outcome ?? "");
+  const [followUp, setFollowUp] = useState(editing?.followUp ?? "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [clubAutoFilled, setClubAutoFilled] = useState(false);
@@ -253,10 +330,37 @@ export function InteractionForm({ onDone }: { onDone: () => void }) {
   const autoFilledClubRef = useRef<string | null>(null);
   const gk = goalkeepers.find((g) => g.id === gkId);
 
-  const canSubmit = useMemo(() => {
-    const validation = validate({ gkId, date, notes, outcome, followUp });
-    return Object.keys(validation).length === 0 && !saving;
-  }, [gkId, date, notes, outcome, followUp, saving]);
+  /**
+   * Change #4. The transcript lives inside VoiceNoteField until it is applied,
+   * and `notes` is read from a render closure at submit time. Mirroring notes
+   * into a ref means a transcript applied moments before Save is still seen by
+   * the submit handler, instead of being dropped because React had not
+   * re-rendered yet.
+   */
+  const notesRef = useRef(notes);
+  notesRef.current = notes;
+  const applyTranscribedText = (text: string, mode: "append" | "replace") => {
+    const next =
+      mode === "replace" || !notesRef.current.trim()
+        ? text
+        : `${notesRef.current.trim()}\n\n${text}`;
+    notesRef.current = next;
+    setNotes(next);
+    clearFieldError("notes");
+  };
+
+  /**
+   * A Live Match Observation is produced by submitting a Match Report, so
+   * choosing it while logging hands over instead of saving. Correcting one that
+   * already exists is still a normal edit.
+   */
+  const handOffToMatchReport = !isEditing && type === MATCH_REPORT_INTERACTION_TYPE;
+
+  const validationErrors = useMemo(
+    () => validate({ gkId, date, notes, outcome, followUp }),
+    [gkId, date, notes, outcome, followUp],
+  );
+  const canSubmit = Object.keys(validationErrors).length === 0 && !saving;
 
 
 
@@ -340,9 +444,22 @@ export function InteractionForm({ onDone }: { onDone: () => void }) {
     });
   }
 
+  /** Hand the entered context over to the Match Report workflow (change #1). */
+  function handleContinueToMatchReport() {
+    if (!selection) {
+      setErrors({ gkId: "Select a goalkeeper" });
+      setShowErrors(true);
+      return;
+    }
+    onOpenMatchReport?.({ goalkeeper: selection.name, matchDate: date, club: club.trim() });
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const validation = validate({ gkId, date, notes, outcome, followUp });
+    // Read the latest notes, not the value captured when this render began, so
+    // a transcript applied immediately before Save is never lost.
+    const currentNotes = notesRef.current;
+    const validation = validate({ gkId, date, notes: currentNotes, outcome, followUp });
 
     if (Object.keys(validation).length > 0) {
       setErrors(validation);
@@ -354,6 +471,47 @@ export function InteractionForm({ onDone }: { onDone: () => void }) {
     setSaving(true);
     setError(null);
     setShowErrors(false);
+
+    if (isEditing && editing) {
+      try {
+        const saved = await updateFn({
+          data: {
+            id: editing.id,
+            playerId: selection.playerId,
+            gkSlug: selection.slug,
+            goalkeeperName: selection.name,
+            interactionType: type,
+            club: club.trim(),
+            occurredAt: date,
+            notes: currentNotes.trim(),
+            outcome,
+            followUp: followUp.trim(),
+          },
+        });
+        // The server read the row back; re-assert the values here so a partial
+        // response can never be presented as a successful correction.
+        if (!saved?.id || saved.occurredAt !== date) {
+          throw new Error("The change could not be confirmed as saved.");
+        }
+        // Refresh the log, timeline, dashboard and Duty of Care together.
+        await refreshInteractionViews(queryClient);
+        const shownDate = formatDateOnly(saved.occurredAt);
+        toast.success("Interaction updated", {
+          description: `${saved.interactionType} with ${saved.goalkeeperName} on ${shownDate}.`,
+        });
+        setSavedSummary(
+          `Interaction updated — ${saved.interactionType} with ${saved.goalkeeperName} on ${shownDate}. The log, timeline and Duty of Care now show the corrected values.`,
+        );
+        setDone(true);
+      } catch (err) {
+        setError(
+          err instanceof Error ? err.message : "Could not save the change. Please try again.",
+        );
+      } finally {
+        setSaving(false);
+      }
+      return;
+    }
 
     // Optimistic timeline update: show the interaction immediately, roll back on failure.
     const optimisticId = `optimistic-${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -367,10 +525,13 @@ export function InteractionForm({ onDone }: { onDone: () => void }) {
       interactionType: type,
       club: club.trim(),
       occurredAt: date,
-      notes: notes.trim(),
+      notes: currentNotes.trim(),
       outcome,
       followUp: followUp.trim(),
       createdAt: new Date().toISOString(),
+      matchReportId: null,
+      updatedAt: null,
+      updatedBy: null,
       optimistic: true,
     } as unknown as LoggedInteraction;
 
@@ -389,7 +550,7 @@ export function InteractionForm({ onDone }: { onDone: () => void }) {
           interactionType: type,
           club: club.trim(),
           occurredAt: date,
-          notes: notes.trim(),
+          notes: currentNotes.trim(),
           outcome,
           followUp: followUp.trim(),
         },
@@ -404,7 +565,7 @@ export function InteractionForm({ onDone }: { onDone: () => void }) {
         confirmed = next.find((i) => i.id === saved.id) ?? saved;
         return next;
       });
-      await queryClient.invalidateQueries({ queryKey: interactionsQueryKey });
+      await refreshInteractionViews(queryClient);
       const shownName = confirmed.goalkeeperName || selection.name;
       const shownType = confirmed.interactionType || type;
       const shownDate = formatDateOnly(confirmed.occurredAt || date);
@@ -465,6 +626,16 @@ export function InteractionForm({ onDone }: { onDone: () => void }) {
               {INTERACTION_TYPES.map((t) => <option key={t}>{t}</option>)}
             </select>
           </Field>
+          {handOffToMatchReport && (
+            <div className="col-span-2 rounded-md border border-primary/40 bg-primary/5 px-3 py-2.5 text-xs">
+              <p className="font-medium">A Live Match Observation is logged from the Match Report.</p>
+              <p className="mt-1 text-muted-foreground">
+                Continue to the Match Report and the interaction is created automatically when you
+                submit it — with the same goalkeeper, date and club — so the two can never disagree
+                and no duplicate is created if you retry.
+              </p>
+            </div>
+          )}
           <Field label="Club">
             <input aria-label="Club" className={inputCls} value={club} onChange={(e) => handleClubChange(e.target.value)} placeholder="e.g. Brighton & Hove Albion" maxLength={80} />
             {clubAutoFilled ? (
@@ -506,11 +677,17 @@ export function InteractionForm({ onDone }: { onDone: () => void }) {
         </div>
         <HandwrittenNotesField
           context={gk ? `Session notes about ${gk.name} (${club || gk.club})` : undefined}
-          onTranscribed={(text, mode) => { setNotes((prev) => mode === "replace" || !prev.trim() ? text : `${prev.trim()}\n\n${text}`); clearFieldError("notes"); }}
+          onTranscribed={applyTranscribedText}
         />
-        <VoiceNoteField
-          onTranscribed={(text, mode) => { setNotes((prev) => mode === "replace" || !prev.trim() ? text : `${prev.trim()}\n\n${text}`); clearFieldError("notes"); }}
-        />
+        {/*
+          `autoApply` is what fixes change #4. Without it a transcript stays
+          inside VoiceNoteField until the reviewed checkbox and two more clicks
+          are completed, so a mentor who records a note, sees it on screen and
+          presses Save leaves Notes empty and nothing is ever written. The
+          transcript now lands in Notes as soon as it arrives, where it is
+          visible, editable and — most importantly — actually submitted.
+        */}
+        <VoiceNoteField autoApply onTranscribed={applyTranscribedText} />
         <Field label="Notes" required error={showErrors ? errors.notes : undefined}>
           <textarea
             aria-label="Notes"
@@ -539,11 +716,34 @@ export function InteractionForm({ onDone }: { onDone: () => void }) {
         </Field>
       </fieldset>
 
-      <div className="flex justify-end gap-2 pt-2">
+      <div className="flex flex-wrap items-center justify-end gap-2 pt-2">
+        {/*
+          Previously the submit button was simply disabled while the form was
+          incomplete, which is how a voice-entered note failed silently: the
+          mentor pressed a greyed-out button and nothing happened, with no
+          explanation. It now stays clickable and reports exactly what is
+          missing.
+        */}
+        {showErrors && !canSubmit && !saving && (
+          <p role="status" className="mr-auto text-[11px] text-muted-foreground">
+            Complete the highlighted fields to save.
+          </p>
+        )}
         <button type="button" onClick={onDone} className="h-9 px-3 rounded-md border border-border text-sm" disabled={saving}>Cancel</button>
-        <button type="submit" disabled={!canSubmit} className="h-9 px-4 rounded-md bg-primary text-primary-foreground text-sm font-medium disabled:opacity-60 inline-flex items-center gap-1.5">
-          {saving && <Loader2 className="size-3.5 animate-spin" />}{saving ? "Saving…" : "Save Interaction"}
-        </button>
+        {handOffToMatchReport ? (
+          <button
+            type="button"
+            onClick={handleContinueToMatchReport}
+            className="h-9 px-4 rounded-md bg-primary text-primary-foreground text-sm font-medium inline-flex items-center gap-1.5"
+          >
+            Continue to Match Report
+          </button>
+        ) : (
+          <button type="submit" disabled={saving} aria-disabled={!canSubmit} className={`h-9 px-4 rounded-md bg-primary text-primary-foreground text-sm font-medium inline-flex items-center gap-1.5 ${canSubmit ? "" : "opacity-60"}`}>
+            {saving && <Loader2 className="size-3.5 animate-spin" />}
+            {saving ? "Saving…" : isEditing ? "Save Changes" : "Save Interaction"}
+          </button>
+        )}
       </div>
     </form>
   );
@@ -555,9 +755,10 @@ export function InteractionForm({ onDone }: { onDone: () => void }) {
  * Match Report form — writes to the RPM Match Reports Google Sheet via
  * a server function. Fields locked to the confirmed 14-column schema.
  */
-function ReportForm({ onDone, prefillGoalkeeper, prefillMatchDate, prefillOpponent }: { onDone: () => void; prefillGoalkeeper?: string; prefillMatchDate?: string; prefillOpponent?: string }) {
+function ReportForm({ onDone, prefillGoalkeeper, prefillMatchDate, prefillOpponent, prefillTeam }: { onDone: () => void; prefillGoalkeeper?: string; prefillMatchDate?: string; prefillOpponent?: string; prefillTeam?: string }) {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const submitFn = useServerFn(submitMatchReport);
   const listPlayersFn = useServerFn(listPlayers);
   const playersQuery = useQuery({
@@ -576,7 +777,13 @@ function ReportForm({ onDone, prefillGoalkeeper, prefillMatchDate, prefillOppone
   const [teamAutoFilled, setTeamAutoFilled] = useState(false);
 
   const [done, setDone] = useState<
-    | { status: "submitted"; reportId: string; average: number }
+    | {
+        status: "submitted";
+        reportId: string;
+        average: number;
+        /** Set when the report saved but its interaction did not. */
+        interactionError?: string | null;
+      }
     | { status: "queued" }
     | null
   >(null);
@@ -651,10 +858,12 @@ function ReportForm({ onDone, prefillGoalkeeper, prefillMatchDate, prefillOppone
       if (prefillGoalkeeper && !d.goalkeeper) setGoalkeeper(prefillGoalkeeper);
       if (prefillMatchDate && !d.matchDate) setMatchDate(prefillMatchDate);
       if (prefillOpponent && !d.opponent) setOpponent(prefillOpponent);
+      if (prefillTeam && !d.team) setTeam(prefillTeam);
     } else {
       if (prefillGoalkeeper) setGoalkeeper(prefillGoalkeeper);
       if (prefillMatchDate) setMatchDate(prefillMatchDate);
       if (prefillOpponent) setOpponent(prefillOpponent);
+      if (prefillTeam) setTeam(prefillTeam);
       setSaveStatus("idle");
     }
     setDraftLoaded(true);
@@ -974,7 +1183,12 @@ function ReportForm({ onDone, prefillGoalkeeper, prefillMatchDate, prefillOppone
     }
     return (
       <Submitted
-        message={`Match report submitted to the RPM Match Reports Google Sheet · Average ${done.average.toFixed(1)}.`}
+        pending={!!done.interactionError}
+        message={
+          done.interactionError
+            ? `Match report submitted to the RPM Match Reports Google Sheet · Average ${done.average.toFixed(1)}. The Live Match Observation interaction could NOT be created (${done.interactionError}), so it will not appear in the interactions log. Do not resubmit the report — tell an administrator.`
+            : `Match report submitted to the RPM Match Reports Google Sheet · Average ${done.average.toFixed(1)}. A Live Match Observation interaction has been logged against this goalkeeper.`
+        }
         onDone={onDone}
         action={{
           label: "Open submitted report",
@@ -1095,7 +1309,15 @@ function ReportForm({ onDone, prefillGoalkeeper, prefillMatchDate, prefillOppone
         }
       }
       if (user) clearDraft(user.id);
-      setDone({ status: "submitted", reportId: res.report_id, average: res.average });
+      // The report also creates its Live Match Observation interaction, so the
+      // log, timelines and Duty of Care must pick it up without a manual reload.
+      await refreshInteractionViews(queryClient);
+      setDone({
+        status: "submitted",
+        reportId: res.report_id,
+        average: res.average,
+        interactionError: res.interaction_error ?? null,
+      });
       try { window.dispatchEvent(new CustomEvent("rpm:report-submitted", { detail: res })); } catch { /* ignore */ }
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Submission failed. Please try again.";

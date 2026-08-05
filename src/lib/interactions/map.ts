@@ -14,7 +14,17 @@ export interface InteractionDbRow {
   outcome: string | null;
   follow_up: string | null;
   created_at: string;
+  match_report_id?: string | null;
+  updated_at?: string | null;
+  updated_by?: string | null;
 }
+
+/**
+ * Every column the client shape needs, in one place so the create, update,
+ * list and paged-list queries can never drift apart.
+ */
+export const INTERACTION_COLUMNS =
+  "id, gk_slug, goalkeeper_name, player_id, mentor_id, mentor_name, interaction_type, club, occurred_at, notes, outcome, follow_up, created_at, match_report_id, updated_at, updated_by";
 
 /**
  * Map a database row to the client shape. `occurred_at` is a Postgres `date`
@@ -36,6 +46,9 @@ export function mapInteractionRow(row: InteractionDbRow): LoggedInteraction {
     outcome: row.outcome ?? "",
     followUp: row.follow_up ?? "",
     createdAt: row.created_at,
+    matchReportId: row.match_report_id ?? null,
+    updatedAt: row.updated_at ?? null,
+    updatedBy: row.updated_by ?? null,
   };
 }
 

@@ -5,6 +5,7 @@ import { cleanup, render, screen, fireEvent, waitFor } from "@testing-library/re
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 const createInteractionMock = vi.fn();
+const updateInteractionMock = vi.fn();
 const listPlayersMock = vi.fn(async () => [
   { id: "p1", full_name: "Demo Keeper", current_club: "Roster FC" },
 ]);
@@ -30,6 +31,7 @@ vi.mock("@tanstack/react-router", () => ({
 }));
 vi.mock("@/lib/interactions.functions", () => ({
   createInteraction: (...args: unknown[]) => createInteractionMock(...args),
+  updateInteraction: (...args: unknown[]) => updateInteractionMock(...args),
   listInteractions: vi.fn(async () => []),
 }));
 vi.mock("@/lib/players.functions", () => ({
@@ -41,8 +43,28 @@ vi.mock("@/lib/auth", () => ({
 vi.mock("@/components/handwritten-notes-field", () => ({
   HandwrittenNotesField: () => null,
 }));
+/**
+ * Stands in for the real field, exposing the `autoApply` contract: a transcript
+ * arrives and is handed straight to the parent. `autoApply` is asserted so the
+ * interaction form cannot silently regress to the review-gated behaviour that
+ * caused spoken notes to be lost.
+ */
 vi.mock("@/components/voice-note-field", () => ({
-  VoiceNoteField: () => null,
+  VoiceNoteField: ({
+    onTranscribed,
+    autoApply,
+  }: {
+    onTranscribed: (t: string, m: "append" | "replace") => void;
+    autoApply?: boolean;
+  }) => (
+    <button
+      type="button"
+      data-auto-apply={autoApply ? "true" : "false"}
+      onClick={() => onTranscribed("Spoken note about the session.", "append")}
+    >
+      simulate transcription
+    </button>
+  ),
 }));
 vi.mock("sonner", () => ({
   toast: { success: vi.fn(), error: vi.fn(), info: vi.fn() },
@@ -50,31 +72,57 @@ vi.mock("sonner", () => ({
 
 const { InteractionForm } = await import("./workflows");
 const { goalkeepers } = await import("@/lib/mock-data");
+type LoggedInteraction = import("@/lib/interactions/schema").LoggedInteraction;
 
-function renderForm() {
+function renderForm(props: Partial<React.ComponentProps<typeof InteractionForm>> = {}) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
-      <InteractionForm onDone={() => {}} />
+      <InteractionForm onDone={() => {}} {...props} />
     </QueryClientProvider>,
   );
 }
 
+const EXISTING: LoggedInteraction = {
+  id: "11111111-1111-4111-8111-111111111111",
+  gkSlug: "",
+  goalkeeperName: "Tom Watson",
+  playerId: null,
+  mentorId: "u1",
+  mentorName: "Mentor",
+  interactionType: "Phone Call",
+  club: "Rotherham United",
+  occurredAt: "2026-07-01",
+  notes: "Original note.",
+  outcome: "On track",
+  followUp: "Check in next week",
+  createdAt: "2026-07-01T10:00:00.000Z",
+  matchReportId: null,
+  updatedAt: null,
+  updatedBy: null,
+};
+
 async function fillValidForm() {
   const gk = goalkeepers[0]!;
   fireEvent.change(screen.getByLabelText("Goalkeeper"), { target: { value: gk.id } });
-  fireEvent.change(screen.getByLabelText("Interaction Type"), { target: { value: "Coffee Catch Up" } });
+  fireEvent.change(screen.getByLabelText("Interaction Type"), {
+    target: { value: "Coffee Catch Up" },
+  });
   fireEvent.change(screen.getByLabelText("Date"), { target: { value: "2026-01-05" } });
   fireEvent.change(screen.getByLabelText("Outcome"), { target: { value: "On track" } });
-  fireEvent.change(screen.getByLabelText("Follow-up Action"), { target: { value: "Schedule video review next week" } });
-  fireEvent.change(screen.getByLabelText("Notes"), { target: { value: "Reviewed the recovery plan." } });
+  fireEvent.change(screen.getByLabelText("Follow-up Action"), {
+    target: { value: "Schedule video review next week" },
+  });
+  fireEvent.change(screen.getByLabelText("Notes"), {
+    target: { value: "Reviewed the recovery plan." },
+  });
   return gk;
 }
-
 
 describe("InteractionForm (durable)", () => {
   beforeEach(() => {
     createInteractionMock.mockReset();
+    updateInteractionMock.mockReset();
     listPlayersMock.mockClear();
   });
 
@@ -82,20 +130,178 @@ describe("InteractionForm (durable)", () => {
 
   it("renders a real entry form with every collected value", () => {
     renderForm();
-    for (const label of ["Goalkeeper", "Interaction Type", "Club", "Date", "Outcome", "Notes", "Follow-up Action"]) {
+    for (const label of [
+      "Goalkeeper",
+      "Interaction Type",
+      "Club",
+      "Date",
+      "Outcome",
+      "Notes",
+      "Follow-up Action",
+    ]) {
       expect(screen.getByLabelText(label)).toBeTruthy();
     }
     expect(screen.getByRole("button", { name: /save interaction/i })).toBeTruthy();
   });
 
-  it("disables the submit button until all required fields are valid", () => {
+  /**
+   * The submit button used to be `disabled` whenever the form was incomplete.
+   * That is how a voice-entered note failed silently: the transcript never
+   * reached Notes, so pressing a greyed-out button did nothing and said nothing.
+   * It now stays pressable and explains what is missing instead.
+   */
+  it("stays pressable while incomplete and reports what is missing instead of failing silently", async () => {
     renderForm();
-    const submitBtn = screen.getByRole("button", { name: /save interaction/i }) as HTMLButtonElement;
-    expect(submitBtn.disabled).toBe(true);
-    fillValidForm();
+    const submitBtn = screen.getByRole("button", {
+      name: /save interaction/i,
+    }) as HTMLButtonElement;
     expect(submitBtn.disabled).toBe(false);
+    expect(submitBtn.getAttribute("aria-disabled")).toBe("true");
+
+    fireEvent.click(submitBtn);
+    // Nothing is written, and the reason is shown rather than swallowed.
+    expect(createInteractionMock).not.toHaveBeenCalled();
+    await waitFor(() => expect(screen.getByText(/select a goalkeeper/i)).toBeTruthy());
+    expect(screen.getByText(/complete the highlighted fields to save/i)).toBeTruthy();
+
+    await fillValidForm();
+    await waitFor(() => expect(submitBtn.getAttribute("aria-disabled")).toBe("false"));
   });
 
+  // ---- Change #4: a spoken note must reach the database ---------------------
+
+  it("puts a voice transcript straight into Notes so it is visible and editable", () => {
+    renderForm();
+    expect(
+      screen
+        .getByRole("button", { name: /simulate transcription/i })
+        .getAttribute("data-auto-apply"),
+    ).toBe("true");
+
+    fireEvent.click(screen.getByRole("button", { name: /simulate transcription/i }));
+
+    expect((screen.getByLabelText("Notes") as HTMLTextAreaElement).value).toContain(
+      "Spoken note about the session.",
+    );
+  });
+
+  it("saves a voice-entered note — the case that was silently losing data", async () => {
+    createInteractionMock.mockResolvedValue({ id: "i1", occurredAt: "2026-01-05" });
+    renderForm();
+    const gk = goalkeepers[0]!;
+    fireEvent.change(screen.getByLabelText("Goalkeeper"), { target: { value: gk.id } });
+    fireEvent.change(screen.getByLabelText("Interaction Type"), {
+      target: { value: "Coffee Catch Up" },
+    });
+    fireEvent.change(screen.getByLabelText("Date"), { target: { value: "2026-01-05" } });
+    fireEvent.change(screen.getByLabelText("Outcome"), { target: { value: "On track" } });
+    fireEvent.change(screen.getByLabelText("Follow-up Action"), {
+      target: { value: "Schedule video review next week" },
+    });
+    // Notes come only from the voice note — nothing is typed.
+    fireEvent.click(screen.getByRole("button", { name: /simulate transcription/i }));
+    fireEvent.click(screen.getByRole("button", { name: /save interaction/i }));
+
+    await waitFor(() => expect(createInteractionMock).toHaveBeenCalledTimes(1));
+    const payload = createInteractionMock.mock.calls[0]![0] as { data: Record<string, unknown> };
+    expect(payload.data["notes"]).toBe("Spoken note about the session.");
+  });
+
+  it("keeps a transcript that arrives while the form is otherwise complete", async () => {
+    createInteractionMock.mockResolvedValue({ id: "i1", occurredAt: "2026-01-05" });
+    renderForm();
+    await fillValidForm();
+    // Appended after the rest of the form was filled in.
+    fireEvent.click(screen.getByRole("button", { name: /simulate transcription/i }));
+    fireEvent.click(screen.getByRole("button", { name: /save interaction/i }));
+
+    await waitFor(() => expect(createInteractionMock).toHaveBeenCalledTimes(1));
+    const payload = createInteractionMock.mock.calls[0]![0] as { data: Record<string, unknown> };
+    expect(payload.data["notes"]).toContain("Reviewed the recovery plan.");
+    expect(payload.data["notes"]).toContain("Spoken note about the session.");
+  });
+
+  // ---- Change #1: Live Match Observation hands over to the Match Report ----
+
+  it("does not log a Live Match Observation directly — it hands over to the Match Report", async () => {
+    const onOpenMatchReport = vi.fn();
+    renderForm({ onOpenMatchReport });
+    const gk = goalkeepers[0]!;
+    fireEvent.change(screen.getByLabelText("Goalkeeper"), { target: { value: gk.id } });
+    fireEvent.change(screen.getByLabelText("Interaction Type"), {
+      target: { value: "Live Match Observation" },
+    });
+    fireEvent.change(screen.getByLabelText("Date"), { target: { value: "2026-07-09" } });
+    fireEvent.change(screen.getByLabelText("Club"), { target: { value: "Rotherham United" } });
+
+    // No save path is offered, and the reason is explained on screen.
+    expect(screen.queryByRole("button", { name: /save interaction/i })).toBeNull();
+    expect(screen.getByText(/logged from the match report/i)).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: /continue to match report/i }));
+
+    expect(createInteractionMock).not.toHaveBeenCalled();
+    expect(onOpenMatchReport).toHaveBeenCalledWith({
+      goalkeeper: gk.name,
+      matchDate: "2026-07-09",
+      club: "Rotherham United",
+    });
+  });
+
+  it("defaults to a type that can actually be logged by hand", () => {
+    renderForm();
+    expect((screen.getByLabelText("Interaction Type") as HTMLSelectElement).value).not.toBe(
+      "Live Match Observation",
+    );
+  });
+
+  // ---- Change #3: editing an existing interaction --------------------------
+
+  it("prefills every field when correcting an existing interaction", () => {
+    renderForm({ editing: EXISTING });
+    expect((screen.getByLabelText("Date") as HTMLInputElement).value).toBe("2026-07-01");
+    expect((screen.getByLabelText("Notes") as HTMLTextAreaElement).value).toBe("Original note.");
+    expect((screen.getByLabelText("Club") as HTMLInputElement).value).toBe("Rotherham United");
+    expect((screen.getByLabelText("Interaction Type") as HTMLSelectElement).value).toBe(
+      "Phone Call",
+    );
+    expect(screen.getByRole("button", { name: /save changes/i })).toBeTruthy();
+  });
+
+  it("updates the original record instead of creating a replacement", async () => {
+    updateInteractionMock.mockResolvedValue({
+      ...EXISTING,
+      occurredAt: "2026-07-09",
+      notes: "Corrected note.",
+    });
+    renderForm({ editing: EXISTING });
+
+    fireEvent.change(screen.getByLabelText("Date"), { target: { value: "2026-07-09" } });
+    fireEvent.change(screen.getByLabelText("Notes"), { target: { value: "Corrected note." } });
+    fireEvent.click(screen.getByRole("button", { name: /save changes/i }));
+
+    await waitFor(() => expect(updateInteractionMock).toHaveBeenCalledTimes(1));
+    // No new row is ever written when correcting.
+    expect(createInteractionMock).not.toHaveBeenCalled();
+    const payload = updateInteractionMock.mock.calls[0]![0] as { data: Record<string, unknown> };
+    expect(payload.data["id"]).toBe(EXISTING.id);
+    expect(payload.data["occurredAt"]).toBe("2026-07-09");
+    await waitFor(() => expect(screen.getByText(/interaction updated/i)).toBeTruthy());
+  });
+
+  it("never claims an edit succeeded when the server does not confirm the new value", async () => {
+    // Server echoes the OLD date — the correction did not persist.
+    updateInteractionMock.mockResolvedValue({ ...EXISTING });
+    renderForm({ editing: EXISTING });
+
+    fireEvent.change(screen.getByLabelText("Date"), { target: { value: "2026-07-09" } });
+    fireEvent.click(screen.getByRole("button", { name: /save changes/i }));
+
+    await waitFor(() => expect(screen.getByRole("alert")).toBeTruthy());
+    expect(screen.queryByText(/interaction updated/i)).toBeNull();
+    // The entered correction is kept so nothing is lost.
+    expect((screen.getByLabelText("Date") as HTMLInputElement).value).toBe("2026-07-09");
+  });
 
   it("shows success only after a confirmed inserted row is returned", async () => {
     createInteractionMock.mockResolvedValue({ id: "i1", occurredAt: "2026-01-05" });
@@ -132,7 +338,9 @@ describe("InteractionForm (durable)", () => {
 
     await waitFor(() => expect(screen.getByRole("alert").textContent).toContain("Unauthorized"));
     expect(screen.queryByText(/logged successfully/i)).toBeNull();
-    expect((screen.getByLabelText("Notes") as HTMLTextAreaElement).value).toBe("Reviewed the recovery plan.");
+    expect((screen.getByLabelText("Notes") as HTMLTextAreaElement).value).toBe(
+      "Reviewed the recovery plan.",
+    );
     expect((screen.getByLabelText("Date") as HTMLInputElement).value).toBe("2026-01-05");
   });
 
@@ -165,7 +373,6 @@ describe("InteractionForm (durable)", () => {
     expect(createInteractionMock).not.toHaveBeenCalled();
   });
 
-
   it("clears inline validation errors as the user fixes each field", async () => {
     createInteractionMock.mockResolvedValue({ id: "i1" });
     renderForm();
@@ -176,8 +383,12 @@ describe("InteractionForm (durable)", () => {
     fireEvent.change(screen.getByLabelText("Goalkeeper"), { target: { value: gk.id } });
     fireEvent.change(screen.getByLabelText("Date"), { target: { value: "2026-01-05" } });
     fireEvent.change(screen.getByLabelText("Outcome"), { target: { value: "On track" } });
-    fireEvent.change(screen.getByLabelText("Follow-up Action"), { target: { value: "Schedule video review next week" } });
-    fireEvent.change(screen.getByLabelText("Notes"), { target: { value: "Reviewed the recovery plan." } });
+    fireEvent.change(screen.getByLabelText("Follow-up Action"), {
+      target: { value: "Schedule video review next week" },
+    });
+    fireEvent.change(screen.getByLabelText("Notes"), {
+      target: { value: "Reviewed the recovery plan." },
+    });
 
     await waitFor(() => expect(screen.queryByText(/Select a goalkeeper/i)).toBeNull());
     expect(screen.queryByText(/Date is required/i)).toBeNull();
@@ -196,9 +407,12 @@ describe("InteractionForm (durable)", () => {
     expect(submitBtn.disabled).toBe(true);
     expect(submitBtn.querySelector("svg")).toBeTruthy();
 
-    const fieldset = document.querySelector("form[aria-label='Log interaction form'] fieldset") as HTMLFieldSetElement;
+    const fieldset = document.querySelector(
+      "form[aria-label='Log interaction form'] fieldset",
+    ) as HTMLFieldSetElement;
     expect(fieldset.disabled).toBe(true);
-    expect((screen.getByRole("button", { name: /cancel/i }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole("button", { name: /cancel/i }) as HTMLButtonElement).disabled).toBe(
+      true,
+    );
   });
-
 });
