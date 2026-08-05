@@ -147,6 +147,7 @@ export const getMentorDashboardStats = createServerFn({ method: "GET" })
           .from("interactions")
           .select("id")
           .eq("mentor_id", userId)
+          .in("interaction_type", DASHBOARD_INTERACTION_TYPES as string[])
           .gte("occurred_at", periodFrom)
           .lte("occurred_at", periodTo),
         supabase
