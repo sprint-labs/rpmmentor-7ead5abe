@@ -250,6 +250,12 @@ export function InteractionForm({ onDone }: { onDone: () => void }) {
   const autoFilledClubRef = useRef<string | null>(null);
   const gk = goalkeepers.find((g) => g.id === gkId);
 
+  const canSubmit = useMemo(() => {
+    const validation = validate({ gkId, date, notes, outcome, followUp });
+    return Object.keys(validation).length === 0 && !saving;
+  }, [gkId, date, notes, outcome, followUp, saving]);
+
+
 
   const listPlayersFn = useServerFn(listPlayers);
   const playersQuery = useQuery({
@@ -355,12 +361,13 @@ export function InteractionForm({ onDone }: { onDone: () => void }) {
 
   if (done) return <Submitted message={savedSummary ?? "Interaction logged successfully."} onDone={onDone} />;
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form aria-label="Log interaction form" onSubmit={handleSubmit} className="space-y-4">
       {error && (
         <div role="alert" className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
           <span className="font-medium">Not saved.</span> {error} Your entries have been kept — fix the issue and try again.
         </div>
       )}
+
 
       <div className="grid grid-cols-2 gap-3">
         <Field label="Goalkeeper" required error={showErrors ? errors.gkId : undefined}>
@@ -457,13 +464,14 @@ export function InteractionForm({ onDone }: { onDone: () => void }) {
 
       <div className="flex justify-end gap-2 pt-2">
         <button type="button" onClick={onDone} className="h-9 px-3 rounded-md border border-border text-sm" disabled={saving}>Cancel</button>
-        <button type="submit" disabled={saving} className="h-9 px-4 rounded-md bg-primary text-primary-foreground text-sm font-medium disabled:opacity-60 inline-flex items-center gap-1.5">
+        <button type="submit" disabled={!canSubmit} className="h-9 px-4 rounded-md bg-primary text-primary-foreground text-sm font-medium disabled:opacity-60 inline-flex items-center gap-1.5">
           {saving && <Loader2 className="size-3.5 animate-spin" />}{saving ? "Saving…" : "Save Interaction"}
         </button>
       </div>
     </form>
   );
 }
+
 
 
 /**
