@@ -2,8 +2,12 @@ import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
-import { listInteractions } from "@/lib/interactions.functions";
-import type { LoggedInteraction } from "@/lib/interactions/schema";
+import { listInteractions, listInteractionsPage } from "@/lib/interactions.functions";
+import type {
+  InteractionsPage,
+  ListInteractionsQuery,
+  LoggedInteraction,
+} from "@/lib/interactions/schema";
 import type { DutySourceInteraction } from "@/lib/mock-data";
 
 export const interactionsQueryKey = ["interactions", "logged"] as const;
@@ -69,4 +73,22 @@ export function useDutySource(): DutySourceInteraction[] {
     () => (data ?? []).map((i) => ({ gkId: i.gkSlug, type: i.interactionType, date: i.occurredAt })),
     [data],
   );
+}
+
+/**
+ * One page of server-filtered interactions. Filters and paging are executed
+ * in Postgres; previous page data is kept while the next page loads so the
+ * table does not flash empty.
+ */
+export function useInteractionsPage(params: ListInteractionsQuery) {
+  const fetchPage = useServerFn(listInteractionsPage);
+  const hasSession = useHasSupabaseSession();
+  return useQuery<InteractionsPage>({
+    queryKey: ["interactions", "page", params],
+    queryFn: () => fetchPage({ data: params }),
+    enabled: hasSession,
+    placeholderData: (prev) => prev,
+    staleTime: 30_000,
+    retry: false,
+  });
 }
