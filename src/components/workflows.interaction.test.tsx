@@ -44,6 +44,9 @@ vi.mock("@/components/handwritten-notes-field", () => ({
 vi.mock("@/components/voice-note-field", () => ({
   VoiceNoteField: () => null,
 }));
+vi.mock("sonner", () => ({
+  toast: { success: vi.fn(), error: vi.fn(), info: vi.fn() },
+}));
 
 const { InteractionForm } = await import("./workflows");
 const { goalkeepers } = await import("@/lib/mock-data");
