@@ -256,7 +256,7 @@ function Dashboard() {
               </div>
             ) : upcoming.map((e) => {
               const gk = e.gkId ? goalkeepers.find((g) => g.id === e.gkId) : undefined;
-              const m = getMentor(e.mentorId);
+              const m = e.mentorId ? getMentor(e.mentorId) : undefined;
               const content = (
                 <>
                   <Avatar initials={gk?.initials ?? "—"} />
