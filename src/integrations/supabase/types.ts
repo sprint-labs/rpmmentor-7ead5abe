@@ -14,6 +14,72 @@ export type Database = {
   }
   public: {
     Tables: {
+      calendar_events: {
+        Row: {
+          created_at: string
+          created_by: string
+          created_by_name: string
+          end_time: string | null
+          event_date: string
+          event_type: string
+          goalkeeper_name: string | null
+          id: string
+          location: string | null
+          notes: string
+          player_id: string | null
+          start_time: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          created_by_name?: string
+          end_time?: string | null
+          event_date: string
+          event_type?: string
+          goalkeeper_name?: string | null
+          id?: string
+          location?: string | null
+          notes?: string
+          player_id?: string | null
+          start_time?: string | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          created_by_name?: string
+          end_time?: string | null
+          event_date?: string
+          event_type?: string
+          goalkeeper_name?: string | null
+          id?: string
+          location?: string | null
+          notes?: string
+          player_id?: string | null
+          start_time?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "calendar_events_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "calendar_events_player_id_fkey"
+            columns: ["player_id"]
+            isOneToOne: false
+            referencedRelation: "players"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       dashboard_click_events: {
         Row: {
           created_at: string
