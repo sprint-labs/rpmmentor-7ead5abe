@@ -250,26 +250,41 @@ function Dashboard() {
             Upcoming Interactions
           </SectionTitle>
           <div className="divide-y divide-border">
-            {upcoming.map((gk) => {
-              const m = getMentor(gk.mentorId);
-              return (
-                <Link key={gk.id} to="/goalkeepers/$gkId" params={{ gkId: gk.id }} className="flex items-center gap-3 py-2.5 hover:bg-accent/30 -mx-2 px-2 rounded-md transition-colors">
-                  <Avatar initials={gk.initials} />
+            {upcoming.length === 0 ? (
+              <div className="text-xs text-muted-foreground p-3 rounded-md border border-dashed border-border/60 text-center">
+                No upcoming interactions scheduled. Planned visits, matches and catch-ups will appear here once they are added to the calendar.
+              </div>
+            ) : upcoming.map((e) => {
+              const gk = e.gkId ? goalkeepers.find((g) => g.id === e.gkId) : undefined;
+              const m = getMentor(e.mentorId);
+              const content = (
+                <>
+                  <Avatar initials={gk?.initials ?? "—"} />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="font-medium text-sm truncate">{gk.name}</span>
-                      <TierBadge tier={gk.tier} />
+                      <span className="font-medium text-sm truncate">{gk?.name ?? e.title}</span>
+                      {gk ? <TierBadge tier={gk.tier} /> : null}
                     </div>
-                    <div className="text-xs text-muted-foreground truncate">{gk.club} · {gk.league}</div>
+                    <div className="text-xs text-muted-foreground truncate">
+                      {gk ? `${gk.club} · ${gk.league}` : e.type}
+                    </div>
                   </div>
                   <div className="text-right">
-                    <div className="text-xs font-medium tabular-nums font-mono flex items-center gap-1 justify-end"><CalendarClock className="size-3 text-muted-foreground" />{formatRelative(gk.nextInteraction)}</div>
-                    <div className="text-[11px] text-muted-foreground">w/ {m?.name.split(" ")[1]}</div>
+                    <div className="text-xs font-medium tabular-nums font-mono flex items-center gap-1 justify-end"><CalendarClock className="size-3 text-muted-foreground" />{formatRelative(e.date)}</div>
+                    {m ? <div className="text-[11px] text-muted-foreground">w/ {m.name.split(" ")[1] ?? m.name}</div> : null}
                   </div>
+                </>
+              );
+              return gk ? (
+                <Link key={e.id} to="/goalkeepers/$gkId" params={{ gkId: gk.id }} className="flex items-center gap-3 py-2.5 hover:bg-accent/30 -mx-2 px-2 rounded-md transition-colors">
+                  {content}
                 </Link>
+              ) : (
+                <div key={e.id} className="flex items-center gap-3 py-2.5 -mx-2 px-2">{content}</div>
               );
             })}
           </div>
+
         </Card>
 
         <Card className="p-4">
