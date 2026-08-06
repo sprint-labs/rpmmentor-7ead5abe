@@ -65,6 +65,8 @@ export type Permission =
   
   | "alerts.view"
   | "calendar.view"
+  /** Add, edit or remove shared team calendar events. */
+  | "calendar.manage"
   | "executive.view"
   | "audit.view";
 
@@ -84,6 +86,7 @@ const MENTOR_MANAGER: Permission[] = [
   "mentors.view",
   "interactions.manage",
   "reports.manage",
+  "calendar.manage",
   "audit.view",
 ];
 
@@ -94,7 +97,7 @@ const ADMIN: Permission[] = [
   "interactions.view", "interactions.log", "interactions.manage",
   "reports.view", "reports.submit", "reports.manage",
   "media.view", "media.edit",
-  "alerts.view", "calendar.view",
+  "alerts.view", "calendar.view", "calendar.manage",
   "executive.view", "audit.view",
 ];
 
