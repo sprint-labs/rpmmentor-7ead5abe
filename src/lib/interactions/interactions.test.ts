@@ -36,17 +36,22 @@ describe("interaction input validation", () => {
     expect(MANUAL_INTERACTION_TYPES).not.toContain(MATCH_REPORT_INTERACTION_TYPE);
   });
 
-  it("rejects Live Match Observation on create and update", () => {
+  it("rejects Live Match Observation on create", () => {
     expect(() =>
       createInteractionInput.parse({ ...validInput, interactionType: MATCH_REPORT_INTERACTION_TYPE }),
     ).toThrow();
-    expect(() =>
+  });
+
+  it("accepts Live Match Observation on update so report rows stay correctable", () => {
+    // The server keeps the stored type; the validator only has to let the
+    // existing value round-trip instead of blocking the edit outright.
+    expect(
       updateInteractionInput.parse({
         ...validInput,
         id: "11111111-1111-4111-8111-111111111111",
         interactionType: MATCH_REPORT_INTERACTION_TYPE,
-      }),
-    ).toThrow();
+      }).interactionType,
+    ).toBe(MATCH_REPORT_INTERACTION_TYPE);
   });
 
   it("rejects an unknown interaction type", () => {
