@@ -223,6 +223,8 @@ export async function readHeaderRow(): Promise<string[]> {
  */
 export async function appendRow(values: (string | number)[]): Promise<number> {
   const range = `'${SHEET_TAB}'!A1`;
+  // The sheet is about to change; never serve a pre-write snapshot afterwards.
+  invalidateSheetReadCache();
   let res: Response;
   try {
     res = await gatewayFetch(
@@ -316,6 +318,7 @@ export async function deleteRow(rowIndex: number): Promise<void> {
     throw new Error(`Refusing to delete invalid row index ${rowIndex}.`);
   }
   const sheetId = await getSheetGid();
+  invalidateSheetReadCache();
   let res: Response;
   try {
     res = await gatewayFetch(
