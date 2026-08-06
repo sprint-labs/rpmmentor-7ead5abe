@@ -125,8 +125,28 @@ async function gatewayFetch(
 }
 
 
-/** Fetch all data rows (skips header). Returns raw string rows + first-row offset (2). */
-export async function readAllRows(): Promise<{ rows: string[][]; firstDataRow: number }> {
+/**
+ * Short-lived snapshot cache for the full sheet read.
+ *
+ * Every reports page and dashboard card triggers a full A2:O read, which
+ * exhausts the per-project "Read requests per minute" quota (429) during
+ * bursts. Reads within TTL reuse the snapshot, concurrent reads share one
+ * in-flight request, and if a fresh read fails we fall back to the last good
+ * snapshot rather than breaking the page.
+ */
+type SheetSnapshot = { rows: string[][]; firstDataRow: number };
+const READ_CACHE_TTL_MS = 30_000;
+const READ_STALE_FALLBACK_MS = 10 * 60_000;
+let cachedRead: { at: number; value: SheetSnapshot } | null = null;
+let inFlightRead: Promise<SheetSnapshot> | null = null;
+
+/** Drop the cached snapshot after any write so reads never serve stale rows. */
+export function invalidateSheetReadCache(): void {
+  cachedRead = null;
+  inFlightRead = null;
+}
+
+async function fetchAllRows(): Promise<SheetSnapshot> {
   const range = `'${SHEET_TAB}'!A2:O`;
   const res = await gatewayFetch(
     `/spreadsheets/${SHEET_ID}/values/${encodeURI(range)}?valueRenderOption=UNFORMATTED_VALUE&dateTimeRenderOption=FORMATTED_STRING`,
@@ -140,6 +160,44 @@ export async function readAllRows(): Promise<{ rows: string[][]; firstDataRow: n
   const rows = (data.values ?? []).map((r) => r.map((c) => (c == null ? "" : String(c))));
   return { rows, firstDataRow: 2 };
 }
+
+/**
+ * Fetch all data rows (skips header). Returns raw string rows + first-row
+ * offset (2). Pass `{ fresh: true }` for read-after-write verification, which
+ * bypasses and refreshes the cache.
+ */
+export async function readAllRows(opts?: { fresh?: boolean }): Promise<SheetSnapshot> {
+  const now = Date.now();
+  if (!opts?.fresh && cachedRead && now - cachedRead.at < READ_CACHE_TTL_MS) {
+    return cachedRead.value;
+  }
+  if (!opts?.fresh && inFlightRead) return inFlightRead;
+
+  const run = (async () => {
+    try {
+      const value = await fetchAllRows();
+      cachedRead = { at: Date.now(), value };
+      return value;
+    } catch (err) {
+      // Quota/transient failures must not blank out the Reports page when we
+      // still hold a recent snapshot. Verification reads (`fresh`) never do this.
+      if (
+        !opts?.fresh &&
+        cachedRead &&
+        Date.now() - cachedRead.at < READ_STALE_FALLBACK_MS
+      ) {
+        console.warn("[sheets] serving cached rows after read failure:", (err as Error)?.message);
+        return cachedRead.value;
+      }
+      throw err;
+    } finally {
+      inFlightRead = null;
+    }
+  })();
+  if (!opts?.fresh) inFlightRead = run;
+  return run;
+}
+
 
 /** Read the header row (A1:O1) exactly as it currently exists in the sheet. */
 export async function readHeaderRow(): Promise<string[]> {
@@ -165,6 +223,8 @@ export async function readHeaderRow(): Promise<string[]> {
  */
 export async function appendRow(values: (string | number)[]): Promise<number> {
   const range = `'${SHEET_TAB}'!A1`;
+  // The sheet is about to change; never serve a pre-write snapshot afterwards.
+  invalidateSheetReadCache();
   let res: Response;
   try {
     res = await gatewayFetch(
@@ -258,6 +318,7 @@ export async function deleteRow(rowIndex: number): Promise<void> {
     throw new Error(`Refusing to delete invalid row index ${rowIndex}.`);
   }
   const sheetId = await getSheetGid();
+  invalidateSheetReadCache();
   let res: Response;
   try {
     res = await gatewayFetch(

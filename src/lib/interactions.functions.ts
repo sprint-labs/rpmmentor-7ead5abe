@@ -120,21 +120,26 @@ export const updateInteraction = createServerFn({ method: "POST" })
   .handler(async ({ data, context }): Promise<LoggedInteraction> => {
     const { supabase, userId } = context;
 
-    if (!isLoggableInteractionType(data.interactionType)) {
-      throw new Error(
-        `"${MATCH_REPORT_INTERACTION_TYPE}" is recorded by submitting a Match Report, not by logging an interaction.`,
-      );
-    }
-
-
-
     const { data: existing, error: loadError } = await supabase
       .from("interactions")
-      .select("id, mentor_id")
+      .select("id, mentor_id, interaction_type")
       .eq("id", data.id)
       .maybeSingle();
     if (loadError) throw new Error(loadError.message);
     if (!existing) throw new Error("That interaction no longer exists.");
+
+    // A Match-Report-generated observation keeps its type for ever: it can be
+    // corrected in place but never reclassified (which would hide it from the
+    // report-linked activity), and a manual entry can never become one.
+    const wasMatchReportObservation = existing.interaction_type === MATCH_REPORT_INTERACTION_TYPE;
+    const interactionType = wasMatchReportObservation
+      ? MATCH_REPORT_INTERACTION_TYPE
+      : data.interactionType;
+    if (!wasMatchReportObservation && !isLoggableInteractionType(interactionType)) {
+      throw new Error(
+        `"${MATCH_REPORT_INTERACTION_TYPE}" is recorded by submitting a Match Report, not by logging an interaction.`,
+      );
+    }
 
     const roles = await getUserRoles(supabase, userId);
     const isAuthor = existing.mentor_id === userId;
@@ -159,7 +164,7 @@ export const updateInteraction = createServerFn({ method: "POST" })
         player_id: playerId,
         goalkeeper_name: data.goalkeeperName,
         gk_slug: data.gkSlug ?? "",
-        interaction_type: data.interactionType,
+        interaction_type: interactionType,
         club: data.club ?? "",
         occurred_at: data.occurredAt,
         notes: data.notes,

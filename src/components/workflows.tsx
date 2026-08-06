@@ -441,6 +441,9 @@ export function InteractionForm({
    * already exists is still a normal edit.
    */
   const handOffToMatchReport = !isEditing && type === MATCH_REPORT_INTERACTION_TYPE;
+  /** Editing a row created by a Match Report — its type is immutable. */
+  const isMatchReportObservation =
+    isEditing && editing?.interactionType === MATCH_REPORT_INTERACTION_TYPE;
 
   const validationErrors = useMemo(
     () => validate({ gkId, date, notes, outcome, followUp }),
@@ -828,9 +831,19 @@ export function InteractionForm({
             </select>
           </Field>
           <Field label="Interaction Type" required>
-            <select aria-label="Interaction Type" className={selectCls} required value={type} onChange={(e) => setType(e.target.value as InteractionTypeValue)}>
-              {MANUAL_INTERACTION_TYPES.map((t) => <option key={t}>{t}</option>)}
-            </select>
+            {isMatchReportObservation ? (
+              <div className="rounded-md border border-border bg-muted/40 px-3 py-2 text-sm">
+                {MATCH_REPORT_INTERACTION_TYPE}
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Created by a Match Report, so the type stays fixed. You can still correct the
+                  other details.
+                </p>
+              </div>
+            ) : (
+              <select aria-label="Interaction Type" className={selectCls} required value={type} onChange={(e) => setType(e.target.value as InteractionTypeValue)}>
+                {MANUAL_INTERACTION_TYPES.map((t) => <option key={t}>{t}</option>)}
+              </select>
+            )}
           </Field>
           {handOffToMatchReport && (
             <div className="col-span-2 rounded-md border border-primary/40 bg-primary/5 px-3 py-2.5 text-xs">

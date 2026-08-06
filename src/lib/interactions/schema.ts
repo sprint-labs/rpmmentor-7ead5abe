@@ -111,7 +111,10 @@ export const updateInteractionInput = z.object({
   playerId: z.string().regex(UUID, "playerId must be a players.id").nullish(),
   gkSlug: z.string().trim().max(120).default(""),
   goalkeeperName: z.string().trim().min(1, "Select a goalkeeper").max(120),
-  interactionType: z.enum(MANUAL_INTERACTION_TYPES, { message: "Live Match Observation is recorded by submitting a Match Report, not by logging an interaction" }),
+  // Editing a Match-Report-generated row must keep its "Live Match Observation"
+  // type, so the update enum is the full list. The server enforces that the
+  // type can never CHANGE into or out of Live Match Observation.
+  interactionType: z.enum(INTERACTION_TYPES),
   club: z.string().trim().max(120).default(""),
   occurredAt: z.string().regex(DATE_ONLY, "Date must be a calendar date (YYYY-MM-DD)"),
   notes: z.string().trim().min(1, "Notes are required").max(8000),
