@@ -130,10 +130,11 @@ function Dashboard() {
   const dutyOverview = computeDutyOverview(dutySource);
 
 
-  const pool = goalkeepers;
-  const upcoming = [...pool]
-    .filter((g) => new Date(g.nextInteraction).getTime() >= Date.now())
-    .sort((a, b) => +new Date(a.nextInteraction) - +new Date(b.nextInteraction))
+  // Upcoming interactions come from scheduled calendar events only. There is
+  // no sample/placeholder fallback — an empty schedule shows an empty state.
+  const upcoming = calendarEvents
+    .filter((e) => +new Date(e.date) >= Date.now())
+    .sort((a, b) => +new Date(a.date) - +new Date(b.date))
     .slice(0, 6);
 
   const greeting = `Good ${new Date().getHours() < 12 ? "morning" : new Date().getHours() < 18 ? "afternoon" : "evening"}, ${user.name.split(" ")[0]}`;
