@@ -441,6 +441,9 @@ export function InteractionForm({
    * already exists is still a normal edit.
    */
   const handOffToMatchReport = !isEditing && type === MATCH_REPORT_INTERACTION_TYPE;
+  /** Editing a row created by a Match Report — its type is immutable. */
+  const isMatchReportObservation =
+    isEditing && editing?.interactionType === MATCH_REPORT_INTERACTION_TYPE;
 
   const validationErrors = useMemo(
     () => validate({ gkId, date, notes, outcome, followUp }),
