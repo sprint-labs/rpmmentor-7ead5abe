@@ -66,7 +66,10 @@ function IntegrationsPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Integrations</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Runtime status for connected services.
+            Runtime status for connected services.{" "}
+            <Link to="/system/github" className="text-primary hover:underline">
+              GitHub sync
+            </Link>
           </p>
         </div>
         <button
