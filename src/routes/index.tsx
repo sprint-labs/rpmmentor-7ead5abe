@@ -3,7 +3,7 @@ import { useEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Card, PageHeader, StatCard, SectionTitle, Avatar, Pill, TierBadge, TrafficLight } from "@/components/primitives";
-import { activity, alerts, goalkeepers, stats, formatRelative, getMentor, computeDutyOverview } from "@/lib/mock-data";
+import { activity, alerts, goalkeepers, calendarEvents, stats, formatRelative, getMentor, computeDutyOverview } from "@/lib/mock-data";
 import { useDutySource, useLoggedInteractions } from "@/lib/interactions/use-interactions";
 import { ErrorBoundary } from "@/components/error-boundary";
 
@@ -130,10 +130,11 @@ function Dashboard() {
   const dutyOverview = computeDutyOverview(dutySource);
 
 
-  const pool = goalkeepers;
-  const upcoming = [...pool]
-    .filter((g) => new Date(g.nextInteraction).getTime() >= Date.now())
-    .sort((a, b) => +new Date(a.nextInteraction) - +new Date(b.nextInteraction))
+  // Upcoming interactions come from scheduled calendar events only. There is
+  // no sample/placeholder fallback — an empty schedule shows an empty state.
+  const upcoming = calendarEvents
+    .filter((e) => +new Date(e.date) >= Date.now())
+    .sort((a, b) => +new Date(a.date) - +new Date(b.date))
     .slice(0, 6);
 
   const greeting = `Good ${new Date().getHours() < 12 ? "morning" : new Date().getHours() < 18 ? "afternoon" : "evening"}, ${user.name.split(" ")[0]}`;
@@ -249,26 +250,41 @@ function Dashboard() {
             Upcoming Interactions
           </SectionTitle>
           <div className="divide-y divide-border">
-            {upcoming.map((gk) => {
-              const m = getMentor(gk.mentorId);
-              return (
-                <Link key={gk.id} to="/goalkeepers/$gkId" params={{ gkId: gk.id }} className="flex items-center gap-3 py-2.5 hover:bg-accent/30 -mx-2 px-2 rounded-md transition-colors">
-                  <Avatar initials={gk.initials} />
+            {upcoming.length === 0 ? (
+              <div className="text-xs text-muted-foreground p-3 rounded-md border border-dashed border-border/60 text-center">
+                No upcoming interactions scheduled. Planned visits, matches and catch-ups will appear here once they are added to the calendar.
+              </div>
+            ) : upcoming.map((e) => {
+              const gk = e.gkId ? goalkeepers.find((g) => g.id === e.gkId) : undefined;
+              const m = e.mentorId ? getMentor(e.mentorId) : undefined;
+              const content = (
+                <>
+                  <Avatar initials={gk?.initials ?? "—"} />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="font-medium text-sm truncate">{gk.name}</span>
-                      <TierBadge tier={gk.tier} />
+                      <span className="font-medium text-sm truncate">{gk?.name ?? e.title}</span>
+                      {gk ? <TierBadge tier={gk.tier} /> : null}
                     </div>
-                    <div className="text-xs text-muted-foreground truncate">{gk.club} · {gk.league}</div>
+                    <div className="text-xs text-muted-foreground truncate">
+                      {gk ? `${gk.club} · ${gk.league}` : e.type}
+                    </div>
                   </div>
                   <div className="text-right">
-                    <div className="text-xs font-medium tabular-nums font-mono flex items-center gap-1 justify-end"><CalendarClock className="size-3 text-muted-foreground" />{formatRelative(gk.nextInteraction)}</div>
-                    <div className="text-[11px] text-muted-foreground">w/ {m?.name.split(" ")[1]}</div>
+                    <div className="text-xs font-medium tabular-nums font-mono flex items-center gap-1 justify-end"><CalendarClock className="size-3 text-muted-foreground" />{formatRelative(e.date)}</div>
+                    {m ? <div className="text-[11px] text-muted-foreground">w/ {m.name.split(" ")[1] ?? m.name}</div> : null}
                   </div>
+                </>
+              );
+              return gk ? (
+                <Link key={e.id} to="/goalkeepers/$gkId" params={{ gkId: gk.id }} className="flex items-center gap-3 py-2.5 hover:bg-accent/30 -mx-2 px-2 rounded-md transition-colors">
+                  {content}
                 </Link>
+              ) : (
+                <div key={e.id} className="flex items-center gap-3 py-2.5 -mx-2 px-2">{content}</div>
               );
             })}
           </div>
+
         </Card>
 
         <Card className="p-4">
