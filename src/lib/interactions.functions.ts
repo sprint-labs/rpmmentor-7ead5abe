@@ -164,7 +164,7 @@ export const updateInteraction = createServerFn({ method: "POST" })
         player_id: playerId,
         goalkeeper_name: data.goalkeeperName,
         gk_slug: data.gkSlug ?? "",
-        interaction_type: data.interactionType,
+        interaction_type: interactionType,
         club: data.club ?? "",
         occurred_at: data.occurredAt,
         notes: data.notes,
