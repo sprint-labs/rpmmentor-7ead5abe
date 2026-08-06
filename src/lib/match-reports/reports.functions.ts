@@ -521,7 +521,7 @@ export const submitMatchReport = createServerFn({ method: "POST" })
     // response, attachments and deletion must all use that exact id.
     let resolved: MatchReportRow | null = null;
     try {
-      const { rows: allRows, firstDataRow } = await readRowsAfterAppend();
+      const { rows: allRows, firstDataRow } = await readRowsAfterAppend({ fresh: true });
       resolved = identityForRowIndex(parseSheetRows(allRows, firstDataRow), rowIndex);
     } catch (e) {
       console.error("[match-reports] identity resolve after append failed:", e);
@@ -648,7 +648,7 @@ export const deleteMatchReport = createServerFn({ method: "POST" })
 
     // Locate the row in the sheet (source of truth).
     const { readAllRows, deleteRow, AmbiguousDeleteError } = await import("./sheets.server");
-    const { rows, firstDataRow } = await readAllRows();
+    const { rows, firstDataRow } = await readAllRows({ fresh: true });
     const parsedRows = parseSheetRows(rows, firstDataRow);
     const target =
       parsedRows.find((r) => r.report_id === data.reportId) ??
@@ -696,7 +696,7 @@ export const deleteMatchReport = createServerFn({ method: "POST" })
       if (err instanceof AmbiguousDeleteError) {
         let rowsAfter: string[][] | null = null;
         try {
-          rowsAfter = (await readAllRows()).rows;
+          rowsAfter = (await readAllRows({ fresh: true })).rows;
         } catch (readErr) {
           console.error("[match-reports] delete read-back failed:", readErr);
         }
