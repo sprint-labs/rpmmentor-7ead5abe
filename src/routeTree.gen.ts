@@ -27,6 +27,7 @@ import { Route as ReportsIndexRouteImport } from './routes/reports.index'
 import { Route as SystemUsersRouteImport } from './routes/system.users'
 import { Route as SystemPermissionsRouteImport } from './routes/system.permissions'
 import { Route as SystemIntegrationsRouteImport } from './routes/system.integrations'
+import { Route as SystemGithubRouteImport } from './routes/system.github'
 import { Route as SystemDataQualityRouteImport } from './routes/system.data-quality'
 import { Route as ReportsReportIdRouteImport } from './routes/reports.$reportId'
 import { Route as GoalkeepersGkIdRouteImport } from './routes/goalkeepers.$gkId'
@@ -127,6 +128,11 @@ const SystemIntegrationsRoute = SystemIntegrationsRouteImport.update({
   path: '/system/integrations',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SystemGithubRoute = SystemGithubRouteImport.update({
+  id: '/system/github',
+  path: '/system/github',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SystemDataQualityRoute = SystemDataQualityRouteImport.update({
   id: '/system/data-quality',
   path: '/system/data-quality',
@@ -196,6 +202,7 @@ export interface FileRoutesByFullPath {
   '/goalkeepers/$gkId': typeof GoalkeepersGkIdRoute
   '/reports/$reportId': typeof ReportsReportIdRoute
   '/system/data-quality': typeof SystemDataQualityRoute
+  '/system/github': typeof SystemGithubRoute
   '/system/integrations': typeof SystemIntegrationsRoute
   '/system/permissions': typeof SystemPermissionsRoute
   '/system/users': typeof SystemUsersRoute
@@ -225,6 +232,7 @@ export interface FileRoutesByTo {
   '/goalkeepers/$gkId': typeof GoalkeepersGkIdRoute
   '/reports/$reportId': typeof ReportsReportIdRoute
   '/system/data-quality': typeof SystemDataQualityRoute
+  '/system/github': typeof SystemGithubRoute
   '/system/integrations': typeof SystemIntegrationsRoute
   '/system/permissions': typeof SystemPermissionsRoute
   '/system/users': typeof SystemUsersRoute
@@ -255,6 +263,7 @@ export interface FileRoutesById {
   '/goalkeepers/$gkId': typeof GoalkeepersGkIdRoute
   '/reports/$reportId': typeof ReportsReportIdRoute
   '/system/data-quality': typeof SystemDataQualityRoute
+  '/system/github': typeof SystemGithubRoute
   '/system/integrations': typeof SystemIntegrationsRoute
   '/system/permissions': typeof SystemPermissionsRoute
   '/system/users': typeof SystemUsersRoute
@@ -286,6 +295,7 @@ export interface FileRouteTypes {
     | '/goalkeepers/$gkId'
     | '/reports/$reportId'
     | '/system/data-quality'
+    | '/system/github'
     | '/system/integrations'
     | '/system/permissions'
     | '/system/users'
@@ -315,6 +325,7 @@ export interface FileRouteTypes {
     | '/goalkeepers/$gkId'
     | '/reports/$reportId'
     | '/system/data-quality'
+    | '/system/github'
     | '/system/integrations'
     | '/system/permissions'
     | '/system/users'
@@ -344,6 +355,7 @@ export interface FileRouteTypes {
     | '/goalkeepers/$gkId'
     | '/reports/$reportId'
     | '/system/data-quality'
+    | '/system/github'
     | '/system/integrations'
     | '/system/permissions'
     | '/system/users'
@@ -373,6 +385,7 @@ export interface RootRouteChildren {
   Char91DotwellKnownChar93OauthProtectedResourceRoute: typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   ReportsReportIdRoute: typeof ReportsReportIdRoute
   SystemDataQualityRoute: typeof SystemDataQualityRoute
+  SystemGithubRoute: typeof SystemGithubRoute
   SystemIntegrationsRoute: typeof SystemIntegrationsRoute
   SystemPermissionsRoute: typeof SystemPermissionsRoute
   SystemUsersRoute: typeof SystemUsersRoute
@@ -511,6 +524,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SystemIntegrationsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/system/github': {
+      id: '/system/github'
+      path: '/system/github'
+      fullPath: '/system/github'
+      preLoaderRoute: typeof SystemGithubRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/system/data-quality': {
       id: '/system/data-quality'
       path: '/system/data-quality'
@@ -609,6 +629,7 @@ const rootRouteChildren: RootRouteChildren = {
     Char91DotwellKnownChar93OauthProtectedResourceRoute,
   ReportsReportIdRoute: ReportsReportIdRoute,
   SystemDataQualityRoute: SystemDataQualityRoute,
+  SystemGithubRoute: SystemGithubRoute,
   SystemIntegrationsRoute: SystemIntegrationsRoute,
   SystemPermissionsRoute: SystemPermissionsRoute,
   SystemUsersRoute: SystemUsersRoute,

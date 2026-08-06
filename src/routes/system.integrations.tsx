@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { CheckCircle2, XCircle, RefreshCw, ExternalLink, FileSpreadsheet, Loader2, AlertCircle } from "lucide-react";
@@ -66,7 +66,10 @@ function IntegrationsPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Integrations</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Runtime status for connected services.
+            Runtime status for connected services.{" "}
+            <Link to="/system/github" className="text-primary hover:underline">
+              GitHub sync
+            </Link>
           </p>
         </div>
         <button
