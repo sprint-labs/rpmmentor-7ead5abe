@@ -1,12 +1,24 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { toast } from "sonner";
 import { PageHeader, Card, Pill } from "@/components/primitives";
-import { calendarEvents, formatDate, goalkeepers } from "@/lib/mock-data";
-import { useEffect, useState } from "react";
+import { formatDate, goalkeepers } from "@/lib/mock-data";
+import { useEffect, useMemo, useState } from "react";
 import { withPermission } from "@/components/require-permission";
-import { X } from "lucide-react";
+import { X, Plus, Pencil, Trash2 } from "lucide-react";
+import { useAuth } from "@/lib/auth";
 import { subscribeMentorSession } from "@/lib/mentor-session-store";
+import {
+  listCalendarEvents,
+  createCalendarEvent,
+  updateCalendarEvent,
+  deleteCalendarEvent,
+  CALENDAR_EVENT_TYPES,
+  type TeamCalendarEvent,
+} from "@/lib/calendar.functions";
 import {
   computeMissingReportTypes,
   shortLabel,
@@ -84,19 +96,102 @@ export const Route = createFileRoute("/calendar")({
   component: withPermission(CalendarPage, "calendar.view"),
 });
 
-
 const TONE: Record<string, "info" | "warning" | "success" | "muted" | "destructive"> = {
   "Match": "info",
   "Observation": "success",
   "Mentor Visit": "warning",
   "Meeting": "muted",
   "Follow Up": "destructive",
+  "Other": "muted",
 };
+
+const CHIP: Record<string, string> = {
+  "Match": "bg-info/15 text-info border-info/30",
+  "Observation": "bg-success/15 text-success border-success/30",
+  "Mentor Visit": "bg-warning/15 text-warning border-warning/30",
+  "Follow Up": "bg-destructive/15 text-destructive border-destructive/30",
+  "Meeting": "bg-muted text-muted-foreground border-border",
+  "Other": "bg-muted text-muted-foreground border-border",
+};
+
+interface DisplayEvent {
+  id: string;
+  date: string;
+  title: string;
+  type: string;
+  gkId?: string;
+  gkName?: string;
+  notes: string;
+  location: string | null;
+  startTime: string | null;
+  endTime: string | null;
+  createdByName: string;
+  raw: TeamCalendarEvent;
+}
+
+const emptyDraft = {
+  id: "",
+  title: "",
+  event_type: "Meeting" as string,
+  event_date: new Date().toISOString().slice(0, 10),
+  start_time: "",
+  end_time: "",
+  location: "",
+  notes: "",
+  goalkeeper_name: "",
+  player_id: "",
+};
+type Draft = typeof emptyDraft;
+
+function timeRange(e: DisplayEvent) {
+  if (!e.startTime) return "";
+  const s = e.startTime.slice(0, 5);
+  return e.endTime ? `${s}–${e.endTime.slice(0, 5)}` : s;
+}
 
 function CalendarPage() {
   const { gkId } = Route.useSearch();
+  const { can } = useAuth();
+  const canManage = can("calendar.manage");
+  const queryClient = useQueryClient();
+
+  const fetchEvents = useServerFn(listCalendarEvents);
+  const createEvent = useServerFn(createCalendarEvent);
+  const editEvent = useServerFn(updateCalendarEvent);
+  const removeEvent = useServerFn(deleteCalendarEvent);
+
+  const { data: events = [], isLoading } = useQuery({
+    queryKey: ["calendar-events"],
+    queryFn: () => fetchEvents(),
+  });
+
+  const [draft, setDraft] = useState<Draft | null>(null);
+  const [saving, setSaving] = useState(false);
+
   const filteredGoalkeeper = gkId ? goalkeepers.find((g) => g.id === gkId) : null;
-  const filteredEvents = gkId ? calendarEvents.filter((e) => e.gkId === gkId) : calendarEvents;
+
+  const displayEvents: DisplayEvent[] = useMemo(() => {
+    const mapped = events.map((e) => {
+      const gk = e.goalkeeper_name
+        ? goalkeepers.find((g) => g.name.toLowerCase() === e.goalkeeper_name!.toLowerCase())
+        : undefined;
+      return {
+        id: e.id,
+        date: e.event_date,
+        title: e.title,
+        type: e.event_type,
+        gkId: gk?.id,
+        gkName: e.goalkeeper_name ?? gk?.name,
+        notes: e.notes,
+        location: e.location,
+        startTime: e.start_time,
+        endTime: e.end_time,
+        createdByName: e.created_by_name,
+        raw: e,
+      } satisfies DisplayEvent;
+    });
+    return filteredGoalkeeper ? mapped.filter((e) => e.gkId === filteredGoalkeeper.id) : mapped;
+  }, [events, filteredGoalkeeper]);
 
   const [view, setView] = useState<"month" | "week">("month");
   const today = new Date();
@@ -108,13 +203,12 @@ function CalendarPage() {
   for (let d = 1; d <= daysInMonth; d++) cells.push(new Date(today.getFullYear(), today.getMonth(), d));
   while (cells.length % 7 !== 0) cells.push(null);
 
-  const eventsByDay = new Map<string, typeof calendarEvents>();
-  filteredEvents.forEach((e) => {
-    const k = new Date(e.date).toDateString();
+  const eventsByDay = new Map<string, DisplayEvent[]>();
+  displayEvents.forEach((e) => {
+    const k = new Date(`${e.date}T00:00:00`).toDateString();
     if (!eventsByDay.has(k)) eventsByDay.set(k, []);
     eventsByDay.get(k)!.push(e);
   });
-
 
   const weekDays = Array.from({ length: 7 }).map((_, i) => {
     const d = new Date(today);
@@ -122,15 +216,87 @@ function CalendarPage() {
     return d;
   });
 
+  function openNew(dateIso?: string) {
+    setDraft({ ...emptyDraft, event_date: dateIso ?? emptyDraft.event_date });
+  }
+
+  function openEdit(e: DisplayEvent) {
+    setDraft({
+      id: e.id,
+      title: e.title,
+      event_type: e.type,
+      event_date: e.date,
+      start_time: e.startTime?.slice(0, 5) ?? "",
+      end_time: e.endTime?.slice(0, 5) ?? "",
+      location: e.location ?? "",
+      notes: e.notes,
+      goalkeeper_name: e.gkName ?? "",
+      player_id: e.raw.player_id ?? "",
+    });
+  }
+
+  async function saveDraft() {
+    if (!draft) return;
+    if (!draft.title.trim()) {
+      toast.error("Add a title for this event.");
+      return;
+    }
+    setSaving(true);
+    try {
+      const payload = {
+        title: draft.title,
+        event_type: draft.event_type,
+        event_date: draft.event_date,
+        start_time: draft.start_time,
+        end_time: draft.end_time,
+        location: draft.location,
+        notes: draft.notes,
+        goalkeeper_name: draft.goalkeeper_name,
+        player_id: draft.player_id || null,
+      };
+      if (draft.id) await editEvent({ data: { id: draft.id, ...payload } });
+      else await createEvent({ data: payload });
+      await queryClient.invalidateQueries({ queryKey: ["calendar-events"] });
+      toast.success(draft.id ? "Calendar event updated" : "Calendar event added");
+      setDraft(null);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not save the event.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleDelete(id: string) {
+    if (!window.confirm("Remove this event from the shared calendar?")) return;
+    try {
+      await removeEvent({ data: { id } });
+      await queryClient.invalidateQueries({ queryKey: ["calendar-events"] });
+      toast.success("Calendar event removed");
+      setDraft(null);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not remove the event.");
+    }
+  }
+
   return (
     <div className="space-y-5">
       <PageHeader
         title="Calendar"
         description={today.toLocaleDateString("en-GB", { month: "long", year: "numeric" })}
         action={
-          <div className="flex rounded-md border border-border overflow-hidden text-xs">
-            <button onClick={() => setView("month")} className={`px-3 py-1.5 ${view === "month" ? "bg-accent" : "hover:bg-accent/40"}`}>Month</button>
-            <button onClick={() => setView("week")} className={`px-3 py-1.5 ${view === "week" ? "bg-accent" : "hover:bg-accent/40"}`}>Week</button>
+          <div className="flex items-center gap-2">
+            <div className="flex rounded-md border border-border overflow-hidden text-xs">
+              <button onClick={() => setView("month")} className={`px-3 py-1.5 ${view === "month" ? "bg-accent" : "hover:bg-accent/40"}`}>Month</button>
+              <button onClick={() => setView("week")} className={`px-3 py-1.5 ${view === "week" ? "bg-accent" : "hover:bg-accent/40"}`}>Week</button>
+            </div>
+            {canManage && (
+              <button
+                onClick={() => openNew()}
+                className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:brightness-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <Plus className="size-3.5" /> Add event
+              </button>
+            )}
           </div>
         }
       />
@@ -153,7 +319,6 @@ function CalendarPage() {
       )}
 
       {view === "month" ? (
-
         <Card className="p-3">
           <div className="grid grid-cols-7 text-[10px] uppercase tracking-wider text-muted-foreground mb-2">
             {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => <div key={d} className="px-2 py-1">{d}</div>)}
@@ -161,60 +326,55 @@ function CalendarPage() {
           <div className="grid grid-cols-7 gap-1">
             {cells.map((d, i) => {
               const isToday = d?.toDateString() === today.toDateString();
-              const events = d ? eventsByDay.get(d.toDateString()) ?? [] : [];
+              const dayEvents = d ? eventsByDay.get(d.toDateString()) ?? [] : [];
+              const iso = d
+                ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
+                : "";
               return (
-                <div key={i} className={`min-h-24 rounded-md border p-1.5 ${d ? "bg-card border-border" : "border-transparent"} ${isToday ? "ring-1 ring-primary" : ""}`}>
-                  {d && <div className={`text-[11px] tabular-nums font-mono font-medium mb-1 ${isToday ? "text-primary" : "text-muted-foreground"}`}>{d.getDate()}</div>}
+                <div key={i} className={`group min-h-24 rounded-md border p-1.5 ${d ? "bg-card border-border" : "border-transparent"} ${isToday ? "ring-1 ring-primary" : ""}`}>
+                  {d && (
+                    <div className="mb-1 flex items-center justify-between">
+                      <span className={`text-[11px] tabular-nums font-mono font-medium ${isToday ? "text-primary" : "text-muted-foreground"}`}>{d.getDate()}</span>
+                      {canManage && (
+                        <button
+                          onClick={() => openNew(iso)}
+                          aria-label={`Add event on ${iso}`}
+                          className="opacity-0 group-hover:opacity-100 focus:opacity-100 rounded p-0.5 text-muted-foreground hover:text-foreground"
+                        >
+                          <Plus className="size-3" />
+                        </button>
+                      )}
+                    </div>
+                  )}
                   <div className="space-y-1">
-                    {events.slice(0, 3).map((e) => {
-                      const cls = `w-full text-left text-[10px] truncate px-1.5 py-0.5 rounded border ${
-                        e.type === "Match" ? "bg-info/15 text-info border-info/30" :
-                        e.type === "Observation" ? "bg-success/15 text-success border-success/30" :
-                        e.type === "Mentor Visit" ? "bg-warning/15 text-warning border-warning/30" :
-                        e.type === "Follow Up" ? "bg-destructive/15 text-destructive border-destructive/30" :
-                        "bg-muted text-muted-foreground border-border"
-                      }`;
-                      if (e.type === "Match" && e.gkId) {
-                        const gkForEvent = goalkeepers.find((g) => g.id === e.gkId);
-                        const iso = new Date(e.date).toISOString().slice(0, 10);
-                        // Title format: "GK vs Opponent" — extract opponent.
-                        const opponent = e.title.includes(" vs ") ? e.title.split(" vs ").pop()!.trim() : "";
-                        return (
-                          <div key={e.id}>
-                            <Link
-                              to="/reports"
-                              search={{ from: "", to: "", coach: "", mentorProfileId: "", source: "", gk: gkForEvent?.name ?? "", openSubmit: "1", last5Gk: "", matchDate: iso, opponent }}
+                    {dayEvents.slice(0, 3).map((e) => {
+                      const cls = `w-full text-left text-[10px] truncate px-1.5 py-0.5 rounded border ${CHIP[e.type] ?? CHIP["Other"]}`;
+                      const label = timeRange(e) ? `${timeRange(e)} ${e.title}` : e.title;
+                      return (
+                        <div key={e.id}>
+                          {canManage ? (
+                            <button
+                              onClick={() => openEdit(e)}
                               className={cls + " hover:brightness-125 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"}
-                              title={`Submit match report for ${e.title} on ${iso}`}
+                              title={e.notes || e.title}
                             >
-                              {e.title}
-                            </Link>
+                              {label}
+                            </button>
+                          ) : (
+                            <div className={cls} title={e.notes || e.title}>{label}</div>
+                          )}
+                          {e.gkId && (
                             <MissingReports
                               gkId={e.gkId}
-                              gkName={gkForEvent?.name}
-                              referenceDate={new Date(e.date)}
+                              gkName={e.gkName}
+                              referenceDate={new Date(`${e.date}T00:00:00`)}
                               variant="compact"
                             />
-                          </div>
-                        );
-                      }
-                      if (e.gkId) {
-                        const gkForEvent = goalkeepers.find((g) => g.id === e.gkId);
-                        return (
-                          <div key={e.id}>
-                            <div className={cls}>{e.title}</div>
-                            <MissingReports
-                              gkId={e.gkId}
-                              gkName={gkForEvent?.name}
-                              referenceDate={new Date(e.date)}
-                              variant="compact"
-                            />
-                          </div>
-                        );
-                      }
-                      return <div key={e.id} className={cls}>{e.title}</div>;
+                          )}
+                        </div>
+                      );
                     })}
-                    {events.length > 3 && <div className="text-[10px] text-muted-foreground">+{events.length - 3}</div>}
+                    {dayEvents.length > 3 && <div className="text-[10px] text-muted-foreground">+{dayEvents.length - 3}</div>}
                   </div>
                 </div>
               );
@@ -225,51 +385,34 @@ function CalendarPage() {
         <Card className="p-3">
           <div className="grid grid-cols-7 gap-2">
             {weekDays.map((d) => {
-              const events = eventsByDay.get(d.toDateString()) ?? [];
+              const dayEvents = eventsByDay.get(d.toDateString()) ?? [];
               const isToday = d.toDateString() === today.toDateString();
               return (
                 <div key={d.toISOString()} className={`min-h-72 rounded-md border border-border p-2 ${isToday ? "ring-1 ring-primary" : ""}`}>
                   <div className="text-[10px] uppercase text-muted-foreground">{d.toLocaleDateString("en", { weekday: "short" })}</div>
                   <div className={`text-lg font-semibold tabular-nums font-mono ${isToday ? "text-primary" : ""}`}>{d.getDate()}</div>
                   <div className="space-y-1.5 mt-2">
-                    {events.map((e) => {
-                      const gkForEvent = e.gkId ? goalkeepers.find((g) => g.id === e.gkId) : null;
-                      const missingSlot = e.gkId ? (
-                        <MissingReports
-                          gkId={e.gkId}
-                          gkName={gkForEvent?.name}
-                          referenceDate={new Date(e.date)}
-                          variant="full"
-                        />
-                      ) : null;
-                      const inner = (
-                        <>
-                          <div className="font-medium leading-tight line-clamp-2">{e.title}</div>
-                          <div className="mt-1"><Pill tone={TONE[e.type]}>{e.type}</Pill></div>
-                          {missingSlot}
-                        </>
-                      );
-                      if (e.type === "Match" && e.gkId) {
-                        const iso = new Date(e.date).toISOString().slice(0, 10);
-                        const opponent = e.title.includes(" vs ") ? e.title.split(" vs ").pop()!.trim() : "";
-                        return (
-                          <Link
-                            key={e.id}
-                            to="/reports"
-                            search={{ from: "", to: "", coach: "", mentorProfileId: "", source: "", gk: gkForEvent?.name ?? "", openSubmit: "1", last5Gk: "", matchDate: iso, opponent }}
-                            className="block text-[11px] p-1.5 rounded bg-accent/40 border border-border/60 hover:bg-accent/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                            title={`Submit match report for ${e.title} on ${iso}`}
-                          >
-                            {inner}
-                          </Link>
-                        );
-                      }
-                      return (
-                        <div key={e.id} className="text-[11px] p-1.5 rounded bg-accent/40 border border-border/60">
-                          {inner}
-                        </div>
-                      );
-                    })}
+                    {dayEvents.map((e) => (
+                      <div key={e.id} className="text-[11px] p-1.5 rounded bg-accent/40 border border-border/60">
+                        <div className="font-medium leading-tight line-clamp-2">{e.title}</div>
+                        {timeRange(e) && <div className="text-[10px] text-muted-foreground tabular-nums font-mono">{timeRange(e)}</div>}
+                        <div className="mt-1"><Pill tone={TONE[e.type] ?? "muted"}>{e.type}</Pill></div>
+                        {e.notes && <div className="mt-1 text-[10px] text-muted-foreground line-clamp-3">{e.notes}</div>}
+                        {e.gkId && (
+                          <MissingReports
+                            gkId={e.gkId}
+                            gkName={e.gkName}
+                            referenceDate={new Date(`${e.date}T00:00:00`)}
+                            variant="full"
+                          />
+                        )}
+                        {canManage && (
+                          <button onClick={() => openEdit(e)} className="mt-1 inline-flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground">
+                            <Pencil className="size-3" /> Edit
+                          </button>
+                        )}
+                      </div>
+                    ))}
                   </div>
                 </div>
               );
@@ -280,49 +423,180 @@ function CalendarPage() {
 
       <Card className="p-4">
         <div className="text-sm font-semibold mb-3 uppercase tracking-wider text-muted-foreground">Upcoming Events</div>
-        <div className="divide-y divide-border">
-          {filteredEvents.filter((e) => new Date(e.date).getTime() >= Date.now() - 86400000).sort((a, b) => +new Date(a.date) - +new Date(b.date)).slice(0, 10).map((e) => {
-            const gkForEvent = e.gkId ? goalkeepers.find((g) => g.id === e.gkId) : null;
-            const row = (
-              <>
-                <div className="w-24 shrink-0 text-xs text-muted-foreground tabular-nums font-mono">{formatDate(e.date)}</div>
-                <Pill tone={TONE[e.type]}>{e.type}</Pill>
-                <div className="min-w-0 flex-1">
-                  <div className="truncate">{e.title}</div>
-                  {e.gkId && (
-                    <MissingReports
-                      gkId={e.gkId}
-                      gkName={gkForEvent?.name}
-                      referenceDate={new Date(e.date)}
-                      variant="full"
-                    />
+        {isLoading ? (
+          <div className="text-sm text-muted-foreground">Loading calendar…</div>
+        ) : (
+          <div className="divide-y divide-border">
+            {displayEvents
+              .filter((e) => new Date(`${e.date}T00:00:00`).getTime() >= Date.now() - 86400000)
+              .slice(0, 10)
+              .map((e) => (
+                <div key={e.id} className="flex items-start gap-3 py-2 text-sm">
+                  <div className="w-24 shrink-0 text-xs text-muted-foreground tabular-nums font-mono">{formatDate(e.date)}</div>
+                  <Pill tone={TONE[e.type] ?? "muted"}>{e.type}</Pill>
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate">{e.title}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {[timeRange(e), e.location, e.gkName, e.createdByName && `added by ${e.createdByName}`]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </div>
+                    {e.notes && <div className="mt-0.5 whitespace-pre-wrap text-xs text-muted-foreground">{e.notes}</div>}
+                    {e.gkId && (
+                      <MissingReports
+                        gkId={e.gkId}
+                        gkName={e.gkName}
+                        referenceDate={new Date(`${e.date}T00:00:00`)}
+                        variant="full"
+                      />
+                    )}
+                  </div>
+                  {canManage && (
+                    <div className="flex shrink-0 items-center gap-1">
+                      <button onClick={() => openEdit(e)} aria-label={`Edit ${e.title}`} className="rounded p-1 text-muted-foreground hover:text-foreground">
+                        <Pencil className="size-3.5" />
+                      </button>
+                      <button onClick={() => handleDelete(e.id)} aria-label={`Delete ${e.title}`} className="rounded p-1 text-muted-foreground hover:text-destructive">
+                        <Trash2 className="size-3.5" />
+                      </button>
+                    </div>
                   )}
                 </div>
-              </>
-            );
-            if (e.type === "Match" && e.gkId) {
-              const iso = new Date(e.date).toISOString().slice(0, 10);
-              const opponent = e.title.includes(" vs ") ? e.title.split(" vs ").pop()!.trim() : "";
-              return (
-                <Link
-                  key={e.id}
-                  to="/reports"
-                  search={{ from: "", to: "", coach: "", mentorProfileId: "", source: "", gk: gkForEvent?.name ?? "", openSubmit: "1", last5Gk: "", matchDate: iso, opponent }}
-                  className="flex items-start gap-3 py-2 text-sm hover:bg-accent/40 rounded -mx-1 px-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  title={`Submit match report for ${e.title}`}
-                >
-                  {row}
-                </Link>
-              );
-            }
-            return (
-              <div key={e.id} className="flex items-start gap-3 py-2 text-sm">
-                {row}
+              ))}
+            {displayEvents.filter((e) => new Date(`${e.date}T00:00:00`).getTime() >= Date.now() - 86400000).length === 0 && (
+              <div className="rounded-md border border-dashed border-border px-3 py-6 text-center text-sm text-muted-foreground">
+                Nothing scheduled yet.
+                {canManage && " Use “Add event” to book a match, visit, meeting or a general note."}
               </div>
-            );
-          })}
-        </div>
+            )}
+          </div>
+        )}
       </Card>
+
+      {draft && canManage && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-background/80 p-4 backdrop-blur-sm">
+          <div className="mt-8 w-full max-w-lg rounded-lg border border-border bg-card p-4 shadow-lg">
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="text-sm font-semibold uppercase tracking-wider">
+                {draft.id ? "Edit event" : "Add calendar event"}
+              </h2>
+              <button onClick={() => setDraft(null)} aria-label="Close" className="rounded p-1 text-muted-foreground hover:text-foreground">
+                <X className="size-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-sm">
+              <label className="block">
+                <span className="mb-1 block text-xs text-muted-foreground">Title</span>
+                <input
+                  value={draft.title}
+                  onChange={(ev) => setDraft({ ...draft, title: ev.target.value })}
+                  maxLength={160}
+                  placeholder="e.g. Watford v Luton — attending"
+                  className="w-full rounded-md border border-border bg-background px-2.5 py-1.5"
+                />
+              </label>
+
+              <div className="grid grid-cols-2 gap-3">
+                <label className="block">
+                  <span className="mb-1 block text-xs text-muted-foreground">Type</span>
+                  <select
+                    value={draft.event_type}
+                    onChange={(ev) => setDraft({ ...draft, event_type: ev.target.value })}
+                    className="w-full rounded-md border border-border bg-background px-2.5 py-1.5"
+                  >
+                    {CALENDAR_EVENT_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                </label>
+                <label className="block">
+                  <span className="mb-1 block text-xs text-muted-foreground">Date</span>
+                  <input
+                    type="date"
+                    value={draft.event_date}
+                    onChange={(ev) => setDraft({ ...draft, event_date: ev.target.value })}
+                    className="w-full rounded-md border border-border bg-background px-2.5 py-1.5"
+                  />
+                </label>
+                <label className="block">
+                  <span className="mb-1 block text-xs text-muted-foreground">Start (optional)</span>
+                  <input
+                    type="time"
+                    value={draft.start_time}
+                    onChange={(ev) => setDraft({ ...draft, start_time: ev.target.value })}
+                    className="w-full rounded-md border border-border bg-background px-2.5 py-1.5"
+                  />
+                </label>
+                <label className="block">
+                  <span className="mb-1 block text-xs text-muted-foreground">End (optional)</span>
+                  <input
+                    type="time"
+                    value={draft.end_time}
+                    onChange={(ev) => setDraft({ ...draft, end_time: ev.target.value })}
+                    className="w-full rounded-md border border-border bg-background px-2.5 py-1.5"
+                  />
+                </label>
+              </div>
+
+              <label className="block">
+                <span className="mb-1 block text-xs text-muted-foreground">Location (optional)</span>
+                <input
+                  value={draft.location}
+                  onChange={(ev) => setDraft({ ...draft, location: ev.target.value })}
+                  maxLength={160}
+                  className="w-full rounded-md border border-border bg-background px-2.5 py-1.5"
+                />
+              </label>
+
+              <label className="block">
+                <span className="mb-1 block text-xs text-muted-foreground">Goalkeeper (optional)</span>
+                <input
+                  list="calendar-gk-list"
+                  value={draft.goalkeeper_name}
+                  onChange={(ev) => setDraft({ ...draft, goalkeeper_name: ev.target.value })}
+                  placeholder="Leave blank for general team events"
+                  className="w-full rounded-md border border-border bg-background px-2.5 py-1.5"
+                />
+                <datalist id="calendar-gk-list">
+                  {goalkeepers.map((g) => <option key={g.id} value={g.name} />)}
+                </datalist>
+              </label>
+
+              <label className="block">
+                <span className="mb-1 block text-xs text-muted-foreground">Notes (free text)</span>
+                <textarea
+                  value={draft.notes}
+                  onChange={(ev) => setDraft({ ...draft, notes: ev.target.value })}
+                  rows={4}
+                  maxLength={4000}
+                  placeholder="Anything the team should know — travel, agenda, who's attending…"
+                  className="w-full rounded-md border border-border bg-background px-2.5 py-1.5"
+                />
+              </label>
+            </div>
+
+            <div className="mt-4 flex items-center justify-between gap-2">
+              {draft.id ? (
+                <button
+                  onClick={() => handleDelete(draft.id)}
+                  className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-xs text-muted-foreground hover:text-destructive"
+                >
+                  <Trash2 className="size-3.5" /> Delete
+                </button>
+              ) : <span />}
+              <div className="flex items-center gap-2">
+                <button onClick={() => setDraft(null)} className="rounded-md border border-border px-3 py-1.5 text-xs hover:bg-accent">Cancel</button>
+                <button
+                  onClick={saveDraft}
+                  disabled={saving}
+                  className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:brightness-110 disabled:opacity-60"
+                >
+                  {saving ? "Saving…" : draft.id ? "Save changes" : "Add event"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
