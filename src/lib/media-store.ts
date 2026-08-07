@@ -187,6 +187,64 @@ export async function listAuditLog(limit = 200): Promise<MediaAuditEntry[]> {
 
 // ---------- Upload / list / signed URLs ----------
 
+/**
+ * Upload the object bytes with real byte-level progress.
+ *
+ * supabase-js uses `fetch`, which cannot report upload progress, so when a
+ * caller wants a progress indicator we send the same authenticated request via
+ * XHR (the only browser API that emits `upload.onprogress`). Any environment
+ * without XHR — SSR, tests — falls back to the normal client call.
+ */
+async function uploadObject(
+  path: string,
+  file: File,
+  onProgress?: (fraction: number) => void,
+): Promise<void> {
+  const url = import.meta.env['VITE_SUPABASE_URL'];
+  const anonKey = import.meta.env['VITE_SUPABASE_PUBLISHABLE_KEY'];
+  const token = onProgress
+    ? (await supabase.auth.getSession()).data.session?.access_token
+    : undefined;
+
+  if (!onProgress || typeof XMLHttpRequest === "undefined" || !url || !anonKey || !token) {
+    const { error } = await supabase.storage
+      .from(BUCKET)
+      .upload(path, file, { contentType: file.type || undefined, upsert: false });
+    if (error) throw new Error(`Upload failed: ${error.message}`);
+    return;
+  }
+
+  await new Promise<void>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", `${url}/storage/v1/object/${BUCKET}/${encodeURI(path)}`);
+    xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+    xhr.setRequestHeader("apikey", anonKey);
+    xhr.setRequestHeader("x-upsert", "false");
+    if (file.type) xhr.setRequestHeader("Content-Type", file.type);
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable && e.total > 0) onProgress(Math.min(1, e.loaded / e.total));
+    };
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        onProgress(1);
+        resolve();
+        return;
+      }
+      let message = `HTTP ${xhr.status}`;
+      try {
+        const parsed = JSON.parse(xhr.responseText) as { message?: string; error?: string };
+        message = parsed.message || parsed.error || message;
+      } catch {
+        /* keep the status-code message */
+      }
+      reject(new Error(`Upload failed: ${message}`));
+    };
+    xhr.onerror = () => reject(new Error("Upload failed: the network connection dropped."));
+    xhr.onabort = () => reject(new Error("Upload cancelled."));
+    xhr.send(file);
+  });
+}
+
 export async function uploadMedia(opts: {
   file: File;
   gkId: string;
@@ -195,8 +253,10 @@ export async function uploadMedia(opts: {
   kind: MediaKind;
   ratingTags?: string[];
   user: SessionUser;
+  /** Receives 0–1 as the bytes go up. Enables the XHR progress path. */
+  onProgress?: (fraction: number) => void;
 }): Promise<MediaAsset> {
-  const { file, gkId, title, notes, kind, ratingTags, user } = opts;
+  const { file, gkId, title, notes, kind, ratingTags, user, onProgress } = opts;
 
   if (file.size > MAX_FILE_BYTES) {
     throw new Error("File exceeds the 200MB upload limit.");
@@ -204,10 +264,8 @@ export async function uploadMedia(opts: {
 
   const path = `${gkId}/${Date.now()}-${crypto.randomUUID().slice(0, 8)}-${sanitizeName(file.name)}`;
 
-  const { error: upErr } = await supabase.storage
-    .from(BUCKET)
-    .upload(path, file, { contentType: file.type || undefined, upsert: false });
-  if (upErr) throw new Error(`Upload failed: ${upErr.message}`);
+  await uploadObject(path, file, onProgress);
+
 
   // Best-effort thumbnail
   let thumbPath: string | null = null;
