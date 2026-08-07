@@ -7,6 +7,7 @@
     "dev": "vite dev",
     "build": "vite build",
     "build:dev": "vite build --mode development",
+    "deploy:cloudflare:preview": "npm run build && npx --yes wrangler@4.119.0 deploy --name rpmmentor-preview --keep-vars",
     "preview": "vite preview",
     "lint": "eslint .",
     "format": "prettier --write .",
