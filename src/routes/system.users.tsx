@@ -32,6 +32,8 @@ const ROLE_TONE: Record<Role, string> = {
 };
 
 const QUERY_KEY = ["managed-users"] as const;
+const AUDIT_KEY = ["user-deletion-audit"] as const;
+
 
 function SystemUsersPage() {
   const { user, can } = useAuth();
