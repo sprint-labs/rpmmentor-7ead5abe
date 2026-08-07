@@ -1244,10 +1244,6 @@ export function InteractionForm({
           </Field>
 
         </div>
-        <HandwrittenNotesField
-          context={gk ? `Session notes about ${gk.name} (${club || gk.club})` : undefined}
-          onTranscribed={applyTranscribedText}
-        />
         {/*
           `autoApply` is what fixes change #4. Without it a transcript stays
           inside VoiceNoteField until the reviewed checkbox and two more clicks
@@ -1277,7 +1273,7 @@ export function InteractionForm({
             aria-required="true"
             rows={5}
             className={`${taCls} ${showErrors && errors.notes ? "border-destructive focus:ring-destructive/40" : ""}`}
-            placeholder="What did you observe? Or use the camera/mic above to transcribe notes."
+            placeholder="What did you observe? Or use the mic above to transcribe notes."
             value={notes}
             onChange={(e) => { setNotes(e.target.value); clearFieldError("notes"); }}
             onBlur={() => { if (!notes.trim()) setErrors((prev) => ({ ...prev, notes: "Notes are required" })); }}
