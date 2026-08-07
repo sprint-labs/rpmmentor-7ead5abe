@@ -316,6 +316,33 @@ const AUDIO_PARTIAL_FAILURE_MESSAGE = "Interaction saved — audio was not saved
 type AudioSaveStatus = "idle" | "saving" | "saved" | "failed";
 
 /**
+ * Best-effort duration for a picked audio file. Metadata can be missing or
+ * infinite for some containers, in which case 0 is used — the upload must
+ * never be blocked by a duration we could not read.
+ */
+async function readAudioDuration(file: File): Promise<number> {
+  return new Promise((resolve) => {
+    try {
+      const url = URL.createObjectURL(file);
+      const el = document.createElement("audio");
+      const finish = (value: number) => {
+        URL.revokeObjectURL(url);
+        resolve(Number.isFinite(value) && value > 0 ? Math.round(value) : 0);
+      };
+      el.preload = "metadata";
+      el.onloadedmetadata = () => finish(el.duration);
+      el.onerror = () => finish(0);
+      el.src = url;
+      window.setTimeout(() => finish(el.duration), 4000);
+    } catch {
+      resolve(0);
+    }
+  });
+}
+
+
+
+/**
  * Byte-level upload progress. Falls back to an indeterminate bar when the
  * browser cannot report progress, so the mentor always sees live movement.
  */
@@ -466,6 +493,9 @@ export function InteractionForm({
   const [audioError, setAudioError] = useState<string | null>(null);
   /** 0–1 while the recording's bytes are going up; null when not uploading. */
   const [audioProgress, setAudioProgress] = useState<number | null>(null);
+  /** Hidden picker used by "Choose an audio file" in the retry panel. */
+  const audioFileInputRef = useRef<HTMLInputElement | null>(null);
+
 
   const [savedInteraction, setSavedInteraction] = useState<LoggedInteraction | null>(null);
 
@@ -749,6 +779,69 @@ export function InteractionForm({
     onDone();
   }
 
+  /**
+   * Swap the pending recording for a new one (freshly recorded or picked from
+   * a file) and send it straight away. The interaction row is untouched, so
+   * every note and field stays exactly as entered; only the audio is replaced.
+   */
+  async function replaceRecording(next: InteractionRecording) {
+    // A previous partial upload must not be reused — this is different audio.
+    uploadedMediaIdRef.current = null;
+    setRecording(next);
+    setAudioError(null);
+    if (!savedInteraction) {
+      setAudioStatus("idle");
+      return;
+    }
+    const ok = await saveRecording(savedInteraction, next);
+    if (ok) {
+      toast.success("Audio saved", {
+        description: "The new recording is attached to this interaction.",
+      });
+      clearInteractionDraft();
+      onDone();
+    }
+  }
+
+  /** Route recordings from the voice field through the replace path once the
+   * interaction is already written, so "record again" resends immediately. */
+  function handleRecordingReady(next: InteractionRecording | null) {
+    if (!next) {
+      setRecording(null);
+      return;
+    }
+    if (savedInteraction && audioStatus !== "saving") {
+      void replaceRecording(next);
+      return;
+    }
+    setRecording(next);
+  }
+
+  /** Read a chosen audio file into a recording, measuring its duration. */
+  async function handleAudioFilePicked(file: File | undefined) {
+    if (!file) return;
+    if (!file.type.startsWith("audio/")) {
+      setAudioError("Choose an audio file.");
+      return;
+    }
+    if (file.size > MAX_FILE_BYTES) {
+      setAudioError(`That file is too large (max ${formatBytes(MAX_FILE_BYTES)}).`);
+      return;
+    }
+    const durationSec = await readAudioDuration(file);
+    await replaceRecording({ blob: file, mimeType: file.type, durationSec });
+  }
+
+  /** Prompt for a new recording using the voice field further down the form. */
+  function focusVoiceRecorder() {
+    setRecording(null);
+    setAudioError(null);
+    const node = document.getElementById("interaction-voice-note");
+    node?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+
+
+
 
   /**
    * Save the recording and report the outcome separately from the interaction.
@@ -997,11 +1090,40 @@ export function InteractionForm({
             </button>
             <button
               type="button"
+              onClick={focusVoiceRecorder}
+              disabled={audioUploading}
+              className="h-8 px-3 rounded-md border border-border text-xs disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              Record again
+            </button>
+            <button
+              type="button"
+              onClick={() => audioFileInputRef.current?.click()}
+              disabled={audioUploading}
+              className="h-8 px-3 rounded-md border border-border text-xs inline-flex items-center gap-1.5 disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              <Paperclip className="size-3.5" /> Choose an audio file
+            </button>
+            <input
+              ref={audioFileInputRef}
+              type="file"
+              accept="audio/*"
+              aria-label="Choose an audio file"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                e.target.value = "";
+                void handleAudioFilePicked(file);
+              }}
+            />
+            <button
+              type="button"
               onClick={discardFailedRecording}
               disabled={audioUploading}
               className="h-8 px-3 rounded-md border border-border text-xs disabled:opacity-60 disabled:cursor-not-allowed"
             >
               Finish without the recording
+
             </button>
           </div>
         </div>
@@ -1140,11 +1262,14 @@ export function InteractionForm({
           spoken note survives a refresh instead of dying with the page — and a
           failed upload leaves the recording here, ready to retry.
         */}
-        <VoiceNoteField
-          autoApply
-          onTranscribed={applyTranscribedText}
-          onRecordingReady={setRecording}
-        />
+        <div id="interaction-voice-note">
+          <VoiceNoteField
+            autoApply
+            onTranscribed={applyTranscribedText}
+            onRecordingReady={handleRecordingReady}
+          />
+        </div>
+
         <Field label="Notes" required error={showErrors ? errors.notes : undefined}>
           <textarea
             aria-label="Notes"
