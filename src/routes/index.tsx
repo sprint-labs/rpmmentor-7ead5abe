@@ -68,6 +68,14 @@ function Dashboard() {
     enabled: Boolean(user && user.role !== "mentor"),
     staleTime: 30_000,
   });
+  // Upcoming Logs reads the shared team calendar (same cache as /calendar).
+  const fetchCalendarEvents = useServerFn(listCalendarEvents);
+  const { data: teamEvents } = useQuery({
+    queryKey: ["calendar-events"],
+    queryFn: () => fetchCalendarEvents(),
+    enabled: Boolean(user && user.role !== "mentor"),
+    staleTime: 30_000,
+  });
   const reportsInPeriod = reportsData?.reports.filter((report) =>
     isDateOnlyInPeriod(report.match_date, period.fromDate, period.toDate),
   ).length;
