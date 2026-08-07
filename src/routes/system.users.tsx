@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
-import { ShieldCheck, ShieldOff, Users, Search, Loader2, AlertCircle, UserPlus, Trash2, Copy, Pencil, KeyRound, Mail } from "lucide-react";
+import { ShieldCheck, ShieldOff, Users, Search, Loader2, AlertCircle, UserPlus, Trash2, Copy, Pencil, KeyRound, Mail, History } from "lucide-react";
 import { useAuth, ROLE_LABEL, type Role } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 import { CANONICAL_ORIGIN } from "@/lib/canonical-url";
@@ -16,6 +16,7 @@ import {
   inviteManagedUser,
   listUserDeletionAudit,
   type ManagedUserRow,
+  type DeletionAuditRow,
 } from "@/lib/admin-users.functions";
 import { refreshUserDirectoryViews } from "@/lib/query-refresh";
 
@@ -863,5 +864,87 @@ function InviteLinkDialog({
         </div>
       </div>
     </div>
+  );
+}
+
+function DeletionAuditPanel({
+  rows,
+  loading,
+  error,
+}: {
+  rows: DeletionAuditRow[];
+  loading: boolean;
+  error: string | null;
+}) {
+  return (
+    <section className="mt-8 rounded-lg border border-border bg-card">
+      <header className="px-4 py-3 border-b border-border flex items-center gap-2">
+        <History className="size-4 text-muted-foreground" />
+        <h2 className="text-sm font-semibold">Deletion audit log</h2>
+        <span className="text-xs text-muted-foreground ml-auto">
+          Who deleted whom, when, and what was affected
+        </span>
+      </header>
+
+      {loading && (
+        <div className="px-4 py-8 text-sm text-muted-foreground inline-flex items-center gap-2">
+          <Loader2 className="size-4 animate-spin" /> Loading audit log…
+        </div>
+      )}
+
+      {error && (
+        <div className="px-4 py-6 text-sm text-destructive inline-flex items-center gap-2">
+          <AlertCircle className="size-4" /> {error}
+        </div>
+      )}
+
+      {!loading && !error && rows.length === 0 && (
+        <p className="px-4 py-8 text-sm text-muted-foreground">
+          No deletions recorded yet.
+        </p>
+      )}
+
+      {!loading && !error && rows.length > 0 && (
+        <ul className="divide-y divide-border">
+          {rows.map((r) => (
+            <li key={r.id} className="px-4 py-3">
+              <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                <span className="text-sm font-medium">
+                  {r.deletedName || r.deletedEmail || "Unknown user"}
+                </span>
+                {r.deletedEmail && (
+                  <span className="text-xs text-muted-foreground">{r.deletedEmail}</span>
+                )}
+                {r.deletedRole && (
+                  <span className="text-[11px] px-1.5 py-0.5 rounded border border-border text-muted-foreground">
+                    {r.deletedRole}
+                  </span>
+                )}
+                <span className="text-xs text-muted-foreground ml-auto">
+                  {new Date(r.createdAt).toLocaleString()}
+                </span>
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Deleted by {r.actorName || r.actorEmail || "unknown admin"}
+                {r.actorName && r.actorEmail ? ` (${r.actorEmail})` : ""}
+              </p>
+              {r.sections.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {r.sections.map((s) => (
+                    <span
+                      key={s.section}
+                      className="text-[11px] px-2 py-0.5 rounded-full border border-border bg-muted/40"
+                      title={`${s.records} record(s) ${s.action}`}
+                    >
+                      {s.section} · {s.records} {s.action}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }
