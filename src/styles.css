@@ -193,3 +193,24 @@
 @utility ring-soft {
   box-shadow: 0 1px 0 0 color-mix(in oklab, white 4%, transparent) inset, 0 0 0 1px var(--border);
 }
+
+/* --- Signal command-centre surfaces --- */
+@utility command-panel {
+  border-radius: 0;
+  border: 1px solid var(--border);
+  background-color: var(--card);
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+  &:hover {
+    border-color: color-mix(in oklab, var(--primary) 35%, var(--border));
+  }
+}
+
+@utility bar-grow {
+  animation: bar-grow 520ms cubic-bezier(0.2, 0.7, 0.3, 1) both;
+  transform-origin: left center;
+}
+
+@keyframes bar-grow {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
