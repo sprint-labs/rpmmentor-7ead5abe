@@ -833,6 +833,9 @@ export function InteractionForm({
       });
       setSavedSummary(`Interaction logged successfully — ${shownType} with ${shownName} on ${shownDate}. It's now in the interactions log.`);
       setSavedInteraction(confirmed);
+      // The work is stored server-side now, so the local draft is finished with.
+      clearInteractionDraft();
+
       // Only now, with a confirmed interaction id to link to, is the recording
       // uploaded — so a failed interaction can never orphan a media record.
       const audioOk = await saveRecordingAndReport(confirmed);
