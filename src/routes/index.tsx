@@ -512,7 +512,21 @@ function Dashboard() {
           )}
         >
           <div className="col-span-12 lg:col-span-4 command-panel p-5">
-            <SectionTitle>Recent Events</SectionTitle>
+            <SectionTitle
+              action={
+                can("interactions.log") ? (
+                  <button
+                    type="button"
+                    onClick={() => setWorkflow("interaction")}
+                    className="text-[10px] font-mono uppercase tracking-widest text-primary inline-flex items-center gap-1 hover:underline"
+                  >
+                    <Plus className="size-3" /> Log interaction
+                  </button>
+                ) : undefined
+              }
+            >
+              Recent Events
+            </SectionTitle>
             <div className="space-y-3">
               {interactionsLoading ? (
                 <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground/70 py-6 text-center">
