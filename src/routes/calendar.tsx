@@ -156,6 +156,13 @@ function CalendarPage() {
   const { can } = useAuth();
   const canManage = can("calendar.manage");
   const [workflow, setWorkflow] = useState<WorkflowKind | null>(null);
+  /** Goalkeeper/date carried into Log Interaction when opened from a calendar day or event. */
+  const [logPrefill, setLogPrefill] = useState<{ gkId?: string; date?: string }>({});
+  const canLog = can("interactions.log");
+  function openLog(prefill: { gkId?: string; date?: string } = {}) {
+    setLogPrefill(prefill);
+    setWorkflow("interaction");
+  }
   const queryClient = useQueryClient();
 
   const fetchEvents = useServerFn(listCalendarEvents);
@@ -301,7 +308,7 @@ function CalendarPage() {
             </div>
             {can("interactions.log") && (
               <button
-                onClick={() => setWorkflow("interaction")}
+                onClick={() => openLog(gkId ? { gkId } : {})}
                 className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-xs font-medium hover:bg-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <Plus className="size-3.5" /> Log interaction
@@ -353,15 +360,27 @@ function CalendarPage() {
                   {d && (
                     <div className="mb-1 flex items-center justify-between">
                       <span className={`text-[11px] tabular-nums font-mono font-medium ${isToday ? "text-primary" : "text-muted-foreground"}`}>{d.getDate()}</span>
-                      {canManage && (
-                        <button
-                          onClick={() => openNew(iso)}
-                          aria-label={`Add event on ${iso}`}
-                          className="opacity-0 group-hover:opacity-100 focus:opacity-100 rounded p-0.5 text-muted-foreground hover:text-foreground"
-                        >
-                          <Plus className="size-3" />
-                        </button>
-                      )}
+                      <span className="flex items-center gap-0.5">
+                        {canLog && (
+                          <button
+                            onClick={() => openLog({ date: iso, gkId: gkId || undefined })}
+                            aria-label={`Log interaction on ${iso}`}
+                            title="Log interaction"
+                            className="opacity-0 group-hover:opacity-100 focus:opacity-100 rounded p-0.5 text-muted-foreground hover:text-foreground"
+                          >
+                            <NotebookPen className="size-3" />
+                          </button>
+                        )}
+                        {canManage && (
+                          <button
+                            onClick={() => openNew(iso)}
+                            aria-label={`Add event on ${iso}`}
+                            className="opacity-0 group-hover:opacity-100 focus:opacity-100 rounded p-0.5 text-muted-foreground hover:text-foreground"
+                          >
+                            <Plus className="size-3" />
+                          </button>
+                        )}
+                      </span>
                     </div>
                   )}
                   <div className="space-y-1">
@@ -424,11 +443,18 @@ function CalendarPage() {
                             variant="full"
                           />
                         )}
-                        {canManage && (
-                          <button onClick={() => openEdit(e)} className="mt-1 inline-flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground">
-                            <Pencil className="size-3" /> Edit
-                          </button>
-                        )}
+                        <div className="mt-1 flex items-center gap-2">
+                          {canLog && (
+                            <button onClick={() => openLog({ date: e.date, gkId: e.gkId })} className="inline-flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground">
+                              <NotebookPen className="size-3" /> Log
+                            </button>
+                          )}
+                          {canManage && (
+                            <button onClick={() => openEdit(e)} className="inline-flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground">
+                              <Pencil className="size-3" /> Edit
+                            </button>
+                          )}
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -616,7 +642,12 @@ function CalendarPage() {
         </div>
       )}
 
-      <WorkflowDialog kind={workflow} onClose={() => setWorkflow(null)} />
+      <WorkflowDialog
+        kind={workflow}
+        onClose={() => { setWorkflow(null); setLogPrefill({}); }}
+        prefillGkId={logPrefill.gkId}
+        prefillMatchDate={logPrefill.date}
+      />
     </div>
   );
 }
