@@ -103,6 +103,8 @@ function SystemUsersPage() {
         // directory, every dashboard KPI, the interactions log and the calendar,
         // then re-run route loaders so nothing on screen keeps the stale row.
         await refreshUserDirectoryViews(qc);
+        await qc.invalidateQueries({ queryKey: AUDIT_KEY });
+
         await router.invalidate();
       } finally {
         setIsRefreshing(false);
