@@ -213,7 +213,7 @@ function Dashboard() {
       {/* Operational grid */}
       <div className="grid grid-cols-12 gap-4">
         {/* Duty of Care monitor */}
-        <div className="col-span-12 lg:col-span-8 command-panel p-5">
+        <div className="col-span-12 lg:col-span-8 command-panel p-5 self-start">
           <SectionTitle
             action={
               <div className="flex items-center gap-3 text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
