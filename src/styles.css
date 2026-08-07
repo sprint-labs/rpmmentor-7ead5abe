@@ -58,8 +58,8 @@
   --color-ember-orange: var(--ember-orange);
   --color-rating-good: var(--rating-good);
   --color-rating-danger: var(--rating-danger);
-  --font-sans: "Saira", ui-sans-serif, system-ui, sans-serif;
-  --font-display: "Chakra Petch", "Saira", sans-serif;
+  --font-sans: "Work Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "JetBrains Mono", ui-monospace, monospace;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
 }
 
