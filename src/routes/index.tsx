@@ -559,6 +559,8 @@ function Dashboard() {
           </div>
         </div>
       </div>
+
+      <WorkflowDialog kind={workflow} onClose={() => setWorkflow(null)} />
     </div>
   );
 }
