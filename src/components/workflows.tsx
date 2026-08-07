@@ -1133,8 +1133,21 @@ export function InteractionForm({
             Complete the highlighted fields to save.
           </p>
         )}
-        <button type="button" onClick={onDone} className="h-9 px-3 rounded-md border border-border text-sm" disabled={saving}>Cancel</button>
-        {handOffToMatchReport ? (
+        <button type="button" onClick={onDone} className="h-9 px-3 rounded-md border border-border text-sm" disabled={saving}>
+          {savedInteraction ? "Close" : "Cancel"}
+        </button>
+        {savedInteraction ? (
+          // The interaction is stored; the only outstanding work is the audio.
+          <button
+            type="button"
+            onClick={() => void retryAudio()}
+            disabled={audioStatus === "saving"}
+            className="h-9 px-4 rounded-md bg-primary text-primary-foreground text-sm font-medium inline-flex items-center gap-1.5 disabled:opacity-60"
+          >
+            {audioStatus === "saving" ? <Loader2 className="size-3.5 animate-spin" /> : <RotateCcw className="size-3.5" />}
+            {audioStatus === "saving" ? "Saving audio…" : "Retry saving audio"}
+          </button>
+        ) : handOffToMatchReport ? (
           <button
             type="button"
             onClick={handleContinueToMatchReport}
@@ -1154,6 +1167,7 @@ export function InteractionForm({
                 : "Save Interaction"}
           </button>
         )}
+
       </div>
     </form>
   );
