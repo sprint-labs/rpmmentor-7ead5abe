@@ -676,8 +676,27 @@ export function InteractionForm({
       toast.success("Audio saved", {
         description: "The recording is attached to this interaction.",
       });
+      clearInteractionDraft();
+      onDone();
     }
   }
+
+  /**
+   * Abandon only the recording. The interaction itself is already written, so
+   * this closes the form without touching it — used when the upload keeps
+   * failing and the mentor would rather move on.
+   */
+  function discardFailedRecording() {
+    setRecording(null);
+    setAudioStatus("idle");
+    setAudioError(null);
+    clearInteractionDraft();
+    toast.info("Recording discarded", {
+      description: "The interaction and its notes are saved.",
+    });
+    onDone();
+  }
+
 
   /**
    * Save the recording and report the outcome separately from the interaction.
@@ -708,6 +727,13 @@ export function InteractionForm({
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    // The interaction is already written and only its recording is outstanding;
+    // submitting again here would duplicate the row.
+    if (savedInteraction) {
+      void retryAudio();
+      return;
+    }
+
     // Read the latest notes, not the value captured when this render began, so
     // a transcript applied immediately before Save is never lost.
     const currentNotes = notesRef.current;
@@ -759,8 +785,10 @@ export function InteractionForm({
         const audioOk = await saveRecordingAndReport(saved);
         // Confirmed saved: close straight back to the page the user came from.
         // Only a failed recording holds the dialog open, for the retry option.
+        // A failed recording keeps the form exactly as it is — every field and
+        // note stays on screen — so the upload can be retried in place.
         if (audioOk) onDone();
-        else setDone(true);
+
 
       } catch (err) {
         setError(
@@ -840,8 +868,10 @@ export function InteractionForm({
       // uploaded — so a failed interaction can never orphan a media record.
       const audioOk = await saveRecordingAndReport(confirmed);
       // Confirmed saved: close straight back to the page the user came from.
+      // A failed recording holds the form open, with all fields intact, so the
+      // upload can be retried without re-entering anything.
       if (audioOk) onDone();
-      else setDone(true);
+
 
 
     } catch (err) {
@@ -892,7 +922,47 @@ export function InteractionForm({
         </div>
       )}
 
+      {savedInteraction && audioStatus === "failed" && (
+        <div
+          role="alert"
+          className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2.5 text-xs"
+        >
+          <p className="font-medium">{AUDIO_PARTIAL_FAILURE_MESSAGE}</p>
+          <p className="mt-1 text-muted-foreground">
+            Your notes and every field are saved and still here. The recording was kept too —
+            resend it without re-entering anything.{audioError ? ` ${audioError}` : ""}
+          </p>
+          <div className="mt-2.5 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => void retryAudio()}
+              className="h-8 px-3 rounded-md bg-primary text-primary-foreground text-xs font-medium inline-flex items-center gap-1.5"
+            >
+              <RotateCcw className="size-3.5" /> Retry saving audio
+            </button>
+            <button
+              type="button"
+              onClick={discardFailedRecording}
+              className="h-8 px-3 rounded-md border border-border text-xs"
+            >
+              Finish without the recording
+            </button>
+          </div>
+        </div>
+      )}
+      {savedInteraction && audioStatus === "saving" && (
+        <p role="status" className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+          <Loader2 className="size-3.5 animate-spin" /> Saving audio recording…
+        </p>
+      )}
+      {savedInteraction && audioStatus === "saved" && (
+        <p className="inline-flex items-center gap-1.5 text-xs text-primary">
+          <CheckCircle2 className="size-3.5" /> Audio saved
+        </p>
+      )}
+
       {draftRestoredAt && (
+
         <div className="flex items-start justify-between gap-3 rounded-md border border-primary/40 bg-primary/5 px-3 py-2 text-xs">
           <p>
             <span className="font-medium">Unsaved draft restored.</span>{" "}
@@ -1063,8 +1133,11 @@ export function InteractionForm({
             Complete the highlighted fields to save.
           </p>
         )}
-        <button type="button" onClick={onDone} className="h-9 px-3 rounded-md border border-border text-sm" disabled={saving}>Cancel</button>
-        {handOffToMatchReport ? (
+        <button type="button" onClick={onDone} className="h-9 px-3 rounded-md border border-border text-sm" disabled={saving}>
+          {savedInteraction ? "Close" : "Cancel"}
+        </button>
+        {savedInteraction ? null : handOffToMatchReport ? (
+
           <button
             type="button"
             onClick={handleContinueToMatchReport}
@@ -1084,6 +1157,7 @@ export function InteractionForm({
                 : "Save Interaction"}
           </button>
         )}
+
       </div>
     </form>
   );
