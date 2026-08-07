@@ -749,6 +749,69 @@ export function InteractionForm({
     onDone();
   }
 
+  /**
+   * Swap the pending recording for a new one (freshly recorded or picked from
+   * a file) and send it straight away. The interaction row is untouched, so
+   * every note and field stays exactly as entered; only the audio is replaced.
+   */
+  async function replaceRecording(next: InteractionRecording) {
+    // A previous partial upload must not be reused — this is different audio.
+    uploadedMediaIdRef.current = null;
+    setRecording(next);
+    setAudioError(null);
+    if (!savedInteraction) {
+      setAudioStatus("idle");
+      return;
+    }
+    const ok = await saveRecording(savedInteraction, next);
+    if (ok) {
+      toast.success("Audio saved", {
+        description: "The new recording is attached to this interaction.",
+      });
+      clearInteractionDraft();
+      onDone();
+    }
+  }
+
+  /** Route recordings from the voice field through the replace path once the
+   * interaction is already written, so "record again" resends immediately. */
+  function handleRecordingReady(next: InteractionRecording | null) {
+    if (!next) {
+      setRecording(null);
+      return;
+    }
+    if (savedInteraction && audioStatus !== "saving") {
+      void replaceRecording(next);
+      return;
+    }
+    setRecording(next);
+  }
+
+  /** Read a chosen audio file into a recording, measuring its duration. */
+  async function handleAudioFilePicked(file: File | undefined) {
+    if (!file) return;
+    if (!file.type.startsWith("audio/")) {
+      setAudioError("Choose an audio file.");
+      return;
+    }
+    if (file.size > MAX_FILE_BYTES) {
+      setAudioError(`That file is too large (max ${formatBytes(MAX_FILE_BYTES)}).`);
+      return;
+    }
+    const durationSec = await readAudioDuration(file);
+    await replaceRecording({ blob: file, mimeType: file.type, durationSec });
+  }
+
+  /** Prompt for a new recording using the voice field further down the form. */
+  function focusVoiceRecorder() {
+    setRecording(null);
+    setAudioError(null);
+    const node = document.getElementById("interaction-voice-note");
+    node?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+
+
+
 
   /**
    * Save the recording and report the outcome separately from the interaction.
