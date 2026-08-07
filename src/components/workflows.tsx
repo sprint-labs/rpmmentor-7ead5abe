@@ -620,9 +620,12 @@ export function InteractionForm({
   /**
    * Save the recording and report the outcome separately from the interaction.
    * A failed recording is never allowed to read as a failed interaction.
+   * Returns whether the recording was stored, so the caller can decide between
+   * closing straight back to the page the user came from and holding the
+   * dialog open on the retry screen.
    */
-  async function saveRecordingAndReport(interaction: LoggedInteraction) {
-    if (!recording) return;
+  async function saveRecordingAndReport(interaction: LoggedInteraction): Promise<boolean> {
+    if (!recording) return true;
     let ok = false;
     try {
       ok = await saveRecording(interaction, recording);
@@ -637,7 +640,9 @@ export function InteractionForm({
         description: "Your recording is kept — use Retry saving audio to try again.",
       });
     }
+    return ok;
   }
+
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
