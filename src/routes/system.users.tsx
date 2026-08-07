@@ -49,6 +49,7 @@ function SystemUsersPage() {
   const [tempPassword, setTempPassword] = useState<{ email: string; password: string } | null>(null);
   const [inviteLink, setInviteLink] = useState<{ email: string; url: string } | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [refreshError, setRefreshError] = useState<{ label: string; message: string } | null>(null);
 
   const list = useServerFn(listManagedUsers);
   const setRole = useServerFn(setManagedUserRole);
