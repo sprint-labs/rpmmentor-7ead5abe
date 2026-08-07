@@ -42,8 +42,9 @@ const OVERVIEW_PERIOD_DAYS = 14;
 export const Route = createFileRoute("/")({ component: Dashboard });
 
 function Dashboard() {
-  const { user } = useAuth();
+  const { user, can } = useAuth();
   const navigate = useNavigate();
+  const [workflow, setWorkflow] = useState<WorkflowKind | null>(null);
   const listReports = useServerFn(listMatchReports);
   const {
     data: reportsData,
