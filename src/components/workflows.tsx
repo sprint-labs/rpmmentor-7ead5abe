@@ -676,8 +676,27 @@ export function InteractionForm({
       toast.success("Audio saved", {
         description: "The recording is attached to this interaction.",
       });
+      clearInteractionDraft();
+      onDone();
     }
   }
+
+  /**
+   * Abandon only the recording. The interaction itself is already written, so
+   * this closes the form without touching it — used when the upload keeps
+   * failing and the mentor would rather move on.
+   */
+  function discardFailedRecording() {
+    setRecording(null);
+    setAudioStatus("idle");
+    setAudioError(null);
+    clearInteractionDraft();
+    toast.info("Recording discarded", {
+      description: "The interaction and its notes are saved.",
+    });
+    onDone();
+  }
+
 
   /**
    * Save the recording and report the outcome separately from the interaction.
