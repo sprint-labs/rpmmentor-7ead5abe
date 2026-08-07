@@ -354,6 +354,14 @@ function SystemUsersPage() {
         )}
       </div>
 
+      <DeletionAuditPanel
+        rows={auditQuery.data ?? []}
+        loading={auditQuery.isLoading}
+        error={auditQuery.error instanceof Error ? auditQuery.error.message : null}
+      />
+
+
+
       {showAdd && (
         <AddUserDialog
           busy={createMutation.isPending}
