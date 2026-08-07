@@ -81,21 +81,38 @@ export function Card({ className, children }: { className?: string; children: Re
 }
 
 export function StatCard({ label, value, hint, accent, emptyMessage, updatedAt }: { label: string; value: string | number; hint?: string; accent?: "primary" | "warning" | "destructive" | "info"; emptyMessage?: string; updatedAt?: string }) {
-  const ring =
+  const rail =
     accent === "warning" ? "before:bg-warning"
     : accent === "destructive" ? "before:bg-destructive"
     : accent === "info" ? "before:bg-info"
     : "before:bg-primary";
+  const valueTone =
+    accent === "warning" ? "text-warning"
+    : accent === "destructive" ? "text-destructive"
+    : accent === "info" ? "text-info"
+    : "text-primary";
+  const glow =
+    accent === "warning" ? "shadow-[0_0_18px_-6px_var(--warning)]"
+    : accent === "destructive" ? "shadow-[0_0_18px_-6px_var(--destructive)]"
+    : accent === "info" ? "shadow-[0_0_18px_-6px_var(--info)]"
+    : "shadow-[0_0_18px_-6px_var(--primary)]";
   const isEmpty = typeof value === "number" && value === 0 && emptyMessage;
   return (
-    <Card className={cn("p-4 relative overflow-hidden before:content-[''] before:absolute before:left-0 before:top-0 before:h-full before:w-[3px]", ring)}>
-      <div className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">{label}</div>
-      <div className={cn("mt-1.5 text-2xl font-semibold tabular-nums font-mono", isEmpty && "text-muted-foreground/60 text-base")}>
+    <div
+      className={cn(
+        "command-panel p-4 relative overflow-hidden text-card-foreground",
+        "before:content-[''] before:absolute before:left-0 before:top-0 before:h-full before:w-[2px]",
+        rail,
+        glow,
+      )}
+    >
+      <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground font-mono">{label}</div>
+      <div className={cn("mt-1.5 text-3xl font-bold tabular-nums font-mono leading-none", isEmpty ? "text-muted-foreground/60 text-base font-normal" : valueTone)}>
         {isEmpty ? emptyMessage : value}
       </div>
-      {hint && <div className="text-xs text-muted-foreground mt-1">{hint}</div>}
+      {hint && <div className="text-[10px] text-muted-foreground mt-2">{hint}</div>}
       {updatedAt && <div className="text-[10px] text-muted-foreground/70 mt-3 font-mono tabular-nums">Updated {updatedAt}</div>}
-    </Card>
+    </div>
   );
 }
 
