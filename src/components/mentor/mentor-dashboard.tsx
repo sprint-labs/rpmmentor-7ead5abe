@@ -81,6 +81,14 @@ const groupOrder = ["Today", "Tomorrow", "This week", "Next week", "Later"] as c
 const PLANNED_TYPE_OPTIONS = ["Coffee Catch Up", "Attend Live Match", "Training Ground Visit"] as const;
 
 export function MentorDashboard({ user }: Props) {
+  const { can } = useAuth();
+  const canLog = can("interactions.log");
+  const [workflow, setWorkflow] = useState<WorkflowKind | null>(null);
+  const [logPrefill, setLogPrefill] = useState<{ gkId?: string; gkName?: string }>({});
+  function openLog(gkId?: string | null, gkName?: string | null) {
+    setLogPrefill({ gkId: gkId ?? undefined, gkName: gkName ?? undefined });
+    setWorkflow("interaction");
+  }
   const [rangeDays, setRangeDays] = useState(14);
   const [filters, setFilters] = useState<string[]>([]);
   const fetchStats = useServerFn(getMentorDashboardStats);
@@ -258,6 +266,18 @@ export function MentorDashboard({ user }: Props) {
           </span>
         </button>
 
+        {canLog && (
+          <div className="mt-3 flex justify-end">
+            <button
+              type="button"
+              onClick={() => openLog()}
+              className="text-xs px-2.5 py-1.5 rounded-md border border-border hover:bg-accent/40 text-primary inline-flex items-center gap-1"
+            >
+              <Plus className="size-3" /> Log interaction
+            </button>
+          </div>
+        )}
+
         {showOutstanding && (
           outstanding.length === 0 ? (
             <div className="text-xs text-muted-foreground py-6 text-center">
@@ -311,6 +331,15 @@ export function MentorDashboard({ user }: Props) {
                       {isReport ? "Submit report" : "Upload clip"}
                       <ArrowUpRight className="size-3" />
                     </Link>
+                    {canLog && (
+                      <button
+                        type="button"
+                        onClick={() => openLog(item.gkId, item.gkName)}
+                        className="shrink-0 text-xs px-2.5 py-1.5 rounded-md border border-border hover:bg-accent/40 text-primary inline-flex items-center gap-1"
+                      >
+                        <Plus className="size-3" /> Log
+                      </button>
+                    )}
                   </div>
                 );
               })}
@@ -324,9 +353,20 @@ export function MentorDashboard({ user }: Props) {
       <Card className="p-4">
         <SectionTitle
           action={
-            <Link to="/calendar" className="text-xs text-primary inline-flex items-center gap-1">
-              Open calendar <ArrowUpRight className="size-3" />
-            </Link>
+            <span className="inline-flex items-center gap-3">
+              {canLog && (
+                <button
+                  type="button"
+                  onClick={() => openLog()}
+                  className="text-xs text-primary inline-flex items-center gap-1"
+                >
+                  <Plus className="size-3" /> Log interaction
+                </button>
+              )}
+              <Link to="/calendar" className="text-xs text-primary inline-flex items-center gap-1">
+                Open calendar <ArrowUpRight className="size-3" />
+              </Link>
+            </span>
           }
         >
           Upcoming Interactions
@@ -461,6 +501,15 @@ export function MentorDashboard({ user }: Props) {
                             {formatEventDateTime(e.date)}
                           </div>
                         </div>
+                        {canLog && (
+                          <button
+                            type="button"
+                            onClick={() => openLog(e.gkId, e.gkName)}
+                            className="shrink-0 text-xs px-2.5 py-1.5 rounded-md border border-border hover:bg-accent/40 text-primary inline-flex items-center gap-1"
+                          >
+                            <Plus className="size-3" /> Log
+                          </button>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -470,6 +519,16 @@ export function MentorDashboard({ user }: Props) {
           </div>
         )}
       </Card>
+
+      <WorkflowDialog
+        kind={workflow}
+        prefillGkId={logPrefill.gkId}
+        prefillGoalkeeper={logPrefill.gkName}
+        onClose={() => {
+          setWorkflow(null);
+          setLogPrefill({});
+        }}
+      />
     </div>
   );
 }
