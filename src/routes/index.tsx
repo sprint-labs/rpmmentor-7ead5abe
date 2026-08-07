@@ -413,17 +413,27 @@ function Dashboard() {
         <div className="col-span-12 lg:col-span-4 command-panel p-5">
           <SectionTitle
             action={
-              <Link
-                to="/insights/$metric"
-                params={{ metric: "events" }}
-                search={{ from: period.fromDate, to: period.toDate, level: "" }}
-                className="text-[10px] font-mono uppercase tracking-widest text-primary inline-flex items-center gap-1"
-              >
-                All events <ArrowUpRight className="size-3" />
-              </Link>
+              <span className="inline-flex items-center gap-3">
+                {can("calendar.manage") && (
+                  <Link
+                    to="/calendar"
+                    search={{ gkId: "", new: true }}
+                    className="text-[10px] font-mono uppercase tracking-widest text-primary inline-flex items-center gap-1 hover:underline"
+                  >
+                    <Plus className="size-3" /> New event
+                  </Link>
+                )}
+                <Link
+                  to="/insights/$metric"
+                  params={{ metric: "events" }}
+                  search={{ from: period.fromDate, to: period.toDate, level: "" }}
+                  className="text-[10px] font-mono uppercase tracking-widest text-primary inline-flex items-center gap-1"
+                >
+                  All events <ArrowUpRight className="size-3" />
+                </Link>
+              </span>
             }
           >
-
             Upcoming Logs
           </SectionTitle>
           <div className="divide-y divide-border">
