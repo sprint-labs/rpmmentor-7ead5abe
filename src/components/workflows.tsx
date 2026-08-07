@@ -620,9 +620,12 @@ export function InteractionForm({
   /**
    * Save the recording and report the outcome separately from the interaction.
    * A failed recording is never allowed to read as a failed interaction.
+   * Returns whether the recording was stored, so the caller can decide between
+   * closing straight back to the page the user came from and holding the
+   * dialog open on the retry screen.
    */
-  async function saveRecordingAndReport(interaction: LoggedInteraction) {
-    if (!recording) return;
+  async function saveRecordingAndReport(interaction: LoggedInteraction): Promise<boolean> {
+    if (!recording) return true;
     let ok = false;
     try {
       ok = await saveRecording(interaction, recording);
@@ -637,7 +640,9 @@ export function InteractionForm({
         description: "Your recording is kept — use Retry saving audio to try again.",
       });
     }
+    return ok;
   }
+
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -689,8 +694,12 @@ export function InteractionForm({
         );
         setSavedInteraction(saved);
         // Reported separately: the correction is already stored either way.
-        if (recording) await saveRecordingAndReport(saved);
-        setDone(true);
+        const audioOk = await saveRecordingAndReport(saved);
+        // Confirmed saved: close straight back to the page the user came from.
+        // Only a failed recording holds the dialog open, for the retry option.
+        if (audioOk) onDone();
+        else setDone(true);
+
       } catch (err) {
         setError(
           err instanceof Error ? err.message : "Could not save the change. Please try again.",
@@ -764,8 +773,11 @@ export function InteractionForm({
       setSavedInteraction(confirmed);
       // Only now, with a confirmed interaction id to link to, is the recording
       // uploaded — so a failed interaction can never orphan a media record.
-      if (recording) await saveRecordingAndReport(confirmed);
-      setDone(true);
+      const audioOk = await saveRecordingAndReport(confirmed);
+      // Confirmed saved: close straight back to the page the user came from.
+      if (audioOk) onDone();
+      else setDone(true);
+
 
     } catch (err) {
       // Roll the optimistic timeline entry back.
