@@ -185,9 +185,11 @@ function Dashboard() {
       {/* KPI strip */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
         <Link
-          to="/goalkeepers"
+          to="/insights/$metric"
+          params={{ metric: "goalkeepers" }}
+          search={{ from: period.fromDate, to: period.toDate, level: "" }}
           className="block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-          aria-label="View goalkeepers"
+          aria-label="Break down total goalkeepers"
         >
           <StatCard
             label="Total Goalkeepers"
@@ -196,10 +198,11 @@ function Dashboard() {
           />
         </Link>
         <Link
-          to="/interactions"
-          search={interactionsSearch}
+          to="/insights/$metric"
+          params={{ metric: "interactions" }}
+          search={{ from: period.fromDate, to: period.toDate, level: "" }}
           className="block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-info"
-          aria-label="View interactions logged"
+          aria-label="Break down interactions logged"
         >
           <StatCard
             label="Interactions Logged"
@@ -210,9 +213,11 @@ function Dashboard() {
           />
         </Link>
         <Link
-          to="/goalkeepers"
+          to="/insights/$metric"
+          params={{ metric: "duty" }}
+          search={{ from: period.fromDate, to: period.toDate, level: "overdue" }}
           className="block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-warning"
-          aria-label="View overdue goalkeepers"
+          aria-label="Break down overdue duty of care"
         >
           <StatCard
             label="Overdue Duty of Care"
@@ -223,10 +228,11 @@ function Dashboard() {
           />
         </Link>
         <Link
-          to="/reports"
-          search={reportsSearch}
+          to="/insights/$metric"
+          params={{ metric: "reports" }}
+          search={{ from: period.fromDate, to: period.toDate, level: "" }}
           className="block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-          aria-label="View match reports"
+          aria-label="Break down match reports submitted"
         >
           <StatCard
             label="Match Reports Submitted"
@@ -239,9 +245,11 @@ function Dashboard() {
           />
         </Link>
         <Link
-          to="/mentors"
+          to="/insights/$metric"
+          params={{ metric: "mentors" }}
+          search={{ from: period.fromDate, to: period.toDate, level: "" }}
           className="block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-          aria-label="View users and roles"
+          aria-label="Break down active mentors"
         >
           <StatCard
             label="Active Mentors"
@@ -250,6 +258,7 @@ function Dashboard() {
           />
         </Link>
       </div>
+
 
       {/* Operational grid */}
       <div className="grid grid-cols-12 gap-4">
