@@ -842,8 +842,10 @@ export function InteractionForm({
       // uploaded — so a failed interaction can never orphan a media record.
       const audioOk = await saveRecordingAndReport(confirmed);
       // Confirmed saved: close straight back to the page the user came from.
+      // A failed recording holds the form open, with all fields intact, so the
+      // upload can be retried without re-entering anything.
       if (audioOk) onDone();
-      else setDone(true);
+
 
 
     } catch (err) {
