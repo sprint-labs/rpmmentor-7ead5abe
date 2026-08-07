@@ -121,56 +121,56 @@
 }
 
 .dark {
-  --background: #0A0A0A;
+  --background: #0D0D0D;
   --foreground: #F0EEE9;
-  --card: #1A1A1A;
+  --card: #1C1C1C;
   --card-foreground: #F0EEE9;
-  --popover: #151515;
+  --popover: #161616;
   --popover-foreground: #F0EEE9;
-  --primary: #2EF900;
+  --primary: #38FF5A;
   --primary-foreground: #0A0A0A;
-  --secondary: #151515;
+  --secondary: #161616;
   --secondary-foreground: #F0EEE9;
-  --muted: #101010;
+  --muted: #121212;
   --muted-foreground: #8A8A85;
-  --accent: #222222;
+  --accent: #232323;
   --accent-foreground: #F0EEE9;
-  --destructive: #FF3B36;
-  --destructive-foreground: #F0EEE9;
-  --success: #2EF900;
+  --destructive: #FF4D4D;
+  --destructive-foreground: #0D0D0D;
+  --success: #38FF5A;
   --success-foreground: #0A0A0A;
-  --warning: #FF6514;
+  --warning: #F0B429;
   --warning-foreground: #0A0A0A;
   --info: #14AEFF;
   --info-foreground: #0A0A0A;
-  --tier-1: #2EF900;
+  --tier-1: #F0B429;
   --tier-2: #14AEFF;
   --tier-3: #DA14FF;
-  --border: #2E2E2E;
-  --input: #151515;
-  --ring: #2EF900;
-  --sidebar: #101010;
+  --border: #2A2A2A;
+  --input: #161616;
+  --ring: #38FF5A;
+  --sidebar: #121212;
   --sidebar-foreground: #C7C4BE;
-  --sidebar-primary: #2EF900;
+  --sidebar-primary: #38FF5A;
   --sidebar-primary-foreground: #0A0A0A;
-  --sidebar-accent: #222222;
+  --sidebar-accent: #232323;
   --sidebar-accent-foreground: #F0EEE9;
-  --sidebar-border: #2E2E2E;
-  --sidebar-ring: #2EF900;
+  --sidebar-border: #2A2A2A;
+  --sidebar-ring: #38FF5A;
   /* Carbon palette aliases */
-  --carbon-bg: #0A0A0A;
-  --carbon-section: #101010;
-  --carbon-panel: #151515;
-  --carbon-card: #1A1A1A;
-  --carbon-raised: #222222;
-  --carbon-border: #2E2E2E;
+  --carbon-bg: #0D0D0D;
+  --carbon-section: #121212;
+  --carbon-panel: #161616;
+  --carbon-card: #1C1C1C;
+  --carbon-raised: #232323;
+  --carbon-border: #2A2A2A;
   --cloud-dancer: #F0EEE9;
-  --gk-green: #2EF900;
+  --gk-green: #38FF5A;
   --signal-blue: #14AEFF;
   --flux-magenta: #DA14FF;
-  --ember-orange: #FF6514;
+  --ember-orange: #F0B429;
   --rating-good: #A7D900;
-  --rating-danger: #FF3B36;
+  --rating-danger: #FF4D4D;
 }
 
 
