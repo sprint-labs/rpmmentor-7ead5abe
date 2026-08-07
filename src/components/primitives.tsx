@@ -204,8 +204,8 @@ export function Avatar({ initials, size = 28, imageUrl, alt }: { initials: strin
 
 export function SectionTitle({ children, action }: { children: ReactNode; action?: ReactNode }) {
   return (
-    <div className="flex items-center justify-between mb-3">
-      <h2 className="text-sm font-semibold tracking-tight uppercase text-muted-foreground">{children}</h2>
+    <div className="flex items-center justify-between gap-3 mb-4">
+      <h2 className="text-xs font-bold uppercase tracking-[0.2em] font-mono text-foreground">{children}</h2>
       {action}
     </div>
   );
