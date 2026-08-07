@@ -316,6 +316,45 @@ const AUDIO_PARTIAL_FAILURE_MESSAGE = "Interaction saved — audio was not saved
 type AudioSaveStatus = "idle" | "saving" | "saved" | "failed";
 
 /**
+ * Byte-level upload progress. Falls back to an indeterminate bar when the
+ * browser cannot report progress, so the mentor always sees live movement.
+ */
+function AudioUploadProgress({ progress }: { progress: number | null }) {
+  const determinate = typeof progress === "number";
+  const pct = determinate ? Math.round(Math.min(1, Math.max(0, progress)) * 100) : null;
+  return (
+    <div className="w-full max-w-sm">
+      <p
+        role="status"
+        aria-live="polite"
+        className="flex items-center justify-between gap-2 text-xs text-muted-foreground"
+      >
+        <span className="inline-flex items-center gap-1.5">
+          <Loader2 className="size-3.5 animate-spin" />
+          {pct === 100 ? "Finishing upload…" : "Uploading audio recording…"}
+        </span>
+        {pct !== null && <span className="tabular-nums font-medium">{pct}%</span>}
+      </p>
+      <div
+        role="progressbar"
+        aria-label="Audio upload progress"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        {...(pct !== null ? { "aria-valuenow": pct } : {})}
+        className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-muted"
+      >
+        <div
+          className={`h-full rounded-full bg-primary transition-[width] duration-200 ease-out ${
+            determinate ? "" : "w-1/3 animate-pulse"
+          }`}
+          {...(determinate ? { style: { width: `${pct}%` } } : {})}
+        />
+      </div>
+    </div>
+  );
+}
+
+/**
  * Reports the recording's fate separately from the interaction's. "Audio saved"
  * appears only for `saved`, which is set solely when the upload AND the
  * database link both succeeded.
@@ -324,17 +363,19 @@ function AudioSaveStatusNote({
   status,
   error,
   summary,
+  progress,
 }: {
   status: AudioSaveStatus;
   error: string | null;
   summary: string | null;
+  progress?: number | null;
 }) {
   if (status === "idle") return null;
   if (status === "saving") {
     return (
-      <p role="status" className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-        <Loader2 className="size-3.5 animate-spin" /> Saving audio recording…
-      </p>
+      <div className="mx-auto max-w-sm">
+        <AudioUploadProgress progress={progress ?? null} />
+      </div>
     );
   }
   if (status === "saved") {
@@ -344,6 +385,7 @@ function AudioSaveStatusNote({
       </p>
     );
   }
+
   return (
     <div
       role="alert"
@@ -422,6 +464,9 @@ export function InteractionForm({
   const [recording, setRecording] = useState<InteractionRecording | null>(null);
   const [audioStatus, setAudioStatus] = useState<AudioSaveStatus>("idle");
   const [audioError, setAudioError] = useState<string | null>(null);
+  /** 0–1 while the recording's bytes are going up; null when not uploading. */
+  const [audioProgress, setAudioProgress] = useState<number | null>(null);
+
   const [savedInteraction, setSavedInteraction] = useState<LoggedInteraction | null>(null);
 
   /**
@@ -624,6 +669,8 @@ export function InteractionForm({
   ): Promise<boolean> {
     setAudioStatus("saving");
     setAudioError(null);
+    // Start at 0 so the bar appears immediately, before the first byte event.
+    setAudioProgress(uploadedMediaIdRef.current ? 1 : 0);
 
     // Media library grouping only. A canonical players.id when there is one,
     // otherwise the roster slug — never the goalkeeper's name.
@@ -641,10 +688,12 @@ export function InteractionForm({
           notes: interactionAudioNotes(audio.durationSec),
           kind: "audio",
           user,
+          onProgress: (fraction) => setAudioProgress(fraction),
         });
         return asset.id;
       },
       link: async (mediaId) => {
+        setAudioProgress(1);
         const link = await attachAudioFn({
           data: { interactionId: interaction.id, mediaId },
         });
@@ -658,11 +707,14 @@ export function InteractionForm({
     if (!result.ok) {
       setAudioStatus("failed");
       setAudioError(result.message);
+      setAudioProgress(null);
       return false;
     }
     setAudioStatus("saved");
+    setAudioProgress(null);
     await refreshInteractionViews(queryClient);
     return true;
+
   }
 
   /**
@@ -909,11 +961,13 @@ export function InteractionForm({
             status={audioStatus}
             error={audioError}
             summary={audioFailed ? savedSummary : null}
+            progress={audioProgress}
           />
         }
       />
     );
   }
+  const audioUploading = audioStatus === "saving";
   return (
     <form aria-label="Log interaction form" onSubmit={handleSubmit} className="space-y-4">
       {error && (
@@ -936,25 +990,24 @@ export function InteractionForm({
             <button
               type="button"
               onClick={() => void retryAudio()}
-              className="h-8 px-3 rounded-md bg-primary text-primary-foreground text-xs font-medium inline-flex items-center gap-1.5"
+              disabled={audioUploading}
+              className="h-8 px-3 rounded-md bg-primary text-primary-foreground text-xs font-medium inline-flex items-center gap-1.5 disabled:opacity-60 disabled:cursor-not-allowed"
             >
               <RotateCcw className="size-3.5" /> Retry saving audio
             </button>
             <button
               type="button"
               onClick={discardFailedRecording}
-              className="h-8 px-3 rounded-md border border-border text-xs"
+              disabled={audioUploading}
+              className="h-8 px-3 rounded-md border border-border text-xs disabled:opacity-60 disabled:cursor-not-allowed"
             >
               Finish without the recording
             </button>
           </div>
         </div>
       )}
-      {savedInteraction && audioStatus === "saving" && (
-        <p role="status" className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-          <Loader2 className="size-3.5 animate-spin" /> Saving audio recording…
-        </p>
-      )}
+      {savedInteraction && audioUploading && <AudioUploadProgress progress={audioProgress} />}
+
       {savedInteraction && audioStatus === "saved" && (
         <p className="inline-flex items-center gap-1.5 text-xs text-primary">
           <CheckCircle2 className="size-3.5" /> Audio saved
