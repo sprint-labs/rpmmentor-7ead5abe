@@ -773,8 +773,11 @@ export function InteractionForm({
       setSavedInteraction(confirmed);
       // Only now, with a confirmed interaction id to link to, is the recording
       // uploaded — so a failed interaction can never orphan a media record.
-      if (recording) await saveRecordingAndReport(confirmed);
-      setDone(true);
+      const audioOk = await saveRecordingAndReport(confirmed);
+      // Confirmed saved: close straight back to the page the user came from.
+      if (audioOk) onDone();
+      else setDone(true);
+
 
     } catch (err) {
       // Roll the optimistic timeline entry back.
