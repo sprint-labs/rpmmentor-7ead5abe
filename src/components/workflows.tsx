@@ -1262,11 +1262,14 @@ export function InteractionForm({
           spoken note survives a refresh instead of dying with the page — and a
           failed upload leaves the recording here, ready to retry.
         */}
-        <VoiceNoteField
-          autoApply
-          onTranscribed={applyTranscribedText}
-          onRecordingReady={setRecording}
-        />
+        <div id="interaction-voice-note">
+          <VoiceNoteField
+            autoApply
+            onTranscribed={applyTranscribedText}
+            onRecordingReady={handleRecordingReady}
+          />
+        </div>
+
         <Field label="Notes" required error={showErrors ? errors.notes : undefined}>
           <textarea
             aria-label="Notes"
