@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { WorkflowDialog, type WorkflowKind } from "@/components/workflows";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { PageHeader, StatCard, SectionTitle, TierBadge } from "@/components/primitives";
 import {
@@ -13,9 +13,11 @@ import {
   formatRelative,
   
   computeDutyOverview,
+  type Alert,
 } from "@/lib/mock-data";
 import { useDutySource, useLoggedInteractions } from "@/lib/interactions/use-interactions";
 import { ErrorBoundary } from "@/components/error-boundary";
+import { toast } from "sonner";
 
 function initialsOf(name: string) {
   return (
@@ -36,7 +38,7 @@ import { listMatchReports } from "@/lib/match-reports/reports.functions";
 
 import { isDateOnlyInPeriod, lastNDaysPeriod } from "@/lib/dashboard-period";
 import { getOverviewDashboardStats } from "@/lib/overview-dashboard.functions";
-import { listCalendarEvents } from "@/lib/calendar.functions";
+import { listCalendarEvents, createCalendarEvent } from "@/lib/calendar.functions";
 
 const OVERVIEW_PERIOD_DAYS = 14;
 
