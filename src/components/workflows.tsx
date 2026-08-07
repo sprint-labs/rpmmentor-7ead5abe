@@ -961,11 +961,13 @@ export function InteractionForm({
             status={audioStatus}
             error={audioError}
             summary={audioFailed ? savedSummary : null}
+            progress={audioProgress}
           />
         }
       />
     );
   }
+  const audioUploading = audioStatus === "saving";
   return (
     <form aria-label="Log interaction form" onSubmit={handleSubmit} className="space-y-4">
       {error && (
@@ -988,25 +990,24 @@ export function InteractionForm({
             <button
               type="button"
               onClick={() => void retryAudio()}
-              className="h-8 px-3 rounded-md bg-primary text-primary-foreground text-xs font-medium inline-flex items-center gap-1.5"
+              disabled={audioUploading}
+              className="h-8 px-3 rounded-md bg-primary text-primary-foreground text-xs font-medium inline-flex items-center gap-1.5 disabled:opacity-60 disabled:cursor-not-allowed"
             >
               <RotateCcw className="size-3.5" /> Retry saving audio
             </button>
             <button
               type="button"
               onClick={discardFailedRecording}
-              className="h-8 px-3 rounded-md border border-border text-xs"
+              disabled={audioUploading}
+              className="h-8 px-3 rounded-md border border-border text-xs disabled:opacity-60 disabled:cursor-not-allowed"
             >
               Finish without the recording
             </button>
           </div>
         </div>
       )}
-      {savedInteraction && audioStatus === "saving" && (
-        <p role="status" className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-          <Loader2 className="size-3.5 animate-spin" /> Saving audio recording…
-        </p>
-      )}
+      {savedInteraction && audioUploading && <AudioUploadProgress progress={audioProgress} />}
+
       {savedInteraction && audioStatus === "saved" && (
         <p className="inline-flex items-center gap-1.5 text-xs text-primary">
           <CheckCircle2 className="size-3.5" /> Audio saved
