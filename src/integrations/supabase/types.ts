@@ -725,6 +725,48 @@ export type Database = {
           },
         ]
       }
+      user_deletion_audit: {
+        Row: {
+          actor_email: string
+          actor_id: string | null
+          actor_name: string
+          affected_sections: Json
+          created_at: string
+          deleted_email: string
+          deleted_name: string
+          deleted_role: string | null
+          deleted_user_id: string
+          id: string
+          metadata: Json
+        }
+        Insert: {
+          actor_email?: string
+          actor_id?: string | null
+          actor_name?: string
+          affected_sections?: Json
+          created_at?: string
+          deleted_email?: string
+          deleted_name?: string
+          deleted_role?: string | null
+          deleted_user_id: string
+          id?: string
+          metadata?: Json
+        }
+        Update: {
+          actor_email?: string
+          actor_id?: string | null
+          actor_name?: string
+          affected_sections?: Json
+          created_at?: string
+          deleted_email?: string
+          deleted_name?: string
+          deleted_role?: string | null
+          deleted_user_id?: string
+          id?: string
+          metadata?: Json
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string

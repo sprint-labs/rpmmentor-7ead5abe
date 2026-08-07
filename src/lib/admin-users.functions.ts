@@ -259,12 +259,104 @@ export const deleteManagedUser = createServerFn({ method: "POST" })
     }
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    // Snapshot who is being deleted and what will be affected, before deletion.
+    const [{ data: target }, { data: targetRoles }, { data: actorProfile }] = await Promise.all([
+      supabaseAdmin.from("profiles").select("email,name").eq("id", data.userId).maybeSingle(),
+      supabaseAdmin.from("user_roles").select("role").eq("user_id", data.userId),
+      supabaseAdmin.from("profiles").select("email,name").eq("id", context.userId).maybeSingle(),
+    ]);
+
+    const countOf = async (
+      table: "interactions" | "calendar_events" | "dashboard_click_events" | "match_report_submissions" | "interaction_media",
+      column: string,
+    ) => {
+      const { count } = await supabaseAdmin
+        .from(table)
+        .select("id", { count: "exact", head: true })
+        .eq(column, data.userId);
+      return count ?? 0;
+    };
+
+    const [interactions, calendarEvents, clickEvents, submissions, mediaLinks] = await Promise.all([
+      countOf("interactions", "mentor_id"),
+      countOf("calendar_events", "created_by"),
+      countOf("dashboard_click_events", "user_id"),
+      countOf("match_report_submissions", "user_id"),
+      countOf("interaction_media", "attached_by"),
+    ]);
+
+    const sections = [
+      { section: "Account (sign-in)", records: 1, action: "deleted" },
+      { section: "Profile", records: target ? 1 : 0, action: "deleted" },
+      { section: "Roles", records: targetRoles?.length ?? 0, action: "deleted" },
+      { section: "Interactions", records: interactions, action: "unassigned" },
+      { section: "Calendar events", records: calendarEvents, action: "unassigned" },
+      { section: "Match report submissions", records: submissions, action: "retained" },
+      { section: "Interaction media links", records: mediaLinks, action: "retained" },
+      { section: "Dashboard analytics events", records: clickEvents, action: "retained" },
+    ].filter((s) => s.records > 0);
+
     const { error: delErr } = await supabaseAdmin.auth.admin.deleteUser(data.userId);
     if (delErr) throw new Error(delErr.message);
 
     // profiles and user_roles rows cascade via FK on auth.users delete.
-    return { ok: true as const };
+    await supabaseAdmin.from("user_deletion_audit").insert({
+      deleted_user_id: data.userId,
+      deleted_email: target?.email ?? "",
+      deleted_name: target?.name ?? "",
+      deleted_role: precedence((targetRoles ?? []).map((r) => r.role as string)),
+      actor_id: context.userId,
+      actor_email: actorProfile?.email ?? "",
+      actor_name: actorProfile?.name ?? "",
+      affected_sections: sections,
+    });
+
+    return { ok: true as const, affectedSections: sections };
   });
+
+export interface DeletionAuditRow {
+  id: string;
+  createdAt: string;
+  deletedEmail: string;
+  deletedName: string;
+  deletedRole: string | null;
+  actorEmail: string;
+  actorName: string;
+  sections: { section: string; records: number; action: string }[];
+}
+
+export const listUserDeletionAudit = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<DeletionAuditRow[]> => {
+    const { data: myRoles, error: roleErr } = await context.supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", context.userId);
+    if (roleErr) throw new Error(roleErr.message);
+    if (!myRoles?.some((r) => r.role === "super_admin")) throw new Error("Forbidden");
+
+    const { data, error } = await context.supabase
+      .from("user_deletion_audit")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(100);
+    if (error) throw new Error(error.message);
+
+    return (data ?? []).map((r) => ({
+      id: r.id as string,
+      createdAt: r.created_at as string,
+      deletedEmail: (r.deleted_email as string) ?? "",
+      deletedName: (r.deleted_name as string) ?? "",
+      deletedRole: (r.deleted_role as string | null) ?? null,
+      actorEmail: (r.actor_email as string) ?? "",
+      actorName: (r.actor_name as string) ?? "",
+      sections: Array.isArray(r.affected_sections)
+        ? (r.affected_sections as { section: string; records: number; action: string }[])
+        : [],
+    }));
+  });
+
 
 const resetPasswordInput = z.object({ userId: z.string().uuid() });
 
