@@ -915,7 +915,47 @@ export function InteractionForm({
         </div>
       )}
 
+      {savedInteraction && audioStatus === "failed" && (
+        <div
+          role="alert"
+          className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2.5 text-xs"
+        >
+          <p className="font-medium">{AUDIO_PARTIAL_FAILURE_MESSAGE}</p>
+          <p className="mt-1 text-muted-foreground">
+            Your notes and every field are saved and still here. The recording was kept too —
+            resend it without re-entering anything.{audioError ? ` ${audioError}` : ""}
+          </p>
+          <div className="mt-2.5 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => void retryAudio()}
+              className="h-8 px-3 rounded-md bg-primary text-primary-foreground text-xs font-medium inline-flex items-center gap-1.5"
+            >
+              <RotateCcw className="size-3.5" /> Retry saving audio
+            </button>
+            <button
+              type="button"
+              onClick={discardFailedRecording}
+              className="h-8 px-3 rounded-md border border-border text-xs"
+            >
+              Finish without the recording
+            </button>
+          </div>
+        </div>
+      )}
+      {savedInteraction && audioStatus === "saving" && (
+        <p role="status" className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+          <Loader2 className="size-3.5 animate-spin" /> Saving audio recording…
+        </p>
+      )}
+      {savedInteraction && audioStatus === "saved" && (
+        <p className="inline-flex items-center gap-1.5 text-xs text-primary">
+          <CheckCircle2 className="size-3.5" /> Audio saved
+        </p>
+      )}
+
       {draftRestoredAt && (
+
         <div className="flex items-start justify-between gap-3 rounded-md border border-primary/40 bg-primary/5 px-3 py-2 text-xs">
           <p>
             <span className="font-medium">Unsaved draft restored.</span>{" "}
