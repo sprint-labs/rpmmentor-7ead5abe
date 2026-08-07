@@ -493,6 +493,9 @@ export function InteractionForm({
   const [audioError, setAudioError] = useState<string | null>(null);
   /** 0–1 while the recording's bytes are going up; null when not uploading. */
   const [audioProgress, setAudioProgress] = useState<number | null>(null);
+  /** Hidden picker used by "Choose an audio file" in the retry panel. */
+  const audioFileInputRef = useRef<HTMLInputElement | null>(null);
+
 
   const [savedInteraction, setSavedInteraction] = useState<LoggedInteraction | null>(null);
 
