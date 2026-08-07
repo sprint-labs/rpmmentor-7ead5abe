@@ -7,10 +7,10 @@ import {
   activity,
   alerts,
   goalkeepers,
-  calendarEvents,
+  
   stats,
   formatRelative,
-  getMentor,
+  
   computeDutyOverview,
 } from "@/lib/mock-data";
 import { useDutySource, useLoggedInteractions } from "@/lib/interactions/use-interactions";
@@ -35,6 +35,7 @@ import { listMatchReports } from "@/lib/match-reports/reports.functions";
 
 import { isDateOnlyInPeriod, lastNDaysPeriod } from "@/lib/dashboard-period";
 import { getOverviewDashboardStats } from "@/lib/overview-dashboard.functions";
+import { listCalendarEvents } from "@/lib/calendar.functions";
 
 const OVERVIEW_PERIOD_DAYS = 14;
 
@@ -64,6 +65,14 @@ function Dashboard() {
   const { data: overview } = useQuery({
     queryKey: ["overview-dashboard-stats", period.fromDate, period.toDate],
     queryFn: () => fetchOverview({ data: { fromDate: period.fromDate, toDate: period.toDate } }),
+    enabled: Boolean(user && user.role !== "mentor"),
+    staleTime: 30_000,
+  });
+  // Upcoming Logs reads the shared team calendar (same cache as /calendar).
+  const fetchCalendarEvents = useServerFn(listCalendarEvents);
+  const { data: teamEvents } = useQuery({
+    queryKey: ["calendar-events"],
+    queryFn: () => fetchCalendarEvents(),
     enabled: Boolean(user && user.role !== "mentor"),
     staleTime: 30_000,
   });
@@ -141,11 +150,12 @@ function Dashboard() {
 
   const dutyOverview = computeDutyOverview(dutySource);
 
-  // Upcoming interactions come from scheduled calendar events only. There is
+  // Upcoming interactions come from the shared team calendar only. There is
   // no sample/placeholder fallback — an empty schedule shows an empty state.
-  const upcoming = calendarEvents
-    .filter((e) => +new Date(e.date) >= Date.now())
-    .sort((a, b) => +new Date(a.date) - +new Date(b.date))
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const upcoming = (teamEvents ?? [])
+    .filter((e) => e.event_date >= todayIso)
+    .sort((a, b) => a.event_date.localeCompare(b.event_date))
     .slice(0, 6);
 
   const greeting = `Good ${new Date().getHours() < 12 ? "morning" : new Date().getHours() < 18 ? "afternoon" : "evening"}, ${user.name.split(" ")[0]}`;
@@ -389,21 +399,26 @@ function Dashboard() {
               </div>
             ) : (
               upcoming.map((e) => {
-                const gk = e.gkId ? goalkeepers.find((g) => g.id === e.gkId) : undefined;
-                const m = e.mentorId ? getMentor(e.mentorId) : undefined;
+                const gk = e.goalkeeper_name
+                  ? goalkeepers.find(
+                      (g) => g.name.toLowerCase() === e.goalkeeper_name!.toLowerCase(),
+                    )
+                  : undefined;
                 const content = (
                   <>
                     <div className="flex-1 min-w-0">
                       <div className="text-[10px] font-mono text-primary mb-1 uppercase tracking-widest">
-                        {formatRelative(e.date)}
+                        {formatRelative(e.event_date)}
+                        {e.start_time ? ` · ${e.start_time.slice(0, 5)}` : ""}
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className="text-xs font-medium truncate">{gk?.name ?? e.title}</span>
+                        <span className="text-xs font-medium truncate">{e.title}</span>
                         {gk ? <TierBadge tier={gk.tier} /> : null}
                       </div>
                       <div className="text-[10px] text-muted-foreground truncate">
-                        {gk ? `${gk.club} · ${gk.league}` : e.type}
-                        {m ? ` · w/ ${m.name.split(" ")[1] ?? m.name}` : ""}
+                        {e.event_type}
+                        {e.goalkeeper_name ? ` · ${e.goalkeeper_name}` : ""}
+                        {e.location ? ` · ${e.location}` : ""}
                       </div>
                     </div>
                     <CalendarClock className="size-3.5 text-muted-foreground/60 shrink-0" />
