@@ -694,8 +694,12 @@ export function InteractionForm({
         );
         setSavedInteraction(saved);
         // Reported separately: the correction is already stored either way.
-        if (recording) await saveRecordingAndReport(saved);
-        setDone(true);
+        const audioOk = await saveRecordingAndReport(saved);
+        // Confirmed saved: close straight back to the page the user came from.
+        // Only a failed recording holds the dialog open, for the retry option.
+        if (audioOk) onDone();
+        else setDone(true);
+
       } catch (err) {
         setError(
           err instanceof Error ? err.message : "Could not save the change. Please try again.",
