@@ -90,6 +90,7 @@ function MissingReports({
 
 const calendarSearchSchema = z.object({
   gkId: fallback(z.string(), "").default(""),
+  new: fallback(z.boolean(), false).default(false),
 });
 
 export const Route = createFileRoute("/calendar")({
@@ -151,7 +152,7 @@ function timeRange(e: DisplayEvent) {
 }
 
 function CalendarPage() {
-  const { gkId } = Route.useSearch();
+  const { gkId, new: openNewOnMount } = Route.useSearch();
   const { can } = useAuth();
   const canManage = can("calendar.manage");
   const [workflow, setWorkflow] = useState<WorkflowKind | null>(null);
@@ -221,6 +222,13 @@ function CalendarPage() {
   function openNew(dateIso?: string) {
     setDraft({ ...emptyDraft, event_date: dateIso ?? emptyDraft.event_date });
   }
+
+  // Deep link from dashboard quick actions: /calendar?new=true
+  useEffect(() => {
+    if (openNewOnMount && canManage) {
+      setDraft({ ...emptyDraft });
+    }
+  }, [openNewOnMount, canManage]);
 
   function openEdit(e: DisplayEvent) {
     setDraft({

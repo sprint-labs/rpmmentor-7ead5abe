@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { WorkflowDialog, type WorkflowKind } from "@/components/workflows";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { PageHeader, StatCard, SectionTitle, TierBadge } from "@/components/primitives";
 import {
@@ -13,9 +13,11 @@ import {
   formatRelative,
   
   computeDutyOverview,
+  type Alert,
 } from "@/lib/mock-data";
 import { useDutySource, useLoggedInteractions } from "@/lib/interactions/use-interactions";
 import { ErrorBoundary } from "@/components/error-boundary";
+import { toast } from "sonner";
 
 function initialsOf(name: string) {
   return (
@@ -36,7 +38,7 @@ import { listMatchReports } from "@/lib/match-reports/reports.functions";
 
 import { isDateOnlyInPeriod, lastNDaysPeriod } from "@/lib/dashboard-period";
 import { getOverviewDashboardStats } from "@/lib/overview-dashboard.functions";
-import { listCalendarEvents } from "@/lib/calendar.functions";
+import { listCalendarEvents, createCalendarEvent } from "@/lib/calendar.functions";
 
 const OVERVIEW_PERIOD_DAYS = 14;
 
@@ -45,7 +47,37 @@ export const Route = createFileRoute("/")({ component: Dashboard });
 function Dashboard() {
   const { user, can } = useAuth();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [workflow, setWorkflow] = useState<WorkflowKind | null>(null);
+  const [escalatingId, setEscalatingId] = useState<string | null>(null);
+  const createEvent = useServerFn(createCalendarEvent);
+
+  async function escalateAlert(a: Alert) {
+    setEscalatingId(a.id);
+    try {
+      const gk = a.gkId ? goalkeepers.find((g) => g.id === a.gkId) : undefined;
+      await createEvent({
+        data: {
+          title: `Escalation: ${a.kind}`,
+          event_type: "Follow Up",
+          event_date: new Date().toISOString().slice(0, 10),
+          start_time: "",
+          end_time: "",
+          location: "",
+          notes: a.message,
+          goalkeeper_name: gk?.name ?? "",
+          player_id: null,
+        },
+      });
+      await queryClient.invalidateQueries({ queryKey: ["calendar-events"] });
+      toast.success("Alert escalated — follow up added to the shared calendar.");
+    } catch {
+      toast.error("Could not escalate this alert. Try again.");
+    } finally {
+      setEscalatingId(null);
+    }
+  }
+
   const listReports = useServerFn(listMatchReports);
   const {
     data: reportsData,
@@ -413,17 +445,27 @@ function Dashboard() {
         <div className="col-span-12 lg:col-span-4 command-panel p-5">
           <SectionTitle
             action={
-              <Link
-                to="/insights/$metric"
-                params={{ metric: "events" }}
-                search={{ from: period.fromDate, to: period.toDate, level: "" }}
-                className="text-[10px] font-mono uppercase tracking-widest text-primary inline-flex items-center gap-1"
-              >
-                All events <ArrowUpRight className="size-3" />
-              </Link>
+              <span className="inline-flex items-center gap-3">
+                {can("calendar.manage") && (
+                  <Link
+                    to="/calendar"
+                    search={{ gkId: "", new: true }}
+                    className="text-[10px] font-mono uppercase tracking-widest text-primary inline-flex items-center gap-1 hover:underline"
+                  >
+                    <Plus className="size-3" /> New event
+                  </Link>
+                )}
+                <Link
+                  to="/insights/$metric"
+                  params={{ metric: "events" }}
+                  search={{ from: period.fromDate, to: period.toDate, level: "" }}
+                  className="text-[10px] font-mono uppercase tracking-widest text-primary inline-flex items-center gap-1"
+                >
+                  All events <ArrowUpRight className="size-3" />
+                </Link>
+              </span>
             }
           >
-
             Upcoming Logs
           </SectionTitle>
           <div className="divide-y divide-border">
@@ -502,7 +544,21 @@ function Dashboard() {
           )}
         >
           <div className="col-span-12 lg:col-span-4 command-panel p-5">
-            <SectionTitle>Recent Events</SectionTitle>
+            <SectionTitle
+              action={
+                can("interactions.log") ? (
+                  <button
+                    type="button"
+                    onClick={() => setWorkflow("interaction")}
+                    className="text-[10px] font-mono uppercase tracking-widest text-primary inline-flex items-center gap-1 hover:underline"
+                  >
+                    <Plus className="size-3" /> Log interaction
+                  </button>
+                ) : undefined
+              }
+            >
+              Recent Events
+            </SectionTitle>
             <div className="space-y-3">
               {interactionsLoading ? (
                 <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground/70 py-6 text-center">
@@ -575,6 +631,17 @@ function Dashboard() {
                       <AlertTriangle className="size-3" />
                     </div>
                     <p className="text-[11px] text-muted-foreground leading-snug">{a.message}</p>
+                    {can("calendar.manage") && (
+                      <button
+                        type="button"
+                        onClick={() => escalateAlert(a)}
+                        disabled={escalatingId === a.id}
+                        className="mt-2 inline-flex items-center gap-1 border border-current/40 px-2 py-1 text-[10px] font-mono uppercase tracking-widest hover:bg-current/10 disabled:opacity-50"
+                      >
+                        <ArrowUpRight className="size-3" />
+                        {escalatingId === a.id ? "Escalating…" : "Escalate"}
+                      </button>
+                    )}
                   </div>
                 );
               })
