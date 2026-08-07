@@ -150,11 +150,12 @@ function Dashboard() {
 
   const dutyOverview = computeDutyOverview(dutySource);
 
-  // Upcoming interactions come from scheduled calendar events only. There is
+  // Upcoming interactions come from the shared team calendar only. There is
   // no sample/placeholder fallback — an empty schedule shows an empty state.
-  const upcoming = calendarEvents
-    .filter((e) => +new Date(e.date) >= Date.now())
-    .sort((a, b) => +new Date(a.date) - +new Date(b.date))
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const upcoming = (teamEvents ?? [])
+    .filter((e) => e.event_date >= todayIso)
+    .sort((a, b) => a.event_date.localeCompare(b.event_date))
     .slice(0, 6);
 
   const greeting = `Good ${new Date().getHours() < 12 ? "morning" : new Date().getHours() < 18 ? "afternoon" : "evening"}, ${user.name.split(" ")[0]}`;
