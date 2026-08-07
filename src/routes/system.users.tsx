@@ -215,7 +215,7 @@ function SystemUsersPage() {
       {refreshError && !isRefreshing && (
         <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm">
           <div className="flex items-start gap-2">
-            <AlertTriangle className="size-4 mt-0.5 text-destructive shrink-0" />
+            <AlertCircle className="size-4 mt-0.5 text-destructive shrink-0" />
             <div className="flex-1">
               <p className="font-medium text-destructive">
                 Dashboard counts and lists could not be refreshed
@@ -225,12 +225,20 @@ function SystemUsersPage() {
                 {refreshError.message}
               </p>
               <div className="mt-2 flex gap-2">
-                <Button size="sm" onClick={() => void runPostDeleteRefresh(refreshError.label)}>
+                <button
+                  type="button"
+                  onClick={() => void runPostDeleteRefresh(refreshError.label)}
+                  className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90"
+                >
                   Retry refresh
-                </Button>
-                <Button size="sm" variant="ghost" onClick={() => setRefreshError(null)}>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRefreshError(null)}
+                  className="rounded-md border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-muted"
+                >
                   Dismiss
-                </Button>
+                </button>
               </div>
             </div>
           </div>
