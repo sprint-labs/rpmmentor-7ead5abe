@@ -110,19 +110,7 @@ function SystemUsersPage() {
     mutationFn: (u: ManagedUserRow) => deleteUser({ data: { userId: u.id } }),
     onSuccess: async (_r, u) => {
       setConfirmDelete(null);
-      setIsRefreshing(true);
-      toast.info(`Deleted ${u.name || u.email}. Refreshing dashboard counts and lists…`);
-      try {
-        // A deleted account changes counts and names everywhere — refresh the
-        // directory, every dashboard KPI, the interactions log and the calendar,
-        // then re-run route loaders so nothing on screen keeps the stale row.
-        await refreshUserDirectoryViews(qc);
-        await qc.invalidateQueries({ queryKey: AUDIT_KEY });
-
-        await router.invalidate();
-      } finally {
-        setIsRefreshing(false);
-      }
+      await runPostDeleteRefresh(u.name || u.email || "user");
       toast.success(`Deleted ${u.name || u.email}`);
     },
     onError: (err: unknown) => {
