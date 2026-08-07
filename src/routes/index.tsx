@@ -28,7 +28,7 @@ function initialsOf(name: string) {
   );
 }
 
-import { ArrowUpRight, AlertTriangle, CalendarClock, FileText, Users, UserCog } from "lucide-react";
+import { ArrowUpRight, AlertTriangle, CalendarClock, FileText, Users, UserCog, Plus } from "lucide-react";
 import { useAuth, ROLE_LABEL } from "@/lib/auth";
 import { MentorDashboard } from "@/components/mentor/mentor-dashboard";
 import { SyncStatusChip } from "@/components/sync-status-chip";
