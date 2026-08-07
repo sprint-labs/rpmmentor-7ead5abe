@@ -627,6 +627,8 @@ export function InteractionForm({
   ): Promise<boolean> {
     setAudioStatus("saving");
     setAudioError(null);
+    // Start at 0 so the bar appears immediately, before the first byte event.
+    setAudioProgress(uploadedMediaIdRef.current ? 1 : 0);
 
     // Media library grouping only. A canonical players.id when there is one,
     // otherwise the roster slug — never the goalkeeper's name.
@@ -644,10 +646,12 @@ export function InteractionForm({
           notes: interactionAudioNotes(audio.durationSec),
           kind: "audio",
           user,
+          onProgress: (fraction) => setAudioProgress(fraction),
         });
         return asset.id;
       },
       link: async (mediaId) => {
+        setAudioProgress(1);
         const link = await attachAudioFn({
           data: { interactionId: interaction.id, mediaId },
         });
@@ -661,11 +665,14 @@ export function InteractionForm({
     if (!result.ok) {
       setAudioStatus("failed");
       setAudioError(result.message);
+      setAudioProgress(null);
       return false;
     }
     setAudioStatus("saved");
+    setAudioProgress(null);
     await refreshInteractionViews(queryClient);
     return true;
+
   }
 
   /**
