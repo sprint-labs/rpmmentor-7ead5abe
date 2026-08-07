@@ -30,6 +30,7 @@ import { Route as SystemIntegrationsRouteImport } from './routes/system.integrat
 import { Route as SystemGithubRouteImport } from './routes/system.github'
 import { Route as SystemDataQualityRouteImport } from './routes/system.data-quality'
 import { Route as ReportsReportIdRouteImport } from './routes/reports.$reportId'
+import { Route as InsightsMetricRouteImport } from './routes/insights.$metric'
 import { Route as GoalkeepersGkIdRouteImport } from './routes/goalkeepers.$gkId'
 import { Route as Char91DotwellKnownChar93OauthProtectedResourceRouteImport } from './routes/[.well-known]/oauth-protected-resource'
 import { Route as Char91DotmcpChar93ListToolsRouteImport } from './routes/[.mcp]/list-tools'
@@ -143,6 +144,11 @@ const ReportsReportIdRoute = ReportsReportIdRouteImport.update({
   path: '/reports/$reportId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const InsightsMetricRoute = InsightsMetricRouteImport.update({
+  id: '/insights/$metric',
+  path: '/insights/$metric',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const GoalkeepersGkIdRoute = GoalkeepersGkIdRouteImport.update({
   id: '/$gkId',
   path: '/$gkId',
@@ -200,6 +206,7 @@ export interface FileRoutesByFullPath {
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/goalkeepers/$gkId': typeof GoalkeepersGkIdRoute
+  '/insights/$metric': typeof InsightsMetricRoute
   '/reports/$reportId': typeof ReportsReportIdRoute
   '/system/data-quality': typeof SystemDataQualityRoute
   '/system/github': typeof SystemGithubRoute
@@ -230,6 +237,7 @@ export interface FileRoutesByTo {
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/goalkeepers/$gkId': typeof GoalkeepersGkIdRoute
+  '/insights/$metric': typeof InsightsMetricRoute
   '/reports/$reportId': typeof ReportsReportIdRoute
   '/system/data-quality': typeof SystemDataQualityRoute
   '/system/github': typeof SystemGithubRoute
@@ -261,6 +269,7 @@ export interface FileRoutesById {
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/goalkeepers/$gkId': typeof GoalkeepersGkIdRoute
+  '/insights/$metric': typeof InsightsMetricRoute
   '/reports/$reportId': typeof ReportsReportIdRoute
   '/system/data-quality': typeof SystemDataQualityRoute
   '/system/github': typeof SystemGithubRoute
@@ -293,6 +302,7 @@ export interface FileRouteTypes {
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
     | '/goalkeepers/$gkId'
+    | '/insights/$metric'
     | '/reports/$reportId'
     | '/system/data-quality'
     | '/system/github'
@@ -323,6 +333,7 @@ export interface FileRouteTypes {
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
     | '/goalkeepers/$gkId'
+    | '/insights/$metric'
     | '/reports/$reportId'
     | '/system/data-quality'
     | '/system/github'
@@ -353,6 +364,7 @@ export interface FileRouteTypes {
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
     | '/goalkeepers/$gkId'
+    | '/insights/$metric'
     | '/reports/$reportId'
     | '/system/data-quality'
     | '/system/github'
@@ -383,6 +395,7 @@ export interface RootRouteChildren {
   ResetPasswordRoute: typeof ResetPasswordRoute
   Char91DotmcpChar93ListToolsRoute: typeof Char91DotmcpChar93ListToolsRoute
   Char91DotwellKnownChar93OauthProtectedResourceRoute: typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
+  InsightsMetricRoute: typeof InsightsMetricRoute
   ReportsReportIdRoute: typeof ReportsReportIdRoute
   SystemDataQualityRoute: typeof SystemDataQualityRoute
   SystemGithubRoute: typeof SystemGithubRoute
@@ -545,6 +558,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ReportsReportIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/insights/$metric': {
+      id: '/insights/$metric'
+      path: '/insights/$metric'
+      fullPath: '/insights/$metric'
+      preLoaderRoute: typeof InsightsMetricRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/goalkeepers/$gkId': {
       id: '/goalkeepers/$gkId'
       path: '/$gkId'
@@ -627,6 +647,7 @@ const rootRouteChildren: RootRouteChildren = {
   Char91DotmcpChar93ListToolsRoute: Char91DotmcpChar93ListToolsRoute,
   Char91DotwellKnownChar93OauthProtectedResourceRoute:
     Char91DotwellKnownChar93OauthProtectedResourceRoute,
+  InsightsMetricRoute: InsightsMetricRoute,
   ReportsReportIdRoute: ReportsReportIdRoute,
   SystemDataQualityRoute: SystemDataQualityRoute,
   SystemGithubRoute: SystemGithubRoute,
