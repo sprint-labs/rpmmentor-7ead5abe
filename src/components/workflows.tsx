@@ -166,6 +166,8 @@ export function WorkflowDialog({ kind, onClose, prefillGoalkeeper, prefillMatchD
               onDone={onClose}
               editing={editingInteraction ?? null}
               onOpenMatchReport={setHandoff}
+              prefillGkId={prefillGkId}
+              prefillDate={prefillMatchDate}
             />
           )}
           {activeKind === "report" && (
@@ -353,10 +355,16 @@ export function InteractionForm({
   onDone,
   editing = null,
   onOpenMatchReport,
+  prefillGkId,
+  prefillDate,
 }: {
   onDone: () => void;
   editing?: LoggedInteraction | null;
   onOpenMatchReport?: (ctx: MatchReportHandoff) => void;
+  /** Goalkeeper to pre-select when opened from a profile or a calendar entry. */
+  prefillGkId?: string;
+  /** Date to pre-select when opened from a calendar day (YYYY-MM-DD). */
+  prefillDate?: string;
 }) {
   const queryClient = useQueryClient();
   const createFn = useServerFn(createInteraction);
@@ -376,7 +384,7 @@ export function InteractionForm({
    * just to correct a date.
    */
   const [gkId, setGkId] = useState(() => {
-    if (!editing) return "";
+    if (!editing) return prefillGkId ?? "";
     if (editing.playerId) return editing.playerId;
     if (editing.gkSlug) return editing.gkSlug;
     const target = editing.goalkeeperName.trim().toLowerCase();
@@ -389,7 +397,7 @@ export function InteractionForm({
     (editing?.interactionType as InteractionTypeValue) ?? MANUAL_INTERACTION_TYPES[0]!,
   );
   const [club, setClub] = useState(editing?.club ?? "");
-  const [date, setDate] = useState(() => editing?.occurredAt ?? todayDateOnly());
+  const [date, setDate] = useState(() => editing?.occurredAt ?? prefillDate ?? todayDateOnly());
   const [outcome, setOutcome] = useState<string>(editing?.outcome ?? "");
   const [followUp, setFollowUp] = useState(editing?.followUp ?? "");
   const [saving, setSaving] = useState(false);
