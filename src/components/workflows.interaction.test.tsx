@@ -322,7 +322,7 @@ describe("InteractionForm (durable)", () => {
     const payload = updateInteractionMock.mock.calls[0]![0] as { data: Record<string, unknown> };
     expect(payload.data["id"]).toBe(EXISTING.id);
     expect(payload.data["occurredAt"]).toBe("2026-07-09");
-    await waitFor(() => expect(screen.getByText(/interaction updated/i)).toBeTruthy());
+    await waitFor(() => expect(onDoneMock).toHaveBeenCalledTimes(1));
   });
 
   it("never claims an edit succeeded when the server does not confirm the new value", async () => {
@@ -334,7 +334,7 @@ describe("InteractionForm (durable)", () => {
     fireEvent.click(screen.getByRole("button", { name: /save changes/i }));
 
     await waitFor(() => expect(screen.getByRole("alert")).toBeTruthy());
-    expect(screen.queryByText(/interaction updated/i)).toBeNull();
+    expect(onDoneMock).not.toHaveBeenCalled();
     // The entered correction is kept so nothing is lost.
     expect((screen.getByLabelText("Date") as HTMLInputElement).value).toBe("2026-07-09");
   });
