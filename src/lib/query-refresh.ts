@@ -39,3 +39,22 @@ export async function refreshClubDependentViews(
     ...(playerId ? [queryClient.invalidateQueries({ queryKey: ["player", playerId] })] : []),
   ]);
 }
+
+/**
+ * Everything that counts or names people: the user directory, the mentor
+ * pickers, every dashboard KPI (mentor counts, activity per mentor), the
+ * interactions log and the shared calendar — all of which show mentor names
+ * and totals that change the moment an account is deleted.
+ */
+export async function refreshUserDirectoryViews(queryClient: QueryClient): Promise<void> {
+  await Promise.all([
+    queryClient.invalidateQueries({ queryKey: ["managed-users"] }),
+    queryClient.invalidateQueries({ queryKey: ["users-and-roles"] }),
+    queryClient.invalidateQueries({ queryKey: ["overview-dashboard-stats"] }),
+    queryClient.invalidateQueries({ queryKey: ["executive-dashboard-stats"] }),
+    queryClient.invalidateQueries({ queryKey: ["mentor-dashboard-stats"] }),
+    queryClient.invalidateQueries({ queryKey: ["calendar-events"] }),
+    refreshInteractionViews(queryClient),
+  ]);
+}
+

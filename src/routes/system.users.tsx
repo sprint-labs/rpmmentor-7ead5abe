@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { ShieldCheck, ShieldOff, Users, Search, Loader2, AlertCircle, UserPlus, Trash2, Copy, Pencil, KeyRound, Mail } from "lucide-react";
 import { useAuth, ROLE_LABEL, type Role } from "@/lib/auth";
@@ -16,6 +16,8 @@ import {
   inviteManagedUser,
   type ManagedUserRow,
 } from "@/lib/admin-users.functions";
+import { refreshUserDirectoryViews } from "@/lib/query-refresh";
+
 
 export const Route = createFileRoute("/system/users")({ component: SystemUsersPage });
 
@@ -49,6 +51,8 @@ function SystemUsersPage() {
   const resetPassword = useServerFn(resetManagedUserPassword);
   const inviteUser = useServerFn(inviteManagedUser);
   const qc = useQueryClient();
+  const router = useRouter();
+
 
   const canManage = !!user && can("system.manage");
 
@@ -89,8 +93,12 @@ function SystemUsersPage() {
 
   const deleteMutation = useMutation({
     mutationFn: (u: ManagedUserRow) => deleteUser({ data: { userId: u.id } }),
-    onSuccess: (_r, u) => {
-      qc.invalidateQueries({ queryKey: QUERY_KEY });
+    onSuccess: async (_r, u) => {
+      // A deleted account changes counts and names everywhere — refresh the
+      // directory, every dashboard KPI, the interactions log and the calendar,
+      // then re-run route loaders so nothing on screen keeps the stale row.
+      await refreshUserDirectoryViews(qc);
+      await router.invalidate();
       setConfirmDelete(null);
       toast.success(`Deleted ${u.name || u.email}`);
     },
@@ -98,6 +106,7 @@ function SystemUsersPage() {
       toast.error(err instanceof Error ? err.message : "Failed to delete user");
     },
   });
+
 
   const resetMutation = useMutation({
     mutationFn: (u: ManagedUserRow) => resetPassword({ data: { userId: u.id } }),
