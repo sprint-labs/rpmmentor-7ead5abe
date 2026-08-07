@@ -7,7 +7,7 @@ import {
   activity,
   alerts,
   goalkeepers,
-  calendarEvents,
+  
   stats,
   formatRelative,
   getMentor,
