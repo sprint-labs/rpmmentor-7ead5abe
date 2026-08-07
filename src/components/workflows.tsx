@@ -26,6 +26,12 @@ import {
   type InteractionTypeValue,
 } from "@/lib/interactions/schema";
 import { reconcileInteraction } from "@/lib/interactions/map";
+import {
+  clearInteractionDraft,
+  loadInteractionDraft,
+  saveInteractionDraft,
+} from "@/lib/interactions/draft-store";
+
 import { refreshInteractionViews } from "@/lib/query-refresh";
 import { useAuth, type SessionUser } from "@/lib/auth";
 import {
@@ -417,6 +423,62 @@ export function InteractionForm({
   const [audioStatus, setAudioStatus] = useState<AudioSaveStatus>("idle");
   const [audioError, setAudioError] = useState<string | null>(null);
   const [savedInteraction, setSavedInteraction] = useState<LoggedInteraction | null>(null);
+
+  /**
+   * Draft persistence. Navigating away mid-entry (accidental back, a link, a
+   * refresh) must not lose typed context, so the in-progress values are mirrored
+   * to browser-local storage and restored the next time the form is opened.
+   * Only for new interactions — a correction always starts from the stored row.
+   */
+  const [draftRestoredAt, setDraftRestoredAt] = useState<string | null>(null);
+  const draftReadyRef = useRef(false);
+  useEffect(() => {
+    if (isEditing) return;
+    const draft = loadInteractionDraft();
+    if (draft) {
+      // Explicit context (a goalkeeper profile, a calendar day) wins over the draft.
+      if (!prefillGkId && draft.gkId) setGkId(draft.gkId);
+      if (!prefillDate && draft.date) setDate(draft.date);
+      if (draft.type && (MANUAL_INTERACTION_TYPES as readonly string[]).includes(draft.type)) {
+        setType(draft.type as InteractionTypeValue);
+      }
+      if (draft.club) setClub(draft.club);
+      if (draft.notes) {
+        notesRef.current = draft.notes;
+        setNotes(draft.notes);
+      }
+      if (draft.outcome) setOutcome(draft.outcome);
+      if (draft.followUp) setFollowUp(draft.followUp);
+      setDraftRestoredAt(draft.savedAt);
+    }
+    draftReadyRef.current = true;
+    // Mount only: restoring later would fight the user's own edits.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (isEditing || !draftReadyRef.current) return;
+    const handle = window.setTimeout(() => {
+      saveInteractionDraft({ gkId, type, club, date, notes, outcome, followUp });
+    }, 600);
+    return () => window.clearTimeout(handle);
+  }, [isEditing, gkId, type, club, date, notes, outcome, followUp]);
+
+  function discardDraft() {
+    clearInteractionDraft();
+    setDraftRestoredAt(null);
+    setGkId(prefillGkId ?? "");
+    setType(MANUAL_INTERACTION_TYPES[0]!);
+    setClub("");
+    setDate(prefillDate ?? todayDateOnly());
+    notesRef.current = "";
+    setNotes("");
+    setOutcome("");
+    setFollowUp("");
+    setErrors({});
+    setShowErrors(false);
+  }
+
   /**
    * Media asset created by an earlier attempt. Reusing it is what makes Retry
    * idempotent: the recording is uploaded at most once however many times the
@@ -771,6 +833,9 @@ export function InteractionForm({
       });
       setSavedSummary(`Interaction logged successfully — ${shownType} with ${shownName} on ${shownDate}. It's now in the interactions log.`);
       setSavedInteraction(confirmed);
+      // The work is stored server-side now, so the local draft is finished with.
+      clearInteractionDraft();
+
       // Only now, with a confirmed interaction id to link to, is the recording
       // uploaded — so a failed interaction can never orphan a media record.
       const audioOk = await saveRecordingAndReport(confirmed);
@@ -826,6 +891,26 @@ export function InteractionForm({
           <span className="font-medium">Not saved.</span> {error} Your entries have been kept — fix the issue and try again.
         </div>
       )}
+
+      {draftRestoredAt && (
+        <div className="flex items-start justify-between gap-3 rounded-md border border-primary/40 bg-primary/5 px-3 py-2 text-xs">
+          <p>
+            <span className="font-medium">Unsaved draft restored.</span>{" "}
+            <span className="text-muted-foreground">
+              Picked up from {formatDateOnly(draftRestoredAt.slice(0, 10))} — nothing has been saved yet.
+            </span>
+          </p>
+          <button
+            type="button"
+            onClick={discardDraft}
+            className="shrink-0 text-primary hover:text-primary/80"
+          >
+            Start blank
+          </button>
+        </div>
+      )}
+
+
 
       <fieldset disabled={saving} className="space-y-4 border-0 p-0 m-0 min-w-0">
         <div className="grid grid-cols-2 gap-3">
