@@ -414,13 +414,16 @@ function Dashboard() {
           <SectionTitle
             action={
               <Link
-                to="/calendar"
+                to="/insights/$metric"
+                params={{ metric: "events" }}
+                search={{ from: period.fromDate, to: period.toDate, level: "" }}
                 className="text-[10px] font-mono uppercase tracking-widest text-primary inline-flex items-center gap-1"
               >
-                Calendar <ArrowUpRight className="size-3" />
+                All events <ArrowUpRight className="size-3" />
               </Link>
             }
           >
+
             Upcoming Logs
           </SectionTitle>
           <div className="divide-y divide-border">
