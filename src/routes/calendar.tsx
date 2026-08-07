@@ -90,6 +90,7 @@ function MissingReports({
 
 const calendarSearchSchema = z.object({
   gkId: fallback(z.string(), "").default(""),
+  new: fallback(z.boolean(), false).default(false),
 });
 
 export const Route = createFileRoute("/calendar")({
