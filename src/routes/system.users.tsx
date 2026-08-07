@@ -107,6 +107,28 @@ function SystemUsersPage() {
     },
   });
 
+  // A deleted account changes counts and names everywhere — refresh the
+  // directory, every dashboard KPI, the interactions log and the calendar,
+  // then re-run route loaders so nothing on screen keeps the stale row.
+  const runPostDeleteRefresh = async (label: string) => {
+    setRefreshError(null);
+    setIsRefreshing(true);
+    toast.info(`Deleted ${label}. Refreshing dashboard counts and lists…`);
+    try {
+      await refreshUserDirectoryViews(qc);
+      await qc.invalidateQueries({ queryKey: AUDIT_KEY });
+      await router.invalidate();
+    } catch (err: unknown) {
+      setRefreshError({
+        label,
+        message: err instanceof Error ? err.message : "Unknown error while refreshing",
+      });
+      toast.error("Dashboard refresh failed");
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
   const deleteMutation = useMutation({
     mutationFn: (u: ManagedUserRow) => deleteUser({ data: { userId: u.id } }),
     onSuccess: async (_r, u) => {
