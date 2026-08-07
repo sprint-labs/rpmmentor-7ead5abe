@@ -1273,7 +1273,7 @@ export function InteractionForm({
             aria-required="true"
             rows={5}
             className={`${taCls} ${showErrors && errors.notes ? "border-destructive focus:ring-destructive/40" : ""}`}
-            placeholder="What did you observe? Or use the camera/mic above to transcribe notes."
+            placeholder="What did you observe? Or use the mic above to transcribe notes."
             value={notes}
             onChange={(e) => { setNotes(e.target.value); clearFieldError("notes"); }}
             onBlur={() => { if (!notes.trim()) setErrors((prev) => ({ ...prev, notes: "Notes are required" })); }}
