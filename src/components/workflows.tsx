@@ -316,6 +316,45 @@ const AUDIO_PARTIAL_FAILURE_MESSAGE = "Interaction saved — audio was not saved
 type AudioSaveStatus = "idle" | "saving" | "saved" | "failed";
 
 /**
+ * Byte-level upload progress. Falls back to an indeterminate bar when the
+ * browser cannot report progress, so the mentor always sees live movement.
+ */
+function AudioUploadProgress({ progress }: { progress: number | null }) {
+  const determinate = typeof progress === "number";
+  const pct = determinate ? Math.round(Math.min(1, Math.max(0, progress)) * 100) : null;
+  return (
+    <div className="w-full max-w-sm">
+      <p
+        role="status"
+        aria-live="polite"
+        className="flex items-center justify-between gap-2 text-xs text-muted-foreground"
+      >
+        <span className="inline-flex items-center gap-1.5">
+          <Loader2 className="size-3.5 animate-spin" />
+          {pct === 100 ? "Finishing upload…" : "Uploading audio recording…"}
+        </span>
+        {pct !== null && <span className="tabular-nums font-medium">{pct}%</span>}
+      </p>
+      <div
+        role="progressbar"
+        aria-label="Audio upload progress"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        {...(pct !== null ? { "aria-valuenow": pct } : {})}
+        className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-muted"
+      >
+        <div
+          className={`h-full rounded-full bg-primary transition-[width] duration-200 ease-out ${
+            determinate ? "" : "w-1/3 animate-pulse"
+          }`}
+          {...(determinate ? { style: { width: `${pct}%` } } : {})}
+        />
+      </div>
+    </div>
+  );
+}
+
+/**
  * Reports the recording's fate separately from the interaction's. "Audio saved"
  * appears only for `saved`, which is set solely when the upload AND the
  * database link both succeeded.
@@ -324,17 +363,19 @@ function AudioSaveStatusNote({
   status,
   error,
   summary,
+  progress,
 }: {
   status: AudioSaveStatus;
   error: string | null;
   summary: string | null;
+  progress?: number | null;
 }) {
   if (status === "idle") return null;
   if (status === "saving") {
     return (
-      <p role="status" className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-        <Loader2 className="size-3.5 animate-spin" /> Saving audio recording…
-      </p>
+      <div className="mx-auto max-w-sm">
+        <AudioUploadProgress progress={progress ?? null} />
+      </div>
     );
   }
   if (status === "saved") {
@@ -344,6 +385,7 @@ function AudioSaveStatusNote({
       </p>
     );
   }
+
   return (
     <div
       role="alert"
