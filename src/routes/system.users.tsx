@@ -212,6 +212,33 @@ function SystemUsersPage() {
         </div>
       )}
 
+      {refreshError && !isRefreshing && (
+        <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm">
+          <div className="flex items-start gap-2">
+            <AlertTriangle className="size-4 mt-0.5 text-destructive shrink-0" />
+            <div className="flex-1">
+              <p className="font-medium text-destructive">
+                Dashboard counts and lists could not be refreshed
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                {refreshError.label} was deleted, but some views may still show stale data.{" "}
+                {refreshError.message}
+              </p>
+              <div className="mt-2 flex gap-2">
+                <Button size="sm" onClick={() => void runPostDeleteRefresh(refreshError.label)}>
+                  Retry refresh
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => setRefreshError(null)}>
+                  Dismiss
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+
+
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <div className="flex items-center gap-2">
