@@ -51,6 +51,8 @@ function SystemUsersPage() {
   const resetPassword = useServerFn(resetManagedUserPassword);
   const inviteUser = useServerFn(inviteManagedUser);
   const qc = useQueryClient();
+  const router = useRouter();
+
 
   const canManage = !!user && can("system.manage");
 
