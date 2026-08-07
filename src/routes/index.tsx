@@ -1,5 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { WorkflowDialog, type WorkflowKind } from "@/components/workflows";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { PageHeader, StatCard, SectionTitle, TierBadge } from "@/components/primitives";
@@ -27,7 +28,7 @@ function initialsOf(name: string) {
   );
 }
 
-import { ArrowUpRight, AlertTriangle, CalendarClock, FileText, Users, UserCog } from "lucide-react";
+import { ArrowUpRight, AlertTriangle, CalendarClock, FileText, Users, UserCog, Plus } from "lucide-react";
 import { useAuth, ROLE_LABEL } from "@/lib/auth";
 import { MentorDashboard } from "@/components/mentor/mentor-dashboard";
 import { SyncStatusChip } from "@/components/sync-status-chip";
@@ -42,8 +43,9 @@ const OVERVIEW_PERIOD_DAYS = 14;
 export const Route = createFileRoute("/")({ component: Dashboard });
 
 function Dashboard() {
-  const { user } = useAuth();
+  const { user, can } = useAuth();
   const navigate = useNavigate();
+  const [workflow, setWorkflow] = useState<WorkflowKind | null>(null);
   const listReports = useServerFn(listMatchReports);
   const {
     data: reportsData,
@@ -165,7 +167,19 @@ function Dashboard() {
       <PageHeader
         title={greeting}
         description={`${ROLE_LABEL[user.role]} view · overview of goalkeeper coverage and outstanding actions.`}
-        action={<SyncStatusChip />}
+        action={
+          <div className="flex items-center gap-2">
+            <SyncStatusChip />
+            {can("interactions.log") && (
+              <button
+                onClick={() => setWorkflow("interaction")}
+                className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md bg-primary text-primary-foreground text-xs uppercase tracking-[0.06em] font-semibold hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <Plus className="size-4" />Log Interaction
+              </button>
+            )}
+          </div>
+        }
       />
 
       {/* KPI strip */}
@@ -545,6 +559,8 @@ function Dashboard() {
           </div>
         </div>
       </div>
+
+      <WorkflowDialog kind={workflow} onClose={() => setWorkflow(null)} />
     </div>
   );
 }
