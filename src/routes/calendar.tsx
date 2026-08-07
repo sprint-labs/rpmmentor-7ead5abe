@@ -223,6 +223,13 @@ function CalendarPage() {
     setDraft({ ...emptyDraft, event_date: dateIso ?? emptyDraft.event_date });
   }
 
+  // Deep link from dashboard quick actions: /calendar?new=true
+  useEffect(() => {
+    if (openNewOnMount && canManage) {
+      setDraft({ ...emptyDraft });
+    }
+  }, [openNewOnMount, canManage]);
+
   function openEdit(e: DisplayEvent) {
     setDraft({
       id: e.id,
