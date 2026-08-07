@@ -8,7 +8,7 @@ import { PageHeader, Card, Pill } from "@/components/primitives";
 import { formatDate, goalkeepers } from "@/lib/mock-data";
 import { useEffect, useMemo, useState } from "react";
 import { withPermission } from "@/components/require-permission";
-import { X, Plus, Pencil, Trash2 } from "lucide-react";
+import { X, Plus, Pencil, Trash2, NotebookPen } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { WorkflowDialog, type WorkflowKind } from "@/components/workflows";
 import { subscribeMentorSession } from "@/lib/mentor-session-store";
