@@ -49,6 +49,7 @@ function SystemUsersPage() {
   const [tempPassword, setTempPassword] = useState<{ email: string; password: string } | null>(null);
   const [inviteLink, setInviteLink] = useState<{ email: string; url: string } | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [refreshError, setRefreshError] = useState<{ label: string; message: string } | null>(null);
 
   const list = useServerFn(listManagedUsers);
   const setRole = useServerFn(setManagedUserRole);
@@ -106,23 +107,33 @@ function SystemUsersPage() {
     },
   });
 
+  // A deleted account changes counts and names everywhere — refresh the
+  // directory, every dashboard KPI, the interactions log and the calendar,
+  // then re-run route loaders so nothing on screen keeps the stale row.
+  const runPostDeleteRefresh = async (label: string) => {
+    setRefreshError(null);
+    setIsRefreshing(true);
+    toast.info(`Deleted ${label}. Refreshing dashboard counts and lists…`);
+    try {
+      await refreshUserDirectoryViews(qc);
+      await qc.invalidateQueries({ queryKey: AUDIT_KEY });
+      await router.invalidate();
+    } catch (err: unknown) {
+      setRefreshError({
+        label,
+        message: err instanceof Error ? err.message : "Unknown error while refreshing",
+      });
+      toast.error("Dashboard refresh failed");
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
   const deleteMutation = useMutation({
     mutationFn: (u: ManagedUserRow) => deleteUser({ data: { userId: u.id } }),
     onSuccess: async (_r, u) => {
       setConfirmDelete(null);
-      setIsRefreshing(true);
-      toast.info(`Deleted ${u.name || u.email}. Refreshing dashboard counts and lists…`);
-      try {
-        // A deleted account changes counts and names everywhere — refresh the
-        // directory, every dashboard KPI, the interactions log and the calendar,
-        // then re-run route loaders so nothing on screen keeps the stale row.
-        await refreshUserDirectoryViews(qc);
-        await qc.invalidateQueries({ queryKey: AUDIT_KEY });
-
-        await router.invalidate();
-      } finally {
-        setIsRefreshing(false);
-      }
+      await runPostDeleteRefresh(u.name || u.email || "user");
       toast.success(`Deleted ${u.name || u.email}`);
     },
     onError: (err: unknown) => {
@@ -200,6 +211,41 @@ function SystemUsersPage() {
           Refreshing dashboard counts and lists…
         </div>
       )}
+
+      {refreshError && !isRefreshing && (
+        <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm">
+          <div className="flex items-start gap-2">
+            <AlertCircle className="size-4 mt-0.5 text-destructive shrink-0" />
+            <div className="flex-1">
+              <p className="font-medium text-destructive">
+                Dashboard counts and lists could not be refreshed
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                {refreshError.label} was deleted, but some views may still show stale data.{" "}
+                {refreshError.message}
+              </p>
+              <div className="mt-2 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => void runPostDeleteRefresh(refreshError.label)}
+                  className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90"
+                >
+                  Retry refresh
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRefreshError(null)}
+                  className="rounded-md border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-muted"
+                >
+                  Dismiss
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+
 
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
