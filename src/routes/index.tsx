@@ -45,7 +45,37 @@ export const Route = createFileRoute("/")({ component: Dashboard });
 function Dashboard() {
   const { user, can } = useAuth();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [workflow, setWorkflow] = useState<WorkflowKind | null>(null);
+  const [escalatingId, setEscalatingId] = useState<string | null>(null);
+  const createEvent = useServerFn(createCalendarEvent);
+
+  async function escalateAlert(a: Alert) {
+    setEscalatingId(a.id);
+    try {
+      const gk = a.gkId ? goalkeepers.find((g) => g.id === a.gkId) : undefined;
+      await createEvent({
+        data: {
+          title: `Escalation: ${a.kind}`,
+          event_type: "Follow Up",
+          event_date: new Date().toISOString().slice(0, 10),
+          start_time: "",
+          end_time: "",
+          location: "",
+          notes: a.message,
+          goalkeeper_name: gk?.name ?? "",
+          player_id: null,
+        },
+      });
+      await queryClient.invalidateQueries({ queryKey: ["calendar-events"] });
+      toast.success("Alert escalated — follow up added to the shared calendar.");
+    } catch {
+      toast.error("Could not escalate this alert. Try again.");
+    } finally {
+      setEscalatingId(null);
+    }
+  }
+
   const listReports = useServerFn(listMatchReports);
   const {
     data: reportsData,
