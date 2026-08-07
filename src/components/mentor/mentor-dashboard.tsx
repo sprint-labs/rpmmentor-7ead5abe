@@ -2,7 +2,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowUpRight, CalendarClock, CalendarPlus, ChevronDown, ChevronRight, FileText, Video, AlertTriangle } from "lucide-react";
+import { ArrowUpRight, CalendarClock, CalendarPlus, ChevronDown, ChevronRight, FileText, Video, AlertTriangle, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Card, StatCard, SectionTitle, Avatar, TierBadge, TierLevelBadge, Pill } from "@/components/primitives";
 import { getMentorDashboardStats } from "@/lib/mentor-dashboard.functions";
@@ -12,6 +12,8 @@ import type { Tier } from "@/lib/mock-data";
 import type { SessionUser } from "@/lib/auth";
 import { logDashboardClick } from "@/lib/analytics.functions";
 import { mentorDashboardMetricCardLabels } from "./mentor-dashboard-cards";
+import { WorkflowDialog, type WorkflowKind } from "@/components/workflows";
+import { useAuth } from "@/lib/auth";
 
 import { lastNDaysPeriod } from "@/lib/dashboard-period";
 
