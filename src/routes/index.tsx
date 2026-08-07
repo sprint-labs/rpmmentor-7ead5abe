@@ -35,6 +35,7 @@ import { listMatchReports } from "@/lib/match-reports/reports.functions";
 
 import { isDateOnlyInPeriod, lastNDaysPeriod } from "@/lib/dashboard-period";
 import { getOverviewDashboardStats } from "@/lib/overview-dashboard.functions";
+import { listCalendarEvents } from "@/lib/calendar.functions";
 
 const OVERVIEW_PERIOD_DAYS = 14;
 
