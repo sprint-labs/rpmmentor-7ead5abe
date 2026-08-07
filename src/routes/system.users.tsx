@@ -55,6 +55,8 @@ function SystemUsersPage() {
   const deleteUser = useServerFn(deleteManagedUser);
   const resetPassword = useServerFn(resetManagedUserPassword);
   const inviteUser = useServerFn(inviteManagedUser);
+  const auditList = useServerFn(listUserDeletionAudit);
+
   const qc = useQueryClient();
   const router = useRouter();
 
