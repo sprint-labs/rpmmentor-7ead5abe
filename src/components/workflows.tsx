@@ -422,6 +422,9 @@ export function InteractionForm({
   const [recording, setRecording] = useState<InteractionRecording | null>(null);
   const [audioStatus, setAudioStatus] = useState<AudioSaveStatus>("idle");
   const [audioError, setAudioError] = useState<string | null>(null);
+  /** 0–1 while the recording's bytes are going up; null when not uploading. */
+  const [audioProgress, setAudioProgress] = useState<number | null>(null);
+
   const [savedInteraction, setSavedInteraction] = useState<LoggedInteraction | null>(null);
 
   /**
