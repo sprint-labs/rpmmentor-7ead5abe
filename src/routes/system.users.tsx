@@ -43,6 +43,7 @@ function SystemUsersPage() {
   const [confirmReset, setConfirmReset] = useState<ManagedUserRow | null>(null);
   const [tempPassword, setTempPassword] = useState<{ email: string; password: string } | null>(null);
   const [inviteLink, setInviteLink] = useState<{ email: string; url: string } | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const list = useServerFn(listManagedUsers);
   const setRole = useServerFn(setManagedUserRole);
@@ -94,12 +95,15 @@ function SystemUsersPage() {
   const deleteMutation = useMutation({
     mutationFn: (u: ManagedUserRow) => deleteUser({ data: { userId: u.id } }),
     onSuccess: async (_r, u) => {
+      setConfirmDelete(null);
+      setIsRefreshing(true);
+      toast.info(`Deleted ${u.name || u.email}. Refreshing dashboard counts and lists…`);
       // A deleted account changes counts and names everywhere — refresh the
       // directory, every dashboard KPI, the interactions log and the calendar,
       // then re-run route loaders so nothing on screen keeps the stale row.
       await refreshUserDirectoryViews(qc);
       await router.invalidate();
-      setConfirmDelete(null);
+      setIsRefreshing(false);
       toast.success(`Deleted ${u.name || u.email}`);
     },
     onError: (err: unknown) => {
@@ -171,6 +175,13 @@ function SystemUsersPage() {
 
   return (
     <div className="max-w-5xl mx-auto space-y-5">
+      {isRefreshing && (
+        <div className="fixed top-0 left-0 right-0 z-50 flex items-center justify-center gap-2 border-b border-primary/20 bg-primary/10 py-2 text-xs font-medium text-primary backdrop-blur-sm">
+          <Loader2 className="size-4 animate-spin" />
+          Refreshing dashboard counts and lists…
+        </div>
+      )}
+
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <div className="flex items-center gap-2">
