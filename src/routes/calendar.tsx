@@ -289,6 +289,14 @@ function CalendarPage() {
               <button onClick={() => setView("month")} className={`px-3 py-1.5 ${view === "month" ? "bg-accent" : "hover:bg-accent/40"}`}>Month</button>
               <button onClick={() => setView("week")} className={`px-3 py-1.5 ${view === "week" ? "bg-accent" : "hover:bg-accent/40"}`}>Week</button>
             </div>
+            {can("interactions.log") && (
+              <button
+                onClick={() => setWorkflow("interaction")}
+                className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-xs font-medium hover:bg-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <Plus className="size-3.5" /> Log interaction
+              </button>
+            )}
             {canManage && (
               <button
                 onClick={() => openNew()}
