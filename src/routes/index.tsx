@@ -333,7 +333,14 @@ function Dashboard() {
             ).map((b) => {
               const pct = Math.round((b.count / Math.max(1, dutyOverview.total)) * 100);
               return (
-                <div key={b.level} className="space-y-2">
+                <Link
+                  key={b.level}
+                  to="/insights/$metric"
+                  params={{ metric: "duty" }}
+                  search={{ from: period.fromDate, to: period.toDate, level: b.level }}
+                  aria-label={`View goalkeepers: ${b.label}`}
+                  className="space-y-2 block -mx-2 px-2 py-1 hover:bg-accent/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                >
                   <div className="h-1.5 w-full bg-background overflow-hidden">
                     <div className={`h-full bar-grow ${b.bar}`} style={{ width: `${pct}%` }} />
                   </div>
@@ -345,8 +352,9 @@ function Dashboard() {
                     <span>{b.hint}</span>
                     <span className="font-mono tabular-nums">{pct}%</span>
                   </div>
-                </div>
+                </Link>
               );
+
             })}
           </div>
         </div>
