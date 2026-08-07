@@ -165,7 +165,19 @@ function Dashboard() {
       <PageHeader
         title={greeting}
         description={`${ROLE_LABEL[user.role]} view · overview of goalkeeper coverage and outstanding actions.`}
-        action={<SyncStatusChip />}
+        action={
+          <div className="flex items-center gap-2">
+            <SyncStatusChip />
+            {can("interactions.log") && (
+              <button
+                onClick={() => setWorkflow("interaction")}
+                className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md bg-primary text-primary-foreground text-xs uppercase tracking-[0.06em] font-semibold hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <Plus className="size-4" />Log Interaction
+              </button>
+            )}
+          </div>
+        }
       />
 
       {/* KPI strip */}
