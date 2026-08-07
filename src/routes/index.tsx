@@ -140,14 +140,14 @@ function Dashboard() {
   const greeting = `Good ${new Date().getHours() < 12 ? "morning" : new Date().getHours() < 18 ? "afternoon" : "evening"}, ${user.name.split(" ")[0]}`;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <PageHeader title={greeting} description={`${ROLE_LABEL[user.role]} view · overview of goalkeeper coverage and outstanding actions.`} action={<SyncStatusChip />} />
 
-
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+      {/* KPI strip */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
         <Link
           to="/goalkeepers"
-          className="block rounded-lg transition-transform hover:-translate-y-0.5 hover:ring-1 hover:ring-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          className="block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
           aria-label="View goalkeepers"
         >
           <StatCard
@@ -159,7 +159,7 @@ function Dashboard() {
         <Link
           to="/interactions"
           search={interactionsSearch}
-          className="block rounded-lg transition-transform hover:-translate-y-0.5 hover:ring-1 hover:ring-info/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-info"
+          className="block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-info"
           aria-label="View interactions logged"
         >
           <StatCard
@@ -172,21 +172,21 @@ function Dashboard() {
         </Link>
         <Link
           to="/goalkeepers"
-          className="block rounded-lg transition-transform hover:-translate-y-0.5 hover:ring-1 hover:ring-destructive/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive"
+          className="block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-warning"
           aria-label="View overdue goalkeepers"
         >
           <StatCard
             label="Overdue Duty of Care"
             value={interactionsLoading ? "…" : interactionsError ? "—" : dutyOverview.overdue}
             hint={interactionsError ? "Count unavailable" : "Past tier cadence"}
-            accent="destructive"
+            accent="warning"
             emptyMessage="All caught up"
           />
         </Link>
         <Link
           to="/reports"
           search={reportsSearch}
-          className="block rounded-lg transition-transform hover:-translate-y-0.5 hover:ring-1 hover:ring-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          className="block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
           aria-label="View match reports"
         >
           <StatCard
@@ -199,7 +199,7 @@ function Dashboard() {
         </Link>
         <Link
           to="/mentors"
-          className="block rounded-lg transition-transform hover:-translate-y-0.5 hover:ring-1 hover:ring-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          className="block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
           aria-label="View users and roles"
         >
           <StatCard
@@ -208,191 +208,191 @@ function Dashboard() {
             hint="Accounts with mentor access"
           />
         </Link>
-
       </div>
-      <Card className="p-4">
-        <SectionTitle action={<Link to="/goalkeepers" className="text-xs text-primary inline-flex items-center gap-1">View goalkeepers <ArrowUpRight className="size-3" /></Link>}>
-          Duty of Care · Traffic Light
-        </SectionTitle>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-          {([
-            { level: "up_to_date", label: "Up to date", count: dutyOverview.up_to_date, hint: "On cadence for tier", bar: "bg-success" },
-            { level: "due_soon", label: "Due soon", count: dutyOverview.due_soon, hint: "Approaching cadence", bar: "bg-warning" },
-            { level: "overdue", label: "Overdue", count: dutyOverview.overdue, hint: "Past required cadence", bar: "bg-destructive" },
-            { level: "not_required", label: "Not required", count: dutyOverview.not_required, hint: "Tier 4 — no formal duty", bar: "bg-muted-foreground/50" },
-            { level: "not_enough_data", label: "Not enough data", count: dutyOverview.not_enough_data, hint: "Missing tier or interactions", bar: "bg-muted-foreground/50" },
-          ] as const).map((b) => {
-            const pct = Math.round((b.count / Math.max(1, dutyOverview.total)) * 100);
-            return (
-              <div key={b.level} className="rounded-md border border-border/60 bg-accent/20 p-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <TrafficLight level={b.level} size={12} />
-                    <span className="text-sm font-medium">{b.label}</span>
-                  </div>
-                  <span className="tabular-nums font-mono text-lg font-semibold">{b.count}</span>
-                </div>
-                <div className="text-[11px] text-muted-foreground mt-1">{b.hint}</div>
-                <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden mt-2">
-                  <div className={`h-full ${b.bar}`} style={{ width: `${pct}%` }} />
-                </div>
-                <div className="text-[10px] text-muted-foreground mt-1 tabular-nums font-mono">{pct}% of roster</div>
+
+      {/* Operational grid */}
+      <div className="grid grid-cols-12 gap-4">
+        {/* Duty of Care monitor */}
+        <div className="col-span-12 lg:col-span-8 command-panel p-5">
+          <SectionTitle
+            action={
+              <div className="flex items-center gap-3 text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
+                <span className="inline-flex items-center gap-1.5"><span className="size-1.5 rounded-full bg-success shadow-[0_0_6px_var(--success)]" />Nominal</span>
+                <span className="inline-flex items-center gap-1.5"><span className="size-1.5 rounded-full bg-warning shadow-[0_0_6px_var(--warning)]" />Warning</span>
+                <Link to="/goalkeepers" className="text-primary inline-flex items-center gap-1 normal-case tracking-normal">Goalkeepers <ArrowUpRight className="size-3" /></Link>
               </div>
-            );
-          })}
+            }
+          >
+            Duty of Care Monitor
+          </SectionTitle>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-5">
+            {([
+              { level: "up_to_date", label: "Up to date", count: dutyOverview.up_to_date, hint: "On cadence for tier", bar: "bg-success", value: "text-success" },
+              { level: "due_soon", label: "Due soon", count: dutyOverview.due_soon, hint: "Approaching cadence", bar: "bg-warning", value: "text-warning" },
+              { level: "overdue", label: "Overdue", count: dutyOverview.overdue, hint: "Past required cadence", bar: "bg-warning", value: "text-warning" },
+              { level: "not_required", label: "Not required", count: dutyOverview.not_required, hint: "Tier 4 — no formal duty", bar: "bg-muted-foreground/50", value: "text-foreground" },
+              { level: "not_enough_data", label: "Not enough data", count: dutyOverview.not_enough_data, hint: "Missing tier or interactions", bar: "bg-muted-foreground/50", value: "text-foreground" },
+            ] as const).map((b) => {
+              const pct = Math.round((b.count / Math.max(1, dutyOverview.total)) * 100);
+              return (
+                <div key={b.level} className="space-y-2">
+                  <div className="h-1.5 w-full bg-background overflow-hidden">
+                    <div className={`h-full bar-grow ${b.bar}`} style={{ width: `${pct}%` }} />
+                  </div>
+                  <div className="flex items-baseline justify-between font-mono text-xs">
+                    <span className="text-muted-foreground">{b.label}</span>
+                    <span className={`tabular-nums font-bold ${b.value}`}>{b.count}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-[10px] text-muted-foreground/70">
+                    <span>{b.hint}</span>
+                    <span className="font-mono tabular-nums">{pct}%</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
-      </Card>
 
+        {/* Status distribution */}
+        <div className="col-span-12 lg:col-span-4 command-panel p-5">
+          <SectionTitle>Distribution</SectionTitle>
+          <div className="space-y-3">
+            {stats.tierDistribution.map((t) => {
+              const pct = Math.round((t.count / stats.totalGks) * 100);
+              const color = t.tier === "Tier 1" ? "bg-warning" : t.tier === "Tier 2" ? "bg-info" : t.tier === "Tier 3" ? "bg-primary" : t.tier === "Academy" ? "bg-tier-3" : "bg-muted-foreground/40";
+              return (
+                <div key={t.tier} className="flex items-center gap-3">
+                  <span className="w-20 shrink-0"><TierBadge tier={t.tier as never} /></span>
+                  <div className="flex-1 h-1 bg-background overflow-hidden">
+                    <div className={`h-full bar-grow ${color}`} style={{ width: `${pct}%` }} />
+                  </div>
+                  <span className="w-8 text-right text-[11px] font-mono tabular-nums text-muted-foreground">{pct}%</span>
+                </div>
+              );
+            })}
+          </div>
+          <div className="grid grid-cols-3 gap-2 mt-6 pt-4 border-t border-border">
+            <Link to="/goalkeepers" className="flex flex-col items-center gap-1 p-2 hover:bg-accent/40"><Users className="size-4 text-primary" /><span className="text-[10px] font-mono uppercase tracking-wider">Keepers</span></Link>
+            <Link to="/mentors" className="flex flex-col items-center gap-1 p-2 hover:bg-accent/40"><UserCog className="size-4 text-info" /><span className="text-[10px] font-mono uppercase tracking-wider">Roles</span></Link>
+            <Link to="/reports" className="flex flex-col items-center gap-1 p-2 hover:bg-accent/40"><FileText className="size-4 text-warning" /><span className="text-[10px] font-mono uppercase tracking-wider">Reports</span></Link>
+          </div>
+        </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <Card className="lg:col-span-2 p-4">
-          <SectionTitle action={<Link to="/calendar" className="text-xs text-primary inline-flex items-center gap-1">Open calendar <ArrowUpRight className="size-3" /></Link>}>
-            Upcoming Interactions
+        {/* Upcoming interactions */}
+        <div className="col-span-12 lg:col-span-4 command-panel p-5">
+          <SectionTitle action={<Link to="/calendar" className="text-[10px] font-mono uppercase tracking-widest text-primary inline-flex items-center gap-1">Calendar <ArrowUpRight className="size-3" /></Link>}>
+            Upcoming Logs
           </SectionTitle>
           <div className="divide-y divide-border">
             {upcoming.length === 0 ? (
-              <div className="text-xs text-muted-foreground p-3 rounded-md border border-dashed border-border/60 text-center">
-                No upcoming interactions scheduled. Planned visits, matches and catch-ups will appear here once they are added to the calendar.
+              <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground/70 py-6 text-center">
+                No scheduled interactions
               </div>
             ) : upcoming.map((e) => {
               const gk = e.gkId ? goalkeepers.find((g) => g.id === e.gkId) : undefined;
               const m = e.mentorId ? getMentor(e.mentorId) : undefined;
               const content = (
                 <>
-                  <Avatar initials={gk?.initials ?? "—"} />
                   <div className="flex-1 min-w-0">
+                    <div className="text-[10px] font-mono text-primary mb-1 uppercase tracking-widest">{formatRelative(e.date)}</div>
                     <div className="flex items-center gap-2">
-                      <span className="font-medium text-sm truncate">{gk?.name ?? e.title}</span>
+                      <span className="text-xs font-medium truncate">{gk?.name ?? e.title}</span>
                       {gk ? <TierBadge tier={gk.tier} /> : null}
                     </div>
-                    <div className="text-xs text-muted-foreground truncate">
-                      {gk ? `${gk.club} · ${gk.league}` : e.type}
+                    <div className="text-[10px] text-muted-foreground truncate">
+                      {gk ? `${gk.club} · ${gk.league}` : e.type}{m ? ` · w/ ${m.name.split(" ")[1] ?? m.name}` : ""}
                     </div>
                   </div>
-                  <div className="text-right">
-                    <div className="text-xs font-medium tabular-nums font-mono flex items-center gap-1 justify-end"><CalendarClock className="size-3 text-muted-foreground" />{formatRelative(e.date)}</div>
-                    {m ? <div className="text-[11px] text-muted-foreground">w/ {m.name.split(" ")[1] ?? m.name}</div> : null}
-                  </div>
+                  <CalendarClock className="size-3.5 text-muted-foreground/60 shrink-0" />
                 </>
               );
               return gk ? (
-                <Link key={e.id} to="/goalkeepers/$gkId" params={{ gkId: gk.id }} className="flex items-center gap-3 py-2.5 hover:bg-accent/30 -mx-2 px-2 rounded-md transition-colors">
+                <Link key={e.id} to="/goalkeepers/$gkId" params={{ gkId: gk.id }} className="flex items-start gap-3 py-3 hover:bg-accent/30 -mx-2 px-2 transition-colors">
                   {content}
                 </Link>
               ) : (
-                <div key={e.id} className="flex items-center gap-3 py-2.5 -mx-2 px-2">{content}</div>
+                <div key={e.id} className="flex items-start gap-3 py-3 -mx-2 px-2">{content}</div>
               );
             })}
           </div>
+        </div>
 
-        </Card>
-
-        <Card className="p-4">
-          <SectionTitle action={<Link to="/alerts" className="text-xs text-primary inline-flex items-center gap-1">All alerts <ArrowUpRight className="size-3" /></Link>}>
-            Alerts Requiring Attention
-          </SectionTitle>
-          <div className="space-y-2">
-            {alerts.length === 0 ? (
-              <div className="text-xs text-muted-foreground p-3 rounded-md border border-dashed border-border/60 text-center">
-                No alerts. New overdue observations, missing reports and duty-of-care warnings will appear here.
-              </div>
-            ) : alerts.slice(0, 6).map((a) => (
-              <div key={a.id} className="flex items-start gap-2 p-2 rounded-md bg-accent/30 border border-border/50">
-                <AlertTriangle className={`size-3.5 mt-0.5 shrink-0 ${a.severity === "high" ? "text-destructive" : a.severity === "medium" ? "text-warning" : "text-info"}`} />
-                <div className="flex-1 min-w-0">
-                  <div className="text-xs font-medium truncate">{a.message}</div>
-                  <div className="flex items-center gap-1.5 mt-1">
-                    <Pill tone={a.severity === "high" ? "destructive" : a.severity === "medium" ? "warning" : "info"}>{a.kind}</Pill>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-
-        </Card>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {/* Recent activity */}
         <ErrorBoundary
           fallback={(reset) => (
-            <Card className="lg:col-span-2 p-4">
-              <SectionTitle>Recent Activity</SectionTitle>
-              <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive flex items-start gap-2">
+            <div className="col-span-12 lg:col-span-4 command-panel p-5">
+              <SectionTitle>Recent Events</SectionTitle>
+              <div className="border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive flex items-start gap-2">
                 <AlertTriangle className="size-4 shrink-0" />
                 <div className="flex-1 min-w-0">
                   <p className="font-medium">Recent activity unavailable</p>
-                  <p className="text-destructive/80">Something went wrong loading the latest interactions. The rest of the dashboard is still working.</p>
+                  <p className="text-destructive/80">Something went wrong loading the latest interactions.</p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={reset}
-                className="mt-3 inline-flex h-8 items-center justify-center rounded-md bg-destructive px-3 text-xs font-medium text-destructive-foreground hover:bg-destructive/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                className="mt-3 inline-flex h-8 items-center justify-center bg-destructive px-3 text-[10px] font-mono uppercase tracking-widest text-destructive-foreground hover:bg-destructive/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 Retry
               </button>
-            </Card>
+            </div>
           )}
         >
-
-          <Card className="lg:col-span-2 p-4">
-            <SectionTitle>Recent Activity</SectionTitle>
-            <div className="space-y-2">
+          <div className="col-span-12 lg:col-span-4 command-panel p-5">
+            <SectionTitle>Recent Events</SectionTitle>
+            <div className="space-y-3">
               {interactionsLoading ? (
-                <div className="text-xs text-muted-foreground p-3 rounded-md border border-dashed border-border/60 text-center">
-                  Loading recent activity…
-                </div>
+                <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground/70 py-6 text-center">Loading…</div>
               ) : interactionsError ? (
-                <div className="text-xs text-muted-foreground p-3 rounded-md border border-dashed border-border/60 text-center">
-                  Recent activity is unavailable right now. Sign in again to see the latest interactions.
-                </div>
+                <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground/70 py-6 text-center">Activity unavailable</div>
               ) : recentActivity.length === 0 ? (
-                <div className="text-xs text-muted-foreground p-3 rounded-md border border-dashed border-border/60 text-center">
-                  No recent activity yet. Interactions, report submissions, media uploads and role changes will appear here as they happen.
-                </div>
+                <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground/70 py-6 text-center">No recent events</div>
               ) : recentActivity.map((a) => (
-
-                <div key={a.id} className="flex items-start gap-3 py-1.5">
-                  <Avatar initials={a.actorInitials} size={26} />
-                  <div className="flex-1 min-w-0 text-sm">
-                    <span className="font-medium">{a.actor}</span>{" "}
-                    <span className="text-muted-foreground">{a.action}</span>{" "}
-                    <span className="font-medium">{a.target}</span>
-                    <div className="text-[11px] text-muted-foreground">{formatRelative(a.date)}</div>
+                <div key={a.id} className="flex items-start gap-3 text-xs">
+                  <div className="w-0.5 self-stretch min-h-8 bg-primary shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-muted-foreground leading-snug">
+                      <span className="text-foreground font-semibold">{a.actor}</span>{" "}
+                      {a.action}{" "}
+                      <span className="text-foreground font-semibold">{a.target}</span>
+                    </p>
+                    <span className="text-[10px] text-muted-foreground/70 font-mono">{formatRelative(a.date)}</span>
                   </div>
                 </div>
               ))}
             </div>
-
-          </Card>
+          </div>
         </ErrorBoundary>
 
-
-        <Card className="p-4">
-          <SectionTitle>Status Distribution</SectionTitle>
-          <div className="space-y-3">
-            {stats.tierDistribution.map((t) => {
-              const pct = Math.round((t.count / stats.totalGks) * 100);
-              const color = t.tier === "Tier 1" ? "bg-warning" : t.tier === "Tier 2" ? "bg-info" : t.tier === "Tier 3" ? "bg-primary" : t.tier === "Academy" ? "bg-tier-3" : "bg-muted-foreground/40";
+        {/* Alerts */}
+        <div className="col-span-12 lg:col-span-4 command-panel p-5">
+          <SectionTitle action={<Link to="/alerts" className="text-[10px] font-mono uppercase tracking-widest text-primary inline-flex items-center gap-1">All <ArrowUpRight className="size-3" /></Link>}>
+            System Alerts
+          </SectionTitle>
+          <div className="space-y-2">
+            {alerts.length === 0 ? (
+              <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground/70 py-6 text-center">
+                No active alerts
+              </div>
+            ) : alerts.slice(0, 6).map((a) => {
+              const tone = a.severity === "high"
+                ? "border-destructive/30 bg-destructive/5 text-destructive"
+                : a.severity === "medium"
+                ? "border-warning/30 bg-warning/5 text-warning"
+                : "border-info/30 bg-info/5 text-info";
               return (
-                <div key={t.tier}>
-                  <div className="flex items-center justify-between text-xs mb-1.5">
-                    <span className="flex items-center gap-2"><TierBadge tier={t.tier as never} /> <span className="text-muted-foreground">{t.count} GKs</span></span>
-                    <span className="tabular-nums font-mono font-medium">{pct}%</span>
+                <div key={a.id} className={`border p-3 ${tone}`}>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-[10px] font-mono font-bold uppercase tracking-widest">{a.kind}</span>
+                    <AlertTriangle className="size-3" />
                   </div>
-                  <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-                    <div className={`h-full ${color}`} style={{ width: `${pct}%` }} />
-                  </div>
+                  <p className="text-[11px] text-muted-foreground leading-snug">{a.message}</p>
                 </div>
               );
             })}
           </div>
-          <div className="grid grid-cols-3 gap-2 mt-6 pt-4 border-t border-border">
-            <Link to="/goalkeepers" className="flex flex-col items-center gap-1 p-2 rounded-md hover:bg-accent/40"><Users className="size-4 text-primary" /><span className="text-[11px]">Goalkeepers</span></Link>
-            <Link to="/mentors" className="flex flex-col items-center gap-1 p-2 rounded-md hover:bg-accent/40"><UserCog className="size-4 text-info" /><span className="text-[11px]">Users & Roles</span></Link>
-            <Link to="/reports" className="flex flex-col items-center gap-1 p-2 rounded-md hover:bg-accent/40"><FileText className="size-4 text-warning" /><span className="text-[11px]">Reports</span></Link>
-          </div>
-        </Card>
+        </div>
       </div>
     </div>
   );
