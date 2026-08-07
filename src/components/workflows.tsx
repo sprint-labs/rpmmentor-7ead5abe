@@ -892,6 +892,26 @@ export function InteractionForm({
         </div>
       )}
 
+      {draftRestoredAt && (
+        <div className="flex items-start justify-between gap-3 rounded-md border border-primary/40 bg-primary/5 px-3 py-2 text-xs">
+          <p>
+            <span className="font-medium">Unsaved draft restored.</span>{" "}
+            <span className="text-muted-foreground">
+              Picked up from {formatDateOnly(draftRestoredAt.slice(0, 10))} — nothing has been saved yet.
+            </span>
+          </p>
+          <button
+            type="button"
+            onClick={discardDraft}
+            className="shrink-0 text-primary hover:text-primary/80"
+          >
+            Start blank
+          </button>
+        </div>
+      )}
+
+
+
       <fieldset disabled={saving} className="space-y-4 border-0 p-0 m-0 min-w-0">
         <div className="grid grid-cols-2 gap-3">
           <Field label="Goalkeeper" required error={showErrors ? errors.gkId : undefined}>
