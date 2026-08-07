@@ -599,6 +599,17 @@ function Dashboard() {
                       <AlertTriangle className="size-3" />
                     </div>
                     <p className="text-[11px] text-muted-foreground leading-snug">{a.message}</p>
+                    {can("calendar.manage") && (
+                      <button
+                        type="button"
+                        onClick={() => escalateAlert(a)}
+                        disabled={escalatingId === a.id}
+                        className="mt-2 inline-flex items-center gap-1 border border-current/40 px-2 py-1 text-[10px] font-mono uppercase tracking-widest hover:bg-current/10 disabled:opacity-50"
+                      >
+                        <ArrowUpRight className="size-3" />
+                        {escalatingId === a.id ? "Escalating…" : "Escalate"}
+                      </button>
+                    )}
                   </div>
                 );
               })
