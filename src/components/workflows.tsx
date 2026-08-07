@@ -316,6 +316,33 @@ const AUDIO_PARTIAL_FAILURE_MESSAGE = "Interaction saved — audio was not saved
 type AudioSaveStatus = "idle" | "saving" | "saved" | "failed";
 
 /**
+ * Best-effort duration for a picked audio file. Metadata can be missing or
+ * infinite for some containers, in which case 0 is used — the upload must
+ * never be blocked by a duration we could not read.
+ */
+async function readAudioDuration(file: File): Promise<number> {
+  return new Promise((resolve) => {
+    try {
+      const url = URL.createObjectURL(file);
+      const el = document.createElement("audio");
+      const finish = (value: number) => {
+        URL.revokeObjectURL(url);
+        resolve(Number.isFinite(value) && value > 0 ? Math.round(value) : 0);
+      };
+      el.preload = "metadata";
+      el.onloadedmetadata = () => finish(el.duration);
+      el.onerror = () => finish(0);
+      el.src = url;
+      window.setTimeout(() => finish(el.duration), 4000);
+    } catch {
+      resolve(0);
+    }
+  });
+}
+
+
+
+/**
  * Byte-level upload progress. Falls back to an indeterminate bar when the
  * browser cannot report progress, so the mentor always sees live movement.
  */
