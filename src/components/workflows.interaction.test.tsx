@@ -102,6 +102,8 @@ vi.mock("sonner", () => ({
 }));
 
 const { InteractionForm } = await import("./workflows");
+// Success closes the dialog and returns the user to the page they came from.
+const onDoneMock = vi.fn();
 const { goalkeepers } = await import("@/lib/mock-data");
 type LoggedInteraction = import("@/lib/interactions/schema").LoggedInteraction;
 
@@ -109,7 +111,7 @@ function renderForm(props: Partial<React.ComponentProps<typeof InteractionForm>>
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
-      <InteractionForm onDone={() => {}} {...props} />
+      <InteractionForm onDone={onDoneMock} {...props} />
     </QueryClientProvider>,
   );
 }
@@ -157,6 +159,7 @@ describe("InteractionForm (durable)", () => {
     attachInteractionAudioMock.mockReset();
     uploadMediaMock.mockReset();
     listPlayersMock.mockClear();
+    onDoneMock.mockClear();
   });
 
   afterEach(() => cleanup());
@@ -350,7 +353,7 @@ describe("InteractionForm (durable)", () => {
     // Mentor identity is never sent from the client.
     expect(payload.data["mentorId"]).toBeUndefined();
 
-    await waitFor(() => expect(screen.getByText(/logged successfully/i)).toBeTruthy());
+    await waitFor(() => expect(onDoneMock).toHaveBeenCalledTimes(1));
   });
 
   it("never claims success when the server returns no confirmed row", async () => {
@@ -360,7 +363,7 @@ describe("InteractionForm (durable)", () => {
     fireEvent.click(screen.getByRole("button", { name: /save interaction/i }));
 
     await waitFor(() => expect(screen.getByRole("alert")).toBeTruthy());
-    expect(screen.queryByText(/logged successfully/i)).toBeNull();
+    expect(onDoneMock).not.toHaveBeenCalled();
   });
 
   it("retains entered values and surfaces the error when saving fails", async () => {
@@ -370,7 +373,7 @@ describe("InteractionForm (durable)", () => {
     fireEvent.click(screen.getByRole("button", { name: /save interaction/i }));
 
     await waitFor(() => expect(screen.getByRole("alert").textContent).toContain("Unauthorized"));
-    expect(screen.queryByText(/logged successfully/i)).toBeNull();
+    expect(onDoneMock).not.toHaveBeenCalled();
     expect((screen.getByLabelText("Notes") as HTMLTextAreaElement).value).toBe(
       "Reviewed the recovery plan.",
     );
@@ -483,6 +486,7 @@ describe("InteractionForm voice recording persistence", () => {
     attachInteractionAudioMock.mockReset();
     uploadMediaMock.mockReset();
     listPlayersMock.mockClear();
+    onDoneMock.mockClear();
   });
 
   afterEach(() => cleanup());
@@ -524,8 +528,7 @@ describe("InteractionForm voice recording persistence", () => {
       data: { interactionId: SAVED_INTERACTION.id, mediaId: "media-1" },
     });
 
-    await waitFor(() => expect(screen.getByText(/^audio saved$/i)).toBeTruthy());
-    expect(screen.getByText(/logged successfully/i)).toBeTruthy();
+    await waitFor(() => expect(onDoneMock).toHaveBeenCalledTimes(1));
   });
 
   // 2. Interaction succeeds but audio upload fails.
@@ -662,10 +665,9 @@ describe("InteractionForm voice recording persistence", () => {
     await fillValidForm();
     fireEvent.click(screen.getByRole("button", { name: /save interaction/i }));
 
-    await waitFor(() => expect(screen.getByText(/logged successfully/i)).toBeTruthy());
+    await waitFor(() => expect(onDoneMock).toHaveBeenCalledTimes(1));
     expect(uploadMediaMock).not.toHaveBeenCalled();
     expect(attachInteractionAudioMock).not.toHaveBeenCalled();
-    expect(screen.queryByText(/^audio saved$/i)).toBeNull();
   });
 
   it("does not try to save a recording the user discarded", async () => {
@@ -677,7 +679,7 @@ describe("InteractionForm voice recording persistence", () => {
     fireEvent.click(screen.getByRole("button", { name: /simulate discard recording/i }));
     fireEvent.click(screen.getByRole("button", { name: /save interaction/i }));
 
-    await waitFor(() => expect(screen.getByText(/logged successfully/i)).toBeTruthy());
+    await waitFor(() => expect(onDoneMock).toHaveBeenCalledTimes(1));
     expect(uploadMediaMock).not.toHaveBeenCalled();
   });
 });
