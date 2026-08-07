@@ -61,8 +61,9 @@ export function AppShell() {
   const visible = NAV.filter((n) => can(n.perm));
 
   // Pick a primary CTA per role
+  const canLog = can("interactions.log");
   const primaryAction: { kind: WorkflowKind; label: string } | null =
-    can("interactions.log") ? { kind: "interaction", label: "Log Interaction" }
+    canLog ? { kind: "interaction", label: "Log Interaction" }
     : can("reports.submit") ? { kind: "report", label: "Submit Report" }
     : can("goalkeepers.create") ? { kind: "goalkeeper", label: "Add Goalkeeper" }
     : null;
@@ -171,6 +172,16 @@ export function AppShell() {
               )}
             </div>
           )}
+          {canLog && (
+            <button
+              onClick={() => setWorkflow("interaction")}
+              title="Log Interaction"
+              aria-label="Log Interaction"
+              className="md:hidden inline-flex size-11 items-center justify-center rounded-md border border-border hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            >
+              <Plus className="size-4" />
+            </button>
+          )}
           <button
             onClick={() => setNavOpen(true)}
             title="Open menu"
@@ -230,7 +241,15 @@ export function AppShell() {
               })}
             </nav>
             <div className="p-3 border-t border-sidebar-border space-y-2">
-              {primaryAction && (
+              {canLog && (
+                <button
+                  onClick={() => { setWorkflow("interaction"); setNavOpen(false); }}
+                  className="w-full min-h-11 flex items-center gap-2 px-3 py-2 rounded-md bg-primary text-primary-foreground text-xs uppercase tracking-[0.06em] font-semibold hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <Plus className="size-4" />Log Interaction
+                </button>
+              )}
+              {primaryAction && primaryAction.kind !== "interaction" && (
                 <button
                   onClick={() => { setWorkflow(primaryAction.kind); setNavOpen(false); }}
                   className="w-full min-h-11 flex items-center gap-2 px-3 py-2 rounded-md bg-primary text-primary-foreground text-xs uppercase tracking-[0.06em] font-semibold hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
