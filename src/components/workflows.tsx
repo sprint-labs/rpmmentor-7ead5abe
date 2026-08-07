@@ -1087,11 +1087,40 @@ export function InteractionForm({
             </button>
             <button
               type="button"
+              onClick={focusVoiceRecorder}
+              disabled={audioUploading}
+              className="h-8 px-3 rounded-md border border-border text-xs disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              Record again
+            </button>
+            <button
+              type="button"
+              onClick={() => audioFileInputRef.current?.click()}
+              disabled={audioUploading}
+              className="h-8 px-3 rounded-md border border-border text-xs inline-flex items-center gap-1.5 disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              <Paperclip className="size-3.5" /> Choose an audio file
+            </button>
+            <input
+              ref={audioFileInputRef}
+              type="file"
+              accept="audio/*"
+              aria-label="Choose an audio file"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                e.target.value = "";
+                void handleAudioFilePicked(file);
+              }}
+            />
+            <button
+              type="button"
               onClick={discardFailedRecording}
               disabled={audioUploading}
               className="h-8 px-3 rounded-md border border-border text-xs disabled:opacity-60 disabled:cursor-not-allowed"
             >
               Finish without the recording
+
             </button>
           </div>
         </div>
