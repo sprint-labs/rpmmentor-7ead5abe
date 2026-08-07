@@ -727,6 +727,13 @@ export function InteractionForm({
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    // The interaction is already written and only its recording is outstanding;
+    // submitting again here would duplicate the row.
+    if (savedInteraction) {
+      void retryAudio();
+      return;
+    }
+
     // Read the latest notes, not the value captured when this render began, so
     // a transcript applied immediately before Save is never lost.
     const currentNotes = notesRef.current;
