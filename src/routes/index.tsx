@@ -399,21 +399,26 @@ function Dashboard() {
               </div>
             ) : (
               upcoming.map((e) => {
-                const gk = e.gkId ? goalkeepers.find((g) => g.id === e.gkId) : undefined;
-                const m = e.mentorId ? getMentor(e.mentorId) : undefined;
+                const gk = e.goalkeeper_name
+                  ? goalkeepers.find(
+                      (g) => g.name.toLowerCase() === e.goalkeeper_name!.toLowerCase(),
+                    )
+                  : undefined;
                 const content = (
                   <>
                     <div className="flex-1 min-w-0">
                       <div className="text-[10px] font-mono text-primary mb-1 uppercase tracking-widest">
-                        {formatRelative(e.date)}
+                        {formatRelative(e.event_date)}
+                        {e.start_time ? ` · ${e.start_time.slice(0, 5)}` : ""}
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className="text-xs font-medium truncate">{gk?.name ?? e.title}</span>
+                        <span className="text-xs font-medium truncate">{e.title}</span>
                         {gk ? <TierBadge tier={gk.tier} /> : null}
                       </div>
                       <div className="text-[10px] text-muted-foreground truncate">
-                        {gk ? `${gk.club} · ${gk.league}` : e.type}
-                        {m ? ` · w/ ${m.name.split(" ")[1] ?? m.name}` : ""}
+                        {e.event_type}
+                        {e.goalkeeper_name ? ` · ${e.goalkeeper_name}` : ""}
+                        {e.location ? ` · ${e.location}` : ""}
                       </div>
                     </div>
                     <CalendarClock className="size-3.5 text-muted-foreground/60 shrink-0" />
