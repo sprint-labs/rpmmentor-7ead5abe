@@ -26,6 +26,12 @@ import {
   type InteractionTypeValue,
 } from "@/lib/interactions/schema";
 import { reconcileInteraction } from "@/lib/interactions/map";
+import {
+  clearInteractionDraft,
+  loadInteractionDraft,
+  saveInteractionDraft,
+} from "@/lib/interactions/draft-store";
+
 import { refreshInteractionViews } from "@/lib/query-refresh";
 import { useAuth, type SessionUser } from "@/lib/auth";
 import {
