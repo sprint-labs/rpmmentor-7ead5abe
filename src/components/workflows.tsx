@@ -759,8 +759,10 @@ export function InteractionForm({
         const audioOk = await saveRecordingAndReport(saved);
         // Confirmed saved: close straight back to the page the user came from.
         // Only a failed recording holds the dialog open, for the retry option.
+        // A failed recording keeps the form exactly as it is — every field and
+        // note stays on screen — so the upload can be retried in place.
         if (audioOk) onDone();
-        else setDone(true);
+
 
       } catch (err) {
         setError(
