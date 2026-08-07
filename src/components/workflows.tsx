@@ -353,10 +353,16 @@ export function InteractionForm({
   onDone,
   editing = null,
   onOpenMatchReport,
+  prefillGkId,
+  prefillDate,
 }: {
   onDone: () => void;
   editing?: LoggedInteraction | null;
   onOpenMatchReport?: (ctx: MatchReportHandoff) => void;
+  /** Goalkeeper to pre-select when opened from a profile or a calendar entry. */
+  prefillGkId?: string;
+  /** Date to pre-select when opened from a calendar day (YYYY-MM-DD). */
+  prefillDate?: string;
 }) {
   const queryClient = useQueryClient();
   const createFn = useServerFn(createInteraction);
