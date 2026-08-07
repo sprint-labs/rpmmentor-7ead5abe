@@ -2,7 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Card, PageHeader, StatCard, SectionTitle, Avatar, Pill, TierBadge, TrafficLight } from "@/components/primitives";
+import { PageHeader, StatCard, SectionTitle, TierBadge } from "@/components/primitives";
 import { activity, alerts, goalkeepers, calendarEvents, stats, formatRelative, getMentor, computeDutyOverview } from "@/lib/mock-data";
 import { useDutySource, useLoggedInteractions } from "@/lib/interactions/use-interactions";
 import { ErrorBoundary } from "@/components/error-boundary";
