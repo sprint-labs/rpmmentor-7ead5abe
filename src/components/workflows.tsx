@@ -417,6 +417,62 @@ export function InteractionForm({
   const [audioStatus, setAudioStatus] = useState<AudioSaveStatus>("idle");
   const [audioError, setAudioError] = useState<string | null>(null);
   const [savedInteraction, setSavedInteraction] = useState<LoggedInteraction | null>(null);
+
+  /**
+   * Draft persistence. Navigating away mid-entry (accidental back, a link, a
+   * refresh) must not lose typed context, so the in-progress values are mirrored
+   * to browser-local storage and restored the next time the form is opened.
+   * Only for new interactions — a correction always starts from the stored row.
+   */
+  const [draftRestoredAt, setDraftRestoredAt] = useState<string | null>(null);
+  const draftReadyRef = useRef(false);
+  useEffect(() => {
+    if (isEditing) return;
+    const draft = loadInteractionDraft();
+    if (draft) {
+      // Explicit context (a goalkeeper profile, a calendar day) wins over the draft.
+      if (!prefillGkId && draft.gkId) setGkId(draft.gkId);
+      if (!prefillDate && draft.date) setDate(draft.date);
+      if (draft.type && (MANUAL_INTERACTION_TYPES as readonly string[]).includes(draft.type)) {
+        setType(draft.type as InteractionTypeValue);
+      }
+      if (draft.club) setClub(draft.club);
+      if (draft.notes) {
+        notesRef.current = draft.notes;
+        setNotes(draft.notes);
+      }
+      if (draft.outcome) setOutcome(draft.outcome);
+      if (draft.followUp) setFollowUp(draft.followUp);
+      setDraftRestoredAt(draft.savedAt);
+    }
+    draftReadyRef.current = true;
+    // Mount only: restoring later would fight the user's own edits.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (isEditing || !draftReadyRef.current) return;
+    const handle = window.setTimeout(() => {
+      saveInteractionDraft({ gkId, type, club, date, notes, outcome, followUp });
+    }, 600);
+    return () => window.clearTimeout(handle);
+  }, [isEditing, gkId, type, club, date, notes, outcome, followUp]);
+
+  function discardDraft() {
+    clearInteractionDraft();
+    setDraftRestoredAt(null);
+    setGkId(prefillGkId ?? "");
+    setType(MANUAL_INTERACTION_TYPES[0]!);
+    setClub("");
+    setDate(prefillDate ?? todayDateOnly());
+    notesRef.current = "";
+    setNotes("");
+    setOutcome("");
+    setFollowUp("");
+    setErrors({});
+    setShowErrors(false);
+  }
+
   /**
    * Media asset created by an earlier attempt. Reusing it is what makes Retry
    * idempotent: the recording is uploaded at most once however many times the
