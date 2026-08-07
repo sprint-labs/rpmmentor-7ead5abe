@@ -152,7 +152,7 @@ function timeRange(e: DisplayEvent) {
 }
 
 function CalendarPage() {
-  const { gkId } = Route.useSearch();
+  const { gkId, new: openNewOnMount } = Route.useSearch();
   const { can } = useAuth();
   const canManage = can("calendar.manage");
   const [workflow, setWorkflow] = useState<WorkflowKind | null>(null);
