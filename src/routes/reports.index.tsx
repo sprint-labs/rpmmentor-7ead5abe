@@ -5,7 +5,8 @@ import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { PageHeader, Card, Pill, SectionTitle, EmptyState } from "@/components/primitives";
 import { useEffect, useMemo, useState } from "react";
-import { FileText, ChevronRight, RefreshCw, X, FilePlus2 } from "lucide-react";
+import { FileText, ChevronRight, RefreshCw, X, FilePlus2, NotebookPen } from "lucide-react";
+import { goalkeepers as roster } from "@/lib/mock-data";
 import { useAuth } from "@/lib/auth";
 import { WorkflowDialog, type WorkflowKind } from "@/components/workflows";
 import { withPermission } from "@/components/require-permission";
@@ -57,6 +58,8 @@ function ReportsPage() {
   const [prefillGoalkeeper, setPrefillGoalkeeper] = useState<string>("");
   const [prefillMatchDate, setPrefillMatchDate] = useState<string>("");
   const [prefillOpponent, setPrefillOpponent] = useState<string>("");
+  /** Goalkeeper/date carried into Log Interaction from a report row. */
+  const [logPrefill, setLogPrefill] = useState<{ gkId?: string; date?: string }>({});
   const [coachFilter, setCoachFilter] = useState<string>(coach || "All");
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -141,6 +144,18 @@ function ReportsPage() {
     return list;
   }, [reports, coachFilter, from, to, last5Ids]);
 
+  /** Report goalkeeper names resolved to roster ids so rows can link and prefill. */
+  const rosterByName = useMemo(() => {
+    const m = new Map<string, (typeof roster)[number]>();
+    for (const g of roster) m.set(normaliseName(g.name), g);
+    return m;
+  }, []);
+
+  function openLog(prefill: { gkId?: string; date?: string } = {}) {
+    setLogPrefill(prefill);
+    setWorkflow("interaction");
+  }
+
   const hasFilters = Boolean(coach) || (Boolean(from) && Boolean(to)) || Boolean(last5Gk);
   const clearSearch = { from: "", to: "", coach: "", mentorProfileId: "", source: "", gk: "", openSubmit: "", last5Gk: "" };
 
@@ -169,6 +184,12 @@ function ReportsPage() {
               <RefreshCw className={`size-3.5 ${isFetching ? "animate-spin" : ""}`} />
               Refresh
             </button>
+            {can("interactions.log") && (
+              <button onClick={() => openLog()}
+                className="h-9 px-3 rounded-md border border-border text-sm font-medium inline-flex items-center gap-1.5">
+                <NotebookPen className="size-3.5" /> Log Interaction
+              </button>
+            )}
             {can("reports.submit") && (
               <button onClick={() => setWorkflow("report")}
                 className="h-9 px-3 rounded-md bg-primary text-primary-foreground text-sm font-medium">
@@ -311,16 +332,44 @@ function ReportsPage() {
               {filtered.slice(0, 100).map((r) => (
                 <tr key={r.report_id} className="border-b border-border/60 last:border-0 hover:bg-accent/20">
                   <td className="px-4 py-2.5 text-muted-foreground tabular-nums font-mono whitespace-nowrap">{formatDate(r.match_date)}</td>
-                  <td className="px-2 font-medium">{r.goalkeeper}</td>
+                  <td className="px-2 font-medium">
+                    {rosterByName.get(normaliseName(r.goalkeeper)) ? (
+                      <Link
+                        to="/goalkeepers/$gkId"
+                        params={{ gkId: rosterByName.get(normaliseName(r.goalkeeper))!.id }}
+                        className="hover:underline"
+                      >
+                        {r.goalkeeper}
+                      </Link>
+                    ) : (
+                      r.goalkeeper
+                    )}
+                  </td>
                   <td className="px-2 text-muted-foreground">{r.coach}</td>
                   <td className="px-2 text-muted-foreground">{r.team ?? "—"}</td>
                   <td className="px-2 text-muted-foreground">{r.opponent ?? "—"}</td>
                   <td className="px-2 text-muted-foreground max-w-md"><span className="line-clamp-1">{r.comments}</span></td>
                   <td className="px-2 text-right tabular-nums font-mono font-semibold">{r.average != null ? r.average.toFixed(1) : "—"}</td>
                   <td className="px-4 text-right">
-                    <Link to="/reports/$reportId" params={{ reportId: r.report_id }} className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-0.5">
-                      Open <ChevronRight className="size-3" />
-                    </Link>
+                    <div className="inline-flex items-center gap-3">
+                      {can("interactions.log") && (
+                        <button
+                          onClick={() =>
+                            openLog({
+                              gkId: rosterByName.get(normaliseName(r.goalkeeper))?.id,
+                              date: r.match_date ?? undefined,
+                            })
+                          }
+                          title={`Log interaction for ${r.goalkeeper}`}
+                          className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
+                        >
+                          <NotebookPen className="size-3" /> Log
+                        </button>
+                      )}
+                      <Link to="/reports/$reportId" params={{ reportId: r.report_id }} className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-0.5">
+                        Open <ChevronRight className="size-3" />
+                      </Link>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -330,7 +379,7 @@ function ReportsPage() {
       </Card>
 
       <SectionTitle>Showing {Math.min(100, filtered.length)} of {filtered.length}</SectionTitle>
-      <WorkflowDialog kind={workflow} onClose={() => { setWorkflow(null); setPrefillGoalkeeper(""); setPrefillMatchDate(""); setPrefillOpponent(""); }} prefillGoalkeeper={prefillGoalkeeper} prefillMatchDate={prefillMatchDate} prefillOpponent={prefillOpponent} />
+      <WorkflowDialog kind={workflow} onClose={() => { setWorkflow(null); setPrefillGoalkeeper(""); setPrefillMatchDate(""); setPrefillOpponent(""); setLogPrefill({}); }} prefillGoalkeeper={prefillGoalkeeper} prefillMatchDate={workflow === "interaction" ? logPrefill.date : prefillMatchDate} prefillOpponent={prefillOpponent} prefillGkId={logPrefill.gkId} />
     </div>
   );
 }
