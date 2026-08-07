@@ -153,6 +153,7 @@ function CalendarPage() {
   const { gkId } = Route.useSearch();
   const { can } = useAuth();
   const canManage = can("calendar.manage");
+  const [workflow, setWorkflow] = useState<WorkflowKind | null>(null);
   const queryClient = useQueryClient();
 
   const fetchEvents = useServerFn(listCalendarEvents);
