@@ -65,6 +65,13 @@ function SystemUsersPage() {
     enabled: canManage,
   });
 
+  const auditQuery = useQuery({
+    queryKey: AUDIT_KEY,
+    queryFn: () => auditList(),
+    enabled: canManage,
+  });
+
+
   const mutation = useMutation({
     mutationFn: (vars: { userId: string; role: Role | null; name: string }) =>
       setRole({ data: { userId: vars.userId, role: vars.role } }),
