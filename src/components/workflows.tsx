@@ -1244,10 +1244,6 @@ export function InteractionForm({
           </Field>
 
         </div>
-        <HandwrittenNotesField
-          context={gk ? `Session notes about ${gk.name} (${club || gk.club})` : undefined}
-          onTranscribed={applyTranscribedText}
-        />
         {/*
           `autoApply` is what fixes change #4. Without it a transcript stays
           inside VoiceNoteField until the reviewed checkbox and two more clicks
