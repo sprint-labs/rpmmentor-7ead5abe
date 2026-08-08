@@ -44,8 +44,9 @@ export function AppShell() {
   const bellRef = useRef<HTMLDivElement>(null);
   const notif = useNotifications();
 
-  // Public routes that don't require auth
-  const isPublic = path === "/login" || path === "/install";
+  // Public routes that don't require auth (also exempt from maintenance so
+  // recovery/invite links on /reset-password can still complete).
+  const isPublic = path === "/login" || path === "/install" || path === "/reset-password";
 
   useEffect(() => {
     if (!loading && !user && !isPublic) {
@@ -58,7 +59,7 @@ export function AppShell() {
 
   if (loading) return <div className="min-h-screen bg-background" />;
   if (!user) return isPublic ? <Outlet /> : <div className="min-h-screen bg-background" />;
-  if (isRestrictedDuringMaintenance(user)) {
+  if (!isPublic && isRestrictedDuringMaintenance(user)) {
     return (
       <MaintenanceScreen
         onSignOut={async () => {
