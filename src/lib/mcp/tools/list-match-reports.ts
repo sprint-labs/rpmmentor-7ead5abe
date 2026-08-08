@@ -25,9 +25,12 @@ export default defineTool({
         auth: { persistSession: false, autoRefreshToken: false },
       },
     );
+    // The canonical Match Report store. Tombstoned reports are excluded so the
+    // tool can never surface a report the app itself no longer shows.
     let q = supabase
       .from("match_reports_cache")
       .select("report_id,goalkeeper,team,opponent,match_date,coach,average")
+      .is("deleted_at", null)
       .order("match_date", { ascending: false, nullsFirst: false })
       .limit(limit ?? 25);
     if (goalkeeper) q = q.ilike("goalkeeper", `%${goalkeeper}%`);

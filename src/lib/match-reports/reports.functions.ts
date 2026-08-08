@@ -5,8 +5,15 @@
  * and display name are looked up from the database (`user_roles`, `profiles`)
  * — never trusted from client input.
  *
- * Sheet layout is A:O. A "Source" provenance column is DEFERRED pending an
- * Excel audit — nothing here reads, writes or stamps a source value.
+ * SUPABASE IS THE SOURCE OF TRUTH. Reads, writes and deletes all go to the
+ * canonical table via `store.server.ts`; no handler here touches Google Sheets.
+ * The Sheet remains as a dormant archive/rollback source, imported once by
+ * `backfill.functions.ts`.
+ *
+ * The duplicate/idempotency protections are unchanged: the submission ledger
+ * (`match_report_submissions`) still reserves a fixture before the write,
+ * classifies duplicate windows from confirmed successes only, and serialises
+ * concurrent tabs through its partial unique indexes.
  */
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
@@ -15,14 +22,7 @@ import {
   matchReportSubmitSchema,
   averageOfScores,
   computeReportUid,
-  parseSheetRows,
-  matchesReportId,
-  baseReportUid,
-
-  identityForRowIndex,
-  formatSheetDate,
-  COLUMN_INDEX,
-  PILLAR_IDS,
+  computeReportId,
   type MatchReportRow,
 } from "./schema";
 import { validateComments } from "./comments";
@@ -59,68 +59,14 @@ import {
 export const listMatchReports = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async () => {
-
-  const { readAllRows } = await import("./sheets.server");
-  const { rows, firstDataRow } = await readAllRows();
-  const parsed: MatchReportRow[] = parseSheetRows(rows, firstDataRow);
-  // Newest first (by match_date, missing dates last).
-  parsed.sort((a, b) => {
-    if (!a.match_date && !b.match_date) return 0;
-    if (!a.match_date) return 1;
-    if (!b.match_date) return -1;
-    return a.match_date < b.match_date ? 1 : a.match_date > b.match_date ? -1 : 0;
-  });
-
-  // Best-effort cache reconciliation. Failures don't block the read.
-  try {
+    // Supabase is the source of truth. Google Sheets is not consulted here —
+    // it is a dormant archive, and nothing on this path can be blocked by the
+    // connector being unlinked or rate-limited.
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    if (parsed.length) {
-      await supabaseAdmin.from("match_reports_cache").upsert(
-        parsed.map((r) => ({
-          report_id: r.report_id,
-          row_index: r.row_index,
-          goalkeeper: r.goalkeeper,
-          coach: r.coach,
-          team: r.team,
-          opponent: r.opponent,
-          competition: r.competition,
-          match_date: r.match_date,
-          protect_goal: r.scores.protect_goal,
-          protect_space: r.scores.protect_space,
-          protect_air: r.scores.protect_air,
-          control_play: r.scores.control_play,
-          change_play: r.scores.change_play,
-          psych: r.scores.psych,
-          physical: r.scores.physical,
-          average: r.average,
-          comments: r.comments,
-          // `synced_at` is reconciliation time, NOT a submit timestamp — it is
-          // never used for duplicate-window decisions.
-          synced_at: new Date().toISOString(),
-        })),
-        { onConflict: "report_id" },
-      );
-    }
-    // Prune cache rows that no longer exist in the sheet.
-    const liveIds = new Set(parsed.map((r) => r.report_id));
-    const { data: cached } = await supabaseAdmin
-      .from("match_reports_cache")
-      .select("report_id");
-    const stale = (cached ?? [])
-      .map((r) => r.report_id as string)
-      .filter((id) => !liveIds.has(id));
-    if (stale.length) {
-      await supabaseAdmin
-        .from("match_reports_cache")
-        .delete()
-        .in("report_id", stale);
-    }
-  } catch (e) {
-    console.error("[match-reports] cache reconcile skipped:", e);
-  }
-
-  return { reports: parsed };
-});
+    const { listCanonicalReports } = await import("./store.server");
+    const reports: MatchReportRow[] = await listCanonicalReports(supabaseAdmin);
+    return { reports };
+  });
 
 
 // ---------------------------------------------------------------------------
@@ -133,15 +79,13 @@ export const getMatchReport = createServerFn({ method: "GET" })
     z.object({ reportId: z.string().min(1) }).parse(data),
   )
   .handler(async ({ data }) => {
-    const { readAllRows } = await import("./sheets.server");
-    const { rows, firstDataRow } = await readAllRows();
-    const parsed = parseSheetRows(rows, firstDataRow);
-    // Exact current identity first, then the legacy (pre-Team) identity so
-    // historic detail URLs keep resolving.
-    const exact = parsed.find((r) => r.report_id === data.reportId);
-    if (exact) return { report: exact };
-    const compat = parsed.find((r) => matchesReportId(r, data.reportId));
-    return { report: compat ?? null };
+    // Resolution order is unchanged: exact identity first, then the base id of
+    // an occurrence, then the legacy (pre-Team) identity — so historic detail
+    // URLs keep resolving. Only the storage behind it moved to Supabase.
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { getCanonicalReport } = await import("./store.server");
+    const report = await getCanonicalReport(supabaseAdmin, data.reportId);
+    return { report };
   });
 
 // ---------------------------------------------------------------------------
@@ -197,7 +141,7 @@ export const submitMatchReport = createServerFn({ method: "POST" })
             /**
              * Client-generated idempotency key — stable across retries.
              * Optional: callers that omit it get a server-generated key so a
-             * reservation is still claimed before any Sheet append.
+             * reservation is still claimed before any canonical write.
              */
             submissionKey: z.string().max(80).optional(),
           })
@@ -264,7 +208,7 @@ export const submitMatchReport = createServerFn({ method: "POST" })
 
     const LEDGER_COLS = "id,status,submitted_at,reserved_at,report_id,sheet_row_index";
     const AMBIGUOUS_MSG =
-      "A previous attempt for this fixture didn't confirm, so we can't tell whether it reached the sheet. Check the reports list and resolve it before submitting again — we won't retry automatically.";
+      "A previous attempt for this fixture didn't confirm, so we can't tell whether it was saved. Check the reports list and resolve it before submitting again — we won't retry automatically.";
     const IN_PROGRESS_MSG =
       "Another submission for this fixture is already in progress. Nothing extra has been written — check the reports list in a moment.";
 
@@ -358,7 +302,7 @@ export const submitMatchReport = createServerFn({ method: "POST" })
     }
 
     // ---- Duplicate protection (confirmed successes only) -----------------
-    // Legacy sheet rows have no submit timestamp and are deliberately NOT
+    // Backfilled sheet history has no submit timestamp and is deliberately NOT
     // considered — cache `synced_at` is reconciliation time, not a submit time.
     const duplicateResult = (
       dup: { window: "strong" | "soft"; report_id: string | null },
@@ -470,122 +414,103 @@ export const submitMatchReport = createServerFn({ method: "POST" })
       }
     }
 
-    // Column order MUST match COLUMN_INDEX / SHEET_HEADERS (A:O).
-    const row = new Array<string | number>(15).fill("");
-    row[COLUMN_INDEX.goalkeeper] = payload.goalkeeper;
-    row[COLUMN_INDEX.coach] = resolvedCoach;
-    row[COLUMN_INDEX.team] = payload.team;
-    row[COLUMN_INDEX.opponent] = payload.opponent;
-    row[COLUMN_INDEX.match_date] = formatSheetDate(payload.match_date);
-    for (const id of PILLAR_IDS) row[COLUMN_INDEX[id]] = payload[id];
-    row[COLUMN_INDEX.average] = average;
-    row[COLUMN_INDEX.comments] = comments;
-    row[COLUMN_INDEX.competition] = payload.competition ?? "";
-
-    const {
-      appendRow,
-      AmbiguousAppendError,
-      SheetsConfigError,
-      readAllRows: readRowsAfterAppend,
-    } = await import("./sheets.server");
-    let rowIndex = -1;
+    // ---- The canonical write ---------------------------------------------
+    // Supabase, not Google Sheets. A confirmed duplicate fixture still gets an
+    // occurrence id (~2, ~3…) exactly as the sheet parser assigned them, and
+    // the unique index on `submission_key` means a retry can never produce a
+    // second report. Ledger, response, attachments and deletion all use the
+    // exact id returned here.
+    const { insertCanonicalReport, CANONICAL_TABLE } = await import("./store.server");
+    let written: Awaited<ReturnType<typeof insertCanonicalReport>>;
     try {
-      // Single attempt — the transport never retries an append.
-      rowIndex = await appendRow(row);
+      written = await insertCanonicalReport(supabaseAdmin, {
+        baseReportId: report_id,
+        legacyReportId: computeReportId({
+          goalkeeper: payload.goalkeeper,
+          match_date: payload.match_date,
+          opponent: payload.opponent,
+        }),
+        goalkeeper: payload.goalkeeper,
+        coach: resolvedCoach,
+        team: payload.team,
+        opponent: payload.opponent,
+        competition: payload.competition ?? "",
+        match_date: payload.match_date,
+        scores: {
+          protect_goal: payload.protect_goal,
+          protect_space: payload.protect_space,
+          protect_air: payload.protect_air,
+          control_play: payload.control_play,
+          change_play: payload.change_play,
+          psych: payload.psych,
+          physical: payload.physical,
+        },
+        average,
+        comments,
+        submittedBy: userId,
+        submissionKey: submissionKey,
+      });
     } catch (err) {
-      if (err instanceof SheetsConfigError) {
-        // Definitive no-write: nothing left the app. Release the reservation so
-        // the same form and submission key work again once the connector is
-        // re-linked — never an ambiguous lock.
-        await markLedger({ status: "failed" });
-        throw new Error(
-          `${(err as Error).message} Nothing was written to the sheet, so you can submit this report again.`,
-        );
+      // The insert threw rather than returning an error — the write may or may
+      // not have landed. `submission_key` is unique, so a read-back settles it
+      // definitively instead of leaving an ambiguous lock behind.
+      let verified: string | null = null;
+      let verifiable = true;
+      try {
+        const { data: check } = await supabaseAdmin
+          .from(CANONICAL_TABLE)
+          .select("report_id")
+          .eq("submission_key", submissionKey)
+          .maybeSingle();
+        verified = (check as { report_id: string } | null)?.report_id ?? null;
+      } catch {
+        verifiable = false;
       }
-      if (err instanceof AmbiguousAppendError) {
+      if (!verified) {
+        if (verifiable) {
+          // Proven no-write: release the reservation so the same form and
+          // submission key work again.
+          await markLedger({ status: "failed" });
+          throw err;
+        }
         await markLedger({ status: "ambiguous" });
         return {
           status: "ambiguous",
           submission_key: submissionKey,
           message:
-            "The sheet didn't confirm this report, so it may or may not have been written. Check the reports list before submitting again — we won't retry automatically.",
+            "The database didn't confirm this report, so it may or may not have been saved. Check the reports list before submitting again — we won't retry automatically.",
         };
       }
+      written = { ok: true, report_id: verified, created: true };
+    }
+
+    if (!written.ok) {
+      // A returned error means nothing was inserted — definitively safe to retry.
       await markLedger({ status: "failed" });
-      throw err;
+      throw new Error(
+        `The report could not be saved (${written.message}). Nothing was written, so you can submit it again.`,
+      );
     }
-
-
-    // ---- Resolve the ACTUAL identity of the appended row ------------------
-    // Confirmed duplicates get an occurrence suffix (~2, ~3…). Ledger, cache,
-    // response, attachments and deletion must all use that exact id.
-    let resolved: MatchReportRow | null = null;
-    try {
-      const { rows: allRows, firstDataRow } = await readRowsAfterAppend({ fresh: true });
-      resolved = identityForRowIndex(parseSheetRows(allRows, firstDataRow), rowIndex);
-    } catch (e) {
-      console.error("[match-reports] identity resolve after append failed:", e);
-    }
-    if (!resolved) {
-      // Appended, but we can't prove which row it is — never a clean success.
-      await markLedger({ status: "ambiguous", sheet_row_index: rowIndex > 0 ? rowIndex : null });
-      return {
-        status: "ambiguous",
-        submission_key: submissionKey,
-        message:
-          "The report reached the sheet but we couldn't confirm which row it is. Check the reports list before submitting again.",
-      };
-    }
-    const finalReportId = resolved.report_id;
+    const finalReportId = written.report_id;
 
     // ---- Confirm the success in the ledger --------------------------------
+    // `sheet_row_index` stays null: reports born in Supabase have no sheet row.
     const confirmed = await markLedger({
       status: "succeeded",
       report_id: finalReportId,
       report_uid: finalReportId,
-      sheet_row_index: rowIndex > 0 ? rowIndex : null,
+      sheet_row_index: null,
       submitted_at: new Date().toISOString(),
     });
     if (!confirmed) {
-      // The row IS in the sheet but we can't prove it durably. Report the
-      // uncertain state rather than a clean success.
+      // The report IS saved but we can't prove it durably. Report the uncertain
+      // state rather than a clean success.
       return {
         status: "ambiguous",
         submission_key: submissionKey,
         message:
-          "The report reached the sheet but we couldn't record it. Check the reports list and do not submit again without checking.",
+          "The report was saved but we couldn't record it. Check the reports list and do not submit again without checking.",
       };
-    }
-
-    // Mirror into cache immediately so /reports reflects the new row without a re-read.
-    try {
-      await supabaseAdmin.from("match_reports_cache").upsert(
-        [
-          {
-            report_id: finalReportId,
-            row_index: rowIndex > 0 ? rowIndex : null,
-            goalkeeper: payload.goalkeeper,
-            coach: resolvedCoach,
-            team: payload.team,
-            opponent: payload.opponent,
-            competition: payload.competition ?? "",
-            match_date: payload.match_date,
-            protect_goal: payload.protect_goal,
-            protect_space: payload.protect_space,
-            protect_air: payload.protect_air,
-            control_play: payload.control_play,
-            change_play: payload.change_play,
-            psych: payload.psych,
-            physical: payload.physical,
-            average,
-            comments,
-            synced_at: new Date().toISOString(),
-          },
-        ],
-        { onConflict: "report_id" },
-      );
-    } catch (e) {
-      console.error("[match-reports] cache mirror on submit failed:", e);
     }
 
     // ---- The Live Match Observation interaction ---------------------------
@@ -614,7 +539,9 @@ export const submitMatchReport = createServerFn({ method: "POST" })
     return {
       status: "ok",
       report_id: finalReportId,
-      row_index: rowIndex,
+      // Reports written to Supabase have no sheet row; -1 keeps the response
+      // shape stable for callers that still read the field.
+      row_index: -1,
       average,
       idempotent: false,
       ...(link.ok ? {} : { interaction_error: link.message }),
@@ -623,7 +550,13 @@ export const submitMatchReport = createServerFn({ method: "POST" })
 
 
 // ---------------------------------------------------------------------------
-// deleteMatchReport — removes the sheet row AND its cache record atomically.
+// deleteMatchReport — tombstones the canonical Supabase report.
+//
+// The Google Sheet archive is deliberately NOT touched: it is a rollback
+// source, and destroying archived history is never part of a delete. Because
+// Supabase ids are stable (they never reindex the way sheet-order occurrence
+// ids did), a delete can no longer shift another report's identity, so the
+// ambiguous read-back dance the sheet required is gone.
 // ---------------------------------------------------------------------------
 
 export const deleteMatchReport = createServerFn({ method: "POST" })
@@ -646,108 +579,26 @@ export const deleteMatchReport = createServerFn({ method: "POST" })
       throw new Error("You don't have permission to delete reports.");
     }
 
-    // Locate the row in the sheet (source of truth).
-    const { readAllRows, deleteRow, AmbiguousDeleteError } = await import("./sheets.server");
-    const { rows, firstDataRow } = await readAllRows({ fresh: true });
-    const parsedRows = parseSheetRows(rows, firstDataRow);
-    const target =
-      parsedRows.find((r) => r.report_id === data.reportId) ??
-      parsedRows.find((r) => matchesReportId(r, data.reportId));
-    const matchedRowIndex = target?.row_index ?? -1;
-    if (matchedRowIndex < 0) {
-      // Sheet row already gone — still purge any stale cache entry.
-      try {
-        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-        await supabaseAdmin
-          .from("match_reports_cache")
-          .delete()
-          .eq("report_id", data.reportId);
-      } catch (e) {
-        console.error("[match-reports] stale cache delete failed:", e);
-      }
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { softDeleteCanonicalReport } = await import("./store.server");
+
+    // Tombstone the canonical report. Resolution accepts the exact id, the base
+    // id of an occurrence, or the legacy identity — the same rules as reads.
+    const removed = await softDeleteCanonicalReport(supabaseAdmin, data.reportId);
+    if (!removed.deleted) {
       return { deleted: false, reason: "not_found" as const };
     }
 
-    // Capture a STABLE, content-based signature of the raw row before deleting.
-    // Occurrence-derived ids (…~2) reindex when a row is removed, so they can
-    // never be used to prove an ambiguous delete landed.
-    const { rawRowSignature, countSignature, classifyDeleteReadback, hasDuplicateIdentityGroup } =
-      await import("./delete-verify");
-    const rawRow = rows[matchedRowIndex - firstDataRow] ?? [];
-    const signature = rawRowSignature(rawRow);
-    const countBefore = countSignature(rows, signature);
-    // Reindex risk is an IDENTITY question: rows sharing the same match key
-    // (goalkeeper/team/opponent/date) get base/~2 ids even when their comments
-    // or scores differ. Raw-row signatures only prove whether a delete landed.
-    const hadDuplicates = hasDuplicateIdentityGroup(
-      parsedRows,
-      target?.report_id ?? data.reportId,
-      baseReportUid,
-    );
-
-
-    // Delete sheet row first — SINGLE attempt. An ambiguous outcome must never
-    // trigger a second delete (that would remove the following report); we read
-    // the sheet back by content and only clean up when the row is proven gone.
-    let verifiedViaReadback = false;
+    // Release this report's ledger records so the fixture can be submitted
+    // again. Only this exact occurrence is affected — ids never reindex.
     try {
-      await deleteRow(matchedRowIndex);
-    } catch (err) {
-      if (err instanceof AmbiguousDeleteError) {
-        let rowsAfter: string[][] | null = null;
-        try {
-          rowsAfter = (await readAllRows({ fresh: true })).rows;
-        } catch (readErr) {
-          console.error("[match-reports] delete read-back failed:", readErr);
-        }
-        const verdict = classifyDeleteReadback({ signature, countBefore, rowsAfter });
-        if (verdict.outcome === "applied") {
-          verifiedViaReadback = true;
-          console.warn("[match-reports] ambiguous delete verified as applied by content.");
-        } else if (verdict.outcome === "not_applied") {
-          throw new Error(
-            `${(err as Error).message} The row is still present and unchanged — nothing was deleted, and no cache or ledger records were changed. You can safely try again.`,
-          );
-        } else {
-          throw new Error(
-            `${(err as Error).message} The result could not be verified (${verdict.detail}). No cache or ledger records were changed. Do not retry in the app — check the sheet directly.`,
-          );
-        }
-      } else {
-        throw err;
-      }
-    }
-
-    // Cleanup. For content that existed more than once, the surviving rows have
-    // reindexed occurrence ids, so identity-based cache/ledger deletion could
-    // remove the wrong record. In that case we skip cleanup and return a
-    // terminal outcome instead of leaving the UI able to retry onto the next row.
-    if (hadDuplicates) {
-      return {
-        deleted: true,
-        row_index: matchedRowIndex,
-        terminal: true,
-        reason: "duplicate_reindexed" as const,
-        message:
-          "The row was deleted. Because duplicate match-key rows exist for this fixture (same goalkeeper, team, opponent and date), the remaining report identities have reindexed — cached records were left untouched and no further delete was attempted. Do not retry in the app; refresh to re-sync.",
-      };
-    }
-
-    // Unique row: remove ONLY this occurrence's cache/ledger records.
-    const exactId = target?.report_id ?? data.reportId;
-    try {
-      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-      await supabaseAdmin
-        .from("match_reports_cache")
-        .delete()
-        .eq("report_id", exactId);
       await supabaseAdmin
         .from("match_report_submissions")
         .delete()
-        .eq("report_id", exactId);
+        .eq("report_id", removed.report_id as string);
     } catch (e) {
-      console.error("[match-reports] cache delete after sheet delete failed:", e);
+      console.error("[match-reports] ledger cleanup after delete failed:", e);
     }
 
-    return { deleted: true, row_index: matchedRowIndex, verified: verifiedViaReadback };
+    return { deleted: true, row_index: removed.row_index ?? -1, verified: true };
   });

@@ -399,8 +399,10 @@ export type Database = {
           competition: string | null
           control_play: number | null
           created_at: string
+          deleted_at: string | null
           goalkeeper: string
           id: string
+          legacy_report_id: string | null
           match_date: string | null
           opponent: string | null
           physical: number | null
@@ -411,6 +413,9 @@ export type Database = {
           report_id: string
           row_index: number | null
           source: string | null
+          submission_key: string | null
+          submitted_at: string | null
+          submitted_by: string | null
           synced_at: string
           team: string | null
           updated_at: string
@@ -423,8 +428,10 @@ export type Database = {
           competition?: string | null
           control_play?: number | null
           created_at?: string
+          deleted_at?: string | null
           goalkeeper: string
           id?: string
+          legacy_report_id?: string | null
           match_date?: string | null
           opponent?: string | null
           physical?: number | null
@@ -435,6 +442,9 @@ export type Database = {
           report_id: string
           row_index?: number | null
           source?: string | null
+          submission_key?: string | null
+          submitted_at?: string | null
+          submitted_by?: string | null
           synced_at?: string
           team?: string | null
           updated_at?: string
@@ -447,8 +457,10 @@ export type Database = {
           competition?: string | null
           control_play?: number | null
           created_at?: string
+          deleted_at?: string | null
           goalkeeper?: string
           id?: string
+          legacy_report_id?: string | null
           match_date?: string | null
           opponent?: string | null
           physical?: number | null
@@ -459,6 +471,9 @@ export type Database = {
           report_id?: string
           row_index?: number | null
           source?: string | null
+          submission_key?: string | null
+          submitted_at?: string | null
+          submitted_by?: string | null
           synced_at?: string
           team?: string | null
           updated_at?: string

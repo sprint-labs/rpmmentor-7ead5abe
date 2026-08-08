@@ -1,9 +1,10 @@
 /**
  * Integration status for the Google Sheets connector.
  *
- * Reports whether the connector is linked, whether we can reach the target
- * spreadsheet through the Lovable gateway, and when the last successful
- * write happened (max synced_at in the match_reports_cache mirror).
+ * The Sheet is a dormant archive/rollback source — no Match Report read or
+ * write depends on it at runtime. This reports whether the connector is still
+ * linked, whether we can reach the archive through the Lovable gateway, and
+ * when its history was last imported into the canonical Supabase store.
  */
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
@@ -20,7 +21,9 @@ export type SheetsIntegrationStatus = {
   headerRow: string[];
   /** Columns whose header text differs from SHEET_HEADERS. */
   headerMismatches: { column: string; expected: string; actual: string }[];
+  /** When the sheet archive was last imported into Supabase. */
   lastWriteAt: string | null; // ISO
+  /** Canonical reports that originated from the sheet archive. */
   totalWrites: number;
   checkedAt: string; // ISO
   error: string | null;
@@ -103,8 +106,8 @@ export const getSheetsIntegrationStatus = createServerFn({ method: "GET" })
       error = "Connector not linked (missing LOVABLE_API_KEY or GOOGLE_SHEETS_API_KEY).";
     }
 
-    // Last successful write is tracked via the cache mirror populated in
-    // submitMatchReport. Failures here don't block the status response.
+    // Last import of the archive, tracked by `synced_at` on the sheet-sourced
+    // canonical rows. Failures here don't block the status response.
     let lastWriteAt: string | null = null;
     let totalWrites = 0;
     try {
@@ -112,13 +115,15 @@ export const getSheetsIntegrationStatus = createServerFn({ method: "GET" })
       const { data: last } = await supabaseAdmin
         .from("match_reports_cache")
         .select("synced_at")
+        .eq("source", "sheet")
         .order("synced_at", { ascending: false })
         .limit(1)
         .maybeSingle();
       lastWriteAt = (last?.synced_at as string | null) ?? null;
       const { count } = await supabaseAdmin
         .from("match_reports_cache")
-        .select("report_id", { count: "exact", head: true });
+        .select("report_id", { count: "exact", head: true })
+        .eq("source", "sheet");
       totalWrites = count ?? 0;
     } catch {
       /* non-fatal */
