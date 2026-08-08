@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable";
 import loginLogo from "@/assets/gkhq-design-system.svg.asset.json";
 import { CANONICAL_ORIGIN } from "@/lib/canonical-url";
+import { MAINTENANCE_MODE } from "@/lib/maintenance";
 
 function safeNext(raw: unknown): string {
   if (typeof raw !== "string" || !raw.startsWith("/") || raw.startsWith("//")) return "/";
@@ -67,6 +68,18 @@ function LoginPage() {
         <div className="mb-10">
           <img src={loginLogo.url} alt="Mentor Hub by RPM" className="h-40 w-auto" />
         </div>
+
+        {MAINTENANCE_MODE && (
+          <div role="status" className="mb-8 rounded-xl border border-primary/30 bg-primary/10 px-4 py-3">
+            <p className="text-xs font-semibold uppercase tracking-[0.08em] text-primary">Temporary maintenance</p>
+            <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
+              Access is currently limited while final updates are completed. We expect the platform to be live again within the next couple of hours.
+            </p>
+            <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+              If you have any questions, please contact <span className="font-semibold text-foreground">Luke</span>.
+            </p>
+          </div>
+        )}
 
 
         {view === "signin" && (

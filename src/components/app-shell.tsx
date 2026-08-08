@@ -11,6 +11,8 @@ import { BrandMark } from "@/components/brand-mark";
 import { OfflineBanner } from "@/components/offline-banner";
 import { SyncManager } from "@/components/sync-manager";
 import { InstallPrompt } from "@/components/install-prompt";
+import { MaintenanceScreen } from "@/components/maintenance-screen";
+import { isRestrictedDuringMaintenance } from "@/lib/maintenance";
 
 type NavItem = { to: string; label: string; icon: typeof LayoutDashboard; exact?: boolean; perm: Permission };
 const NAV: NavItem[] = [
@@ -33,7 +35,7 @@ const NAV: NavItem[] = [
 ];
 
 export function AppShell() {
-  const { user, can, signOut, setViewAsRole } = useAuth();
+  const { user, loading, can, signOut, setViewAsRole } = useAuth();
   const path = useRouterState({ select: (s) => s.location.pathname });
   const navigate = useNavigate();
   const [navOpen, setNavOpen] = useState(false);
@@ -46,16 +48,27 @@ export function AppShell() {
   const isPublic = path === "/login" || path === "/install";
 
   useEffect(() => {
-    if (!user && !isPublic) {
+    if (!loading && !user && !isPublic) {
       navigate({ to: "/login" as never, search: { next: path } as never, replace: true });
     }
-  }, [user, isPublic, navigate, path]);
+  }, [loading, user, isPublic, navigate, path]);
 
   // Close drawer on route change
   useEffect(() => { setNavOpen(false); }, [path]);
 
+  if (loading) return <div className="min-h-screen bg-background" />;
+  if (!user) return isPublic ? <Outlet /> : <div className="min-h-screen bg-background" />;
+  if (isRestrictedDuringMaintenance(user)) {
+    return (
+      <MaintenanceScreen
+        onSignOut={async () => {
+          await signOut();
+          navigate({ to: "/login" as never, replace: true });
+        }}
+      />
+    );
+  }
   if (isPublic) return <Outlet />;
-  if (!user) return <div className="min-h-screen bg-background" />;
 
   // Role-gated visible nav
   const visible = NAV.filter((n) => can(n.perm));
