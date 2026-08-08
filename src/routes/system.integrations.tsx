@@ -1,9 +1,14 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { CheckCircle2, XCircle, RefreshCw, ExternalLink, FileSpreadsheet, Loader2, AlertCircle } from "lucide-react";
+import { useState } from "react";
+import { CheckCircle2, XCircle, RefreshCw, ExternalLink, FileSpreadsheet, Loader2, AlertCircle, Database, DownloadCloud } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { getSheetsIntegrationStatus } from "@/lib/integrations/sheets-status.functions";
+import {
+  importMatchReportsFromSheet,
+  type MatchReportBackfillResult,
+} from "@/lib/match-reports/backfill.functions";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/system/integrations")({
@@ -37,8 +42,26 @@ function fmtRelative(iso: string | null): string {
 function IntegrationsPage() {
   const { user, can } = useAuth();
   const fetchStatus = useServerFn(getSheetsIntegrationStatus);
+  const runBackfill = useServerFn(importMatchReportsFromSheet);
+
+  const [backfill, setBackfill] = useState<MatchReportBackfillResult | null>(null);
+  const [backfillRunning, setBackfillRunning] = useState<"dry" | "import" | null>(null);
+  const [backfillError, setBackfillError] = useState<string | null>(null);
 
   const canManage = !!user && can("system.manage");
+
+  const runReconcile = async (dryRun: boolean) => {
+    setBackfillRunning(dryRun ? "dry" : "import");
+    setBackfillError(null);
+    try {
+      setBackfill(await runBackfill({ data: { dryRun } }));
+    } catch (e) {
+      setBackfill(null);
+      setBackfillError(e instanceof Error ? e.message : "The import could not be run.");
+    } finally {
+      setBackfillRunning(null);
+    }
+  };
 
   const q = useQuery({
     queryKey: ["integration-status", "google_sheets"],
@@ -87,12 +110,123 @@ function IntegrationsPage() {
         <div className="flex items-center justify-between gap-4 border-b border-border p-4">
           <div className="flex items-center gap-3">
             <div className="rounded-md bg-accent p-2">
+              <Database className="h-5 w-5 text-primary" />
+            </div>
+            <div>
+              <h2 className="font-medium leading-tight">Match Reports store</h2>
+              <p className="text-xs text-muted-foreground">
+                Supabase · runtime source of truth
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-4 p-4 text-sm">
+          <p className="text-muted-foreground">
+            Match Reports are read and written directly in Supabase. The Google Sheet below is
+            kept as a dormant archive — it is only touched by the import here, never by a page
+            load or a submission.
+          </p>
+
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => runReconcile(true)}
+              disabled={backfillRunning !== null}
+              className="inline-flex items-center gap-2 rounded-md border border-border bg-background px-3 py-2 text-sm hover:bg-accent disabled:opacity-50"
+            >
+              {backfillRunning === "dry" ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4" />
+              )}
+              Reconcile against sheet (dry run)
+            </button>
+            <button
+              type="button"
+              onClick={() => runReconcile(false)}
+              disabled={backfillRunning !== null}
+              className="inline-flex items-center gap-2 rounded-md border border-border bg-background px-3 py-2 text-sm hover:bg-accent disabled:opacity-50"
+            >
+              {backfillRunning === "import" ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <DownloadCloud className="h-4 w-4" />
+              )}
+              Import sheet history
+            </button>
+          </div>
+
+          {backfillError && (
+            <div className="rounded-md bg-destructive/10 p-3 text-destructive">
+              <p className="font-medium">Import failed</p>
+              <p className="mt-0.5 break-words">{backfillError}</p>
+            </div>
+          )}
+
+          {backfill && (
+            <div className="space-y-3">
+              <div
+                className={cn(
+                  "rounded-md p-3",
+                  backfill.ok ? "bg-accent" : "bg-destructive/10 text-destructive",
+                )}
+              >
+                <p className="font-medium">
+                  {backfill.dryRun ? "Dry run" : "Import"} —{" "}
+                  {backfill.ok ? "reconciliation passed" : "reconciliation FAILED"}
+                </p>
+                {backfill.problems.map((p) => (
+                  <p key={p} className="mt-0.5">
+                    {p}
+                  </p>
+                ))}
+              </div>
+              <dl className="divide-y divide-border rounded-md border border-border">
+                <Row label="Sheet rows read">{backfill.sheet.rawRows}</Row>
+                <Row label="Valid sheet reports">{backfill.sheet.validReports}</Row>
+                <Row label="Sheet rows skipped (unparseable)">{backfill.sheet.skippedRows}</Row>
+                <Row label="Duplicate fixtures in sheet">
+                  {backfill.sheet.duplicateBaseIds.length}
+                </Row>
+                <Row label="Supabase reports before">{backfill.supabase.totalBefore}</Row>
+                <Row label="Supabase reports after">{backfill.supabase.totalAfter}</Row>
+                <Row label="Supabase live (not deleted)">{backfill.supabase.liveAfter}</Row>
+                <Row label="From sheet / from app">
+                  {backfill.supabase.fromSheet} / {backfill.supabase.fromApp}
+                </Row>
+                <Row label="Rows written this run">{backfill.imported}</Row>
+                <Row label="Skipped (app-owned / deleted)">
+                  {backfill.skippedAppOwned} / {backfill.skippedTombstoned}
+                </Row>
+                <Row label="Missing in Supabase">{backfill.missingInSupabase.length}</Row>
+                <Row label="Field mismatches">{backfill.fieldMismatches.length}</Row>
+              </dl>
+              {backfill.fieldMismatches.length > 0 && (
+                <ul className="space-y-0.5 text-xs text-muted-foreground">
+                  {backfill.fieldMismatches.slice(0, 10).map((m) => (
+                    <li key={`${m.report_id}-${m.field}`}>
+                      <code>{m.report_id}</code> · {m.field}: sheet “{m.sheet}” vs Supabase “
+                      {m.supabase}”
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+        </div>
+      </section>
+
+      <section className="rounded-lg border border-border bg-card overflow-hidden">
+        <div className="flex items-center justify-between gap-4 border-b border-border p-4">
+          <div className="flex items-center gap-3">
+            <div className="rounded-md bg-accent p-2">
               <FileSpreadsheet className="h-5 w-5 text-primary" />
             </div>
             <div>
               <h2 className="font-medium leading-tight">Google Sheets</h2>
               <p className="text-xs text-muted-foreground">
-                Match Reports · source of truth
+                Match Reports · archive &amp; rollback source only
               </p>
             </div>
           </div>
@@ -144,7 +278,7 @@ function IntegrationsPage() {
               {s && <BoolPill value={s.sheetTabExists} />}
             </span>
           </Row>
-          <Row label="Last successful write">
+          <Row label="Last sheet sync recorded">
             <div className="flex flex-col items-end">
               <span className={cn(!s?.lastWriteAt && "text-muted-foreground")}>
                 {fmtRelative(s?.lastWriteAt ?? null)}
@@ -156,7 +290,7 @@ function IntegrationsPage() {
               )}
             </div>
           </Row>
-          <Row label="Total reports mirrored">
+          <Row label="Reports imported from sheet">
             <span>{s?.totalWrites ?? 0}</span>
           </Row>
           <Row label="Checked">
@@ -173,8 +307,8 @@ function IntegrationsPage() {
               <div className="space-y-2">
                 <p className="font-medium">Column headers don't match the app's mapping</p>
                 <p className="text-muted-foreground">
-                  Match Reports are read by column position. Fix these headers in the sheet
-                  before submitting new reports.
+                  The archive is parsed by column position. Fix these headers in the sheet
+                  before importing its history again.
                 </p>
                 <ul className="space-y-0.5 text-xs text-muted-foreground">
                   {s.headerMismatches.map((m) => (

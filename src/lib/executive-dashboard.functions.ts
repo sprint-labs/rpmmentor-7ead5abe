@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
-import { parseSheetRows } from "@/lib/match-reports/schema";
+import type { MatchReportRow } from "@/lib/match-reports/schema";
 import { DASHBOARD_INTERACTION_TYPES } from "@/lib/interactions/schema";
 
 export interface ExecutiveBar {
@@ -93,12 +93,12 @@ export const getExecutiveDashboardStats = createServerFn({ method: "GET" })
         .filter((value): value is string => Boolean(value)),
     );
 
-    // Match Reports come from the same canonical Sheets pipeline as /reports.
-    const { readAllRows } = await import("@/lib/match-reports/sheets.server");
-    let reports: ReturnType<typeof parseSheetRows> = [];
+    // Match Reports come from the same canonical Supabase store as /reports.
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { listCanonicalReports } = await import("@/lib/match-reports/store.server");
+    let reports: MatchReportRow[] = [];
     try {
-      const { rows, firstDataRow } = await readAllRows();
-      reports = parseSheetRows(rows, firstDataRow);
+      reports = await listCanonicalReports(supabaseAdmin);
     } catch {
       reports = [];
     }

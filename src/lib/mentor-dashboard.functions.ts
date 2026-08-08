@@ -3,7 +3,6 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
 import { goalkeepers, calendarEvents, mentors } from "@/lib/mock-data";
 import type { TierLevel } from "@/lib/mock-data";
-import { parseSheetRows } from "@/lib/match-reports/schema";
 import {
   countCanonicalReportsForCoach,
   FALLBACK_MENTOR_ID,
@@ -192,14 +191,14 @@ export const getMentorDashboardStats = createServerFn({ method: "GET" })
       ),
     );
 
-    // Match Reports are read from the same canonical Sheets pipeline as the
+    // Match Reports are read from the same canonical Supabase store as the
     // report centre, then scoped to the authenticated coach identity.
     let reportsLast14 = 0;
     let coachReports: { goalkeeper: string; match_date: string | null }[] = [];
     if (coachIdentity) {
-      const { readAllRows } = await import("@/lib/match-reports/sheets.server");
-      const { rows, firstDataRow } = await readAllRows();
-      const parsed = parseSheetRows(rows, firstDataRow);
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const { listCanonicalReports } = await import("@/lib/match-reports/store.server");
+      const parsed = await listCanonicalReports(supabaseAdmin);
       // Same calendar-day window as the Interactions card.
       reportsLast14 = countCanonicalReportsForCoach(parsed, coachIdentity, periodFrom, periodTo);
       const needle = coachIdentity.trim().toLowerCase();
