@@ -78,7 +78,7 @@ export function AppShell() {
           </Link>
           <div className="flex-1" />
 
-          {user.actualRole === "super_admin" ? (
+          {user.actualRole === "super_admin" || user.actualRole === "mentor_manager" ? (
             <div className="hidden md:inline-flex items-center gap-1.5 h-7 pl-2 pr-1 rounded-md bg-primary/10 border border-primary/30 text-primary text-[10px] font-medium uppercase tracking-wider" title="Interface only — server permissions are unchanged. This preview does not grant or restrict backend access.">
               <ShieldCheck className="size-3" />
               {user.role !== user.actualRole ? (
@@ -95,15 +95,24 @@ export function AppShell() {
                 onChange={(e) => setViewAsRole(e.target.value as Role)}
                 className="h-6 bg-transparent text-primary text-[10px] font-medium uppercase tracking-wider focus:outline-none cursor-pointer"
               >
-                <option value="super_admin">Super Admin</option>
-                <option value="admin">Admin</option>
-                <option value="mentor_manager">Mentor Manager</option>
-                <option value="mentor">Mentor</option>
+                {user.actualRole === "super_admin" ? (
+                  <>
+                    <option value="super_admin">Super Admin</option>
+                    <option value="admin">Admin</option>
+                    <option value="mentor_manager">Mentor Manager</option>
+                    <option value="mentor">Mentor</option>
+                  </>
+                ) : (
+                  <>
+                    <option value="mentor_manager">Mentor Manager</option>
+                    <option value="mentor">Mentor</option>
+                  </>
+                )}
               </select>
               {user.role !== user.actualRole && (
                 <button
                   onClick={() => setViewAsRole(null)}
-                  title="Exit view as and return to Super Admin"
+                  title={user.actualRole === "super_admin" ? "Exit view as and return to Super Admin" : "Exit view as and return to Mentor Manager"}
                   className="ml-1 inline-flex items-center gap-1 h-5 pl-1.5 pr-2 rounded bg-primary text-primary-foreground hover:opacity-90"
                 >
                   <X className="size-3" />

@@ -165,7 +165,12 @@ async function loadSessionUser(session: Session | null): Promise<SessionUser | n
 
   const actualRole = role;
   const override = readViewAs();
-  const effectiveRole: Role = actualRole === "super_admin" && override ? override : actualRole;
+  // Super admins may preview any role. Mentor managers may preview the mentor
+  // interface so they can walk mentors through "what the lads see".
+  const effectiveRole: Role =
+    actualRole === "super_admin" && override ? override :
+    actualRole === "mentor_manager" && override === "mentor" ? "mentor" :
+    actualRole;
 
   return {
     id: uid,
@@ -236,7 +241,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch { /* ignore */ }
     setUser((u) => {
       if (!u || !u.actualRole) return u;
-      const next: Role = u.actualRole === "super_admin" && role ? role : u.actualRole;
+      let next: Role = u.actualRole;
+      if (u.actualRole === "super_admin" && role) next = role;
+      else if (u.actualRole === "mentor_manager" && role === "mentor") next = "mentor";
       return { ...u, role: next };
     });
   };

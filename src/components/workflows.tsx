@@ -6,6 +6,8 @@ import { useNavigate } from "@tanstack/react-router";
 import { X, CheckCircle2, Upload, AlertCircle, Paperclip, Search, Trash2, Loader2, RotateCcw } from "lucide-react";
 import { goalkeepers } from "@/lib/mock-data";
 import { listPlayers, type PlayerRosterRow } from "@/lib/players.functions";
+import { COMPETITIONS } from "@/lib/competitions";
+import { findPlayerByName, legacyGkSlugForName, normalisePersonName } from "@/lib/goalkeeper-player-link";
 import {
   attachInteractionAudio,
   createInteraction,
@@ -612,15 +614,33 @@ export function InteractionForm({
   }, [players]);
 
   /**
-   * The selected option. A canonical `players.id` is carried ONLY when the
-   * user picked a real player record; legacy roster profiles link to nothing.
+   * The selected option. A canonical `players.id` is carried when the user
+   * picked a real player record. The legacy roster slug is ALWAYS derived from
+   * the name so GK timelines (which key on `gkSlug`) still find the row.
    */
   const selectedPlayer = useMemo(() => players.find((p) => p.id === gkId) ?? null, [players, gkId]);
   const selection = useMemo(() => {
-    if (selectedPlayer) return { name: selectedPlayer.full_name, slug: "", playerId: selectedPlayer.id };
-    if (gk) return { name: gk.name, slug: gk.id, playerId: null as string | null };
+    if (selectedPlayer) {
+      const legacy =
+        goalkeepers.find(
+          (g) => normalisePersonName(g.name) === normalisePersonName(selectedPlayer.full_name),
+        ) ?? null;
+      return {
+        name: selectedPlayer.full_name,
+        slug: legacy?.id ?? legacyGkSlugForName(selectedPlayer.full_name),
+        playerId: selectedPlayer.id,
+      };
+    }
+    if (gk) {
+      const matched = findPlayerByName(players, gk.name);
+      return {
+        name: gk.name,
+        slug: gk.id,
+        playerId: matched?.id ?? (null as string | null),
+      };
+    }
     return null;
-  }, [selectedPlayer, gk]);
+  }, [selectedPlayer, gk, players]);
 
   useEffect(() => {
     if (selectedPlayer) {
@@ -1961,9 +1981,10 @@ function ReportForm({ onDone, prefillGoalkeeper, prefillMatchDate, prefillOppone
             placeholder="e.g. EFL Championship" maxLength={80} />
           <datalist id="mr-competition-suggestions">
             {Array.from(new Set([
+              ...COMPETITIONS,
               ...players.map((p) => p.league),
               ...goalkeepers.map((g) => g.league),
-            ].filter(Boolean))).sort().map((l) => (
+            ].filter(Boolean))).sort((a, b) => a.localeCompare(b)).map((l) => (
               <option key={l} value={l} />
             ))}
           </datalist>

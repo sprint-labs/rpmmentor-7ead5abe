@@ -13,6 +13,8 @@ import { WorkflowDialog, type WorkflowKind } from "@/components/workflows";
 import { useAuth } from "@/lib/auth";
 import { listMedia, openAsset, formatBytes, type MediaAsset } from "@/lib/media-store";
 import { UpdateClubButton } from "@/components/update-club-dialog";
+import { listPlayers } from "@/lib/players.functions";
+import { findPlayerByName, interactionBelongsToGoalkeeper } from "@/lib/goalkeeper-player-link";
 
 /** Inclusive 1–5 finite numeric guard for report scores/averages. */
 function isValidScore(v: unknown): v is number {
@@ -59,9 +61,25 @@ function GkDetail() {
   const { gk } = Route.useLoaderData();
   const { can, user } = useAuth();
   const { data: loggedInteractions } = useLoggedInteractions();
+  const listPlayersFn = useServerFn(listPlayers);
+  const { data: players } = useQuery({
+    queryKey: ["players", "roster"],
+    queryFn: () => listPlayersFn(),
+    staleTime: 5 * 60_000,
+  });
+  const linkedPlayer = useMemo(
+    () => findPlayerByName(players, gk.name),
+    [players, gk.name],
+  );
+  const linkedPlayerId = linkedPlayer?.id ?? (gk as { playerId?: string | null }).playerId ?? null;
+  const displayClub = linkedPlayer?.current_club || gk.club;
+  const displayLeague = linkedPlayer?.league || gk.league;
   const gkInteractions = useMemo(
-    () => (loggedInteractions ?? []).filter((i) => i.gkSlug === gk.id).sort((a, b) => +new Date(b.occurredAt) - +new Date(a.occurredAt)),
-    [loggedInteractions, gk.id],
+    () =>
+      (loggedInteractions ?? [])
+        .filter((i) => interactionBelongsToGoalkeeper(i, gk, linkedPlayerId))
+        .sort((a, b) => +new Date(b.occurredAt) - +new Date(a.occurredAt)),
+    [loggedInteractions, gk, linkedPlayerId],
   );
   
   const [gkMedia, setGkMedia] = useState<MediaAsset[]>([]);
@@ -221,31 +239,27 @@ function GkDetail() {
               {gk.onLoan && <Pill tone="info">On loan{gk.parentClub ? ` from ${gk.parentClub}` : ""}</Pill>}
             </div>
             <div className="mt-1 text-sm leading-snug text-muted-foreground">
-              {gk.tags.includes("Free Agent") ? "Free Agent" : (gk.club || "Club not recorded")}
-              {!gk.tags.includes("Free Agent") && gk.league ? ` · ${gk.league}` : ""}
+              {gk.tags.includes("Free Agent") ? "Free Agent" : (displayClub || "Club not recorded")}
+              {!gk.tags.includes("Free Agent") && displayLeague ? ` · ${displayLeague}` : ""}
               {" · "}{gk.nationality || "Nationality not recorded"}
               {" · "}{gk.age} yrs · {gk.height} · {gk.foot} foot
             </div>
-            {/* Only a genuine, stored players.id links a legacy profile to a
-                canonical Player Record. No name-based crosswalk is inferred. */}
-            {(() => {
-              const linkedPlayerId = (gk as { playerId?: string | null }).playerId ?? null;
-              return linkedPlayerId ? (
-                <div className="mt-1 flex flex-wrap items-center gap-3 text-xs">
-                  <Link to="/system/players/$playerId" params={{ playerId: linkedPlayerId }} className="text-primary hover:underline">
-                    View player record
-                  </Link>
-                  {/* Correct an out-of-date club right where it is displayed. */}
-                  <UpdateClubButton
-                    playerId={linkedPlayerId}
-                    playerName={gk.name}
-                    currentClub={gk.club ?? ""}
-                  />
-                </div>
-              ) : (
-                <div className="mt-1 text-xs text-muted-foreground">Player record not linked — this profile is read-only.</div>
-              );
-            })()}
+            {/* Prefer a name-matched players row so club corrections work even
+                when the legacy profile has no stored playerId. */}
+            {linkedPlayerId ? (
+              <div className="mt-1 flex flex-wrap items-center gap-3 text-xs">
+                <Link to="/system/players/$playerId" params={{ playerId: linkedPlayerId }} className="text-primary hover:underline">
+                  View player record
+                </Link>
+                <UpdateClubButton
+                  playerId={linkedPlayerId}
+                  playerName={gk.name}
+                  currentClub={displayClub ?? ""}
+                />
+              </div>
+            ) : (
+              <div className="mt-1 text-xs text-muted-foreground">Player record not linked — this profile is read-only.</div>
+            )}
 
             {gk.instagram && (
               <div className="mt-1 text-xs">
