@@ -4,9 +4,13 @@
 //     componentTagger (dev-only), VITE_* env injection, @ path alias, React/TanStack dedupe,
 //     error logger plugins, and sandbox detection (port/host/strictPort).
 // You can pass additional config via defineConfig({ vite: { ... }, etc... }) if needed.
+import { fileURLToPath } from "node:url";
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 import { mcpPlugin } from "@lovable.dev/mcp-js/stacks/tanstack/vite";
 import { VitePWA } from "vite-plugin-pwa";
+
+const isVercelBuild = process.env.VERCEL === "1";
+const vercelMcpStub = fileURLToPath(new URL("./src/lib/vercel-mcp-stub.ts", import.meta.url));
 
 export default defineConfig({
   tanstackStart: {
@@ -15,8 +19,16 @@ export default defineConfig({
     server: { entry: "server" },
   },
   vite: {
+    resolve: isVercelBuild
+      ? {
+          alias: [
+            { find: /^@lovable\.dev\/mcp-js$/, replacement: vercelMcpStub },
+            { find: /^@lovable\.dev\/mcp-js\/stacks\/tanstack$/, replacement: vercelMcpStub },
+          ],
+        }
+      : undefined,
     plugins: [
-      mcpPlugin(),
+      ...(isVercelBuild ? [] : [mcpPlugin()]),
       VitePWA({
         registerType: "autoUpdate",
         injectRegister: null,
