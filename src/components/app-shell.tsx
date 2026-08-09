@@ -32,6 +32,7 @@ const NAV: NavItem[] = [
   { to: "/system/permissions", label: "Permission Check", icon: ShieldCheck, perm: "system.manage" },
   { to: "/system/integrations", label: "Integrations", icon: Plug, perm: "system.manage" },
   { to: "/system/data-quality", label: "Data Quality", icon: Database, perm: "system.manage" },
+  { to: "/system/sync-verification", label: "Sync Verification", icon: ShieldCheck, perm: "system.manage" },
 ];
 
 export function AppShell() {
