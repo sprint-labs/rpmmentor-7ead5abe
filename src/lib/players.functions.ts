@@ -37,7 +37,7 @@ export const listPlayers = createServerFn({ method: "GET" })
 
 export const getPlayer = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: { id: string }) => {
+  .validator((data: { id: string }) => {
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(data?.id ?? "")) {
       throw new Error("A canonical player id is required.");
     }
@@ -68,7 +68,7 @@ export const getPlayer = createServerFn({ method: "GET" })
  */
 export const updatePlayerClub = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: { id: string; currentClub: string }) => {
+  .validator((data: { id: string; currentClub: string }) => {
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(data?.id ?? "")) {
       throw new Error("A canonical player id is required.");
     }

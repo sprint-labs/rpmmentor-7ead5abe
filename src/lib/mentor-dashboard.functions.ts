@@ -107,7 +107,7 @@ const dashboardInputSchema = z
 
 export const getMentorDashboardStats = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data) => dashboardInputSchema.parse(data))
+  .validator((data) => dashboardInputSchema.parse(data))
   .handler(async ({ context, data }): Promise<MentorDashboardStats> => {
     const { supabase, userId } = context;
 

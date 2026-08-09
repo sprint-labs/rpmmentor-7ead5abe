@@ -16,7 +16,7 @@ const logInput = z.object({
 
 export const logDashboardClick = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: z.infer<typeof logInput>) => logInput.parse(data))
+  .validator((data: z.infer<typeof logInput>) => logInput.parse(data))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     const { error } = await supabase.from("dashboard_click_events").insert({

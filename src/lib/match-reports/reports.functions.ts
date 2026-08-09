@@ -75,7 +75,7 @@ export const listMatchReports = createServerFn({ method: "GET" })
 
 export const getMatchReport = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: { reportId: string }) =>
+  .validator((data: { reportId: string }) =>
     z.object({ reportId: z.string().min(1) }).parse(data),
   )
   .handler(async ({ data }) => {
@@ -128,7 +128,7 @@ export type SubmitMatchReportResult =
 
 export const submitMatchReport = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: unknown) => {
+  .validator((data: unknown) => {
     return z
       .object({
         payload: matchReportSubmitSchema,
@@ -561,7 +561,7 @@ export const submitMatchReport = createServerFn({ method: "POST" })
 
 export const deleteMatchReport = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: unknown) =>
+  .validator((data: unknown) =>
     z.object({ reportId: z.string().min(1) }).parse(data),
   )
   .handler(async ({ data, context }) => {

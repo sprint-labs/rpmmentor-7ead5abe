@@ -174,7 +174,7 @@ async function callGateway(systemPrompt: string, userText: string) {
 
 export const summarizeTranscript = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: unknown) => SummaryInputSchema.parse(data))
+  .validator((data: unknown) => SummaryInputSchema.parse(data))
   .handler(async ({ data }) => {
     const result = await callGateway(
       SUMMARY_SYSTEM_PROMPT,
@@ -195,7 +195,7 @@ export const summarizeTranscript = createServerFn({ method: "POST" })
 
 export const rewriteTranscript = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: unknown) => RewriteInputSchema.parse(data))
+  .validator((data: unknown) => RewriteInputSchema.parse(data))
   .handler(async ({ data }) => {
     const result = await callGateway(
       REWRITE_SYSTEM_PROMPT,
@@ -215,7 +215,7 @@ export const rewriteTranscript = createServerFn({ method: "POST" })
 
 export const analyzeReport = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: unknown) => AnalysisInputSchema.parse(data))
+  .validator((data: unknown) => AnalysisInputSchema.parse(data))
   .handler(async ({ data, context }) => {
     const { data: roleRows, error: roleError } = await context.supabase
       .from("user_roles")
