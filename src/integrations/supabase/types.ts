@@ -330,6 +330,48 @@ export type Database = {
           },
         ]
       }
+      match_report_cutover_state: {
+        Row: {
+          created_at: string
+          expected_sheet_count: number | null
+          id: string
+          reconciled_at: string | null
+          reconciled_by: string | null
+          reconciled_by_label: string | null
+          reconciliation: Json
+          run_id: string | null
+          sheet_digest: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          expected_sheet_count?: number | null
+          id: string
+          reconciled_at?: string | null
+          reconciled_by?: string | null
+          reconciled_by_label?: string | null
+          reconciliation?: Json
+          run_id?: string | null
+          sheet_digest?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          expected_sheet_count?: number | null
+          id?: string
+          reconciled_at?: string | null
+          reconciled_by?: string | null
+          reconciled_by_label?: string | null
+          reconciliation?: Json
+          run_id?: string | null
+          sheet_digest?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       match_report_submissions: {
         Row: {
           confirmed_duplicate: boolean
@@ -815,9 +857,24 @@ export type Database = {
         }
         Returns: boolean
       }
+      import_match_report_sheet_batch: {
+        Args: { _rows: Json; _run_id: string }
+        Returns: {
+          imported_report_id: string
+        }[]
+      }
       interaction_demo_fingerprint: {
         Args: { _goalkeeper_name: string; _notes: string; _occurred_at: string }
         Returns: string
+      }
+      soft_delete_match_report_journey_exact: {
+        Args: { _report_id: string }
+        Returns: {
+          deleted_interaction_id: string
+          deleted_ledger_count: number
+          deleted_report_id: string
+          deleted_row_index: number
+        }[]
       }
     }
     Enums: {
