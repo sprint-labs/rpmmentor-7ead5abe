@@ -25,6 +25,7 @@ import { Route as AccountRouteImport } from './routes/account'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ReportsIndexRouteImport } from './routes/reports.index'
 import { Route as SystemUsersRouteImport } from './routes/system.users'
+import { Route as SystemSyncVerificationRouteImport } from './routes/system.sync-verification'
 import { Route as SystemPermissionsRouteImport } from './routes/system.permissions'
 import { Route as SystemIntegrationsRouteImport } from './routes/system.integrations'
 import { Route as SystemGithubRouteImport } from './routes/system.github'
@@ -117,6 +118,11 @@ const ReportsIndexRoute = ReportsIndexRouteImport.update({
 const SystemUsersRoute = SystemUsersRouteImport.update({
   id: '/system/users',
   path: '/system/users',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SystemSyncVerificationRoute = SystemSyncVerificationRouteImport.update({
+  id: '/system/sync-verification',
+  path: '/system/sync-verification',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SystemPermissionsRoute = SystemPermissionsRouteImport.update({
@@ -212,6 +218,7 @@ export interface FileRoutesByFullPath {
   '/system/github': typeof SystemGithubRoute
   '/system/integrations': typeof SystemIntegrationsRoute
   '/system/permissions': typeof SystemPermissionsRoute
+  '/system/sync-verification': typeof SystemSyncVerificationRoute
   '/system/users': typeof SystemUsersRoute
   '/reports/': typeof ReportsIndexRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
@@ -243,6 +250,7 @@ export interface FileRoutesByTo {
   '/system/github': typeof SystemGithubRoute
   '/system/integrations': typeof SystemIntegrationsRoute
   '/system/permissions': typeof SystemPermissionsRoute
+  '/system/sync-verification': typeof SystemSyncVerificationRoute
   '/system/users': typeof SystemUsersRoute
   '/reports': typeof ReportsIndexRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
@@ -275,6 +283,7 @@ export interface FileRoutesById {
   '/system/github': typeof SystemGithubRoute
   '/system/integrations': typeof SystemIntegrationsRoute
   '/system/permissions': typeof SystemPermissionsRoute
+  '/system/sync-verification': typeof SystemSyncVerificationRoute
   '/system/users': typeof SystemUsersRoute
   '/reports/': typeof ReportsIndexRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
@@ -308,6 +317,7 @@ export interface FileRouteTypes {
     | '/system/github'
     | '/system/integrations'
     | '/system/permissions'
+    | '/system/sync-verification'
     | '/system/users'
     | '/reports/'
     | '/.lovable/oauth/consent'
@@ -339,6 +349,7 @@ export interface FileRouteTypes {
     | '/system/github'
     | '/system/integrations'
     | '/system/permissions'
+    | '/system/sync-verification'
     | '/system/users'
     | '/reports'
     | '/.lovable/oauth/consent'
@@ -370,6 +381,7 @@ export interface FileRouteTypes {
     | '/system/github'
     | '/system/integrations'
     | '/system/permissions'
+    | '/system/sync-verification'
     | '/system/users'
     | '/reports/'
     | '/.lovable/oauth/consent'
@@ -401,6 +413,7 @@ export interface RootRouteChildren {
   SystemGithubRoute: typeof SystemGithubRoute
   SystemIntegrationsRoute: typeof SystemIntegrationsRoute
   SystemPermissionsRoute: typeof SystemPermissionsRoute
+  SystemSyncVerificationRoute: typeof SystemSyncVerificationRoute
   SystemUsersRoute: typeof SystemUsersRoute
   ReportsIndexRoute: typeof ReportsIndexRoute
   DotlovableOauthConsentRoute: typeof DotlovableOauthConsentRoute
@@ -521,6 +534,13 @@ declare module '@tanstack/react-router' {
       path: '/system/users'
       fullPath: '/system/users'
       preLoaderRoute: typeof SystemUsersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/system/sync-verification': {
+      id: '/system/sync-verification'
+      path: '/system/sync-verification'
+      fullPath: '/system/sync-verification'
+      preLoaderRoute: typeof SystemSyncVerificationRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/system/permissions': {
@@ -653,6 +673,7 @@ const rootRouteChildren: RootRouteChildren = {
   SystemGithubRoute: SystemGithubRoute,
   SystemIntegrationsRoute: SystemIntegrationsRoute,
   SystemPermissionsRoute: SystemPermissionsRoute,
+  SystemSyncVerificationRoute: SystemSyncVerificationRoute,
   SystemUsersRoute: SystemUsersRoute,
   ReportsIndexRoute: ReportsIndexRoute,
   DotlovableOauthConsentRoute: DotlovableOauthConsentRoute,
