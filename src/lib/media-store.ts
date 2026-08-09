@@ -202,17 +202,24 @@ async function uploadObject(
 ): Promise<void> {
   const url = import.meta.env['VITE_SUPABASE_URL'];
   const anonKey = import.meta.env['VITE_SUPABASE_PUBLISHABLE_KEY'];
-  const token = onProgress
-    ? (await supabase.auth.getSession()).data.session?.access_token
-    : undefined;
 
-  if (!onProgress || typeof XMLHttpRequest === "undefined" || !url || !anonKey || !token) {
+  // Storage RLS only admits requests that arrive as `authenticated`. An expired
+  // or missing session reaches Postgres as `anon` and fails with an opaque
+  // "violates row-level security policy" error, so refresh first and, if there
+  // is genuinely no session, say so in words the user can act on.
+  const token = await currentAccessToken();
+  if (!token) {
+    throw new Error("Upload failed: your session has expired. Sign in again and retry.");
+  }
+
+  if (!onProgress || typeof XMLHttpRequest === "undefined" || !url || !anonKey) {
     const { error } = await supabase.storage
       .from(BUCKET)
       .upload(path, file, { contentType: file.type || undefined, upsert: false });
     if (error) throw new Error(`Upload failed: ${error.message}`);
     return;
   }
+
 
   await new Promise<void>((resolve, reject) => {
     const xhr = new XMLHttpRequest();
