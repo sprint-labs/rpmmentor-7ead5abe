@@ -188,6 +188,26 @@ export async function listAuditLog(limit = 200): Promise<MediaAuditEntry[]> {
 // ---------- Upload / list / signed URLs ----------
 
 /**
+ * A usable access token, refreshing an expired one first.
+ *
+ * `getSession()` returns the stored session even when it has just expired; the
+ * storage request would then be evaluated as `anon` and rejected by RLS.
+ */
+async function currentAccessToken(): Promise<string | null> {
+  const { data } = await supabase.auth.getSession();
+  const session = data.session;
+  if (!session) return null;
+
+  const expiresAt = session.expires_at ? session.expires_at * 1000 : 0;
+  if (expiresAt && expiresAt - Date.now() < 60_000) {
+    const { data: refreshed } = await supabase.auth.refreshSession();
+    return refreshed.session?.access_token ?? null;
+  }
+  return session.access_token ?? null;
+}
+
+
+/**
  * Upload the object bytes with real byte-level progress.
  *
  * supabase-js uses `fetch`, which cannot report upload progress, so when a
