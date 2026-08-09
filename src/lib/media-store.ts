@@ -188,6 +188,26 @@ export async function listAuditLog(limit = 200): Promise<MediaAuditEntry[]> {
 // ---------- Upload / list / signed URLs ----------
 
 /**
+ * A usable access token, refreshing an expired one first.
+ *
+ * `getSession()` returns the stored session even when it has just expired; the
+ * storage request would then be evaluated as `anon` and rejected by RLS.
+ */
+async function currentAccessToken(): Promise<string | null> {
+  const { data } = await supabase.auth.getSession();
+  const session = data.session;
+  if (!session) return null;
+
+  const expiresAt = session.expires_at ? session.expires_at * 1000 : 0;
+  if (expiresAt && expiresAt - Date.now() < 60_000) {
+    const { data: refreshed } = await supabase.auth.refreshSession();
+    return refreshed.session?.access_token ?? null;
+  }
+  return session.access_token ?? null;
+}
+
+
+/**
  * Upload the object bytes with real byte-level progress.
  *
  * supabase-js uses `fetch`, which cannot report upload progress, so when a
@@ -202,17 +222,24 @@ async function uploadObject(
 ): Promise<void> {
   const url = import.meta.env['VITE_SUPABASE_URL'];
   const anonKey = import.meta.env['VITE_SUPABASE_PUBLISHABLE_KEY'];
-  const token = onProgress
-    ? (await supabase.auth.getSession()).data.session?.access_token
-    : undefined;
 
-  if (!onProgress || typeof XMLHttpRequest === "undefined" || !url || !anonKey || !token) {
+  // Storage RLS only admits requests that arrive as `authenticated`. An expired
+  // or missing session reaches Postgres as `anon` and fails with an opaque
+  // "violates row-level security policy" error, so refresh first and, if there
+  // is genuinely no session, say so in words the user can act on.
+  const token = await currentAccessToken();
+  if (!token) {
+    throw new Error("Upload failed: your session has expired. Sign in again and retry.");
+  }
+
+  if (!onProgress || typeof XMLHttpRequest === "undefined" || !url || !anonKey) {
     const { error } = await supabase.storage
       .from(BUCKET)
       .upload(path, file, { contentType: file.type || undefined, upsert: false });
     if (error) throw new Error(`Upload failed: ${error.message}`);
     return;
   }
+
 
   await new Promise<void>((resolve, reject) => {
     const xhr = new XMLHttpRequest();
