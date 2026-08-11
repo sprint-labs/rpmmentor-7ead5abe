@@ -1,9 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { isRestrictedDuringMaintenance } from "./maintenance";
 
-describe("temporary maintenance access", () => {
-  it.each(["admin", "mentor_manager", "mentor"])("restricts %s accounts", (role) => {
-    expect(isRestrictedDuringMaintenance({ role, actualRole: role })).toBe(true);
+describe("maintenance access", () => {
+  it.each(["admin", "mentor_manager", "mentor"])("allows %s accounts while maintenance is disabled", (role) => {
+    expect(isRestrictedDuringMaintenance({ role, actualRole: role })).toBe(false);
+  });
+
+  it.each(["admin", "mentor_manager", "mentor"])("restricts %s accounts when maintenance is enabled", (role) => {
+    expect(isRestrictedDuringMaintenance({ role, actualRole: role }, true)).toBe(true);
   });
 
   it("allows a Super Admin account", () => {
@@ -18,11 +22,11 @@ describe("temporary maintenance access", () => {
     );
   });
 
-  it("does not treat an interface role as a Super Admin bypass", () => {
-    expect(isRestrictedDuringMaintenance({ role: "super_admin", actualRole: "mentor" })).toBe(true);
+  it("does not treat an interface role as a Super Admin bypass when maintenance is enabled", () => {
+    expect(isRestrictedDuringMaintenance({ role: "super_admin", actualRole: "mentor" }, true)).toBe(true);
   });
 
-  it("fails closed when the actual database role is unavailable", () => {
+  it("fails closed when the actual database role is unavailable, even when maintenance is disabled", () => {
     expect(isRestrictedDuringMaintenance({ role: "super_admin" })).toBe(true);
   });
 

@@ -110,7 +110,7 @@ Several seemingly unusual pieces are intentional:
 - `vite.config.ts` aliases the Lovable MCP package to `src/lib/vercel-mcp-stub.ts` during Vercel builds. The original package reaches a Cloudflare-only import; removing the alias can break Vercel builds.
 - Server-only Supabase imports are often dynamic inside TanStack server-function handlers. This avoids the server-function splitter removing or bundling code incorrectly.
 - The SSR wrapper and error capture code exist because Nitro can turn some thrown handlers into unhelpful JSON 500 responses.
-- `MAINTENANCE_MODE` is currently `true` in `src/lib/maintenance.ts`. During this recovery phase, every authenticated role except a genuine Super Admin is restricted. Do not change this casually: turning it off is a production rollout decision.
+- `MAINTENANCE_MODE` is currently `false` in `src/lib/maintenance.ts`. This is the normal live state. It is an emergency/recovery gate; enable it only with explicit production-incident approval and confirm that a genuine Super Admin still has access.
 - Match Report identifiers, duplicate windows, ledger records and soft deletion are deliberately defensive because the history contains legacy Sheet-era identities and duplicate fixtures. Preserve these invariants when changing report code.
 
 ## Safe Cursor workflow
@@ -173,7 +173,7 @@ Use this short release gate:
 ## Current known follow-ups
 
 1. Deliberately provision the remaining RPM mentor accounts only after their real email addresses/inboxes exist; assign roles through the Super Admin flow, never by sharing a common password.
-2. Decide when to end maintenance mode after user/account and Match Report acceptance testing.
+2. Keep maintenance mode off during normal operation; re-enable it only for a documented incident and after testing its Super Admin access path.
 3. Reconcile the repository's migration history with the live database into a reviewed forward-only baseline before the next schema project.
 4. Verify/copy the underlying media objects and any desired historical interaction/calendar records separately. Their metadata/history is not proof that every original storage object or auth-linked record migrated.
 5. Remove the legacy tracked `.env` safely and rotate any affected credentials in a dedicated security change.
