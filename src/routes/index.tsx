@@ -217,11 +217,9 @@ function Dashboard() {
       {/* KPI strip */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
         <Link
-          to="/insights/$metric"
-          params={{ metric: "goalkeepers" }}
-          search={{ from: period.fromDate, to: period.toDate, level: "" }}
+          to="/goalkeepers"
           className="block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-          aria-label="Break down total goalkeepers"
+          aria-label="View all goalkeepers"
         >
           <StatCard
             label="Total Goalkeepers"
