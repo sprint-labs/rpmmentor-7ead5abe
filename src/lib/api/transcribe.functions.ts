@@ -150,7 +150,7 @@ export const transcribeVoiceNote = createServerFn({ method: "POST" })
     }
     const payload = parsed.data;
 
-    const apiKey = process.env.LOVABLE_API_KEY;
+    const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) return { ok: false as const, error: "AI service is not configured." };
 
     const mime = normalizeAudioMimeType(payload.mimeType);
@@ -167,12 +167,12 @@ export const transcribeVoiceNote = createServerFn({ method: "POST" })
     const form = new FormData();
     const audioArrayBuffer = new ArrayBuffer(bytes.byteLength);
     new Uint8Array(audioArrayBuffer).set(bytes);
-    form.append("model", "openai/gpt-4o-mini-transcribe");
+    form.append("model", "gpt-4o-mini-transcribe");
     form.append("file", new Blob([audioArrayBuffer], { type: mime }), fileName);
     form.append("response_format", "json");
     form.append("include[]", "logprobs");
 
-    const res = await fetch("https://ai.gateway.lovable.dev/v1/audio/transcriptions", {
+    const res = await fetch("https://api.openai.com/v1/audio/transcriptions", {
       method: "POST",
       headers: { Authorization: `Bearer ${apiKey}` },
       body: form,
@@ -181,7 +181,7 @@ export const transcribeVoiceNote = createServerFn({ method: "POST" })
     if (!res.ok) {
       if (res.status === 429) return { ok: false as const, error: "Rate limit reached — try again in a moment." };
       if (res.status === 402) return { ok: false as const, error: "AI credits exhausted — add credits in workspace settings." };
-      console.error("transcribeVoiceNote gateway error", res.status);
+      console.error("transcribeVoiceNote OpenAI error", res.status);
       return { ok: false as const, error: `Transcription failed (${res.status}).` };
     }
 
