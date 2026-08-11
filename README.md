@@ -1,5 +1,7 @@
 # RPM Mentor Hub
 
+> **Current live operating baseline:** production is [rpmmentor.com](https://rpmmentor.com), deployed through Vercel and backed by the standalone RPM Supabase project. Before changing code, infrastructure or data, read [docs/RPM-LIVE-OPERATING-GUIDE.md](docs/RPM-LIVE-OPERATING-GUIDE.md) and [AGENTS.md](AGENTS.md). The historical Lovable instructions below explain the code's origin; they are not the current production deployment instructions.
+
 Build a premium football operations platform for RPM (Refuel Performance Management), focused on goalkeeper development, mentor management and scouting operations.
 
 This is an internal staff platform used by mentors, scouts, analysts and management.
@@ -208,15 +210,13 @@ Focus on usability, workflows and information architecture rather than flashy ma
 
 This project was built with [Lovable](https://lovable.dev).
 
-**Live app**: https://rpmmentor.lovable.app
+**Production app**: https://rpmmentor.com
 
-## Build with Lovable
+**Historical Lovable app/origin**: https://rpmmentor.lovable.app
 
-Continue developing this project in the [Lovable editor](https://lovable.dev/projects/09000fc3-6e10-463a-b90f-7b0d3fb20b5a).
+## Lovable historical origin
 
-- **Ship faster**: describe what you want to build and Lovable handles the code.
-- **Stay in sync**: every change made in Lovable is committed straight to this repository.
-- **Full ownership**: this code is yours. Push to `main` on GitHub and your changes sync back into Lovable, ready for your next prompt.
+This project began in the [Lovable editor](https://lovable.dev/projects/09000fc3-6e10-463a-b90f-7b0d3fb20b5a). It explains parts of the generated code and remains useful for historical reference, but it is **not** the deployment or backend control plane for `rpmmentor.com`. Use the operating guide above before making a production-facing change.
 
 ## Development
 

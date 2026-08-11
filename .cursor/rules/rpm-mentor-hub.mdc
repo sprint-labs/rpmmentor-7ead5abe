@@ -1,0 +1,14 @@
+---
+description: Guardrails for the live RPM Mentor Hub repository
+alwaysApply: true
+---
+
+Read `AGENTS.md` and `docs/RPM-LIVE-OPERATING-GUIDE.md` before making a plan or edit.
+
+Use only the RPM Mentor Hub repository and its current `origin/main` baseline. The live app is deployed from Vercel and uses the standalone RPM Supabase project described in the guide. Do not substitute GKHQ, Split Decision, an old Lovable Cloud project, a preview URL, or a Google Sheet.
+
+You may plan, branch, edit, test, and create local commits. You must not push, merge, deploy, modify Vercel settings, modify Supabase Auth/RLS/data, run production migrations, invite users, alter DNS, or expose/commit credentials unless the owner explicitly approves that exact action in the current request.
+
+Treat `public.match_reports_cache` as the canonical live Match Report store. Google Sheets is only archive/backfill/rollback material. Do not use name-only matching for data changes. Do not run `supabase db push` against production: the live database has documented safety adjustments that must be preserved.
+
+For every change, state the scope and acceptance criteria first. Keep the patch focused. Run the most relevant tests plus `npm run build` for build/runtime work and `git diff --check` before committing. Report failures honestly; never claim a deploy, database migration, or live verification from a local check.
