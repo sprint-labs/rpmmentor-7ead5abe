@@ -14,13 +14,13 @@ import { toast } from "sonner";
 
 function NotFoundComponent() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4">
+    <main id="main-content" tabIndex={-1} className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="max-w-md text-center">
         <h1 className="text-7xl font-display font-bold uppercase tracking-[0.02em] text-foreground">404</h1>
         <p className="mt-3 text-sm text-muted-foreground">That route doesn't exist.</p>
         <a href="/" className="mt-5 inline-flex h-9 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground">Back to dashboard</a>
       </div>
-    </div>
+    </main>
   );
 }
 
@@ -28,13 +28,13 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   const router = useRouter();
   useEffect(() => { reportLovableError(error, { boundary: "tanstack_root_error_component" }); }, [error]);
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4">
+    <main id="main-content" tabIndex={-1} className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="max-w-md text-center">
         <h1 className="text-xl font-semibold">Something went wrong</h1>
         <p className="mt-2 text-sm text-muted-foreground">{error.message}</p>
         <button onClick={() => { router.invalidate(); reset(); }} className="mt-4 h-9 px-4 rounded-md bg-primary text-primary-foreground text-sm font-medium">Try again</button>
       </div>
-    </div>
+    </main>
   );
 }
 

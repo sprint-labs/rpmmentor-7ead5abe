@@ -77,7 +77,7 @@ function InstallPage() {
   useEffect(() => { setTab(active); }, [active]);
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
+    <main id="main-content" tabIndex={-1} className="mx-auto max-w-2xl space-y-6">
       <header className="space-y-2">
         <div className="flex size-12 items-center justify-center rounded-lg bg-primary/15 text-primary">
           <Download className="size-6" />
@@ -177,7 +177,7 @@ function InstallPage() {
           <li className="flex gap-2"><CheckCircle2 className="mt-0.5 size-4 shrink-0 text-primary" /> Automatic updates when a new version ships</li>
         </ul>
       </Section>
-    </div>
+    </main>
   );
 }
 
