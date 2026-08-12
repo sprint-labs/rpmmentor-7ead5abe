@@ -95,7 +95,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 });
 
 const bootSplashCss = `
-#boot-splash{position:fixed;inset:0;z-index:2147483647;display:flex;align-items:center;justify-content:center;background:#0A0A0A;transition:opacity .35s ease-out;opacity:1;pointer-events:auto}
+#boot-splash{position:fixed;inset:0;z-index:2147483646;display:flex;align-items:center;justify-content:center;background:#0A0A0A;transition:opacity .35s ease-out;opacity:1;pointer-events:auto}
 #boot-splash[data-hide="1"]{opacity:0;pointer-events:none}
 #boot-splash .bs-wrap{display:flex;flex-direction:column;align-items:center;gap:18px}
 #boot-splash .bs-mark{width:64px;height:64px;border-radius:14px;background:linear-gradient(135deg,#00E5A0 0%,#00B37A 100%);display:flex;align-items:center;justify-content:center;color:#0A0A0A;font-family:'Chakra Petch',system-ui,sans-serif;font-weight:700;font-size:26px;letter-spacing:.02em;box-shadow:0 10px 40px rgba(0,229,160,.25);animation:bs-pulse 1.6s ease-in-out infinite}
@@ -118,6 +118,7 @@ function RootShell({ children }: { children: ReactNode }) {
         <HeadContent />
       </head>
       <body>
+        <a className="skip-link" href="#main-content">Skip to main content</a>
         <div id="boot-splash" aria-hidden="true">
           <div className="bs-wrap">
             <div className="bs-mark">GK</div>

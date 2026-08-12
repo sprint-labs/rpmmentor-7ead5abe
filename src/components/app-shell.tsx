@@ -3,7 +3,7 @@ import { LayoutDashboard, Users, UserCog, MessageSquare, FileText, FolderOpen, B
 import { useTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 import { useAuth, ROLE_LABEL, type Permission, type Role } from "@/lib/auth";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { WorkflowDialog, type WorkflowKind } from "@/components/workflows";
 import { useNotifications } from "@/lib/notifications";
 import { formatRelative } from "@/lib/mock-data";
@@ -43,6 +43,10 @@ export function AppShell() {
   const [bellOpen, setBellOpen] = useState(false);
   const [workflow, setWorkflow] = useState<WorkflowKind | null>(null);
   const bellRef = useRef<HTMLDivElement>(null);
+  const menuTriggerRef = useRef<HTMLButtonElement>(null);
+  const menuCloseRef = useRef<HTMLButtonElement>(null);
+  const menuDialogRef = useRef<HTMLElement>(null);
+  const wasMenuOpenRef = useRef(false);
   const notif = useNotifications();
 
   // Public routes that don't require auth
@@ -56,6 +60,43 @@ export function AppShell() {
 
   // Close drawer on route change
   useEffect(() => { setNavOpen(false); }, [path]);
+
+  useEffect(() => {
+    if (navOpen) {
+      requestAnimationFrame(() => menuCloseRef.current?.focus());
+    } else if (wasMenuOpenRef.current) {
+      menuTriggerRef.current?.focus();
+    }
+    wasMenuOpenRef.current = navOpen;
+  }, [navOpen]);
+
+  function closeMenu() {
+    setNavOpen(false);
+  }
+
+  function trapMenuFocus(event: KeyboardEvent<HTMLElement>) {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      closeMenu();
+      return;
+    }
+    if (event.key !== "Tab" || !menuDialogRef.current) return;
+
+    const focusable = Array.from(menuDialogRef.current.querySelectorAll<HTMLElement>(
+      'a[href], button:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])',
+    )).filter((element) => !element.hasAttribute("hidden"));
+    if (!focusable.length) return;
+
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  }
 
   if (loading) return <div className="min-h-screen bg-background" />;
   if (!user) return isPublic ? <Outlet /> : <div className="min-h-screen bg-background" />;
@@ -87,7 +128,7 @@ export function AppShell() {
       <div className="flex flex-1 flex-col min-w-0">
         <header className="h-16 md:h-14 flex items-center gap-2 md:gap-3 px-3 sm:px-4 md:px-6 border-b border-border bg-sidebar/95 backdrop-blur sticky top-0 z-10">
           <Link to="/" className="size-11 md:w-auto md:h-auto flex items-center justify-center md:justify-start gap-2.5 shrink-0 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
-            <BrandMark className="size-9 shrink-0" alt="Mentor Hub" />
+            <BrandMark className="size-9 shrink-0" alt="" />
             <span className="hidden sm:inline font-semibold text-foreground tracking-tight">Mentor Hub</span>
           </Link>
           <div className="flex-1" />
@@ -107,6 +148,7 @@ export function AppShell() {
               <select
                 value={user.role}
                 onChange={(e) => setViewAsRole(e.target.value as Role)}
+                aria-label="View interface as role"
                 className="h-6 bg-transparent text-primary text-[10px] font-medium uppercase tracking-wider focus:outline-none cursor-pointer"
               >
                 {user.actualRole === "super_admin" ? (
@@ -140,8 +182,14 @@ export function AppShell() {
           <ThemeToggle />
           {can("alerts.view") && (
             <div ref={bellRef} className="relative">
-              <button onClick={() => setBellOpen((v) => !v)} className="relative size-11 md:size-9 grid place-items-center rounded-md border border-border hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
-                <BellRing className="size-4" />
+              <button
+                onClick={() => setBellOpen((v) => !v)}
+                aria-label={bellOpen ? "Close duty notifications" : "Open duty notifications"}
+                aria-expanded={bellOpen}
+                aria-controls="duty-notifications"
+                className="relative size-11 md:size-9 grid place-items-center rounded-md border border-border hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              >
+                <BellRing className="size-4" aria-hidden="true" />
                 {notif.unread > 0 && (
                   <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-destructive text-destructive-foreground text-[10px] font-mono font-semibold grid place-items-center">
                     {notif.unread > 9 ? "9+" : notif.unread}
@@ -151,7 +199,7 @@ export function AppShell() {
               {bellOpen && (
                 <>
                   <div className="fixed inset-0 z-20" onClick={() => setBellOpen(false)} />
-                  <div className="fixed inset-x-3 top-16 z-30 w-auto rounded-md border border-border bg-popover shadow-xl overflow-hidden md:absolute md:inset-x-auto md:top-auto md:right-0 md:mt-2 md:w-[360px]">
+                  <div id="duty-notifications" role="region" aria-label="Duty notifications" className="fixed inset-x-3 top-16 z-30 w-auto rounded-md border border-border bg-popover shadow-xl overflow-hidden md:absolute md:inset-x-auto md:top-auto md:right-0 md:mt-2 md:w-[360px]">
                     <div className="flex items-center justify-between px-3 py-2 border-b border-border">
                       <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Duty Notifications</div>
                       <div className="flex items-center gap-1">
@@ -206,16 +254,19 @@ export function AppShell() {
             </button>
           )}
           <button
+            ref={menuTriggerRef}
             onClick={() => setNavOpen(true)}
             title="Open menu"
             aria-label="Open menu"
+            aria-expanded={navOpen}
+            aria-controls="main-navigation"
             className="inline-flex size-11 md:w-auto md:h-9 md:px-3 items-center justify-center gap-1.5 rounded-md border border-border text-xs uppercase tracking-[0.06em] font-semibold hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           >
             <Menu className="size-4" />
             <span className="hidden md:inline">Menu</span>
           </button>
         </header>
-        <main className="flex-1 min-w-0 p-4 md:p-6">
+        <main id="main-content" tabIndex={-1} className="flex-1 min-w-0 p-4 md:p-6">
           <OfflineBanner />
           <SyncManager />
           <Outlet />
@@ -226,16 +277,25 @@ export function AppShell() {
       {/* Slide-out navigation drawer */}
       {navOpen && (
         <>
-          <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm" onClick={() => setNavOpen(false)} />
-          <aside className="fixed inset-y-0 right-0 z-50 w-[min(22rem,calc(100vw-1rem))] md:w-72 flex flex-col border-l border-sidebar-border bg-sidebar shadow-2xl">
+          <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm" aria-hidden="true" onClick={closeMenu} />
+          <aside
+            ref={menuDialogRef}
+            id="main-navigation"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="menu-title"
+            onKeyDown={trapMenuFocus}
+            className="fixed inset-y-0 right-0 z-50 w-[min(22rem,calc(100vw-1rem))] md:w-72 flex flex-col border-l border-sidebar-border bg-sidebar shadow-2xl"
+          >
             <div className="flex items-center gap-2.5 px-4 min-h-16 md:h-14 border-b border-sidebar-border">
               <BrandMark className="size-7 shrink-0" alt="Mentor Hub" />
               <div className="flex flex-col leading-tight min-w-0 flex-1">
-                <span className="text-sm font-semibold tracking-tight truncate">{user.name}</span>
+                <h2 id="menu-title" className="text-sm font-semibold tracking-tight truncate">{user.name}</h2>
                 <span className="text-[10px] uppercase tracking-wider text-muted-foreground truncate">{ROLE_LABEL[user.role]}</span>
               </div>
               <button
-                onClick={() => setNavOpen(false)}
+                ref={menuCloseRef}
+                onClick={closeMenu}
                 aria-label="Close menu"
                 className="size-11 md:size-8 grid place-items-center rounded-md hover:bg-sidebar-accent/60 text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
@@ -282,7 +342,7 @@ export function AppShell() {
               )}
               <Link
                 to={"/account" as never}
-                onClick={() => setNavOpen(false)}
+                onClick={closeMenu}
                 className="w-full min-h-11 flex items-center gap-2 px-3 py-2 rounded-md border border-border text-xs uppercase tracking-[0.06em] font-semibold hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <KeyRound className="size-4" />Account
