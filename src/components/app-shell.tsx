@@ -145,10 +145,13 @@ export function AppShell() {
               ) : (
                 <span>View as <span className="text-primary/70 normal-case tracking-normal">(interface only)</span></span>
               )}
+              <label htmlFor="view-as-role" className="sr-only">
+                View interface as role
+              </label>
               <select
+                id="view-as-role"
                 value={user.role}
                 onChange={(e) => setViewAsRole(e.target.value as Role)}
-                aria-label="View interface as role"
                 className="h-6 bg-transparent text-primary text-[10px] font-medium uppercase tracking-wider focus:outline-none cursor-pointer"
               >
                 {user.actualRole === "super_admin" ? (
@@ -190,6 +193,9 @@ export function AppShell() {
                 className="relative size-11 md:size-9 grid place-items-center rounded-md border border-border hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               >
                 <BellRing className="size-4" aria-hidden="true" />
+                <span className="sr-only">
+                  {bellOpen ? "Close duty notifications" : "Open duty notifications"}
+                </span>
                 {notif.unread > 0 && (
                   <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-destructive text-destructive-foreground text-[10px] font-mono font-semibold grid place-items-center">
                     {notif.unread > 9 ? "9+" : notif.unread}
