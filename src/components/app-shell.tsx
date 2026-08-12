@@ -98,8 +98,8 @@ export function AppShell() {
     }
   }
 
-  if (loading) return <div className="min-h-screen bg-background" />;
-  if (!user) return isPublic ? <Outlet /> : <div className="min-h-screen bg-background" />;
+  if (loading) return <main id="main-content" tabIndex={-1} className="min-h-screen bg-background" aria-busy="true" />;
+  if (!user) return isPublic ? <Outlet /> : <main id="main-content" tabIndex={-1} className="min-h-screen bg-background" />;
   if (isRestrictedDuringMaintenance(user)) {
     return (
       <MaintenanceScreen
