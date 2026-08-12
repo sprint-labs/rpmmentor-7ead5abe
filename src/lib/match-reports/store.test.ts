@@ -10,6 +10,7 @@ import {
   getCanonicalReport,
   listCanonicalReports,
   softDeleteCanonicalReport,
+  updateCanonicalReport,
   toMatchReportRow,
 } from "./store.server";
 
@@ -91,14 +92,12 @@ function fakeDb(seed: Partial<Row>[] = []) {
       },
       maybeSingle: async () => {
         if (pendingInsert) return commitInsert();
+        if (pendingUpdate) return commitUpdate();
         return { data: working[0] ?? null, error: null };
       },
       then: (resolve: (v: unknown) => unknown) => {
         if (pendingInsert) return Promise.resolve(commitInsert()).then(resolve);
-        if (pendingUpdate) {
-          for (const r of working) Object.assign(r, pendingUpdate);
-          return Promise.resolve({ data: null, error: null }).then(resolve);
-        }
+        if (pendingUpdate) return Promise.resolve(commitUpdate()).then(resolve);
         return Promise.resolve({ data: working, error: null }).then(resolve);
       },
     };
@@ -114,6 +113,13 @@ function fakeDb(seed: Partial<Row>[] = []) {
       }
       rows.push(row);
       return { data: { report_id: row.report_id }, error: null };
+    }
+
+    function commitUpdate() {
+      const patch = pendingUpdate as Partial<Row>;
+      pendingUpdate = null;
+      for (const r of working) Object.assign(r, patch);
+      return { data: working[0] ?? null, error: null };
     }
 
     return api;
@@ -210,6 +216,61 @@ describe("canonical match report store", () => {
       report_id: null,
       row_index: null,
     });
+  });
+
+  it("edits only report comments and scores while preserving its identity and provenance", async () => {
+    const db = fakeDb();
+    await insertCanonicalReport(db, { ...base, submissionKey: "key-1" });
+
+    const edited = await updateCanonicalReport(db, {
+      reportId: "mr2_aaaa1111",
+      scores: {
+        protect_goal: 5,
+        protect_space: 3,
+        protect_air: 4,
+        control_play: 2,
+        change_play: 5,
+        psych: 4,
+        physical: 3,
+      },
+      average: 3.7,
+      comments: "Updated after reviewing the match footage.",
+    });
+
+    expect(edited).toMatchObject({
+      updated: true,
+      report: {
+        report_id: "mr2_aaaa1111",
+        coach: "Andy Marshall",
+        team: "Cambridge United",
+        opponent: "Barnet",
+        comments: "Updated after reviewing the match footage.",
+        average: 3.7,
+      },
+    });
+    expect(edited.updated && edited.report.scores.control_play).toBe(2);
+    expect(db.rows[0]).toMatchObject({
+      report_id: "mr2_aaaa1111",
+      legacy_report_id: "mr_bbbb2222",
+      submission_key: "key-1",
+      coach: "Andy Marshall",
+      comments: "Updated after reviewing the match footage.",
+    });
+  });
+
+  it("does not edit a report that has already been tombstoned", async () => {
+    const db = fakeDb();
+    await insertCanonicalReport(db, { ...base, submissionKey: "key-1" });
+    await softDeleteCanonicalReport(db, "mr2_aaaa1111");
+
+    await expect(
+      updateCanonicalReport(db, {
+        reportId: "mr2_aaaa1111",
+        scores: base.scores,
+        average: base.average,
+        comments: base.comments,
+      }),
+    ).resolves.toEqual({ updated: false, report: null });
   });
 
   it("maps a database row onto the shape every report screen consumes", () => {

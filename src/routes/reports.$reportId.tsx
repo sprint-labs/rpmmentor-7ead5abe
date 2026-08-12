@@ -1,15 +1,46 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { PageHeader, Card, Pill } from "@/components/primitives";
 import { useCallback, useEffect, useState } from "react";
-import { ArrowLeft, FileText, Video, Image as ImageIcon, Mic, ExternalLink, Loader2, Sparkles, Copy } from "lucide-react";
+import {
+  ArrowLeft,
+  FileText,
+  Video,
+  Image as ImageIcon,
+  Mic,
+  ExternalLink,
+  Loader2,
+  Pencil,
+  Save,
+  Trash2,
+  X,
+} from "lucide-react";
 import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { listReportAttachmentsForIds, openAsset, type MediaAsset } from "@/lib/media-store";
 import { useAuth } from "@/lib/auth";
-import { getMatchReport } from "@/lib/match-reports/reports.functions";
-import { PILLAR_IDS, PILLAR_LABELS } from "@/lib/match-reports/schema";
-import { analyzeReport, type StructuredAnalysis } from "@/lib/api/summarize.functions";
+import {
+  deleteMatchReport,
+  getMatchReport,
+  updateMatchReport,
+} from "@/lib/match-reports/reports.functions";
+import {
+  PILLAR_IDS,
+  PILLAR_LABELS,
+  type MatchReportRow,
+  type PillarId,
+} from "@/lib/match-reports/schema";
 
 export const Route = createFileRoute("/reports/$reportId")({
   component: ReportDetail,
@@ -21,7 +52,12 @@ export const Route = createFileRoute("/reports/$reportId")({
   ),
 });
 
-const ICON: Record<string, typeof FileText> = { video: Video, pdf: FileText, image: ImageIcon, audio: Mic };
+const ICON: Record<string, typeof FileText> = {
+  video: Video,
+  pdf: FileText,
+  image: ImageIcon,
+  audio: Mic,
+};
 
 function formatDate(iso: string | null) {
   if (!iso) return "—";
@@ -29,11 +65,20 @@ function formatDate(iso: string | null) {
   return `${d}/${m}/${y}`;
 }
 
+function editableScores(report: MatchReportRow): Record<PillarId, number> {
+  const scores = {} as Record<PillarId, number>;
+  for (const id of PILLAR_IDS) scores[id] = report.scores[id] ?? 3;
+  return scores;
+}
+
 function ReportDetail() {
   const { reportId } = Route.useParams();
-  const { user } = useAuth();
+  const { user, can } = useAuth();
+  const router = useRouter();
+  const queryClient = useQueryClient();
   const getFn = useServerFn(getMatchReport);
-  const analyzeFn = useServerFn(analyzeReport);
+  const updateFn = useServerFn(updateMatchReport);
+  const deleteFn = useServerFn(deleteMatchReport);
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["match-report", reportId],
@@ -44,9 +89,13 @@ function ReportDetail() {
 
   const [attachments, setAttachments] = useState<MediaAsset[]>([]);
   const [loadingAttachments, setLoadingAttachments] = useState(true);
-  const [analysis, setAnalysis] = useState<StructuredAnalysis | null>(null);
-  const [analyzing, setAnalyzing] = useState(false);
-  const [analysisError, setAnalysisError] = useState<string | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [draftScores, setDraftScores] = useState<Record<PillarId, number> | null>(null);
+  const [draftComments, setDraftComments] = useState("");
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   // Load attachments for EVERY identity this report has ever had: the route id
   // the user arrived on, its current resolved id, and its legacy id. Historic
@@ -56,81 +105,145 @@ function ReportDetail() {
 
   const loadAttachments = useCallback(async () => {
     setLoadingAttachments(true);
-    try { setAttachments(await listReportAttachmentsForIds([reportId, currentId, legacyId])); }
-    catch (e) { console.error(e); }
-    finally { setLoadingAttachments(false); }
+    try {
+      setAttachments(await listReportAttachmentsForIds([reportId, currentId, legacyId]));
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoadingAttachments(false);
+    }
   }, [reportId, currentId, legacyId]);
 
-  useEffect(() => { loadAttachments(); }, [loadAttachments]);
+  useEffect(() => {
+    loadAttachments();
+  }, [loadAttachments]);
 
-  const generateAnalysis = async () => {
-    if (!r?.comments?.trim()) return;
-    setAnalyzing(true);
-    setAnalysisError(null);
+  const refreshReportViews = async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["match-report", reportId] }),
+      queryClient.invalidateQueries({ queryKey: ["match-reports"] }),
+      queryClient.invalidateQueries({ queryKey: ["mentor-dashboard-stats"] }),
+      queryClient.invalidateQueries({ queryKey: ["overview-dashboard-stats"] }),
+    ]);
+  };
+
+  const openEditor = () => {
+    if (!r) return;
+    setDraftScores(editableScores(r));
+    setDraftComments(r.comments);
+    setSaveError(null);
+    setEditing(true);
+  };
+
+  const saveReport = async () => {
+    if (!r || !draftScores) return;
+    setSaving(true);
+    setSaveError(null);
     try {
-      const result = await analyzeFn({
+      const result = await updateFn({
         data: {
-          reportText: r.comments,
-          context: {
-            goalkeeper: r.goalkeeper,
-            team: r.team ?? "",
-            opponent: r.opponent ?? "",
-            competition: r.competition ?? "",
-            matchDate: r.match_date ?? "",
-          },
+          reportId: r.report_id,
+          scores: draftScores,
+          comments: draftComments,
         },
       });
-      if (!result.ok) {
-        setAnalysisError(result.error);
+      if (!result.updated) {
+        setSaveError("This report is no longer available to edit. Refresh the page and try again.");
         return;
       }
-      setAnalysis(result.analysis);
-    } catch (analysisFailure) {
-      setAnalysisError(
-        analysisFailure instanceof Error
-          ? analysisFailure.message
-          : "Could not generate structured analysis.",
+      await refreshReportViews();
+      setEditing(false);
+      toast.success("Match report updated");
+      if (result.interaction_error) {
+        toast.warning("The report was updated, but its linked interaction could not be refreshed.");
+      }
+    } catch (saveFailure) {
+      setSaveError(
+        saveFailure instanceof Error ? saveFailure.message : "Could not update the report.",
       );
     } finally {
-      setAnalyzing(false);
+      setSaving(false);
     }
   };
 
-  const copyAnalysis = () => {
-    if (!analysis) return;
-    const text = [
-      `Summary:\n${analysis.summary}`,
-      `Key Moments:\n${analysis.keyMoments.join("\n")}`,
-      `Development Focus:\n${analysis.developmentFocus.join("\n")}`,
-    ].join("\n\n");
-    void navigator.clipboard?.writeText(text);
-    toast.success("Structured analysis copied");
+  const deleteReport = async () => {
+    if (!r) return;
+    setDeleting(true);
+    try {
+      const result = await deleteFn({ data: { reportId: r.report_id } });
+      if (!result.deleted) {
+        toast.error("This report is no longer available to delete.");
+        return;
+      }
+      await refreshReportViews();
+      setDeleteOpen(false);
+      toast.success("Match report deleted");
+      await router.navigate({ to: "/reports" });
+    } catch (deleteFailure) {
+      toast.error(
+        deleteFailure instanceof Error ? deleteFailure.message : "Could not delete the report.",
+      );
+    } finally {
+      setDeleting(false);
+    }
   };
+
+  const canManage = can("reports.manage");
 
   if (isLoading) {
     return <Card className="p-10 text-center text-sm text-muted-foreground">Loading report…</Card>;
   }
   if (error) {
-    return <Card className="p-10 text-center text-sm text-destructive">{(error as Error).message}</Card>;
+    return (
+      <Card className="p-10 text-center text-sm text-destructive">{(error as Error).message}</Card>
+    );
   }
   if (!r) {
-    return <Card className="p-10 text-center text-sm text-muted-foreground">Report not found.</Card>;
+    return (
+      <Card className="p-10 text-center text-sm text-muted-foreground">Report not found.</Card>
+    );
   }
 
   return (
     <div className="space-y-5">
-      <Link to="/reports" className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1">
-        <ArrowLeft className="size-3" />Back to reports
+      <Link
+        to="/reports"
+        className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
+      >
+        <ArrowLeft className="size-3" />
+        Back to reports
       </Link>
 
       <PageHeader
         title={`Match Report — ${r.goalkeeper}`}
         description={`${formatDate(r.match_date)} · ${r.team ?? "—"} vs ${r.opponent ?? "—"} · Coach: ${r.coach}`}
         action={
-          <div className="text-right">
-            <div className="text-[11px] text-muted-foreground uppercase tracking-wider">Average</div>
-            <div className="text-3xl font-semibold tabular-nums font-mono">
-              {r.average != null ? r.average.toFixed(1) : "—"}
+          <div className="flex flex-wrap items-end justify-end gap-2">
+            {canManage && (
+              <>
+                <Button type="button" size="sm" variant="outline" onClick={openEditor}>
+                  <Pencil />
+                  Edit report
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                  onClick={() => setDeleteOpen(true)}
+                >
+                  <Trash2 />
+                  Delete report
+                </Button>
+              </>
+            )}
+            <div className="text-right min-w-16">
+              <div className="text-[11px] text-muted-foreground uppercase tracking-wider">
+                Average
+              </div>
+              <div className="text-3xl font-semibold tabular-nums font-mono">
+                {r.average != null ? r.average.toFixed(1) : "—"}
+              </div>
             </div>
           </div>
         }
@@ -141,20 +254,137 @@ function ReportDetail() {
         <Pill tone="muted">{r.competition ?? "Not recorded"}</Pill>
       </div>
 
+      {editing && draftScores && (
+        <Card className="p-4">
+          <form
+            className="space-y-5"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void saveReport();
+            }}
+          >
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <div className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
+                  Edit Match Report
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Correct the seven RPM pillar scores and comments. Goalkeeper, fixture and coach
+                  details remain unchanged.
+                </p>
+              </div>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                onClick={() => {
+                  setEditing(false);
+                  setSaveError(null);
+                }}
+              >
+                <X />
+                Cancel
+              </Button>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              {PILLAR_IDS.map((id) => (
+                <fieldset key={id} className="rounded-md border border-border p-3">
+                  <legend className="px-1 text-[10px] uppercase tracking-wider text-muted-foreground">
+                    {PILLAR_LABELS[id]}
+                  </legend>
+                  <div
+                    className="mt-1 flex gap-1"
+                    role="group"
+                    aria-label={`${PILLAR_LABELS[id]} score`}
+                  >
+                    {[1, 2, 3, 4, 5].map((score) => {
+                      const selected = draftScores[id] === score;
+                      return (
+                        <button
+                          key={score}
+                          type="button"
+                          onClick={() =>
+                            setDraftScores((current) =>
+                              current ? { ...current, [id]: score } : current,
+                            )
+                          }
+                          className={`h-9 flex-1 rounded border text-sm font-mono font-semibold transition-colors ${
+                            selected
+                              ? "border-primary bg-primary text-primary-foreground"
+                              : "border-border text-muted-foreground hover:bg-accent hover:text-foreground"
+                          }`}
+                          aria-pressed={selected}
+                        >
+                          {score}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </fieldset>
+              ))}
+            </div>
+
+            <label className="block space-y-1.5">
+              <span className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
+                Comments
+              </span>
+              <textarea
+                value={draftComments}
+                onChange={(event) => setDraftComments(event.target.value)}
+                maxLength={5000}
+                rows={8}
+                className="w-full rounded-md border border-border bg-input/60 px-3 py-2 text-sm leading-relaxed focus:outline-none focus:ring-2 focus:ring-ring/40 resize-y"
+              />
+            </label>
+
+            {saveError && (
+              <p className="text-sm text-destructive" role="alert">
+                {saveError}
+              </p>
+            )}
+
+            <div className="flex flex-wrap justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setEditing(false);
+                  setSaveError(null);
+                }}
+                disabled={saving}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={saving}>
+                {saving ? <Loader2 className="animate-spin" /> : <Save />}Save changes
+              </Button>
+            </div>
+          </form>
+        </Card>
+      )}
 
       <div className="grid lg:grid-cols-3 gap-4">
         <Card className="p-4 lg:col-span-2">
-          <div className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium mb-2">Comments</div>
+          <div className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium mb-2">
+            Comments
+          </div>
           <p className="text-sm leading-relaxed text-foreground/90 whitespace-pre-wrap">
-            {r.comments || <span className="text-muted-foreground italic">No comments recorded.</span>}
+            {r.comments || (
+              <span className="text-muted-foreground italic">No comments recorded.</span>
+            )}
           </p>
         </Card>
         <Card className="p-4">
-          <div className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium mb-2">RPM Pillar Scores</div>
+          <div className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium mb-2">
+            RPM Pillar Scores
+          </div>
           <ul className="space-y-1.5 text-sm">
             {PILLAR_IDS.map((id) => (
               <li key={id} className="flex items-start justify-between gap-3">
-                <span className="text-muted-foreground text-xs leading-tight">{PILLAR_LABELS[id]}</span>
+                <span className="text-muted-foreground text-xs leading-tight">
+                  {PILLAR_LABELS[id]}
+                </span>
                 <span className="font-semibold tabular-nums font-mono shrink-0">
                   {r.scores[id] != null ? `${r.scores[id]}/5` : "—"}
                 </span>
@@ -164,92 +394,19 @@ function ReportDetail() {
         </Card>
       </div>
 
-      {user?.actualRole === "super_admin" && (
-        <Card className="p-4 space-y-3">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <div className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
-                Super Admin · Structured Analysis
-              </div>
-              <p className="text-xs text-muted-foreground mt-1">
-                Optional private analysis. Generating or editing this does not change the mentor's report or the Google Sheet.
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              {analysis && (
-                <button
-                  type="button"
-                  onClick={copyAnalysis}
-                  className="h-8 px-3 rounded-md border border-border text-xs font-medium inline-flex items-center gap-1.5 hover:bg-accent"
-                >
-                  <Copy className="size-3.5" />Copy
-                </button>
-              )}
-              <button
-                type="button"
-                disabled={analyzing || (r.comments?.trim().length ?? 0) < 40}
-                onClick={() => void generateAnalysis()}
-                className="h-8 px-3 rounded-md border border-primary/40 text-primary text-xs font-medium inline-flex items-center gap-1.5 hover:bg-primary/10 disabled:opacity-40"
-              >
-                {analyzing ? <Loader2 className="size-3.5 animate-spin" /> : <Sparkles className="size-3.5" />}
-                {analysis ? "Regenerate analysis" : "Generate structured analysis"}
-              </button>
-            </div>
-          </div>
-
-          {analysisError && (
-            <div className="text-xs text-destructive" role="alert">{analysisError}</div>
-          )}
-
-          {analysis && (
-            <div className="grid md:grid-cols-3 gap-3">
-              <label className="space-y-1">
-                <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Summary</span>
-                <textarea
-                  value={analysis.summary}
-                  onChange={(event) => setAnalysis((current) => current ? { ...current, summary: event.target.value } : current)}
-                  rows={7}
-                  className="w-full px-3 py-2 rounded-md bg-input/60 border border-border text-sm leading-relaxed focus:outline-none focus:ring-2 focus:ring-ring/40 resize-y"
-                />
-              </label>
-              <label className="space-y-1">
-                <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Key Moments</span>
-                <textarea
-                  value={analysis.keyMoments.join("\n")}
-                  onChange={(event) => setAnalysis((current) => current ? {
-                    ...current,
-                    keyMoments: event.target.value.split("\n").map((line) => line.trim()).filter(Boolean),
-                  } : current)}
-                  rows={7}
-                  className="w-full px-3 py-2 rounded-md bg-input/60 border border-border text-sm leading-relaxed focus:outline-none focus:ring-2 focus:ring-ring/40 resize-y"
-                />
-              </label>
-              <label className="space-y-1">
-                <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Development Focus</span>
-                <textarea
-                  value={analysis.developmentFocus.join("\n")}
-                  onChange={(event) => setAnalysis((current) => current ? {
-                    ...current,
-                    developmentFocus: event.target.value.split("\n").map((line) => line.trim()).filter(Boolean),
-                  } : current)}
-                  rows={7}
-                  className="w-full px-3 py-2 rounded-md bg-input/60 border border-border text-sm leading-relaxed focus:outline-none focus:ring-2 focus:ring-ring/40 resize-y"
-                />
-              </label>
-            </div>
-          )}
-        </Card>
-      )}
-
       <Card className="p-4">
         <div className="flex items-center justify-between mb-3">
-          <div className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">Attached Media</div>
+          <div className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
+            Attached Media
+          </div>
           <span className="text-xs text-muted-foreground">{attachments.length} attached</span>
         </div>
         {loadingAttachments ? (
           <div className="text-sm text-muted-foreground py-4">Loading…</div>
         ) : attachments.length === 0 ? (
-          <div className="text-sm text-muted-foreground py-4">No media attached to this report.</div>
+          <div className="text-sm text-muted-foreground py-4">
+            No media attached to this report.
+          </div>
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
             {attachments.map((a) => {
@@ -265,7 +422,9 @@ function ReportDetail() {
                       <div className="text-xs font-medium line-clamp-1">{a.title}</div>
                       <div className="flex items-center justify-between mt-1">
                         <Pill>{a.media_type}</Pill>
-                        <span className="text-[10px] text-muted-foreground">{new Date(a.created_at).toLocaleDateString()}</span>
+                        <span className="text-[10px] text-muted-foreground">
+                          {new Date(a.created_at).toLocaleDateString()}
+                        </span>
                       </div>
                     </div>
                   </Card>
@@ -275,6 +434,31 @@ function ReportDetail() {
           </div>
         )}
       </Card>
+
+      <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this Match Report?</AlertDialogTitle>
+            <AlertDialogDescription>
+              It will be removed from live views. The original report record remains retained for
+              audit and can be recovered by an administrator.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={deleting}
+              onClick={(event) => {
+                event.preventDefault();
+                void deleteReport();
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleting ? <Loader2 className="animate-spin" /> : <Trash2 />}Delete report
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

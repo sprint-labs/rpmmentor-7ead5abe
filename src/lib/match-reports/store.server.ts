@@ -121,10 +121,7 @@ export async function listCanonicalReports(db: Db): Promise<MatchReportRow[]> {
  * One report by any identity it has ever had: the exact id (including a `~2`
  * occurrence suffix), its base id, or its pre-Team legacy id.
  */
-export async function getCanonicalReport(
-  db: Db,
-  reportId: string,
-): Promise<MatchReportRow | null> {
+export async function getCanonicalReport(db: Db, reportId: string): Promise<MatchReportRow | null> {
   const exact = await db
     .from(CANONICAL_TABLE)
     .select(CANONICAL_COLUMNS)
@@ -145,7 +142,9 @@ export async function getCanonicalReport(
     .order("report_id", { ascending: true });
   if (!byBase.error) {
     // `_` is a LIKE wildcard, so the prefix match is re-checked exactly here.
-    const hit = ((byBase.data ?? []) as CanonicalRow[]).find((r) => isOccurrenceOf(r.report_id, base));
+    const hit = ((byBase.data ?? []) as CanonicalRow[]).find((r) =>
+      isOccurrenceOf(r.report_id, base),
+    );
     if (hit) return toMatchReportRow(hit);
   }
 
@@ -180,8 +179,7 @@ export interface InsertCanonicalInput {
 }
 
 export type InsertCanonicalResult =
-  | { ok: true; report_id: string; created: boolean }
-  | { ok: false; message: string };
+  { ok: true; report_id: string; created: boolean } | { ok: false; message: string };
 
 /** True when `id` is the base identity itself or one of its ~2/~3 occurrences. */
 function isOccurrenceOf(id: string, base: string): boolean {
@@ -244,14 +242,21 @@ export async function insertCanonicalReport(
       .eq("submission_key", input.submissionKey)
       .maybeSingle();
     if (!existing.error && existing.data) {
-      return { ok: true, report_id: (existing.data as { report_id: string }).report_id, created: false };
+      return {
+        ok: true,
+        report_id: (existing.data as { report_id: string }).report_id,
+        created: false,
+      };
     }
 
     let candidate: string;
     try {
       candidate = nextFreeId(base, await takenOccurrences(db, base));
     } catch (e) {
-      return { ok: false, message: e instanceof Error ? e.message : "Could not allocate a report id." };
+      return {
+        ok: false,
+        message: e instanceof Error ? e.message : "Could not allocate a report id.",
+      };
     }
 
     const { data, error } = await db
@@ -297,6 +302,51 @@ export async function insertCanonicalReport(
     ok: false,
     message: "Could not allocate a unique report id after repeated attempts.",
   };
+}
+
+export interface UpdateCanonicalReportInput {
+  /** Exact, base, or legacy report identity — resolved before updating. */
+  reportId: string;
+  scores: Record<PillarId, number>;
+  average: number;
+  comments: string;
+}
+
+export type UpdateCanonicalReportResult =
+  { updated: true; report: MatchReportRow } | { updated: false; report: null };
+
+/**
+ * Correct the editable content of a report without changing its provenance,
+ * fixture identity, author, or submission key.
+ */
+export async function updateCanonicalReport(
+  db: Db,
+  input: UpdateCanonicalReportInput,
+): Promise<UpdateCanonicalReportResult> {
+  const found = await getCanonicalReport(db, input.reportId);
+  if (!found) return { updated: false, report: null };
+
+  const { data, error } = await db
+    .from(CANONICAL_TABLE)
+    .update({
+      protect_goal: input.scores.protect_goal,
+      protect_space: input.scores.protect_space,
+      protect_air: input.scores.protect_air,
+      control_play: input.scores.control_play,
+      change_play: input.scores.change_play,
+      psych: input.scores.psych,
+      physical: input.scores.physical,
+      average: input.average,
+      comments: input.comments,
+    })
+    .eq("report_id", found.report_id)
+    .is("deleted_at", null)
+    .select(CANONICAL_COLUMNS)
+    .maybeSingle();
+
+  if (error) throw new Error(`Could not update the report: ${error.message}`);
+  if (!data) return { updated: false, report: null };
+  return { updated: true, report: toMatchReportRow(data as CanonicalRow) };
 }
 
 /**

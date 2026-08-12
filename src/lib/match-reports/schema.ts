@@ -77,13 +77,24 @@ export const SHEET_HEADERS = [
 // NOTE: a "Source" provenance column is deliberately DEFERRED pending an
 // Excel audit. Do not add a Source sheet column, field or stamped value.
 
-
-
 export const pillarScore = z
   .number({ message: "Score is required" })
   .int()
   .min(1, "Min 1")
   .max(5, "Max 5");
+
+/** The seven scores that make up a Match Report. */
+export const matchReportScoresSchema = z.object({
+  protect_goal: pillarScore,
+  protect_space: pillarScore,
+  protect_air: pillarScore,
+  control_play: pillarScore,
+  change_play: pillarScore,
+  psych: pillarScore,
+  physical: pillarScore,
+});
+
+export type MatchReportScores = z.infer<typeof matchReportScoresSchema>;
 
 /** Full payload accepted by the submit server fn. */
 export const matchReportSubmitSchema = z.object({
@@ -110,6 +121,18 @@ export const matchReportSubmitSchema = z.object({
 });
 
 export type MatchReportSubmit = z.infer<typeof matchReportSubmitSchema>;
+
+/**
+ * The deliberately narrow set of fields management may correct after a report
+ * has been submitted. Fixture, goalkeeper and coach identity stay immutable.
+ */
+export const matchReportEditSchema = z.object({
+  reportId: z.string().trim().min(1).max(160),
+  scores: matchReportScoresSchema,
+  comments: z.string().max(5000).optional().default(""),
+});
+
+export type MatchReportEdit = z.infer<typeof matchReportEditSchema>;
 
 /** Server-side row shape returned to the UI (already normalised). */
 export interface MatchReportRow {
@@ -214,16 +237,21 @@ export function identityForRowIndex(
 
 /** True when `id` addresses this report by current OR legacy identity. */
 export function matchesReportId(r: MatchReportRow, id: string): boolean {
-  return (
-    r.report_id === id ||
-    baseReportUid(r.report_id) === id ||
-    r.legacy_report_id === id
-  );
+  return r.report_id === id || baseReportUid(r.report_id) === id || r.legacy_report_id === id;
 }
 
-export function averageOfScores(v: Pick<MatchReportSubmit,
-  "protect_goal" | "protect_space" | "protect_air" | "control_play" | "change_play" | "psych" | "physical"
->): number {
+export function averageOfScores(
+  v: Pick<
+    MatchReportSubmit,
+    | "protect_goal"
+    | "protect_space"
+    | "protect_air"
+    | "control_play"
+    | "change_play"
+    | "psych"
+    | "physical"
+  >,
+): number {
   const scores = PILLAR_IDS.map((id) => v[id]);
   const sum = scores.reduce((a, b) => a + b, 0);
   return Math.round((sum / scores.length) * 10) / 10;
@@ -277,7 +305,12 @@ export function rowToMatchReport(row: string[], rowIndex: number): MatchReportRo
     return Number.isFinite(n) ? n : null;
   };
   return {
-    report_id: computeReportUid({ goalkeeper, team: (row[COLUMN_INDEX.team] ?? "").trim() || null, opponent, match_date }),
+    report_id: computeReportUid({
+      goalkeeper,
+      team: (row[COLUMN_INDEX.team] ?? "").trim() || null,
+      opponent,
+      match_date,
+    }),
     legacy_report_id: computeReportId({ goalkeeper, match_date, opponent }),
     row_index: rowIndex,
     goalkeeper,
@@ -285,7 +318,7 @@ export function rowToMatchReport(row: string[], rowIndex: number): MatchReportRo
     team: (row[COLUMN_INDEX.team] ?? "").trim() || null,
     opponent,
     competition: (row[COLUMN_INDEX.competition] ?? "").toString().trim() || null,
-    
+
     match_date,
     scores: {
       protect_goal: num(COLUMN_INDEX.protect_goal),

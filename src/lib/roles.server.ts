@@ -31,6 +31,9 @@ export const REPORT_SUBMIT_ROLES: readonly AppRole[] = [
   "mentor",
 ];
 
+/** Management roles may correct or tombstone an existing Match Report. */
+export const REPORT_MANAGE_ROLES: readonly AppRole[] = ["super_admin", "admin", "mentor_manager"];
+
 /** Every signed-in operational role may view the read-only user directory. */
 export const USER_DIRECTORY_VIEW_ROLES: readonly AppRole[] = [
   "super_admin",

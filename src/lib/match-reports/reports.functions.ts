@@ -20,6 +20,7 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import {
   matchReportSubmitSchema,
+  matchReportEditSchema,
   averageOfScores,
   computeReportUid,
   computeReportId,
@@ -42,15 +43,15 @@ import {
 } from "./ledger";
 import {
   hasAnyRole,
+  getUserRoles,
+  REPORT_MANAGE_ROLES,
   REPORT_SUBMIT_ROLES,
   type AppRole,
 } from "@/lib/roles.server";
 
-
 // NOTE: helpers used inside `createServerFn` handlers must be declared inside the
 // handler or in a separate imported module — the splitter deletes sibling module-
 // scope consts before shipping. See tanstack-serverfn-splitting.
-
 
 // ---------------------------------------------------------------------------
 // listMatchReports
@@ -67,7 +68,6 @@ export const listMatchReports = createServerFn({ method: "GET" })
     const reports: MatchReportRow[] = await listCanonicalReports(supabaseAdmin);
     return { reports };
   });
-
 
 // ---------------------------------------------------------------------------
 // getMatchReport
@@ -304,9 +304,10 @@ export const submitMatchReport = createServerFn({ method: "POST" })
     // ---- Duplicate protection (confirmed successes only) -----------------
     // Backfilled sheet history has no submit timestamp and is deliberately NOT
     // considered — cache `synced_at` is reconciliation time, not a submit time.
-    const duplicateResult = (
-      dup: { window: "strong" | "soft"; report_id: string | null },
-    ): SubmitMatchReportResult => ({
+    const duplicateResult = (dup: {
+      window: "strong" | "soft";
+      report_id: string | null;
+    }): SubmitMatchReportResult => ({
       status: "duplicate",
       window: dup.window,
       message: duplicateMessage(dup.window, {
@@ -357,7 +358,9 @@ export const submitMatchReport = createServerFn({ method: "POST" })
         if (classifyLedgerWriteError(reuseErr) === "conflict") {
           return { status: "in_progress", submission_key: submissionKey, message: IN_PROGRESS_MSG };
         }
-        throw new Error("Could not reserve this submission. Nothing was written; please try again.");
+        throw new Error(
+          "Could not reserve this submission. Nothing was written; please try again.",
+        );
       }
       if (!reused) {
         // Someone else changed the row out from under us — never guess.
@@ -375,10 +378,14 @@ export const submitMatchReport = createServerFn({ method: "POST" })
           return { status: "in_progress", submission_key: submissionKey, message: IN_PROGRESS_MSG };
         }
         // A non-conflict ledger failure is NOT another request in progress.
-        throw new Error("Could not reserve this submission. Nothing was written; please try again.");
+        throw new Error(
+          "Could not reserve this submission. Nothing was written; please try again.",
+        );
       }
       if (!reserved) {
-        throw new Error("Could not reserve this submission. Nothing was written; please try again.");
+        throw new Error(
+          "Could not reserve this submission. Nothing was written; please try again.",
+        );
       }
       ledgerId = (reserved as { id: string }).id;
     }
@@ -548,6 +555,68 @@ export const submitMatchReport = createServerFn({ method: "POST" })
     };
   });
 
+// ---------------------------------------------------------------------------
+// updateMatchReport — management may correct comments and RPM pillar scores.
+// ---------------------------------------------------------------------------
+
+export type UpdateMatchReportResult =
+  | { updated: true; report: MatchReportRow; interaction_error?: string }
+  | { updated: false; report: null; reason: "not_found" };
+
+export const updateMatchReport = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: unknown) => matchReportEditSchema.parse(data))
+  .handler(async ({ data, context }): Promise<UpdateMatchReportResult> => {
+    const { supabase, userId } = context;
+    const roles = await getUserRoles(supabase, userId);
+    if (!hasAnyRole(roles, REPORT_MANAGE_ROLES)) {
+      throw new Error("You don't have permission to edit reports.");
+    }
+
+    const average = averageOfScores(data.scores);
+    const comments = data.comments.trim();
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { updateCanonicalReport } = await import("./store.server");
+    const saved = await updateCanonicalReport(supabaseAdmin, {
+      reportId: data.reportId,
+      scores: data.scores,
+      average,
+      comments,
+    });
+    if (!saved.updated) {
+      return { updated: false, report: null, reason: "not_found" };
+    }
+
+    // Keep the auto-created Live Match Observation self-describing after an
+    // approved correction. A missing link is fine; a failed update is surfaced
+    // to the caller without undoing the saved report.
+    const { error: interactionError } = await supabaseAdmin
+      .from("interactions")
+      .update({
+        notes: matchReportInteractionNotes({
+          opponent: saved.report.opponent ?? "",
+          competition: saved.report.competition ?? "",
+          average,
+          comments,
+        }),
+        updated_by: userId,
+      })
+      .eq("match_report_id", saved.report.report_id);
+
+    if (interactionError) {
+      console.error(
+        "[match-reports] interaction refresh after report edit failed:",
+        interactionError,
+      );
+    }
+
+    return {
+      updated: true,
+      report: saved.report,
+      ...(interactionError ? { interaction_error: interactionError.message } : {}),
+    };
+  });
 
 // ---------------------------------------------------------------------------
 // deleteMatchReport — tombstones the canonical Supabase report.
@@ -561,21 +630,13 @@ export const submitMatchReport = createServerFn({ method: "POST" })
 
 export const deleteMatchReport = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: unknown) =>
-    z.object({ reportId: z.string().min(1) }).parse(data),
-  )
+  .inputValidator((data: unknown) => z.object({ reportId: z.string().min(1) }).parse(data))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
 
     // Only privileged roles may delete reports.
-    const { data: roleRows, error: roleErr } = await supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", userId);
-    if (roleErr) throw new Error("Unable to verify caller role.");
-    const roles = (roleRows ?? []).map((r) => r.role as string);
-    const CAN_DELETE = ["super_admin", "admin", "mentor_manager"];
-    if (!roles.some((r) => CAN_DELETE.includes(r))) {
+    const roles = await getUserRoles(supabase, userId);
+    if (!hasAnyRole(roles, REPORT_MANAGE_ROLES)) {
       throw new Error("You don't have permission to delete reports.");
     }
 
