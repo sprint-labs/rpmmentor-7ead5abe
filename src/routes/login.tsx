@@ -63,7 +63,7 @@ function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-6">
+    <main id="main-content" tabIndex={-1} className="min-h-screen flex items-center justify-center bg-background p-6">
       <div className="w-full max-w-md">
         <div className="mb-10">
           <img src={loginLogo.url} alt="Mentor Hub by RPM" className="h-40 w-auto" />
@@ -104,7 +104,7 @@ function LoginPage() {
               <div>
                 <div className="flex items-center justify-between mb-1.5">
                   <label htmlFor="password" className="block text-xs font-medium">Password</label>
-                  <button type="button" onClick={() => setView("forgot")} className="text-xs text-muted-foreground hover:text-foreground">Forgot password?</button>
+                  <button type="button" onClick={() => setView("forgot")} className="min-h-11 px-1 text-xs text-muted-foreground hover:text-foreground">Forgot password?</button>
                 </div>
                 <div className="relative">
                   <Lock className="size-4 text-muted-foreground absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -113,13 +113,13 @@ function LoginPage() {
                     placeholder="Enter your password"
                     className="w-full pl-10 pr-10 py-2.5 rounded-xl border border-border bg-card text-sm focus:outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/10 transition" />
                   <button type="button" onClick={() => setShowPw((v) => !v)} aria-label={showPw ? "Hide password" : "Show password"}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                    className="absolute right-1 top-1/2 size-11 -translate-y-1/2 text-muted-foreground hover:text-foreground">
                     {showPw ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
                   </button>
                 </div>
               </div>
 
-              {error && <div className="text-xs text-destructive bg-destructive/10 border border-destructive/20 rounded-lg px-3 py-2">{error}</div>}
+              {error && <div role="alert" className="text-xs text-destructive bg-destructive/10 border border-destructive/20 rounded-lg px-3 py-2">{error}</div>}
 
               <button type="submit" disabled={submitting}
                 className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-60">
@@ -203,6 +203,6 @@ function LoginPage() {
           </>
         )}
       </div>
-    </div>
+    </main>
   );
 }
