@@ -32,31 +32,38 @@ export interface TeamCalendarEvent {
   event_type: CalendarEventType;
   event_date: string;
   start_time: string | null;
-  end_time: string | null;
   location: string | null;
   notes: string;
   player_id: string | null;
   goalkeeper_name: string | null;
+  assigned_mentor_id: string | null;
+  assigned_mentor_name: string;
   created_by: string;
   created_by_name: string;
 }
 
 const COLUMNS =
-  "id, title, event_type, event_date, start_time, end_time, location, notes, player_id, goalkeeper_name, created_by, created_by_name";
+  "id, title, event_type, event_date, start_time, location, notes, player_id, goalkeeper_name, assigned_mentor_id, assigned_mentor_name, created_by, created_by_name";
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 interface EventInput {
   title: string;
   event_type: string;
   event_date: string;
   start_time?: string | null;
-  end_time?: string | null;
   location?: string | null;
   notes?: string | null;
   player_id?: string | null;
-  goalkeeper_name?: string | null;
+  assigned_mentor_id?: string | null;
 }
 
-function validateEvent(data: EventInput) {
+/**
+ * Shape and required-field checks. The goalkeeper and the attending mentor are
+ * submitted as ids and confirmed against the database in the handler, so a
+ * scheduled event always points at a real roster player and a real profile.
+ */
+export function validateEvent(data: EventInput) {
   const title = (data?.title ?? "").trim();
   if (!title) throw new Error("A title is required.");
   if (title.length > 160) throw new Error("Title must be 160 characters or fewer.");
@@ -73,20 +80,77 @@ function validateEvent(data: EventInput) {
   if (notes.length > 4000) throw new Error("Notes must be 4000 characters or fewer.");
   const location = (data?.location ?? "").trim();
   if (location.length > 160) throw new Error("Location must be 160 characters or fewer.");
-  const gkName = (data?.goalkeeper_name ?? "").trim();
   const playerId = (data?.player_id ?? "").trim();
+  if (!playerId) throw new Error("Choose the goalkeeper this event is about.");
+  if (!UUID_RE.test(playerId)) throw new Error("Choose the goalkeeper from the roster list.");
+  const mentorId = (data?.assigned_mentor_id ?? "").trim();
+  if (!mentorId) throw new Error("Choose the mentor attending this event.");
+  if (!UUID_RE.test(mentorId)) throw new Error("Choose the attending mentor from the list.");
   return {
     title,
     event_type: type,
     event_date: data.event_date,
     start_time: time(data.start_time),
-    end_time: time(data.end_time),
     location: location || null,
     notes,
-    player_id: playerId || null,
-    goalkeeper_name: gkName || null,
+    player_id: playerId,
+    assigned_mentor_id: mentorId,
   };
 }
+
+type AuthedClient = Parameters<typeof requireRole>[0];
+
+/**
+ * Confirms both links exist and derives their display names server-side, so a
+ * stored name can never disagree with the id it is meant to describe.
+ */
+async function resolveEventPeople(
+  supabase: AuthedClient,
+  playerId: string,
+  mentorId: string,
+): Promise<{ goalkeeper_name: string; assigned_mentor_name: string }> {
+  const [{ data: player }, { data: mentor }] = await Promise.all([
+    supabase
+      .from("players")
+      .select("full_name")
+      .eq("id", playerId)
+      .maybeSingle<{ full_name: string }>(),
+    supabase
+      .from("profiles")
+      .select("name")
+      .eq("id", mentorId)
+      .maybeSingle<{ name: string | null }>(),
+  ]);
+  if (!player) throw new Error("That goalkeeper is not on the roster.");
+  if (!mentor) throw new Error("That mentor could not be found.");
+  return {
+    goalkeeper_name: player.full_name,
+    assigned_mentor_name: mentor.name ?? "",
+  };
+}
+
+/**
+ * Profiles a manager can assign an event to. Deliberately not filtered by role:
+ * `user_roles` is read-own-only under RLS, so roles cannot be read here, and
+ * excluding people by guesswork would hide legitimate attendees — a mentor
+ * manager who attends events himself, for one.
+ */
+export const listAssignableMentors = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<{ id: string; name: string }[]> => {
+    await requireRole(
+      context.supabase,
+      context.userId,
+      CALENDAR_MANAGE_ROLES,
+      "assign calendar events",
+    );
+    const { data, error } = await context.supabase
+      .from("profiles")
+      .select("id, name")
+      .order("name", { ascending: true });
+    if (error) throw new Error(error.message);
+    return (data ?? []).map((p) => ({ id: p.id as string, name: (p.name as string | null) ?? "" }));
+  });
 
 export const listCalendarEvents = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
@@ -113,9 +177,21 @@ export const createCalendarEvent = createServerFn({ method: "POST" })
       .eq("id", context.userId)
       .maybeSingle<{ name: string }>();
 
+    const people = await resolveEventPeople(
+      context.supabase,
+      data.player_id,
+      data.assigned_mentor_id,
+    );
+
     const { data: row, error } = await context.supabase
       .from("calendar_events")
-      .insert({ ...data, created_by: context.userId, created_by_name: profile?.name ?? "" })
+      .insert({
+        ...data,
+        ...people,
+        end_time: null,
+        created_by: context.userId,
+        created_by_name: profile?.name ?? "",
+      })
       .select(COLUMNS)
       .single();
     if (error) throw new Error(error.message);
@@ -131,9 +207,16 @@ export const updateCalendarEvent = createServerFn({ method: "POST" })
   .handler(async ({ data, context }): Promise<TeamCalendarEvent> => {
     await requireRole(context.supabase, context.userId, CALENDAR_MANAGE_ROLES, "edit calendar events");
     const { id, ...fields } = data;
+    const people = await resolveEventPeople(
+      context.supabase,
+      fields.player_id,
+      fields.assigned_mentor_id,
+    );
     const { data: row, error } = await context.supabase
       .from("calendar_events")
-      .update(fields)
+      // `end_time` is cleared rather than left behind: the form no longer
+      // collects one, so a stored value would be invisible and unmaintainable.
+      .update({ ...fields, ...people, end_time: null })
       .eq("id", id)
       .select(COLUMNS)
       .maybeSingle();

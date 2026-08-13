@@ -17,9 +17,11 @@ import {
   createCalendarEvent,
   updateCalendarEvent,
   deleteCalendarEvent,
+  listAssignableMentors,
   CALENDAR_EVENT_TYPES,
   type TeamCalendarEvent,
 } from "@/lib/calendar.functions";
+import { listPlayers } from "@/lib/players.functions";
 import {
   computeMissingReportTypes,
   shortLabel,
@@ -91,6 +93,9 @@ function MissingReports({
 const calendarSearchSchema = z.object({
   gkId: fallback(z.string(), "").default(""),
   new: fallback(z.boolean(), false).default(false),
+  /** Wording carried over when a manager escalates a dashboard alert. */
+  title: fallback(z.string(), "").default(""),
+  notes: fallback(z.string(), "").default(""),
 });
 
 export const Route = createFileRoute("/calendar")({
@@ -126,7 +131,7 @@ interface DisplayEvent {
   notes: string;
   location: string | null;
   startTime: string | null;
-  endTime: string | null;
+  assignedMentorName: string;
   createdByName: string;
   raw: TeamCalendarEvent;
 }
@@ -134,25 +139,22 @@ interface DisplayEvent {
 const emptyDraft = {
   id: "",
   title: "",
-  event_type: "Meeting" as string,
+  event_type: "Match" as string,
   event_date: new Date().toISOString().slice(0, 10),
   start_time: "",
-  end_time: "",
   location: "",
   notes: "",
-  goalkeeper_name: "",
   player_id: "",
+  assigned_mentor_id: "",
 };
 type Draft = typeof emptyDraft;
 
-function timeRange(e: DisplayEvent) {
-  if (!e.startTime) return "";
-  const s = e.startTime.slice(0, 5);
-  return e.endTime ? `${s}–${e.endTime.slice(0, 5)}` : s;
+function startTimeLabel(e: DisplayEvent) {
+  return e.startTime ? e.startTime.slice(0, 5) : "";
 }
 
 function CalendarPage() {
-  const { gkId, new: openNewOnMount } = Route.useSearch();
+  const { gkId, new: openNewOnMount, title: prefillTitle, notes: prefillNotes } = Route.useSearch();
   const { can } = useAuth();
   const canManage = can("calendar.manage");
   const [workflow, setWorkflow] = useState<WorkflowKind | null>(null);
@@ -175,6 +177,23 @@ function CalendarPage() {
     queryFn: () => fetchEvents(),
   });
 
+  // Scheduling an event needs the canonical roster and the assignable profiles.
+  // Only managers can open the form, so neither list is fetched for anyone else.
+  const fetchRoster = useServerFn(listPlayers);
+  const { data: roster = [] } = useQuery({
+    queryKey: ["players", "roster"],
+    queryFn: () => fetchRoster(),
+    staleTime: 5 * 60_000,
+    enabled: canManage,
+  });
+  const fetchMentors = useServerFn(listAssignableMentors);
+  const { data: assignableMentors = [] } = useQuery({
+    queryKey: ["calendar", "assignable-mentors"],
+    queryFn: () => fetchMentors(),
+    staleTime: 5 * 60_000,
+    enabled: canManage,
+  });
+
   const [draft, setDraft] = useState<Draft | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -195,7 +214,7 @@ function CalendarPage() {
         notes: e.notes,
         location: e.location,
         startTime: e.start_time,
-        endTime: e.end_time,
+        assignedMentorName: e.assigned_mentor_name,
         createdByName: e.created_by_name,
         raw: e,
       } satisfies DisplayEvent;
@@ -233,9 +252,13 @@ function CalendarPage() {
   // Deep link from dashboard quick actions: /calendar?new=true
   useEffect(() => {
     if (openNewOnMount && canManage) {
-      setDraft({ ...emptyDraft });
+      setDraft({
+        ...emptyDraft,
+        ...(prefillTitle ? { title: prefillTitle, event_type: "Follow Up" } : {}),
+        ...(prefillNotes ? { notes: prefillNotes } : {}),
+      });
     }
-  }, [openNewOnMount, canManage]);
+  }, [openNewOnMount, canManage, prefillTitle, prefillNotes]);
 
   function openEdit(e: DisplayEvent) {
     setDraft({
@@ -244,11 +267,10 @@ function CalendarPage() {
       event_type: e.type,
       event_date: e.date,
       start_time: e.startTime?.slice(0, 5) ?? "",
-      end_time: e.endTime?.slice(0, 5) ?? "",
       location: e.location ?? "",
       notes: e.notes,
-      goalkeeper_name: e.gkName ?? "",
       player_id: e.raw.player_id ?? "",
+      assigned_mentor_id: e.raw.assigned_mentor_id ?? "",
     });
   }
 
@@ -258,6 +280,18 @@ function CalendarPage() {
       toast.error("Add a title for this event.");
       return;
     }
+    if (!draft.event_date) {
+      toast.error("Pick a date for this event.");
+      return;
+    }
+    if (!draft.player_id) {
+      toast.error("Choose the goalkeeper this event is about.");
+      return;
+    }
+    if (!draft.assigned_mentor_id) {
+      toast.error("Choose the mentor attending this event.");
+      return;
+    }
     setSaving(true);
     try {
       const payload = {
@@ -265,11 +299,10 @@ function CalendarPage() {
         event_type: draft.event_type,
         event_date: draft.event_date,
         start_time: draft.start_time,
-        end_time: draft.end_time,
         location: draft.location,
         notes: draft.notes,
-        goalkeeper_name: draft.goalkeeper_name,
-        player_id: draft.player_id || null,
+        player_id: draft.player_id,
+        assigned_mentor_id: draft.assigned_mentor_id,
       };
       if (draft.id) await editEvent({ data: { id: draft.id, ...payload } });
       else await createEvent({ data: payload });
@@ -386,7 +419,7 @@ function CalendarPage() {
                   <div className="space-y-1">
                     {dayEvents.slice(0, 3).map((e) => {
                       const cls = `w-full text-left text-[10px] truncate px-1.5 py-0.5 rounded border ${CHIP[e.type] ?? CHIP["Other"]}`;
-                      const label = timeRange(e) ? `${timeRange(e)} ${e.title}` : e.title;
+                      const label = startTimeLabel(e) ? `${startTimeLabel(e)} ${e.title}` : e.title;
                       return (
                         <div key={e.id}>
                           {canManage ? (
@@ -432,7 +465,7 @@ function CalendarPage() {
                     {dayEvents.map((e) => (
                       <div key={e.id} className="text-[11px] p-1.5 rounded bg-accent/40 border border-border/60">
                         <div className="font-medium leading-tight line-clamp-2">{e.title}</div>
-                        {timeRange(e) && <div className="text-[10px] text-muted-foreground tabular-nums font-mono">{timeRange(e)}</div>}
+                        {startTimeLabel(e) && <div className="text-[10px] text-muted-foreground tabular-nums font-mono">{startTimeLabel(e)}</div>}
                         <div className="mt-1"><Pill tone={TONE[e.type] ?? "muted"}>{e.type}</Pill></div>
                         {e.notes && <div className="mt-1 text-[10px] text-muted-foreground line-clamp-3">{e.notes}</div>}
                         {e.gkId && (
@@ -481,7 +514,13 @@ function CalendarPage() {
                   <div className="min-w-0 flex-1">
                     <div className="truncate">{e.title}</div>
                     <div className="text-xs text-muted-foreground">
-                      {[timeRange(e), e.location, e.gkName, e.createdByName && `added by ${e.createdByName}`]
+                      {[
+                        startTimeLabel(e),
+                        e.location,
+                        e.gkName,
+                        e.assignedMentorName && `${e.assignedMentorName} attending`,
+                        e.createdByName && `added by ${e.createdByName}`,
+                      ]
                         .filter(Boolean)
                         .join(" · ")}
                     </div>
@@ -510,7 +549,7 @@ function CalendarPage() {
             {displayEvents.filter((e) => new Date(`${e.date}T00:00:00`).getTime() >= Date.now() - 86400000).length === 0 && (
               <div className="rounded-md border border-dashed border-border px-3 py-6 text-center text-sm text-muted-foreground">
                 Nothing scheduled yet.
-                {canManage && " Use “Add event” to book a match, visit, meeting or a general note."}
+                {canManage && " Use “Add event” to book a mentor in to see a goalkeeper."}
               </div>
             )}
           </div>
@@ -570,16 +609,38 @@ function CalendarPage() {
                     className="w-full rounded-md border border-border bg-background px-2.5 py-1.5"
                   />
                 </label>
-                <label className="block">
-                  <span className="mb-1 block text-xs text-muted-foreground">End (optional)</span>
-                  <input
-                    type="time"
-                    value={draft.end_time}
-                    onChange={(ev) => setDraft({ ...draft, end_time: ev.target.value })}
-                    className="w-full rounded-md border border-border bg-background px-2.5 py-1.5"
-                  />
-                </label>
               </div>
+
+              <label className="block">
+                <span className="mb-1 block text-xs text-muted-foreground">Goalkeeper</span>
+                <select
+                  value={draft.player_id}
+                  onChange={(ev) => setDraft({ ...draft, player_id: ev.target.value })}
+                  className="w-full rounded-md border border-border bg-background px-2.5 py-1.5"
+                >
+                  <option value="">Choose a goalkeeper…</option>
+                  {roster.map((p) => (
+                    <option key={p.id} value={p.id}>{p.full_name}</option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="block">
+                <span className="mb-1 block text-xs text-muted-foreground">Mentor attending</span>
+                <select
+                  value={draft.assigned_mentor_id}
+                  onChange={(ev) => setDraft({ ...draft, assigned_mentor_id: ev.target.value })}
+                  className="w-full rounded-md border border-border bg-background px-2.5 py-1.5"
+                >
+                  <option value="">Choose a mentor…</option>
+                  {assignableMentors.map((m) => (
+                    <option key={m.id} value={m.id}>{m.name}</option>
+                  ))}
+                </select>
+                <span className="mt-1 block text-[11px] text-muted-foreground">
+                  This event will appear on their home page.
+                </span>
+              </label>
 
               <label className="block">
                 <span className="mb-1 block text-xs text-muted-foreground">Location (optional)</span>
@@ -589,20 +650,6 @@ function CalendarPage() {
                   maxLength={160}
                   className="w-full rounded-md border border-border bg-background px-2.5 py-1.5"
                 />
-              </label>
-
-              <label className="block">
-                <span className="mb-1 block text-xs text-muted-foreground">Goalkeeper (optional)</span>
-                <input
-                  list="calendar-gk-list"
-                  value={draft.goalkeeper_name}
-                  onChange={(ev) => setDraft({ ...draft, goalkeeper_name: ev.target.value })}
-                  placeholder="Leave blank for general team events"
-                  className="w-full rounded-md border border-border bg-background px-2.5 py-1.5"
-                />
-                <datalist id="calendar-gk-list">
-                  {goalkeepers.map((g) => <option key={g.id} value={g.name} />)}
-                </datalist>
               </label>
 
               <label className="block">

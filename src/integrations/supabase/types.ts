@@ -16,6 +16,8 @@ export type Database = {
     Tables: {
       calendar_events: {
         Row: {
+          assigned_mentor_id: string | null
+          assigned_mentor_name: string
           created_at: string
           created_by: string
           created_by_name: string
@@ -32,6 +34,8 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          assigned_mentor_id?: string | null
+          assigned_mentor_name?: string
           created_at?: string
           created_by: string
           created_by_name?: string
@@ -48,6 +52,8 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          assigned_mentor_id?: string | null
+          assigned_mentor_name?: string
           created_at?: string
           created_by?: string
           created_by_name?: string
@@ -64,6 +70,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "calendar_events_assigned_mentor_id_fkey"
+            columns: ["assigned_mentor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "calendar_events_created_by_fkey"
             columns: ["created_by"]
