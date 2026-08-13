@@ -344,15 +344,67 @@ async function retireAccount(admin, email, byEmail, reconciledIds, apply) {
     return { email, actions: ["refused: address was migrated to a roster account"], failed: true };
   }
 
+  const { data: roleRows, error: roleError } = await admin
+    .from("user_roles")
+    .select("role")
+    .eq("user_id", existing.id);
+  if (roleError) {
+    return { email, actions: [`failed: reading roles: ${roleError.message}`], failed: true };
+  }
+  const roles = (roleRows ?? []).map((row) => row.role);
+
+  // Removing the last super admin would leave nobody able to reach the
+  // account-management UI, recoverable only with the service-role key.
+  if (roles.includes("super_admin")) {
+    const { count, error: countError } = await admin
+      .from("user_roles")
+      .select("user_id", { count: "exact", head: true })
+      .eq("role", "super_admin");
+    if (countError) {
+      return {
+        email,
+        actions: [`failed: counting super admins: ${countError.message}`],
+        failed: true,
+      };
+    }
+    if ((count ?? 0) <= 1) {
+      return { email, actions: ["refused: is the only super admin"], failed: true };
+    }
+  }
+
   const attributed = await countAttributedRows(admin, existing.id);
   if (attributed.length > 0) {
     return { email, actions: [`refused: holds ${attributed.join(", ")}`], failed: true };
   }
   if (!apply) return { email, actions: ["would delete (no attributed rows)"], failed: false };
 
+  // Snapshot the identity before deleting, so the audit row can name who went.
+  const { data: profile } = await admin
+    .from("profiles")
+    .select("name")
+    .eq("id", existing.id)
+    .maybeSingle();
+
   const { error } = await admin.auth.admin.deleteUser(existing.id);
   if (error) return { email, actions: [`failed: ${error.message}`], failed: true };
-  return { email, actions: ["deleted (no attributed rows)"], failed: false };
+
+  // Mirror deleteManagedUser so a script removal is visible in the same audit
+  // view as one made through the UI. profiles and user_roles cascade on delete.
+  const { error: auditError } = await admin.from("user_deletion_audit").insert({
+    deleted_user_id: existing.id,
+    deleted_email: email,
+    deleted_name: profile?.name ?? "",
+    deleted_role: ROLES.find((role) => roles.includes(role)) ?? null,
+    actor_id: null,
+    actor_email: "",
+    actor_name: "provision-users script",
+    affected_sections:
+      roles.length > 0 ? [{ section: "Roles", records: roles.length, action: "deleted" }] : [],
+    metadata: { source: "scripts/provision-users.mjs" },
+  });
+  const actions = ["deleted (no attributed rows)"];
+  if (auditError) actions.push(`warning: audit row not written: ${auditError.message}`);
+  return { email, actions, failed: false };
 }
 
 async function verify(admin, entries) {
