@@ -11,7 +11,6 @@ import { withPermission } from "@/components/require-permission";
 import { X, Plus, Pencil, Trash2, NotebookPen } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { WorkflowDialog, type WorkflowKind } from "@/components/workflows";
-import { subscribeMentorSession } from "@/lib/mentor-session-store";
 import {
   listCalendarEvents,
   createCalendarEvent,
@@ -22,29 +21,31 @@ import {
   type TeamCalendarEvent,
 } from "@/lib/calendar.functions";
 import { listPlayers } from "@/lib/players.functions";
+import { listReportCoverage } from "@/lib/calendar/report-coverage.functions";
 import {
-  computeMissingReportTypes,
+  missingReportTypes,
   shortLabel,
+  type GoalkeeperRef,
+  type ReportCoverageEntry,
   type TrackedReportType,
-} from "@/lib/calendar/missing-report-types";
+} from "@/lib/calendar/report-coverage";
 
 function MissingReports({
-  gkId,
-  gkName,
-  referenceDate,
+  coverage,
+  gk,
+  eventDate,
+  today,
   variant,
 }: {
-  gkId: string;
-  gkName?: string;
-  referenceDate: Date;
+  coverage: readonly ReportCoverageEntry[];
+  gk: GoalkeeperRef;
+  eventDate: string;
+  today: string;
   variant: "compact" | "full";
 }) {
-  // Re-render when session interactions/reports change.
-  const [, setTick] = useState(0);
-  useEffect(() => subscribeMentorSession(() => setTick((n) => n + 1)), []);
-
-  const missing: TrackedReportType[] = computeMissingReportTypes(gkId, gkName, {
-    referenceDate,
+  const missing: TrackedReportType[] = missingReportTypes(coverage, gk, {
+    referenceDate: eventDate,
+    today,
   });
   if (missing.length === 0) return null;
 
@@ -128,6 +129,8 @@ interface DisplayEvent {
   type: string;
   gkId?: string;
   gkName?: string;
+  /** Every identifier this event has for its goalkeeper, for coverage matching. */
+  gkRef: GoalkeeperRef;
   notes: string;
   location: string | null;
   startTime: string | null;
@@ -153,6 +156,11 @@ function startTimeLabel(e: DisplayEvent) {
   return e.startTime ? e.startTime.slice(0, 5) : "";
 }
 
+/** The calendar date a user is looking at, not a UTC instant. */
+function localDateIso(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 function CalendarPage() {
   const { gkId, new: openNewOnMount, title: prefillTitle, notes: prefillNotes } = Route.useSearch();
   const { can } = useAuth();
@@ -175,6 +183,14 @@ function CalendarPage() {
   const { data: events = [], isLoading } = useQuery({
     queryKey: ["calendar-events"],
     queryFn: () => fetchEvents(),
+  });
+
+  // What has actually been logged, for the missing-report badges.
+  const fetchCoverage = useServerFn(listReportCoverage);
+  const { data: coverage = [] } = useQuery({
+    queryKey: ["calendar", "report-coverage"],
+    queryFn: () => fetchCoverage(),
+    staleTime: 60_000,
   });
 
   // Scheduling an event needs the canonical roster and the assignable profiles.
@@ -211,6 +227,11 @@ function CalendarPage() {
         type: e.event_type,
         gkId: gk?.id,
         gkName: e.goalkeeper_name ?? gk?.name,
+        gkRef: {
+          playerId: e.player_id,
+          gkSlug: gk?.id ?? null,
+          name: e.goalkeeper_name ?? gk?.name ?? null,
+        },
         notes: e.notes,
         location: e.location,
         startTime: e.start_time,
@@ -224,6 +245,7 @@ function CalendarPage() {
 
   const [view, setView] = useState<"month" | "week">("month");
   const today = new Date();
+  const todayIso = localDateIso(today);
   const start = new Date(today.getFullYear(), today.getMonth(), 1);
   const startDow = (start.getDay() + 6) % 7; // Mon = 0
   const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
@@ -385,9 +407,7 @@ function CalendarPage() {
             {cells.map((d, i) => {
               const isToday = d?.toDateString() === today.toDateString();
               const dayEvents = d ? eventsByDay.get(d.toDateString()) ?? [] : [];
-              const iso = d
-                ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
-                : "";
+              const iso = d ? localDateIso(d) : "";
               return (
                 <div key={i} className={`group min-h-24 rounded-md border p-1.5 ${d ? "bg-card border-border" : "border-transparent"} ${isToday ? "ring-1 ring-primary" : ""}`}>
                   {d && (
@@ -433,14 +453,13 @@ function CalendarPage() {
                           ) : (
                             <div className={cls} title={e.notes || e.title}>{label}</div>
                           )}
-                          {e.gkId && (
-                            <MissingReports
-                              gkId={e.gkId}
-                              gkName={e.gkName}
-                              referenceDate={new Date(`${e.date}T00:00:00`)}
-                              variant="compact"
-                            />
-                          )}
+                          <MissingReports
+                            coverage={coverage}
+                            gk={e.gkRef}
+                            eventDate={e.date}
+                            today={todayIso}
+                            variant="compact"
+                          />
                         </div>
                       );
                     })}
@@ -468,14 +487,13 @@ function CalendarPage() {
                         {startTimeLabel(e) && <div className="text-[10px] text-muted-foreground tabular-nums font-mono">{startTimeLabel(e)}</div>}
                         <div className="mt-1"><Pill tone={TONE[e.type] ?? "muted"}>{e.type}</Pill></div>
                         {e.notes && <div className="mt-1 text-[10px] text-muted-foreground line-clamp-3">{e.notes}</div>}
-                        {e.gkId && (
-                          <MissingReports
-                            gkId={e.gkId}
-                            gkName={e.gkName}
-                            referenceDate={new Date(`${e.date}T00:00:00`)}
-                            variant="full"
-                          />
-                        )}
+                        <MissingReports
+                          coverage={coverage}
+                          gk={e.gkRef}
+                          eventDate={e.date}
+                          today={todayIso}
+                          variant="full"
+                        />
                         <div className="mt-1 flex items-center gap-2">
                           {canLog && (
                             <button onClick={() => openLog({ date: e.date, gkId: e.gkId })} className="inline-flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground">
@@ -525,14 +543,13 @@ function CalendarPage() {
                         .join(" · ")}
                     </div>
                     {e.notes && <div className="mt-0.5 whitespace-pre-wrap text-xs text-muted-foreground">{e.notes}</div>}
-                    {e.gkId && (
-                      <MissingReports
-                        gkId={e.gkId}
-                        gkName={e.gkName}
-                        referenceDate={new Date(`${e.date}T00:00:00`)}
-                        variant="full"
-                      />
-                    )}
+                    <MissingReports
+                      coverage={coverage}
+                      gk={e.gkRef}
+                      eventDate={e.date}
+                      today={todayIso}
+                      variant="full"
+                    />
                   </div>
                   {canManage && (
                     <div className="flex shrink-0 items-center gap-1">
