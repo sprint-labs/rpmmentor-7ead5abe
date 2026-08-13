@@ -3,10 +3,16 @@ import { useServerFn } from "@tanstack/react-start";
 import { Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { ArrowUpRight, CalendarClock, CalendarPlus, ChevronDown, ChevronRight, FileText, Video, AlertTriangle, Plus } from "lucide-react";
+import { MentorPrimaryActions } from "./mentor-primary-actions";
 import { cn } from "@/lib/utils";
 import { Card, StatCard, SectionTitle, Avatar, TierBadge, TierLevelBadge, Pill } from "@/components/primitives";
 import { getMentorDashboardStats } from "@/lib/mentor-dashboard.functions";
-import type { MentorUpcomingInteraction } from "@/lib/mentor-dashboard.functions";
+import {
+  formatUpcomingEventDateTime,
+  upcomingGroupLabel,
+  UPCOMING_GROUP_ORDER,
+  type MentorUpcomingInteraction,
+} from "@/lib/mentor-upcoming-events";
 import { mentors } from "@/lib/mock-data";
 import type { Tier } from "@/lib/mock-data";
 import type { SessionUser } from "@/lib/auth";
@@ -49,40 +55,20 @@ function formatRelativeTime(iso: string) {
   return `${days}d ago`;
 }
 
-function startOfDay(d: Date) {
-  return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
-}
-
-function startOfWeekMonday(d: Date) {
-  const date = new Date(d);
-  const day = date.getDay();
-  const diff = date.getDate() - day + (day === 0 ? -6 : 1);
-  date.setDate(diff);
-  date.setHours(0, 0, 0, 0);
-  return date.getTime();
-}
-
-function interactionGroupLabel(date: string) {
-  const now = new Date();
-  const today = startOfDay(now);
-  const eventDay = startOfDay(new Date(date));
-  const daysDiff = Math.floor((eventDay - today) / 86400000);
-  if (daysDiff === 0) return "Today";
-  if (daysDiff === 1) return "Tomorrow";
-  const thisWeek = startOfWeekMonday(now);
-  const eventWeek = startOfWeekMonday(new Date(date));
-  if (eventWeek === thisWeek) return "This week";
-  if (eventWeek === thisWeek + 7 * 86400000) return "Next week";
-  return "Later";
-}
-
-const groupOrder = ["Today", "Tomorrow", "This week", "Next week", "Later"] as const;
-
-const PLANNED_TYPE_OPTIONS = ["Coffee Catch Up", "Attend Live Match", "Training Ground Visit"] as const;
+// `value` is the stored planned type and must not be renamed: normalisePlannedType()
+// maps "Match" and "Observation" onto "Attend Live Match", and /interactions filters
+// on that same string. Only the chip caption is presentational.
+const PLANNED_TYPE_OPTIONS = [
+  { value: "Coffee Catch Up", label: "Coffee Catch Up" },
+  { value: "Attend Live Match", label: "Match Day Events" },
+  { value: "Training Ground Visit", label: "Training Ground Visit" },
+] as const;
 
 export function MentorDashboard({ user }: Props) {
   const { can } = useAuth();
   const canLog = can("interactions.log");
+  const canSubmitReport = can("reports.submit");
+  const canViewCalendar = can("calendar.view");
   const [workflow, setWorkflow] = useState<WorkflowKind | null>(null);
   const [logPrefill, setLogPrefill] = useState<{ gkId?: string; gkName?: string }>({});
   function openLog(gkId?: string | null, gkName?: string | null) {
@@ -132,7 +118,7 @@ export function MentorDashboard({ user }: Props) {
   const groupedUpcoming = useMemo(() => {
     const map = new Map<string, MentorUpcomingInteraction[]>();
     for (const item of filteredUpcoming) {
-      const label = interactionGroupLabel(item.date);
+      const label = upcomingGroupLabel(item.date);
       const list = map.get(label) ?? [];
       list.push(item);
       map.set(label, list);
@@ -149,8 +135,6 @@ export function MentorDashboard({ user }: Props) {
   const effectiveMentorId = data?.mentorProfileId ?? user.mentorId ?? "";
   const reportsSearch = { ...periodSearch, coach: data?.coachIdentity ?? "", mentorProfileId: effectiveMentorId, source: "reports-submitted" };
   const interactionsSearch = { ...periodSearch, mentorId: effectiveMentorId, type: filters.length === 1 ? filters[0]! : "", source: "interactions-logged" };
-  const outstandingSearch = { ...periodSearch, coach: mentorName ?? "", mentorProfileId: effectiveMentorId, source: "outstanding-actions" };
-
   const toggleFilter = (type: string) => {
     setFilters((prev) =>
       prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type]
@@ -185,7 +169,7 @@ export function MentorDashboard({ user }: Props) {
             ? "Loading your dashboard…"
             : isError
               ? "Couldn't load your dashboard."
-              : `Your reporting activity — last ${rangeDays} days`}
+              : "Match reports and interactions first"}
         </p>
         {isError && (
           <button
@@ -197,7 +181,16 @@ export function MentorDashboard({ user }: Props) {
         )}
       </header>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+      <MentorPrimaryActions
+        canSubmitReport={canSubmitReport}
+        canLogInteraction={canLog}
+        canViewCalendar={canViewCalendar}
+        onLogReport={() => setWorkflow("report")}
+        onLogInteraction={() => openLog()}
+      />
+
+      <section aria-label="Your activity">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <Link
           to="/reports"
           search={reportsSearch}
@@ -228,23 +221,8 @@ export function MentorDashboard({ user }: Props) {
             updatedAt={updatedAt}
           />
         </Link>
-        <Link
-          to="/reports"
-          search={outstandingSearch}
-          onClick={() => trackClick("outstanding-actions", "/reports")}
-          className="block rounded-lg transition-transform hover:-translate-y-0.5 hover:ring-1 hover:ring-destructive/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive"
-          aria-label="View outstanding actions"
-        >
-          <StatCard
-            label={mentorDashboardMetricCardLabels.outstandingActions}
-            value={data?.outstandingActions ?? 0}
-            hint="Overdue reports & clip uploads"
-            accent="destructive"
-            emptyMessage="All caught up"
-            updatedAt={updatedAt}
-          />
-        </Link>
       </div>
+      </section>
 
       <Card className="p-4">
         <button
@@ -265,18 +243,6 @@ export function MentorDashboard({ user }: Props) {
             {showOutstanding ? "Hide" : "Show"}
           </span>
         </button>
-
-        {canLog && (
-          <div className="mt-3 flex justify-end">
-            <button
-              type="button"
-              onClick={() => openLog()}
-              className="text-xs px-2.5 py-1.5 rounded-md border border-border hover:bg-accent/40 text-primary inline-flex items-center gap-1"
-            >
-              <Plus className="size-3" /> Log interaction
-            </button>
-          </div>
-        )}
 
         {showOutstanding && (
           outstanding.length === 0 ? (
@@ -351,26 +317,7 @@ export function MentorDashboard({ user }: Props) {
 
 
       <Card className="p-4">
-        <SectionTitle
-          action={
-            <span className="inline-flex items-center gap-3">
-              {canLog && (
-                <button
-                  type="button"
-                  onClick={() => openLog()}
-                  className="text-xs text-primary inline-flex items-center gap-1"
-                >
-                  <Plus className="size-3" /> Log interaction
-                </button>
-              )}
-              <Link to="/calendar" className="text-xs text-primary inline-flex items-center gap-1">
-                Open calendar <ArrowUpRight className="size-3" />
-              </Link>
-            </span>
-          }
-        >
-          Upcoming Interactions
-        </SectionTitle>
+        <SectionTitle>Upcoming Interactions and Matches</SectionTitle>
 
         <div className="flex items-center justify-between gap-3 mb-3">
           <span className="text-xs text-muted-foreground">
@@ -409,12 +356,12 @@ export function MentorDashboard({ user }: Props) {
           >
             All
           </button>
-          {PLANNED_TYPE_OPTIONS.map((type) => {
-            const active = filters.includes(type);
+          {PLANNED_TYPE_OPTIONS.map(({ value, label }) => {
+            const active = filters.includes(value);
             return (
               <button
-                key={type}
-                onClick={() => toggleFilter(type)}
+                key={value}
+                onClick={() => toggleFilter(value)}
                 className={cn(
                   "px-2.5 py-1 text-[11px] uppercase tracking-wider rounded-md border transition-colors",
                   active
@@ -423,7 +370,7 @@ export function MentorDashboard({ user }: Props) {
                 )}
                 aria-pressed={active}
               >
-                {type}
+                {label}
               </button>
             );
           })}
@@ -455,16 +402,17 @@ export function MentorDashboard({ user }: Props) {
               </button>
             ) : (
               <Link
-                to="/interactions"
+                to="/calendar"
+                search={{ gkId: "", new: false }}
                 className="text-xs px-3 py-1.5 rounded-md border border-border hover:bg-accent/40 text-primary inline-flex items-center gap-1"
               >
-                Schedule interaction <ArrowUpRight className="size-3" />
+                View Calendar <ArrowUpRight className="size-3" />
               </Link>
             )}
           </div>
         ) : (
           <div className="space-y-4">
-            {groupOrder.map((label) => {
+            {UPCOMING_GROUP_ORDER.map((label) => {
               const list = groupedUpcoming.get(label);
               if (!list || list.length === 0) return null;
               return (
@@ -489,7 +437,11 @@ export function MentorDashboard({ user }: Props) {
                             {e.gkTierLevel && <TierLevelBadge level={e.gkTierLevel} />}
                           </div>
                           <div className="text-xs text-muted-foreground truncate">
-                            {e.gkClub ? `${e.gkClub}${e.gkLeague ? ` — ${e.gkLeague}` : ""}` : "Free Agent"}
+                            {e.gkClub
+                              ? `${e.gkClub}${e.gkLeague ? ` — ${e.gkLeague}` : ""}`
+                              : e.gkFreeAgent
+                                ? "Free Agent"
+                                : e.title}
                           </div>
                         </div>
                         <div className="hidden md:block text-sm font-medium text-foreground/90 truncate max-w-[240px]">
@@ -498,7 +450,7 @@ export function MentorDashboard({ user }: Props) {
                         <div className="text-right shrink-0">
                           <div className="text-xs font-medium tabular-nums font-mono flex items-center gap-1 justify-end">
                             <CalendarClock className="size-3 text-muted-foreground" />
-                            {formatEventDateTime(e.date)}
+                            {formatUpcomingEventDateTime(e.date, e.startTime)}
                           </div>
                         </div>
                         {canLog && (

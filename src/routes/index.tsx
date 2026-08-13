@@ -202,12 +202,20 @@ function Dashboard() {
         action={
           <div className="flex items-center gap-2">
             <SyncStatusChip />
+            {can("reports.submit") && (
+              <button
+                onClick={() => setWorkflow("report")}
+                className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md bg-primary text-primary-foreground text-xs uppercase tracking-[0.06em] font-semibold hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <FileText className="size-4" />Submit a Match report
+              </button>
+            )}
             {can("interactions.log") && (
               <button
                 onClick={() => setWorkflow("interaction")}
-                className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md bg-primary text-primary-foreground text-xs uppercase tracking-[0.06em] font-semibold hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md border border-border text-xs uppercase tracking-[0.06em] font-semibold hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
-                <Plus className="size-4" />Log Interaction
+                <Plus className="size-4" />Log interaction
               </button>
             )}
           </div>

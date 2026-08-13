@@ -335,15 +335,23 @@ export function AppShell() {
               })}
             </nav>
             <div className="p-3 border-t border-sidebar-border space-y-2">
+              {can("reports.submit") && (
+                <button
+                  onClick={() => { setWorkflow("report"); setNavOpen(false); }}
+                  className="w-full min-h-11 flex items-center gap-2 px-3 py-2 rounded-md bg-primary text-primary-foreground text-xs uppercase tracking-[0.06em] font-semibold hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <FileText className="size-4" />Submit a Match report
+                </button>
+              )}
               {canLog && (
                 <button
                   onClick={() => { setWorkflow("interaction"); setNavOpen(false); }}
-                  className="w-full min-h-11 flex items-center gap-2 px-3 py-2 rounded-md bg-primary text-primary-foreground text-xs uppercase tracking-[0.06em] font-semibold hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className="w-full min-h-11 flex items-center gap-2 px-3 py-2 rounded-md border border-border text-xs uppercase tracking-[0.06em] font-semibold hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
-                  <Plus className="size-4" />Log Interaction
+                  <Plus className="size-4" />Log interaction
                 </button>
               )}
-              {primaryAction && primaryAction.kind !== "interaction" && (
+              {primaryAction && primaryAction.kind !== "interaction" && primaryAction.kind !== "report" && (
                 <button
                   onClick={() => { setWorkflow(primaryAction.kind); setNavOpen(false); }}
                   className="w-full min-h-11 flex items-center gap-2 px-3 py-2 rounded-md bg-primary text-primary-foreground text-xs uppercase tracking-[0.06em] font-semibold hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
