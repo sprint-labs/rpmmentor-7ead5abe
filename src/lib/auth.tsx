@@ -27,17 +27,20 @@ function readViewAs(): Role | null {
 
 // Reference directory of known team members (for name/initials lookups in the UI only).
 // Login and role assignment go through Supabase Auth + the user_roles table — not this list.
+// Each `role` here mirrors the provisioned production role so this list can never
+// imply a permission the database does not grant. The addresses are deliberately
+// placeholders: real contact addresses belong in Supabase, not in the repository.
 export const DEMO_USERS: SessionUser[] = [
   { id: "u-luke", name: "Luke Corrigan", email: "lcorrigan@gkhq.app", role: "super_admin", initials: "LC", title: "System Admin / Product Owner" },
-  { id: "u-rich", name: "Rich Lee", email: "rlee@gkhq.app", role: "admin", initials: "RL", title: "Co-Founder & Director", mentorId: "m-rich-lee" },
+  { id: "u-rich", name: "Rich Lee", email: "rlee@gkhq.app", role: "mentor_manager", initials: "RL", title: "Co-Founder & Director", mentorId: "m-rich-lee" },
   { id: "u-drouse", name: "David Rouse", email: "drouse@gkhq.app", role: "mentor_manager", initials: "DR", title: "Managing Director & Mentor", mentorId: "m-david-rouse" },
+  { id: "u-mbeadle", name: "Matt Beadle", email: "mbeadle@gkhq.app", role: "mentor_manager", initials: "MB", title: "Mentor Manager", mentorId: "m-matt-beadle" },
   { id: "u-dwatson", name: "Dave Watson", email: "dwatson@gkhq.app", role: "mentor", initials: "DW", title: "Goalkeeper Mentor", mentorId: "m-dave-watson" },
   { id: "u-amarshall", name: "Andy Marshall", email: "amarshall@gkhq.app", role: "mentor", initials: "AM", title: "Goalkeeper Mentor", mentorId: "m-andy-marshall" },
-  { id: "u-jstern", name: "Jack Stern", email: "jstern@gkhq.app", role: "mentor", initials: "JS", title: "Goalkeeper Mentor", mentorId: "m-jack-stern" },
   { id: "u-achamberlain", name: "Alec Chamberlain", email: "achamberlain@gkhq.app", role: "mentor", initials: "AC", title: "Goalkeeper Mentor", mentorId: "m-alec-chamberlain" },
   { id: "u-mmargetson", name: "Martyn Margetson", email: "mmargetson@gkhq.app", role: "mentor", initials: "MM", title: "Goalkeeper Mentor", mentorId: "m-martyn-margetson" },
   { id: "u-mmiddelbeek", name: "Martijn Middelbeek", email: "mmiddelbeek@gkhq.app", role: "mentor", initials: "MM", title: "Goalkeeper Mentor", mentorId: "m-martijn-middelbeek" },
-  { id: "u-mbeadle", name: "Matt Beadle", email: "mbeadle@gkhq.app", role: "mentor", initials: "MB", title: "Goalkeeper Mentor", mentorId: "m-matt-beadle" },
+  { id: "u-gward", name: "Gavin Ward", email: "gward@gkhq.app", role: "mentor", initials: "GW", title: "Goalkeeper Mentor" },
 ];
 
 export type Permission =

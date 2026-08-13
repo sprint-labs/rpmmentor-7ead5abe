@@ -1,0 +1,570 @@
+#!/usr/bin/env node
+/**
+ * Reconcile Supabase Auth users, `public.profiles` and `public.user_roles`
+ * against a roster file, through the supported Auth Admin API.
+ *
+ * The roster is an input file rather than repository data, so a production email
+ * list never lands in Git. Every write is idempotent: a second run over an
+ * unchanged roster reports `ok` and writes nothing.
+ *
+ *   node scripts/provision-users.mjs --project-ref <ref> --roster <path>
+ *   node scripts/provision-users.mjs --project-ref <ref> --roster <path> --apply
+ *
+ * `--project-ref` is mandatory and must match the host in SUPABASE_URL. The
+ * tracked legacy `.env` still names an unrelated project, so the run aborts
+ * rather than reconcile accounts into the wrong database.
+ *
+ * Roster shape:
+ *
+ *   {
+ *     "users": [
+ *       {
+ *         "full_name": "Ada Lovelace",
+ *         "email": "ada@example.com",
+ *         "role": "mentor",
+ *         "title": "Goalkeeper Mentor",             // optional
+ *         "previous_emails": ["ada@temp.example"]    // optional; migrated in place
+ *       }
+ *     ],
+ *     "retire": ["stale@example.com"]                // optional
+ *   }
+ *
+ * A person listed with `previous_emails` keeps their existing user UUID: the
+ * address is moved onto the same account so attributed reports, interactions,
+ * media and audit rows stay attached. Current and previous addresses share one
+ * identity namespace, and the roster is rejected if two entries could resolve to
+ * the same account or if `retire` names an address a roster entry claims.
+ *
+ * `retire` deletes an obsolete account only when every attribution column in the
+ * public schema is clear for it, and never when the run has just reconciled that
+ * account.
+ *
+ * Requires SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY from the environment or an
+ * untracked `.env.local`. Generated passwords are never printed, returned or
+ * stored. A provisioned account is email-confirmed and its owner sets their own
+ * password through the app's password-reset flow.
+ */
+import { randomUUID } from "node:crypto";
+import { readFileSync } from "node:fs";
+import { pathToFileURL } from "node:url";
+import { config } from "dotenv";
+import { createClient } from "@supabase/supabase-js";
+
+const ROLES = ["super_admin", "admin", "mentor_manager", "mentor"];
+
+/**
+ * Every column that attributes a public row to an auth user. Retirement is
+ * refused unless all of them are clear for that user, so deleting an obsolete
+ * account can never orphan history. The media and audit tables hold the UUID in
+ * a text column rather than a uuid column, and carry no foreign key, so nothing
+ * else would stop the reference going stale.
+ */
+const ATTRIBUTION_COLUMNS = [
+  ["interactions", "mentor_id"],
+  ["interactions", "updated_by"],
+  ["interaction_audit", "changed_by"],
+  ["interaction_media", "attached_by"],
+  ["calendar_events", "created_by"],
+  ["match_reports_cache", "submitted_by"],
+  ["match_report_submissions", "user_id"],
+  ["match_report_cutover_state", "reconciled_by"],
+  ["media_assets", "uploaded_by_id"],
+  ["report_attachments", "attached_by_id"],
+  ["media_audit_log", "actor_id"],
+  ["password_change_audit", "user_id"],
+  ["password_change_audit", "actor_id"],
+  ["user_deletion_audit", "deleted_user_id"],
+  ["user_deletion_audit", "actor_id"],
+  ["dashboard_click_events", "user_id"],
+  ["install_prompt_events", "user_id"],
+];
+
+function parseArgs(argv) {
+  const args = { roster: null, projectRef: null, apply: false };
+  for (let i = 0; i < argv.length; i += 1) {
+    if (argv[i] === "--roster") args.roster = argv[i + 1] ?? null;
+    else if (argv[i] === "--project-ref") args.projectRef = argv[i + 1] ?? null;
+    else if (argv[i] === "--apply") args.apply = true;
+  }
+  return args;
+}
+
+const normaliseEmail = (email) =>
+  String(email ?? "")
+    .trim()
+    .toLowerCase();
+
+/** Mirrors `initialsOf` in src/lib/admin-users.functions.ts. */
+function initialsOf(name, email) {
+  const source = (name || email).trim();
+  const parts = source.split(/\s+/).filter(Boolean);
+  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+  return source.slice(0, 2).toUpperCase();
+}
+
+function loadRoster(path) {
+  const parsed = JSON.parse(readFileSync(path, "utf8"));
+  const users = Array.isArray(parsed.users) ? parsed.users : [];
+  const retire = Array.isArray(parsed.retire) ? parsed.retire.map(normaliseEmail) : [];
+  if (users.length === 0) throw new Error("Roster contains no users");
+
+  // Current and previous addresses form one identity namespace. If two entries
+  // could resolve to the same account, an apply run would reassign one person's
+  // history to the other, so the roster is rejected before anything is written.
+  const claimedBy = new Map();
+  const claim = (address, label) => {
+    const owner = claimedBy.get(address);
+    if (owner) throw new Error(`address ${address} is claimed by both ${owner} and ${label}`);
+    claimedBy.set(address, label);
+  };
+
+  const entries = users.map((raw, index) => {
+    const email = normaliseEmail(raw.email);
+    const fullName = String(raw.full_name ?? "").trim();
+    if (!email.includes("@")) throw new Error(`users[${index}]: invalid email`);
+    if (!fullName) throw new Error(`users[${index}] (${email}): full_name is required`);
+    if (!ROLES.includes(raw.role)) {
+      throw new Error(`users[${index}] (${email}): role must be one of ${ROLES.join(", ")}`);
+    }
+    claim(email, `users[${index}].email`);
+
+    // An entry restating its own current address is a harmless no-op, not a clash.
+    const previous = (Array.isArray(raw.previous_emails) ? raw.previous_emails : [])
+      .map(normaliseEmail)
+      .filter((candidate) => candidate && candidate !== email);
+    for (const alias of previous) claim(alias, `users[${index}].previous_emails`);
+
+    return {
+      email,
+      fullName,
+      role: raw.role,
+      title: String(raw.title ?? "").trim(),
+      previousEmails: previous,
+      initials: initialsOf(fullName, email),
+    };
+  });
+
+  // Retiring an address that a roster entry claims would delete the account that
+  // entry just migrated onto its new address.
+  for (const email of retire) {
+    const owner = claimedBy.get(email);
+    if (owner) throw new Error(`retire lists ${email}, which ${owner} already claims`);
+  }
+  return { entries, retire };
+}
+
+/**
+ * Match each roster entry to at most one existing account, considering its
+ * current address and every previous alias.
+ *
+ * An entry is ambiguous when those addresses already belong to different
+ * accounts. Reconciling one of them would silently strand the person's history
+ * on the other, and verification would still pass because it only checks the
+ * current address. The caller stops the run instead of guessing.
+ *
+ * Exported for tests.
+ */
+export function resolveRosterAccounts(entries, byEmail) {
+  const resolved = new Map();
+  const ambiguous = [];
+  for (const entry of entries) {
+    const matches = [entry.email, ...entry.previousEmails]
+      .map((address) => byEmail.get(address))
+      .filter(Boolean);
+    const distinct = [...new Map(matches.map((user) => [user.id, user])).values()];
+    if (distinct.length > 1) {
+      const addresses = distinct.map((user) => normaliseEmail(user.email)).join(", ");
+      ambiguous.push(`${entry.email} matches ${distinct.length} accounts: ${addresses}`);
+    }
+    resolved.set(entry.email, distinct[0] ?? null);
+  }
+  return { resolved, ambiguous };
+}
+
+function requireEnv(projectRef) {
+  config({ path: ".env", quiet: true });
+  config({ path: ".env.local", override: true, quiet: true });
+  const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const missing = [
+    ...(url ? [] : ["SUPABASE_URL"]),
+    ...(serviceRoleKey ? [] : ["SUPABASE_SERVICE_ROLE_KEY"]),
+  ];
+  if (missing.length > 0) {
+    throw new Error(`Missing environment variable(s): ${missing.join(", ")}`);
+  }
+  const host = new URL(url).host;
+  if (host !== `${projectRef}.supabase.co`) {
+    throw new Error(
+      `Refusing to run: SUPABASE_URL resolves to ${host}, not the requested ${projectRef}.supabase.co`,
+    );
+  }
+  return { url, serviceRoleKey };
+}
+
+async function listAllAuthUsers(admin) {
+  const perPage = 200;
+  const all = [];
+  for (let page = 1; ; page += 1) {
+    const { data, error } = await admin.auth.admin.listUsers({ page, perPage });
+    if (error) throw new Error(`listUsers failed: ${error.message}`);
+    const batch = data?.users ?? [];
+    all.push(...batch);
+    if (batch.length < perPage) return all;
+  }
+}
+
+async function countAttributedRows(admin, userId) {
+  const found = [];
+  for (const [table, column] of ATTRIBUTION_COLUMNS) {
+    const { count, error } = await admin
+      .from(table)
+      .select("*", { count: "exact", head: true })
+      .eq(column, userId);
+    if (error) throw new Error(`counting ${table}.${column} failed: ${error.message}`);
+    if ((count ?? 0) > 0) found.push(`${table}.${column}=${count}`);
+  }
+  return found;
+}
+
+async function reconcileAuthUser(admin, entry, existing, apply) {
+  const actions = [];
+
+  if (!existing) {
+    if (!apply) return { userId: null, actions: ["would create account"] };
+    // Never surfaced: the owner sets their own password via the reset flow.
+    const password = `${randomUUID().replace(/-/g, "")}${randomUUID().slice(0, 8)}Aa1!`;
+    const { data, error } = await admin.auth.admin.createUser({
+      email: entry.email,
+      password,
+      email_confirm: true,
+      user_metadata: { name: entry.fullName, title: entry.title, initials: entry.initials },
+    });
+    if (error || !data?.user)
+      throw new Error(`createUser failed: ${error?.message ?? "no user returned"}`);
+    return { userId: data.user.id, actions: ["created account"] };
+  }
+
+  const patch = {};
+  if (normaliseEmail(existing.email) !== entry.email) {
+    patch.email = entry.email;
+    patch.email_confirm = true;
+    actions.push(`migrated email from ${existing.email}`);
+  }
+  const meta = existing.user_metadata ?? {};
+  if (
+    meta.name !== entry.fullName ||
+    meta.title !== entry.title ||
+    meta.initials !== entry.initials
+  ) {
+    patch.user_metadata = {
+      ...meta,
+      name: entry.fullName,
+      title: entry.title,
+      initials: entry.initials,
+    };
+    actions.push("updated account metadata");
+  }
+
+  if (Object.keys(patch).length > 0 && apply) {
+    const { error } = await admin.auth.admin.updateUserById(existing.id, patch);
+    if (error) throw new Error(`updateUserById failed: ${error.message}`);
+  }
+  return { userId: existing.id, actions: apply ? actions : actions.map((a) => `would ${a}`) };
+}
+
+async function reconcileProfile(admin, entry, userId, apply) {
+  const { data, error } = await admin
+    .from("profiles")
+    .select("id,email,name,initials,title")
+    .eq("id", userId)
+    .maybeSingle();
+  if (error) throw new Error(`reading profile failed: ${error.message}`);
+
+  const desired = {
+    id: userId,
+    email: entry.email,
+    name: entry.fullName,
+    initials: entry.initials,
+    title: entry.title,
+  };
+  const matches =
+    data &&
+    data.email === desired.email &&
+    data.name === desired.name &&
+    data.initials === desired.initials &&
+    (data.title ?? "") === desired.title;
+  if (matches) return [];
+
+  if (!apply) return [data ? "would update profile" : "would create profile"];
+  const { error: upsertError } = await admin.from("profiles").upsert(desired);
+  if (upsertError) throw new Error(`upserting profile failed: ${upsertError.message}`);
+  return [data ? "updated profile" : "created profile"];
+}
+
+async function reconcileRole(admin, entry, userId, apply) {
+  const { data, error } = await admin.from("user_roles").select("role").eq("user_id", userId);
+  if (error) throw new Error(`reading roles failed: ${error.message}`);
+
+  const current = (data ?? []).map((row) => row.role).sort();
+  if (current.length === 1 && current[0] === entry.role) return [];
+
+  const detail = current.length === 0 ? "none" : current.join("+");
+
+  // Demoting the last super admin ends the run with nobody able to manage users,
+  // which is the same outage retireAccount guards against and is only
+  // recoverable with the service-role key. Roles are granted before they are
+  // revoked, so a replacement granted earlier in this run already counts.
+  if (current.includes("super_admin") && entry.role !== "super_admin") {
+    const { count, error: countError } = await admin
+      .from("user_roles")
+      .select("user_id", { count: "exact", head: true })
+      .eq("role", "super_admin")
+      .neq("user_id", userId);
+    if (countError) throw new Error(`counting super admins failed: ${countError.message}`);
+    if ((count ?? 0) === 0) {
+      throw new Error(
+        `refusing to revoke super_admin: no other account holds it. Grant super_admin elsewhere before demoting ${entry.email}`,
+      );
+    }
+  }
+
+  if (!apply) return [`would set role ${detail} -> ${entry.role}`];
+
+  // Grant before revoking. If the second call fails the account is left holding
+  // an extra role, which the next run clears; revoking first would leave it with
+  // no role at all and lock the person out, including the sole super admin.
+  if (!current.includes(entry.role)) {
+    const { error: insertError } = await admin
+      .from("user_roles")
+      .insert({ user_id: userId, role: entry.role });
+    if (insertError) throw new Error(`granting role failed: ${insertError.message}`);
+  }
+  const obsolete = current.filter((role) => role !== entry.role);
+  if (obsolete.length > 0) {
+    const { error: deleteError } = await admin
+      .from("user_roles")
+      .delete()
+      .eq("user_id", userId)
+      .in("role", obsolete);
+    if (deleteError) throw new Error(`revoking obsolete roles failed: ${deleteError.message}`);
+  }
+  return [`set role ${detail} -> ${entry.role}`];
+}
+
+async function retireAccount(admin, email, byEmail, reconciledIds, apply) {
+  const existing = byEmail.get(email);
+  if (!existing) return { email, actions: ["absent"], failed: false };
+
+  // byEmail is a pre-reconcile snapshot, so a migrated alias still resolves to
+  // the account it was migrated onto. Never delete an account this run just
+  // reconciled, whatever the roster says.
+  if (reconciledIds.has(existing.id)) {
+    return { email, actions: ["refused: address was migrated to a roster account"], failed: true };
+  }
+
+  const { data: roleRows, error: roleError } = await admin
+    .from("user_roles")
+    .select("role")
+    .eq("user_id", existing.id);
+  if (roleError) {
+    return { email, actions: [`failed: reading roles: ${roleError.message}`], failed: true };
+  }
+  const roles = (roleRows ?? []).map((row) => row.role);
+
+  // Removing the last super admin would leave nobody able to reach the
+  // account-management UI, recoverable only with the service-role key.
+  if (roles.includes("super_admin")) {
+    const { count, error: countError } = await admin
+      .from("user_roles")
+      .select("user_id", { count: "exact", head: true })
+      .eq("role", "super_admin");
+    if (countError) {
+      return {
+        email,
+        actions: [`failed: counting super admins: ${countError.message}`],
+        failed: true,
+      };
+    }
+    if ((count ?? 0) <= 1) {
+      return { email, actions: ["refused: is the only super admin"], failed: true };
+    }
+  }
+
+  const attributed = await countAttributedRows(admin, existing.id);
+  if (attributed.length > 0) {
+    return { email, actions: [`refused: holds ${attributed.join(", ")}`], failed: true };
+  }
+  if (!apply) return { email, actions: ["would delete (no attributed rows)"], failed: false };
+
+  // Snapshot the identity before deleting, so the audit row can name who went.
+  const { data: profile } = await admin
+    .from("profiles")
+    .select("name")
+    .eq("id", existing.id)
+    .maybeSingle();
+
+  const { error } = await admin.auth.admin.deleteUser(existing.id);
+  if (error) return { email, actions: [`failed: ${error.message}`], failed: true };
+
+  // Mirror deleteManagedUser so a script removal is visible in the same audit
+  // view as one made through the UI. profiles and user_roles cascade on delete.
+  const { error: auditError } = await admin.from("user_deletion_audit").insert({
+    deleted_user_id: existing.id,
+    deleted_email: email,
+    deleted_name: profile?.name ?? "",
+    deleted_role: ROLES.find((role) => roles.includes(role)) ?? null,
+    actor_id: null,
+    actor_email: "",
+    actor_name: "provision-users script",
+    affected_sections:
+      roles.length > 0 ? [{ section: "Roles", records: roles.length, action: "deleted" }] : [],
+    metadata: { source: "scripts/provision-users.mjs" },
+  });
+  const actions = ["deleted (no attributed rows)"];
+  if (auditError) actions.push(`warning: audit row not written: ${auditError.message}`);
+  return { email, actions, failed: false };
+}
+
+async function verify(admin, entries) {
+  const users = await listAllAuthUsers(admin);
+  const results = [];
+  for (const entry of entries) {
+    const matches = users.filter((user) => normaliseEmail(user.email) === entry.email);
+    const problems = [];
+    if (matches.length !== 1) problems.push(`${matches.length} auth users`);
+
+    if (matches.length === 1) {
+      const userId = matches[0].id;
+      const { data: profiles, error: profileError } = await admin
+        .from("profiles")
+        .select("id,name,email")
+        .eq("id", userId);
+      if (profileError) throw new Error(`verifying profile failed: ${profileError.message}`);
+      if ((profiles ?? []).length !== 1) problems.push(`${(profiles ?? []).length} profiles`);
+      else if (profiles[0].name !== entry.fullName)
+        problems.push(`profile name "${profiles[0].name}"`);
+      else if (normaliseEmail(profiles[0].email) !== entry.email)
+        problems.push("profile email mismatch");
+
+      const { data: roles, error: roleError } = await admin
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", userId);
+      if (roleError) throw new Error(`verifying roles failed: ${roleError.message}`);
+      const roleValues = (roles ?? []).map((row) => row.role);
+      if (roleValues.length !== 1 || roleValues[0] !== entry.role) {
+        problems.push(`roles [${roleValues.join(", ") || "none"}]`);
+      }
+      results.push({ email: entry.email, userId, role: entry.role, problems });
+    } else {
+      results.push({ email: entry.email, userId: null, role: entry.role, problems });
+    }
+  }
+  return results;
+}
+
+async function main() {
+  const args = parseArgs(process.argv.slice(2));
+  if (!args.roster || !args.projectRef) {
+    throw new Error(
+      "Usage: node scripts/provision-users.mjs --project-ref <ref> --roster <path> [--apply]",
+    );
+  }
+
+  const { entries, retire } = loadRoster(args.roster);
+  const { url, serviceRoleKey } = requireEnv(args.projectRef);
+  const admin = createClient(url, serviceRoleKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+
+  console.log(`Project: ${url}`);
+  console.log(`Mode:    ${args.apply ? "APPLY" : "dry run"}`);
+  console.log(`Roster:  ${entries.length} user(s), ${retire.length} to retire\n`);
+
+  const authUsers = await listAllAuthUsers(admin);
+  const byEmail = new Map(authUsers.map((user) => [normaliseEmail(user.email), user]));
+
+  // Resolve everyone against the live project before writing anything, so an
+  // ambiguous entry stops the run rather than half-applying it.
+  const { resolved, ambiguous } = resolveRosterAccounts(entries, byEmail);
+  if (ambiguous.length > 0) {
+    throw new Error(
+      `Roster entries match more than one existing account. Merge them by hand first:\n  ${ambiguous.join("\n  ")}`,
+    );
+  }
+
+  let failures = 0;
+  const reconciledIds = new Set();
+  for (const entry of entries) {
+    const existing = resolved.get(entry.email) ?? null;
+
+    try {
+      const { userId, actions } = await reconcileAuthUser(admin, entry, existing, args.apply);
+      if (existing) reconciledIds.add(existing.id);
+      if (userId) {
+        reconciledIds.add(userId);
+        actions.push(...(await reconcileProfile(admin, entry, userId, args.apply)));
+        actions.push(...(await reconcileRole(admin, entry, userId, args.apply)));
+      } else {
+        actions.push("would create profile", `would set role -> ${entry.role}`);
+      }
+      const summary = actions.length > 0 ? actions.join("; ") : "ok (already correct)";
+      console.log(`  ${entry.email} [${entry.role}] ${existing ? "reused" : "new"}: ${summary}`);
+    } catch (error) {
+      failures += 1;
+      console.error(`  ${entry.email} [${entry.role}] FAILED: ${error.message}`);
+    }
+  }
+
+  if (retire.length > 0) {
+    // Retirement is irreversible, so it must not run against a half-applied
+    // roster: a replacement account that failed to be created above would leave
+    // that person with the old account deleted and nothing to sign in to.
+    if (failures > 0) {
+      console.log(
+        `\nSkipping ${retire.length} retirement(s): reconciliation failed above, so the roster is only partly applied.`,
+      );
+    } else {
+      console.log("\nRetiring obsolete accounts:");
+      for (const email of retire) {
+        const result = await retireAccount(admin, email, byEmail, reconciledIds, args.apply);
+        if (result.failed) failures += 1;
+        console.log(`  ${email}: ${result.actions.join("; ")}`);
+      }
+    }
+  }
+
+  if (args.apply) {
+    console.log("\nVerification against the live project:");
+    for (const result of await verify(admin, entries)) {
+      if (result.problems.length > 0) {
+        failures += 1;
+        console.error(`  FAIL ${result.email}: ${result.problems.join(", ")}`);
+      } else {
+        console.log(`  PASS ${result.email} -> ${result.role} (${result.userId})`);
+      }
+    }
+  }
+
+  if (failures > 0) {
+    console.error(`\n${failures} problem(s). Nothing further was attempted for those entries.`);
+    process.exitCode = 1;
+    return;
+  }
+  console.log(
+    args.apply
+      ? "\nAll roster entries reconciled. New accounts are email-confirmed; each owner sets their own password through the app's password-reset flow."
+      : "\nDry run complete. Re-run with --apply to write these changes.",
+  );
+}
+
+// Only provision when run as a command; importing this file for tests must not
+// reach the live project.
+const invokedDirectly = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
+if (invokedDirectly) {
+  main().catch((error) => {
+    console.error(`provision-users: ${error.message}`);
+    process.exitCode = 1;
+  });
+}
