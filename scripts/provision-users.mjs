@@ -310,6 +310,25 @@ async function reconcileRole(admin, entry, userId, apply) {
   if (current.length === 1 && current[0] === entry.role) return [];
 
   const detail = current.length === 0 ? "none" : current.join("+");
+
+  // Demoting the last super admin ends the run with nobody able to manage users,
+  // which is the same outage retireAccount guards against and is only
+  // recoverable with the service-role key. Roles are granted before they are
+  // revoked, so a replacement granted earlier in this run already counts.
+  if (current.includes("super_admin") && entry.role !== "super_admin") {
+    const { count, error: countError } = await admin
+      .from("user_roles")
+      .select("user_id", { count: "exact", head: true })
+      .eq("role", "super_admin")
+      .neq("user_id", userId);
+    if (countError) throw new Error(`counting super admins failed: ${countError.message}`);
+    if ((count ?? 0) === 0) {
+      throw new Error(
+        `refusing to revoke super_admin: no other account holds it. Grant super_admin elsewhere before demoting ${entry.email}`,
+      );
+    }
+  }
+
   if (!apply) return [`would set role ${detail} -> ${entry.role}`];
 
   // Grant before revoking. If the second call fails the account is left holding
@@ -498,11 +517,22 @@ async function main() {
     }
   }
 
-  if (retire.length > 0) console.log("\nRetiring obsolete accounts:");
-  for (const email of retire) {
-    const result = await retireAccount(admin, email, byEmail, reconciledIds, args.apply);
-    if (result.failed) failures += 1;
-    console.log(`  ${email}: ${result.actions.join("; ")}`);
+  if (retire.length > 0) {
+    // Retirement is irreversible, so it must not run against a half-applied
+    // roster: a replacement account that failed to be created above would leave
+    // that person with the old account deleted and nothing to sign in to.
+    if (failures > 0) {
+      console.log(
+        `\nSkipping ${retire.length} retirement(s): reconciliation failed above, so the roster is only partly applied.`,
+      );
+    } else {
+      console.log("\nRetiring obsolete accounts:");
+      for (const email of retire) {
+        const result = await retireAccount(admin, email, byEmail, reconciledIds, args.apply);
+        if (result.failed) failures += 1;
+        console.log(`  ${email}: ${result.actions.join("; ")}`);
+      }
+    }
   }
 
   if (args.apply) {
