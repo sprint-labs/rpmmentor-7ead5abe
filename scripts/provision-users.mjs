@@ -31,7 +31,13 @@
  *
  * A person listed with `previous_emails` keeps their existing user UUID: the
  * address is moved onto the same account so attributed reports, interactions,
- * media and audit rows stay attached.
+ * media and audit rows stay attached. Current and previous addresses share one
+ * identity namespace, and the roster is rejected if two entries could resolve to
+ * the same account or if `retire` names an address a roster entry claims.
+ *
+ * `retire` deletes an obsolete account only when every attribution column in the
+ * public schema is clear for it, and never when the run has just reconciled that
+ * account.
  *
  * Requires SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY from the environment or an
  * untracked `.env.local`. Generated passwords are never printed, returned or
@@ -48,8 +54,9 @@ const ROLES = ["super_admin", "admin", "mentor_manager", "mentor"];
 /**
  * Every column that attributes a public row to an auth user. Retirement is
  * refused unless all of them are clear for that user, so deleting an obsolete
- * account can never orphan history. `media_audit_log.actor_id` stores the UUID
- * as text rather than a uuid column.
+ * account can never orphan history. The media and audit tables hold the UUID in
+ * a text column rather than a uuid column, and carry no foreign key, so nothing
+ * else would stop the reference going stale.
  */
 const ATTRIBUTION_COLUMNS = [
   ["interactions", "mentor_id"],
@@ -60,6 +67,8 @@ const ATTRIBUTION_COLUMNS = [
   ["match_reports_cache", "submitted_by"],
   ["match_report_submissions", "user_id"],
   ["match_report_cutover_state", "reconciled_by"],
+  ["media_assets", "uploaded_by_id"],
+  ["report_attachments", "attached_by_id"],
   ["media_audit_log", "actor_id"],
   ["password_change_audit", "user_id"],
   ["password_change_audit", "actor_id"],
@@ -98,7 +107,16 @@ function loadRoster(path) {
   const retire = Array.isArray(parsed.retire) ? parsed.retire.map(normaliseEmail) : [];
   if (users.length === 0) throw new Error("Roster contains no users");
 
-  const seen = new Set();
+  // Current and previous addresses form one identity namespace. If two entries
+  // could resolve to the same account, an apply run would reassign one person's
+  // history to the other, so the roster is rejected before anything is written.
+  const claimedBy = new Map();
+  const claim = (address, label) => {
+    const owner = claimedBy.get(address);
+    if (owner) throw new Error(`address ${address} is claimed by both ${owner} and ${label}`);
+    claimedBy.set(address, label);
+  };
+
   const entries = users.map((raw, index) => {
     const email = normaliseEmail(raw.email);
     const fullName = String(raw.full_name ?? "").trim();
@@ -107,12 +125,13 @@ function loadRoster(path) {
     if (!ROLES.includes(raw.role)) {
       throw new Error(`users[${index}] (${email}): role must be one of ${ROLES.join(", ")}`);
     }
-    if (seen.has(email)) throw new Error(`users[${index}]: duplicate email ${email}`);
-    seen.add(email);
+    claim(email, `users[${index}].email`);
 
+    // An entry restating its own current address is a harmless no-op, not a clash.
     const previous = (Array.isArray(raw.previous_emails) ? raw.previous_emails : [])
       .map(normaliseEmail)
       .filter((candidate) => candidate && candidate !== email);
+    for (const alias of previous) claim(alias, `users[${index}].previous_emails`);
 
     return {
       email,
@@ -124,8 +143,11 @@ function loadRoster(path) {
     };
   });
 
+  // Retiring an address that a roster entry claims would delete the account that
+  // entry just migrated onto its new address.
   for (const email of retire) {
-    if (seen.has(email)) throw new Error(`retire contains a roster address: ${email}`);
+    const owner = claimedBy.get(email);
+    if (owner) throw new Error(`retire lists ${email}, which ${owner} already claims`);
   }
   return { entries, retire };
 }
@@ -261,18 +283,37 @@ async function reconcileRole(admin, entry, userId, apply) {
   const detail = current.length === 0 ? "none" : current.join("+");
   if (!apply) return [`would set role ${detail} -> ${entry.role}`];
 
-  const { error: deleteError } = await admin.from("user_roles").delete().eq("user_id", userId);
-  if (deleteError) throw new Error(`clearing roles failed: ${deleteError.message}`);
-  const { error: insertError } = await admin
-    .from("user_roles")
-    .insert({ user_id: userId, role: entry.role });
-  if (insertError) throw new Error(`granting role failed: ${insertError.message}`);
+  // Grant before revoking. If the second call fails the account is left holding
+  // an extra role, which the next run clears; revoking first would leave it with
+  // no role at all and lock the person out, including the sole super admin.
+  if (!current.includes(entry.role)) {
+    const { error: insertError } = await admin
+      .from("user_roles")
+      .insert({ user_id: userId, role: entry.role });
+    if (insertError) throw new Error(`granting role failed: ${insertError.message}`);
+  }
+  const obsolete = current.filter((role) => role !== entry.role);
+  if (obsolete.length > 0) {
+    const { error: deleteError } = await admin
+      .from("user_roles")
+      .delete()
+      .eq("user_id", userId)
+      .in("role", obsolete);
+    if (deleteError) throw new Error(`revoking obsolete roles failed: ${deleteError.message}`);
+  }
   return [`set role ${detail} -> ${entry.role}`];
 }
 
-async function retireAccount(admin, email, byEmail, apply) {
+async function retireAccount(admin, email, byEmail, reconciledIds, apply) {
   const existing = byEmail.get(email);
   if (!existing) return { email, actions: ["absent"], failed: false };
+
+  // byEmail is a pre-reconcile snapshot, so a migrated alias still resolves to
+  // the account it was migrated onto. Never delete an account this run just
+  // reconciled, whatever the roster says.
+  if (reconciledIds.has(existing.id)) {
+    return { email, actions: ["refused: address was migrated to a roster account"], failed: true };
+  }
 
   const attributed = await countAttributedRows(admin, existing.id);
   if (attributed.length > 0) {
@@ -345,6 +386,7 @@ async function main() {
   const byEmail = new Map(authUsers.map((user) => [normaliseEmail(user.email), user]));
 
   let failures = 0;
+  const reconciledIds = new Set();
   for (const entry of entries) {
     const existing =
       byEmail.get(entry.email) ??
@@ -353,7 +395,9 @@ async function main() {
 
     try {
       const { userId, actions } = await reconcileAuthUser(admin, entry, existing, args.apply);
+      if (existing) reconciledIds.add(existing.id);
       if (userId) {
+        reconciledIds.add(userId);
         actions.push(...(await reconcileProfile(admin, entry, userId, args.apply)));
         actions.push(...(await reconcileRole(admin, entry, userId, args.apply)));
       } else {
@@ -369,7 +413,7 @@ async function main() {
 
   if (retire.length > 0) console.log("\nRetiring obsolete accounts:");
   for (const email of retire) {
-    const result = await retireAccount(admin, email, byEmail, args.apply);
+    const result = await retireAccount(admin, email, byEmail, reconciledIds, args.apply);
     if (result.failed) failures += 1;
     console.log(`  ${email}: ${result.actions.join("; ")}`);
   }
