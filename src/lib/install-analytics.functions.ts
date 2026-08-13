@@ -16,7 +16,7 @@ const input = z.object({
 // too (they can install from the marketing/landing surface before signing in).
 // The row's user_id is nullable; when a session cookie is present we attribute.
 export const logInstallEvent = createServerFn({ method: "POST" })
-  .inputValidator((data: z.infer<typeof input>) => input.parse(data))
+  .validator((data: z.infer<typeof input>) => input.parse(data))
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { error } = await supabaseAdmin.from("install_prompt_events").insert({

@@ -65,7 +65,7 @@ const setRoleInput = z.object({
 
 export const setManagedUserRole = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => setRoleInput.parse(input))
+  .validator((input: unknown) => setRoleInput.parse(input))
   .handler(async ({ data, context }) => {
     const { data: myRoles, error: roleErr } = await context.supabase
       .from("user_roles")
@@ -112,7 +112,7 @@ function initialsOf(name: string, email: string): string {
 
 export const createManagedUser = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => createUserInput.parse(input))
+  .validator((input: unknown) => createUserInput.parse(input))
   .handler(async ({ data, context }) => {
     const { data: myRoles, error: roleErr } = await context.supabase
       .from("user_roles")
@@ -182,7 +182,7 @@ const inviteUserInput = z.object({
 
 export const inviteManagedUser = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => inviteUserInput.parse(input))
+  .validator((input: unknown) => inviteUserInput.parse(input))
   .handler(async ({ data, context }) => {
     const { data: myRoles, error: roleErr } = await context.supabase
       .from("user_roles")
@@ -245,7 +245,7 @@ const deleteUserInput = z.object({ userId: z.string().uuid() });
 
 export const deleteManagedUser = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => deleteUserInput.parse(input))
+  .validator((input: unknown) => deleteUserInput.parse(input))
   .handler(async ({ data, context }) => {
     const { data: myRoles, error: roleErr } = await context.supabase
       .from("user_roles")
@@ -362,7 +362,7 @@ const resetPasswordInput = z.object({ userId: z.string().uuid() });
 
 export const resetManagedUserPassword = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => resetPasswordInput.parse(input))
+  .validator((input: unknown) => resetPasswordInput.parse(input))
   .handler(async ({ data, context }) => {
     const { data: myRoles, error: roleErr } = await context.supabase
       .from("user_roles")

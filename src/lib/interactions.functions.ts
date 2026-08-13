@@ -41,7 +41,7 @@ export const listInteractions = createServerFn({ method: "GET" })
 
 export const createInteraction = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data) => createInteractionInput.parse(data))
+  .validator((data) => createInteractionInput.parse(data))
   .handler(async ({ data, context }): Promise<LoggedInteraction> => {
     const { supabase, userId } = context;
 
@@ -116,7 +116,7 @@ export const createInteraction = createServerFn({ method: "POST" })
  */
 export const updateInteraction = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data) => updateInteractionInput.parse(data))
+  .validator((data) => updateInteractionInput.parse(data))
   .handler(async ({ data, context }): Promise<LoggedInteraction> => {
     const { supabase, userId } = context;
 
@@ -206,7 +206,7 @@ export const updateInteraction = createServerFn({ method: "POST" })
  */
 export const listInteractionsPage = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data) => listInteractionsQuery.parse(data))
+  .validator((data) => listInteractionsQuery.parse(data))
   .handler(async ({ data, context }): Promise<InteractionsPage> => {
     const pageSize = data.pageSize;
     const page = data.page;
@@ -258,7 +258,7 @@ export const listInteractionsPage = createServerFn({ method: "GET" })
  */
 export const attachInteractionAudio = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data) => attachInteractionAudioInput.parse(data))
+  .validator((data) => attachInteractionAudioInput.parse(data))
   .handler(async ({ data, context }): Promise<InteractionAudioLink> => {
     const { supabase, userId } = context;
     const roles = await getUserRoles(supabase, userId);
@@ -277,7 +277,7 @@ export const attachInteractionAudio = createServerFn({ method: "POST" })
  */
 export const listInteractionAudio = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data) => listInteractionAudioQuery.parse(data))
+  .validator((data) => listInteractionAudioQuery.parse(data))
   .handler(async ({ data, context }): Promise<InteractionAudioClip[]> => {
     if (data.interactionIds.length === 0) return [];
 

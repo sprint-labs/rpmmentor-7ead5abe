@@ -103,7 +103,7 @@ export const listCalendarEvents = createServerFn({ method: "GET" })
 
 export const createCalendarEvent = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: EventInput) => validateEvent(data))
+  .validator((data: EventInput) => validateEvent(data))
   .handler(async ({ data, context }): Promise<TeamCalendarEvent> => {
     await requireRole(context.supabase, context.userId, CALENDAR_MANAGE_ROLES, "add calendar events");
 
@@ -124,7 +124,7 @@ export const createCalendarEvent = createServerFn({ method: "POST" })
 
 export const updateCalendarEvent = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: EventInput & { id: string }) => {
+  .validator((data: EventInput & { id: string }) => {
     if (!data?.id) throw new Error("An event id is required.");
     return { id: data.id, ...validateEvent(data) };
   })
@@ -144,7 +144,7 @@ export const updateCalendarEvent = createServerFn({ method: "POST" })
 
 export const deleteCalendarEvent = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: { id: string }) => {
+  .validator((data: { id: string }) => {
     if (!data?.id) throw new Error("An event id is required.");
     return { id: data.id };
   })

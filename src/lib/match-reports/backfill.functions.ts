@@ -64,7 +64,7 @@ export interface MatchReportBackfillResult {
 
 export const importMatchReportsFromSheet = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: unknown) =>
+  .validator((data: unknown) =>
     z
       .object({ dryRun: z.boolean().optional().default(false) })
       .optional()

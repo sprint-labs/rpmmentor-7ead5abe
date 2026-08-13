@@ -26,7 +26,7 @@ Your job:
 
 export const transcribeNotes = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: unknown) => InputSchema.parse(data))
+  .validator((data: unknown) => InputSchema.parse(data))
   .handler(async ({ data }) => {
     const apiKey = process.env.LOVABLE_API_KEY;
     if (!apiKey) {
@@ -142,7 +142,7 @@ const VoiceInputSchema = z.object({
 
 export const transcribeVoiceNote = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: unknown) => data as z.infer<typeof VoiceInputSchema>)
+  .validator((data: unknown) => data as z.infer<typeof VoiceInputSchema>)
   .handler(async ({ data }) => {
     const parsed = VoiceInputSchema.safeParse(data);
     if (!parsed.success) {

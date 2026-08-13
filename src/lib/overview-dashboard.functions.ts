@@ -27,7 +27,7 @@ const overviewInputSchema = z.object({
  */
 export const getOverviewDashboardStats = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data) => overviewInputSchema.parse(data))
+  .validator((data) => overviewInputSchema.parse(data))
   .handler(async ({ context, data }): Promise<OverviewDashboardStats> => {
     const { supabase, userId } = context;
 
