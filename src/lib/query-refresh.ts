@@ -8,6 +8,7 @@
  */
 import type { QueryClient } from "@tanstack/react-query";
 import { interactionsQueryKey } from "@/lib/interactions/use-interactions";
+import { reportCoverageQueryKey } from "@/lib/calendar/report-coverage";
 
 /**
  * Everything that reflects an interaction: the interactions log (shared cache
@@ -24,7 +25,7 @@ export async function refreshInteractionViews(queryClient: QueryClient): Promise
     queryClient.invalidateQueries({ queryKey: ["interactions", "page"] }),
     queryClient.invalidateQueries({ queryKey: ["interactions", "audio"] }),
     queryClient.invalidateQueries({ queryKey: ["mentor-dashboard-stats"] }),
-    queryClient.invalidateQueries({ queryKey: ["calendar", "report-coverage"] }),
+    queryClient.invalidateQueries({ queryKey: reportCoverageQueryKey }),
   ]);
 }
 

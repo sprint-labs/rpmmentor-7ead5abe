@@ -13,6 +13,12 @@
 import { INTERACTION_TYPES } from "@/lib/interactions/schema";
 import { normalisePersonName } from "@/lib/goalkeeper-player-link";
 
+/**
+ * Shared so that every path which writes a report or an interaction can refresh
+ * the badges without repeating the key as a literal.
+ */
+export const reportCoverageQueryKey = ["calendar", "report-coverage"] as const;
+
 export const MATCH_REPORT_TYPE = "Match Report";
 
 export type TrackedReportType = typeof MATCH_REPORT_TYPE | (typeof INTERACTION_TYPES)[number];

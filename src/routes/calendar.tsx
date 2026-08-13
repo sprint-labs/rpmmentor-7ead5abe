@@ -24,6 +24,7 @@ import { listPlayers } from "@/lib/players.functions";
 import { listReportCoverage } from "@/lib/calendar/report-coverage.functions";
 import {
   missingReportTypes,
+  reportCoverageQueryKey,
   shortLabel,
   type GoalkeeperRef,
   type ReportCoverageEntry,
@@ -196,10 +197,20 @@ function CalendarPage() {
   // left undefined until it resolves; see MissingReports.
   const fetchCoverage = useServerFn(listReportCoverage);
   const { data: coverage } = useQuery({
-    queryKey: ["calendar", "report-coverage"],
+    queryKey: reportCoverageQueryKey,
     queryFn: () => fetchCoverage(),
     staleTime: 60_000,
   });
+
+  // A queued report can reach the server while this page is open — the offline
+  // queue drains in the background and only announces itself as a window event.
+  useEffect(() => {
+    const invalidate = () => {
+      void queryClient.invalidateQueries({ queryKey: reportCoverageQueryKey });
+    };
+    window.addEventListener("rpm:report-submitted", invalidate);
+    return () => window.removeEventListener("rpm:report-submitted", invalidate);
+  }, [queryClient]);
 
   // Scheduling an event needs the canonical roster and the assignable profiles.
   // Only managers can open the form, so neither list is fetched for anyone else.
