@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
-import { goalkeepers, calendarEvents, mentors } from "@/lib/mock-data";
+import { goalkeepers, mentors } from "@/lib/mock-data";
 import type { TierLevel } from "@/lib/mock-data";
 import {
   countCanonicalReportsForCoach,
@@ -10,29 +10,18 @@ import {
   selectCoachProfileForDashboard,
   type DashboardCoachProfile,
 } from "@/lib/mentor-dashboard-report-count";
+import {
+  mapUpcomingCalendarEvents,
+  upcomingWindow,
+  UPCOMING_EVENTS_LIMIT,
+  type MentorUpcomingInteraction,
+} from "@/lib/mentor-upcoming-events";
 import { DASHBOARD_INTERACTION_TYPES } from "@/lib/interactions/schema";
 
-export type UpcomingPlannedType =
-  | "Coffee Catch Up"
-  | "Attend Live Match"
-  | "Training Ground Visit"
-  | string;
-
-export interface MentorUpcomingInteraction {
-  id: string;
-  date: string;
-  title: string;
-  type: string;
-  plannedType: UpcomingPlannedType | null;
-  gkId: string | null;
-  gkName: string | null;
-  gkInitials: string | null;
-  gkStatus: string | null;
-  gkTierLevel: TierLevel | null;
-  gkClub: string | null;
-  gkLeague: string | null;
-  gkFreeAgent: boolean;
-}
+export type {
+  MentorUpcomingInteraction,
+  UpcomingPlannedType,
+} from "@/lib/mentor-upcoming-events";
 
 export type OutstandingActionKind = "missing_report" | "missing_clip";
 
@@ -66,29 +55,13 @@ export interface MentorDashboardStats {
   lastUpdatedAt: string;
 }
 
-// Map calendar event types to the supported in-person planned interaction
-// types the pilot brief lists. Falls back to the original label when no
-// clean mapping exists.
-function mapPlannedType(type: string): UpcomingPlannedType | null {
-  switch (type) {
-    case "Match":
-    case "Observation":
-      return "Attend Live Match";
-    case "Mentor Visit":
-      return "Training Ground Visit";
-    case "Meeting":
-      return "Coffee Catch Up";
-    default:
-      return null;
-  }
-}
-
 /**
  * Server-side mentor dashboard aggregation.
  *
- * Stats are scoped to the signed-in mentor's OWN submissions and calendar,
- * not to a roster of assigned goalkeepers. Mentors work collaboratively
- * across the whole RPM roster.
+ * Activity stats are scoped to the signed-in mentor's OWN submissions, not to
+ * a roster of assigned goalkeepers — mentors work collaboratively across the
+ * whole RPM roster. The upcoming list is the SHARED team calendar, because
+ * `calendar_events` has no assigned-mentor column to scope it by.
  */
 const dashboardInputSchema = z
   .object({
@@ -131,39 +104,55 @@ export const getMentorDashboardStats = createServerFn({ method: "GET" })
 
     const days = data.days;
     const now = Date.now();
-    const inRange = now + days * 86400000;
     // `occurred_at`/`match_date` are DATE columns: compare them against the
     // caller's local calendar days, not the UTC slice of the instant.
     const periodFrom = data.fromDate ?? data.from.slice(0, 10);
     const periodTo = data.toDate ?? data.to.slice(0, 10);
     const thirtyDaysAgo = new Date(now - 30 * 86400000).toISOString().slice(0, 10);
+    // The caller's local today is the upper bound of the backward window, and
+    // the lower bound of the forward one the upcoming list needs.
+    const upcoming = upcomingWindow(periodTo, days);
 
     // Real, durable activity for the signed-in user. These are the numbers the
     // dashboard cards claim to show, so they are read from the database rather
     // than from any sample data.
-    const [{ data: periodInteractions }, { data: observationRows }, { data: clipRows }] =
-      await Promise.all([
-        supabase
-          .from("interactions")
-          .select("id")
-          .eq("mentor_id", userId)
-          .in("interaction_type", [...DASHBOARD_INTERACTION_TYPES])
-          .gte("occurred_at", periodFrom)
-          .lte("occurred_at", periodTo),
-        supabase
-          .from("interactions")
-          .select("id, goalkeeper_name, gk_slug, player_id, occurred_at, interaction_type")
-          .eq("mentor_id", userId)
-          .eq("interaction_type", "Live Match Observation")
-          .gte("occurred_at", thirtyDaysAgo),
-        supabase
-          .from("media_assets")
-          .select("id, gk_id, media_type, created_at")
-          .eq("uploaded_by_id", userId)
-          .eq("media_type", "video")
-          .gte("created_at", data.from)
-          .lte("created_at", data.to),
-      ]);
+    const [
+      { data: periodInteractions },
+      { data: observationRows },
+      { data: clipRows },
+      { data: upcomingEventRows },
+    ] = await Promise.all([
+      supabase
+        .from("interactions")
+        .select("id")
+        .eq("mentor_id", userId)
+        .in("interaction_type", [...DASHBOARD_INTERACTION_TYPES])
+        .gte("occurred_at", periodFrom)
+        .lte("occurred_at", periodTo),
+      supabase
+        .from("interactions")
+        .select("id, goalkeeper_name, gk_slug, player_id, occurred_at, interaction_type")
+        .eq("mentor_id", userId)
+        .eq("interaction_type", "Live Match Observation")
+        .gte("occurred_at", thirtyDaysAgo),
+      supabase
+        .from("media_assets")
+        .select("id, gk_id, media_type, created_at")
+        .eq("uploaded_by_id", userId)
+        .eq("media_type", "video")
+        .gte("created_at", data.from)
+        .lte("created_at", data.to),
+      // The shared team calendar `/calendar` writes to, bounded to the
+      // forward window so this never reads the whole table.
+      supabase
+        .from("calendar_events")
+        .select("id, title, event_type, event_date, start_time, goalkeeper_name")
+        .gte("event_date", upcoming.fromDate)
+        .lte("event_date", upcoming.toDate)
+        .order("event_date", { ascending: true })
+        .order("start_time", { ascending: true, nullsFirst: true })
+        .limit(UPCOMING_EVENTS_LIMIT),
+    ]);
 
     const interactionsLast14 = periodInteractions?.length ?? 0;
     const clipsLast14 = clipRows?.length ?? 0;
@@ -207,6 +196,15 @@ export const getMentorDashboardStats = createServerFn({ method: "GET" })
         .map((r) => ({ goalkeeper: r.goalkeeper, match_date: r.match_date }));
     }
 
+    // INTERIM SCOPE, agreed with the owner: `calendar_events` has no
+    // assigned-mentor column, so every mentor sees the whole team's upcoming
+    // events. A per-mentor view is blocked on a future `assigned_mentor_id`
+    // column — do not approximate it with `created_by` or by matching names.
+    //
+    // Because the list is team-wide it does not depend on mentor identity, so
+    // it is built before the no-mentor-profile early return below.
+    const upcomingList = mapUpcomingCalendarEvents(upcomingEventRows ?? [], goalkeepers);
+
     if (!mentorId) {
       return {
         mentorProfileId: null,
@@ -216,7 +214,7 @@ export const getMentorDashboardStats = createServerFn({ method: "GET" })
         clipsLast14,
         outstandingActions: 0,
         outstandingItems: [],
-        upcomingList: [],
+        upcomingList,
         lastUpdatedAt: new Date().toISOString(),
       };
     }
@@ -283,31 +281,6 @@ export const getMentorDashboardStats = createServerFn({ method: "GET" })
     }
     outstandingItems.sort((a, b) => b.daysOverdue - a.daysOverdue);
     const outstandingActions = outstandingItems.length;
-
-    // Upcoming interactions: this mentor's calendar in the next 14 days.
-    const upcomingEvents = calendarEvents
-      .filter((e) => e.mentorId === mentorId && +new Date(e.date) >= now && +new Date(e.date) <= inRange)
-      .sort((a, b) => +new Date(a.date) - +new Date(b.date));
-
-    const upcomingList: MentorUpcomingInteraction[] = upcomingEvents.map((e) => {
-      const gk = e.gkId ? gkById.get(e.gkId) ?? null : null;
-      return {
-        id: e.id,
-        date: e.date,
-        title: e.title,
-        type: e.type,
-        plannedType: mapPlannedType(e.type),
-        gkId: gk?.id ?? null,
-        gkName: gk?.name ?? null,
-
-        gkInitials: gk?.initials ?? null,
-        gkStatus: gk?.status ?? null,
-        gkTierLevel: gk?.tierLevel ?? null,
-        gkClub: gk?.club ?? null,
-        gkLeague: gk?.league ?? null,
-        gkFreeAgent: gk?.status === "Free Agent",
-      };
-    });
 
     return {
       mentorProfileId: mentorId,

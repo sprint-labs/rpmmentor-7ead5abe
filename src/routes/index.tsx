@@ -207,7 +207,7 @@ function Dashboard() {
                 onClick={() => setWorkflow("report")}
                 className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md bg-primary text-primary-foreground text-xs uppercase tracking-[0.06em] font-semibold hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
-                <FileText className="size-4" />Log match report
+                <FileText className="size-4" />Submit a Match report
               </button>
             )}
             {can("interactions.log") && (

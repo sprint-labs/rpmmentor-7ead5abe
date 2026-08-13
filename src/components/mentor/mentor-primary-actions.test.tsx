@@ -40,7 +40,7 @@ describe("MentorPrimaryActions", () => {
       />,
     );
 
-    const report = screen.getByRole("button", { name: /log match report/i });
+    const report = screen.getByRole("button", { name: /submit a match report/i });
     const interaction = screen.getByRole("button", { name: /log interaction/i });
     const calendar = screen.getByRole("link", { name: /view calendar/i });
 
@@ -62,7 +62,7 @@ describe("MentorPrimaryActions", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: /log match report/i }));
+    fireEvent.click(screen.getByRole("button", { name: /submit a match report/i }));
     fireEvent.click(screen.getByRole("button", { name: /log interaction/i }));
 
     expect(onLogReport).toHaveBeenCalledTimes(1);
@@ -80,7 +80,7 @@ describe("MentorPrimaryActions", () => {
       />,
     );
 
-    expect(screen.queryByRole("button", { name: /log match report/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /submit a match report/i })).toBeNull();
     expect(screen.queryByRole("button", { name: /log interaction/i })).toBeNull();
     expect(screen.queryByRole("link", { name: /view calendar/i })).toBeNull();
   });
