@@ -29,7 +29,12 @@ const MATCH_REPORT_TABLE = "match_reports_cache";
  */
 const LOOKBACK_DAYS = 120;
 
-/** Enough for the window above; the alternative is a silently truncated page. */
+/**
+ * Ample for the window above. Both reads are ordered newest first so that if the
+ * cap is ever reached, the rows dropped are the oldest — the ones least likely to
+ * fall inside a badge's 30-day window. An unordered limit would drop an arbitrary
+ * subset instead, and recent coverage could silently read as missing.
+ */
 const ROW_LIMIT = 2000;
 
 export const listReportCoverage = createServerFn({ method: "GET" })
@@ -42,6 +47,7 @@ export const listReportCoverage = createServerFn({ method: "GET" })
         .from("interactions")
         .select("player_id, gk_slug, goalkeeper_name, interaction_type, occurred_at")
         .gte("occurred_at", since)
+        .order("occurred_at", { ascending: false })
         .limit(ROW_LIMIT),
       context.supabase
         .from(MATCH_REPORT_TABLE)
@@ -49,6 +55,7 @@ export const listReportCoverage = createServerFn({ method: "GET" })
         .select("goalkeeper, match_date")
         .is("deleted_at", null)
         .gte("match_date", since)
+        .order("match_date", { ascending: false })
         .limit(ROW_LIMIT),
     ]);
     if (interactions.error) throw new Error(interactions.error.message);

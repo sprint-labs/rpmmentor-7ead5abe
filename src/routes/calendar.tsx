@@ -37,12 +37,19 @@ function MissingReports({
   today,
   variant,
 }: {
-  coverage: readonly ReportCoverageEntry[];
+  /**
+   * Undefined while the read is in flight or after it has failed. Treating that
+   * as "nothing logged" would put the original bug back: five MISSING badges on
+   * every goalkeeper, this time whenever the query has not answered yet.
+   */
+  coverage: readonly ReportCoverageEntry[] | undefined;
   gk: GoalkeeperRef;
   eventDate: string;
   today: string;
   variant: "compact" | "full";
 }) {
+  if (!coverage) return null;
+
   const missing: TrackedReportType[] = missingReportTypes(coverage, gk, {
     referenceDate: eventDate,
     today,
@@ -185,9 +192,10 @@ function CalendarPage() {
     queryFn: () => fetchEvents(),
   });
 
-  // What has actually been logged, for the missing-report badges.
+  // What has actually been logged, for the missing-report badges. Deliberately
+  // left undefined until it resolves; see MissingReports.
   const fetchCoverage = useServerFn(listReportCoverage);
-  const { data: coverage = [] } = useQuery({
+  const { data: coverage } = useQuery({
     queryKey: ["calendar", "report-coverage"],
     queryFn: () => fetchCoverage(),
     staleTime: 60_000,
