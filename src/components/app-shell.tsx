@@ -13,6 +13,7 @@ import { SyncManager } from "@/components/sync-manager";
 import { InstallPrompt } from "@/components/install-prompt";
 import { MaintenanceScreen } from "@/components/maintenance-screen";
 import { isRestrictedDuringMaintenance } from "@/lib/maintenance";
+import { isPublicRoute } from "@/lib/public-routes";
 
 type NavItem = { to: string; label: string; icon: typeof LayoutDashboard; exact?: boolean; perm: Permission };
 const NAV: NavItem[] = [
@@ -49,8 +50,9 @@ export function AppShell() {
   const wasMenuOpenRef = useRef(false);
   const notif = useNotifications();
 
-  // Public routes that don't require auth
-  const isPublic = path === "/login" || path === "/install";
+  // Public routes must remain available without auth. Password recovery must
+  // also remain reachable while maintenance mode is enabled.
+  const isPublic = isPublicRoute(path);
 
   useEffect(() => {
     if (!loading && !user && !isPublic) {
@@ -100,7 +102,7 @@ export function AppShell() {
 
   if (loading) return <main id="main-content" tabIndex={-1} className="min-h-screen bg-background" aria-busy="true" />;
   if (!user) return isPublic ? <Outlet /> : <main id="main-content" tabIndex={-1} className="min-h-screen bg-background" />;
-  if (isRestrictedDuringMaintenance(user)) {
+  if (!isPublic && isRestrictedDuringMaintenance(user)) {
     return (
       <MaintenanceScreen
         onSignOut={async () => {
@@ -127,9 +129,9 @@ export function AppShell() {
     <div className="flex min-h-screen bg-background text-foreground">
       <div className="flex flex-1 flex-col min-w-0">
         <header className="h-16 md:h-14 flex items-center gap-2 md:gap-3 px-3 sm:px-4 md:px-6 border-b border-border bg-sidebar/95 backdrop-blur sticky top-0 z-10">
-          <Link to="/" className="size-11 md:w-auto md:h-auto flex items-center justify-center md:justify-start gap-2.5 shrink-0 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+          <Link to="/" aria-label="Mentor Hub" className="size-11 md:w-auto md:h-auto flex items-center justify-center md:justify-start gap-2.5 shrink-0 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
             <BrandMark className="size-9 shrink-0" alt="" />
-            <span className="hidden sm:inline font-semibold text-foreground tracking-tight">Mentor Hub</span>
+            <span className="hidden sm:inline font-semibold text-foreground tracking-tight" aria-hidden="true">Mentor Hub</span>
           </Link>
           <div className="flex-1" />
 
@@ -187,17 +189,20 @@ export function AppShell() {
             <div ref={bellRef} className="relative">
               <button
                 onClick={() => setBellOpen((v) => !v)}
-                aria-label={bellOpen ? "Close duty notifications" : "Open duty notifications"}
+                aria-label={
+                  notif.unread > 0
+                    ? `${bellOpen ? "Close" : "Open"} duty notifications, ${notif.unread > 9 ? "9+" : notif.unread} unread`
+                    : bellOpen
+                      ? "Close duty notifications"
+                      : "Open duty notifications"
+                }
                 aria-expanded={bellOpen}
                 aria-controls="duty-notifications"
                 className="relative size-11 md:size-9 grid place-items-center rounded-md border border-border hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               >
                 <BellRing className="size-4" aria-hidden="true" />
-                <span className="sr-only">
-                  {bellOpen ? "Close duty notifications" : "Open duty notifications"}
-                </span>
                 {notif.unread > 0 && (
-                  <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-destructive text-destructive-foreground text-[10px] font-mono font-semibold grid place-items-center">
+                  <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-destructive text-destructive-foreground text-[10px] font-mono font-semibold grid place-items-center" aria-hidden="true">
                     {notif.unread > 9 ? "9+" : notif.unread}
                   </span>
                 )}
