@@ -61,6 +61,22 @@ export interface EventFollowUpRow {
 }
 
 /**
+ * How many event ids to put in one `in` filter.
+ *
+ * PostgREST filters travel in the query string, and a few hundred UUIDs is
+ * already a URL long enough to be rejected by an intermediary. Asking in batches
+ * keeps every request comfortably short; a dropped batch would silently report
+ * saved write-ups as missing.
+ */
+const ID_BATCH = 100;
+
+function batches<T>(items: readonly T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
+  return out;
+}
+
+/**
  * Which of these events already have their write-up saved.
  *
  * Two reads rather than one join: the canonical Match Report store is keyed by
@@ -74,22 +90,24 @@ export async function loadCompletions(
   const completed = new Map<string, string>();
   if (eventIds.length === 0) return completed;
 
-  const [interactions, reports] = await Promise.all([
-    supabase.from("interactions").select("id, calendar_event_id").in("calendar_event_id", eventIds),
-    supabase
-      .from("match_reports_cache")
-      .select("report_id, calendar_event_id")
-      .is("deleted_at", null)
-      .in("calendar_event_id", eventIds),
-  ]);
-  if (interactions.error) throw new Error(interactions.error.message);
-  if (reports.error) throw new Error(reports.error.message);
+  for (const chunk of batches(eventIds, ID_BATCH)) {
+    const [interactions, reports] = await Promise.all([
+      supabase.from("interactions").select("id, calendar_event_id").in("calendar_event_id", chunk),
+      supabase
+        .from("match_reports_cache")
+        .select("report_id, calendar_event_id")
+        .is("deleted_at", null)
+        .in("calendar_event_id", chunk),
+    ]);
+    if (interactions.error) throw new Error(interactions.error.message);
+    if (reports.error) throw new Error(reports.error.message);
 
-  for (const row of interactions.data ?? []) {
-    if (row.calendar_event_id) completed.set(row.calendar_event_id, row.id as string);
-  }
-  for (const row of reports.data ?? []) {
-    if (row.calendar_event_id) completed.set(row.calendar_event_id, row.report_id as string);
+    for (const row of interactions.data ?? []) {
+      if (row.calendar_event_id) completed.set(row.calendar_event_id, row.id as string);
+    }
+    for (const row of reports.data ?? []) {
+      if (row.calendar_event_id) completed.set(row.calendar_event_id, row.report_id as string);
+    }
   }
   return completed;
 }
