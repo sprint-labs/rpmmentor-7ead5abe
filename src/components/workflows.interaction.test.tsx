@@ -257,31 +257,15 @@ describe("InteractionForm (durable)", () => {
     expect(payload.data["notes"]).toContain("Spoken note about the session.");
   });
 
-  // ---- Change #1: Live Match Observation hands over to the Match Report ----
+  // A Live Match Observation is created only when its Match Report is submitted.
+  it("does not offer Live Match Observation as a manually loggable type", () => {
+    renderForm();
+    const options = Array.from(
+      (screen.getByLabelText("Interaction Type") as HTMLSelectElement).options,
+      (option) => option.value,
+    );
 
-  it("does not log a Live Match Observation directly — it hands over to the Match Report", async () => {
-    const onOpenMatchReport = vi.fn();
-    renderForm({ onOpenMatchReport });
-    const gk = goalkeepers[0]!;
-    fireEvent.change(screen.getByLabelText("Goalkeeper"), { target: { value: gk.id } });
-    fireEvent.change(screen.getByLabelText("Interaction Type"), {
-      target: { value: "Live Match Observation" },
-    });
-    fireEvent.change(screen.getByLabelText("Date"), { target: { value: "2026-07-09" } });
-    fireEvent.change(screen.getByLabelText("Club"), { target: { value: "Rotherham United" } });
-
-    // No save path is offered, and the reason is explained on screen.
-    expect(screen.queryByRole("button", { name: /save interaction/i })).toBeNull();
-    expect(screen.getByText(/logged from the match report/i)).toBeTruthy();
-
-    fireEvent.click(screen.getByRole("button", { name: /continue to match report/i }));
-
-    expect(createInteractionMock).not.toHaveBeenCalled();
-    expect(onOpenMatchReport).toHaveBeenCalledWith({
-      goalkeeper: gk.name,
-      matchDate: "2026-07-09",
-      club: "Rotherham United",
-    });
+    expect(options).not.toContain("Live Match Observation");
   });
 
   it("defaults to a type that can actually be logged by hand", () => {
