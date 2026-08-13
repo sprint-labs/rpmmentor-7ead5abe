@@ -46,6 +46,7 @@
  */
 import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
+import { pathToFileURL } from "node:url";
 import { config } from "dotenv";
 import { createClient } from "@supabase/supabase-js";
 
@@ -150,6 +151,34 @@ function loadRoster(path) {
     if (owner) throw new Error(`retire lists ${email}, which ${owner} already claims`);
   }
   return { entries, retire };
+}
+
+/**
+ * Match each roster entry to at most one existing account, considering its
+ * current address and every previous alias.
+ *
+ * An entry is ambiguous when those addresses already belong to different
+ * accounts. Reconciling one of them would silently strand the person's history
+ * on the other, and verification would still pass because it only checks the
+ * current address. The caller stops the run instead of guessing.
+ *
+ * Exported for tests.
+ */
+export function resolveRosterAccounts(entries, byEmail) {
+  const resolved = new Map();
+  const ambiguous = [];
+  for (const entry of entries) {
+    const matches = [entry.email, ...entry.previousEmails]
+      .map((address) => byEmail.get(address))
+      .filter(Boolean);
+    const distinct = [...new Map(matches.map((user) => [user.id, user])).values()];
+    if (distinct.length > 1) {
+      const addresses = distinct.map((user) => normaliseEmail(user.email)).join(", ");
+      ambiguous.push(`${entry.email} matches ${distinct.length} accounts: ${addresses}`);
+    }
+    resolved.set(entry.email, distinct[0] ?? null);
+  }
+  return { resolved, ambiguous };
 }
 
 function requireEnv(projectRef) {
@@ -385,13 +414,19 @@ async function main() {
   const authUsers = await listAllAuthUsers(admin);
   const byEmail = new Map(authUsers.map((user) => [normaliseEmail(user.email), user]));
 
+  // Resolve everyone against the live project before writing anything, so an
+  // ambiguous entry stops the run rather than half-applying it.
+  const { resolved, ambiguous } = resolveRosterAccounts(entries, byEmail);
+  if (ambiguous.length > 0) {
+    throw new Error(
+      `Roster entries match more than one existing account. Merge them by hand first:\n  ${ambiguous.join("\n  ")}`,
+    );
+  }
+
   let failures = 0;
   const reconciledIds = new Set();
   for (const entry of entries) {
-    const existing =
-      byEmail.get(entry.email) ??
-      entry.previousEmails.map((alias) => byEmail.get(alias)).find(Boolean) ??
-      null;
+    const existing = resolved.get(entry.email) ?? null;
 
     try {
       const { userId, actions } = await reconcileAuthUser(admin, entry, existing, args.apply);
@@ -442,7 +477,12 @@ async function main() {
   );
 }
 
-main().catch((error) => {
-  console.error(`provision-users: ${error.message}`);
-  process.exitCode = 1;
-});
+// Only provision when run as a command; importing this file for tests must not
+// reach the live project.
+const invokedDirectly = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
+if (invokedDirectly) {
+  main().catch((error) => {
+    console.error(`provision-users: ${error.message}`);
+    process.exitCode = 1;
+  });
+}
