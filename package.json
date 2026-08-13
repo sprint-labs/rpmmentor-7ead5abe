@@ -11,7 +11,8 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "provision:users": "node scripts/provision-users.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
