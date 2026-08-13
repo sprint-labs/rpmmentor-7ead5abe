@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { WorkflowDialog, type WorkflowKind } from "@/components/workflows";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { PageHeader, StatCard, SectionTitle, TierBadge } from "@/components/primitives";
 import {
@@ -17,7 +17,6 @@ import {
 } from "@/lib/mock-data";
 import { useDutySource, useLoggedInteractions } from "@/lib/interactions/use-interactions";
 import { ErrorBoundary } from "@/components/error-boundary";
-import { toast } from "sonner";
 
 function initialsOf(name: string) {
   return (
@@ -38,7 +37,7 @@ import { listMatchReports } from "@/lib/match-reports/reports.functions";
 
 import { isDateOnlyInPeriod, lastNDaysPeriod } from "@/lib/dashboard-period";
 import { getOverviewDashboardStats } from "@/lib/overview-dashboard.functions";
-import { listCalendarEvents, createCalendarEvent } from "@/lib/calendar.functions";
+import { listCalendarEvents } from "@/lib/calendar.functions";
 
 const OVERVIEW_PERIOD_DAYS = 14;
 
@@ -47,35 +46,20 @@ export const Route = createFileRoute("/")({ component: Dashboard });
 function Dashboard() {
   const { user, can } = useAuth();
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
   const [workflow, setWorkflow] = useState<WorkflowKind | null>(null);
-  const [escalatingId, setEscalatingId] = useState<string | null>(null);
-  const createEvent = useServerFn(createCalendarEvent);
 
-  async function escalateAlert(a: Alert) {
-    setEscalatingId(a.id);
-    try {
-      const gk = a.gkId ? goalkeepers.find((g) => g.id === a.gkId) : undefined;
-      await createEvent({
-        data: {
-          title: `Escalation: ${a.kind}`,
-          event_type: "Follow Up",
-          event_date: new Date().toISOString().slice(0, 10),
-          start_time: "",
-          end_time: "",
-          location: "",
-          notes: a.message,
-          goalkeeper_name: gk?.name ?? "",
-          player_id: null,
-        },
-      });
-      await queryClient.invalidateQueries({ queryKey: ["calendar-events"] });
-      toast.success("Alert escalated — follow up added to the shared calendar.");
-    } catch {
-      toast.error("Could not escalate this alert. Try again.");
-    } finally {
-      setEscalatingId(null);
-    }
+  /**
+   * Opens the calendar's add-event form with the alert's wording carried over.
+   * A follow-up now has to name the goalkeeper and the attending mentor, and
+   * neither can be derived from an alert: its goalkeeper reference cannot be
+   * resolved to a canonical roster id without matching on names, and an alert
+   * says nothing about who should attend. So the manager confirms both.
+   */
+  function escalateAlert(a: Alert) {
+    navigate({
+      to: "/calendar",
+      search: { new: true, title: `Escalation: ${a.kind}`, notes: a.message },
+    });
   }
 
   const listReports = useServerFn(listMatchReports);
@@ -641,11 +625,10 @@ function Dashboard() {
                       <button
                         type="button"
                         onClick={() => escalateAlert(a)}
-                        disabled={escalatingId === a.id}
-                        className="mt-2 inline-flex items-center gap-1 border border-current/40 px-2 py-1 text-[10px] font-mono uppercase tracking-widest hover:bg-current/10 disabled:opacity-50"
+                        className="mt-2 inline-flex items-center gap-1 border border-current/40 px-2 py-1 text-[10px] font-mono uppercase tracking-widest hover:bg-current/10"
                       >
                         <ArrowUpRight className="size-3" />
-                        {escalatingId === a.id ? "Escalating…" : "Escalate"}
+                        Escalate
                       </button>
                     )}
                   </div>

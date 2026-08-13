@@ -142,11 +142,16 @@ export const getMentorDashboardStats = createServerFn({ method: "GET" })
         .eq("media_type", "video")
         .gte("created_at", data.from)
         .lte("created_at", data.to),
-      // The shared team calendar `/calendar` writes to, bounded to the
-      // forward window so this never reads the whole table.
+      // Events a manager has booked this mentor in to attend, bounded to the
+      // forward window so this never reads the whole table. Scoped by the
+      // assigned profile, so a mentor sees their own diary rather than the
+      // whole team's. Events scheduled before mentors were assignable have no
+      // assignee and therefore reach nobody: they need reassigning on
+      // `/calendar` to reappear here.
       supabase
         .from("calendar_events")
         .select("id, title, event_type, event_date, start_time, goalkeeper_name")
+        .eq("assigned_mentor_id", userId)
         .gte("event_date", upcoming.fromDate)
         .lte("event_date", upcoming.toDate)
         .order("event_date", { ascending: true })
@@ -196,13 +201,9 @@ export const getMentorDashboardStats = createServerFn({ method: "GET" })
         .map((r) => ({ goalkeeper: r.goalkeeper, match_date: r.match_date }));
     }
 
-    // INTERIM SCOPE, agreed with the owner: `calendar_events` has no
-    // assigned-mentor column, so every mentor sees the whole team's upcoming
-    // events. A per-mentor view is blocked on a future `assigned_mentor_id`
-    // column — do not approximate it with `created_by` or by matching names.
-    //
-    // Because the list is team-wide it does not depend on mentor identity, so
-    // it is built before the no-mentor-profile early return below.
+    // Built before the no-mentor-profile early return below: the list is scoped
+    // by the signed-in profile in the query above, so it does not depend on the
+    // separate `profiles.mentor_id` link that the counts below need.
     const upcomingList = mapUpcomingCalendarEvents(upcomingEventRows ?? [], goalkeepers);
 
     if (!mentorId) {
