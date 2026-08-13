@@ -75,7 +75,7 @@ export const listMatchReports = createServerFn({ method: "GET" })
 
 export const getMatchReport = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: { reportId: string }) =>
+  .validator((data: { reportId: string }) =>
     z.object({ reportId: z.string().min(1) }).parse(data),
   )
   .handler(async ({ data }) => {
@@ -128,7 +128,7 @@ export type SubmitMatchReportResult =
 
 export const submitMatchReport = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: unknown) => {
+  .validator((data: unknown) => {
     return z
       .object({
         payload: matchReportSubmitSchema,
@@ -565,7 +565,7 @@ export type UpdateMatchReportResult =
 
 export const updateMatchReport = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: unknown) => matchReportEditSchema.parse(data))
+  .validator((data: unknown) => matchReportEditSchema.parse(data))
   .handler(async ({ data, context }): Promise<UpdateMatchReportResult> => {
     const { supabase, userId } = context;
     const roles = await getUserRoles(supabase, userId);
@@ -630,7 +630,7 @@ export const updateMatchReport = createServerFn({ method: "POST" })
 
 export const deleteMatchReport = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: unknown) => z.object({ reportId: z.string().min(1) }).parse(data))
+  .validator((data: unknown) => z.object({ reportId: z.string().min(1) }).parse(data))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
 

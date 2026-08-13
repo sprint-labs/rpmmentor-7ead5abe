@@ -30,6 +30,7 @@ export default defineConfig({
     plugins: [
       ...(isVercelBuild ? [] : [mcpPlugin()]),
       VitePWA({
+        outDir: isVercelBuild ? ".vercel/output/static" : ".output/public",
         registerType: "autoUpdate",
         injectRegister: null,
         filename: "sw.js",

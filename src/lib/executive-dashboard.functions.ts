@@ -61,7 +61,7 @@ function tally(values: (string | null | undefined)[], fallback: string): Executi
  */
 export const getExecutiveDashboardStats = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data) => executiveInputSchema.parse(data))
+  .validator((data) => executiveInputSchema.parse(data))
   .handler(async ({ context, data }): Promise<ExecutiveDashboardStats> => {
     const { supabase } = context;
 

@@ -20,7 +20,7 @@ const changePasswordSchema = z.object({
  */
 export const changePassword = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: unknown) => changePasswordSchema.parse(data))
+  .validator((data: unknown) => changePasswordSchema.parse(data))
   .handler(async ({ data, context }) => {
     const { currentPassword, newPassword } = data;
 
