@@ -79,6 +79,25 @@ export const createInteraction = createServerFn({ method: "POST" })
       playerId = player?.id ?? null;
     }
 
+    // When this interaction is the write-up for a scheduled event, the event is
+    // confirmed first: it must exist, still be going ahead, expect an
+    // interaction, and belong to this mentor or to somebody entitled to answer
+    // for it. A rejected link fails the save rather than storing an unlinked
+    // interaction that would leave the requirement quietly outstanding.
+    let calendarEventId: string | null = null;
+    if (data.calendarEventId) {
+      const { verifyFollowUpTarget } = await import("@/lib/events/link-follow-up.server");
+      const target = await verifyFollowUpTarget(
+        supabase,
+        userId,
+        data.calendarEventId,
+        "interaction",
+      );
+      calendarEventId = target.eventId;
+      // The event decides which goalkeeper this is about.
+      playerId = target.playerId ?? playerId;
+    }
+
     const { data: inserted, error } = await supabase
       .from("interactions")
       .insert({
@@ -93,12 +112,21 @@ export const createInteraction = createServerFn({ method: "POST" })
         notes: data.notes,
         outcome: data.outcome ?? "",
         follow_up: data.followUp ?? "",
+        calendar_event_id: calendarEventId,
       })
       .select(INTERACTION_COLUMNS)
       .single();
 
     // Read-back is mandatory: no inserted row means no success.
-    if (error) throw new Error(error.message);
+    if (error) {
+      const { isDuplicateFollowUp, DUPLICATE_FOLLOW_UP_MESSAGE } = await import(
+        "@/lib/events/link-follow-up.server"
+      );
+      if (calendarEventId && isDuplicateFollowUp(error)) {
+        throw new Error(DUPLICATE_FOLLOW_UP_MESSAGE);
+      }
+      throw new Error(error.message);
+    }
     if (!inserted) throw new Error("The interaction could not be confirmed as saved.");
     return mapInteractionRow(inserted);
   });

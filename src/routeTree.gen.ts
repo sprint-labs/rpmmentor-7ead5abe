@@ -17,6 +17,7 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as InteractionsRouteImport } from './routes/interactions'
 import { Route as InstallRouteImport } from './routes/install'
 import { Route as GoalkeepersRouteImport } from './routes/goalkeepers'
+import { Route as FollowUpsRouteImport } from './routes/follow-ups'
 import { Route as ExecutiveRouteImport } from './routes/executive'
 import { Route as CalendarRouteImport } from './routes/calendar'
 import { Route as AuditRouteImport } from './routes/audit'
@@ -78,6 +79,11 @@ const InstallRoute = InstallRouteImport.update({
 const GoalkeepersRoute = GoalkeepersRouteImport.update({
   id: '/goalkeepers',
   path: '/goalkeepers',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FollowUpsRoute = FollowUpsRouteImport.update({
+  id: '/follow-ups',
+  path: '/follow-ups',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ExecutiveRoute = ExecutiveRouteImport.update({
@@ -201,6 +207,7 @@ export interface FileRoutesByFullPath {
   '/audit': typeof AuditRoute
   '/calendar': typeof CalendarRoute
   '/executive': typeof ExecutiveRoute
+  '/follow-ups': typeof FollowUpsRoute
   '/goalkeepers': typeof GoalkeepersRouteWithChildren
   '/install': typeof InstallRoute
   '/interactions': typeof InteractionsRoute
@@ -233,6 +240,7 @@ export interface FileRoutesByTo {
   '/audit': typeof AuditRoute
   '/calendar': typeof CalendarRoute
   '/executive': typeof ExecutiveRoute
+  '/follow-ups': typeof FollowUpsRoute
   '/goalkeepers': typeof GoalkeepersRouteWithChildren
   '/install': typeof InstallRoute
   '/interactions': typeof InteractionsRoute
@@ -266,6 +274,7 @@ export interface FileRoutesById {
   '/audit': typeof AuditRoute
   '/calendar': typeof CalendarRoute
   '/executive': typeof ExecutiveRoute
+  '/follow-ups': typeof FollowUpsRoute
   '/goalkeepers': typeof GoalkeepersRouteWithChildren
   '/install': typeof InstallRoute
   '/interactions': typeof InteractionsRoute
@@ -300,6 +309,7 @@ export interface FileRouteTypes {
     | '/audit'
     | '/calendar'
     | '/executive'
+    | '/follow-ups'
     | '/goalkeepers'
     | '/install'
     | '/interactions'
@@ -332,6 +342,7 @@ export interface FileRouteTypes {
     | '/audit'
     | '/calendar'
     | '/executive'
+    | '/follow-ups'
     | '/goalkeepers'
     | '/install'
     | '/interactions'
@@ -364,6 +375,7 @@ export interface FileRouteTypes {
     | '/audit'
     | '/calendar'
     | '/executive'
+    | '/follow-ups'
     | '/goalkeepers'
     | '/install'
     | '/interactions'
@@ -397,6 +409,7 @@ export interface RootRouteChildren {
   AuditRoute: typeof AuditRoute
   CalendarRoute: typeof CalendarRoute
   ExecutiveRoute: typeof ExecutiveRoute
+  FollowUpsRoute: typeof FollowUpsRoute
   GoalkeepersRoute: typeof GoalkeepersRouteWithChildren
   InstallRoute: typeof InstallRoute
   InteractionsRoute: typeof InteractionsRoute
@@ -478,6 +491,13 @@ declare module '@tanstack/react-router' {
       path: '/goalkeepers'
       fullPath: '/goalkeepers'
       preLoaderRoute: typeof GoalkeepersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/follow-ups': {
+      id: '/follow-ups'
+      path: '/follow-ups'
+      fullPath: '/follow-ups'
+      preLoaderRoute: typeof FollowUpsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/executive': {
@@ -656,6 +676,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuditRoute: AuditRoute,
   CalendarRoute: CalendarRoute,
   ExecutiveRoute: ExecutiveRoute,
+  FollowUpsRoute: FollowUpsRoute,
   GoalkeepersRoute: GoalkeepersRouteWithChildren,
   InstallRoute: InstallRoute,
   InteractionsRoute: InteractionsRoute,

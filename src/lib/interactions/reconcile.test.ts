@@ -17,6 +17,7 @@ const base: LoggedInteraction = {
   followUp: "f",
   createdAt: "2026-01-05T10:00:00.000Z",
   matchReportId: null,
+  calendarEventId: null,
   updatedAt: null,
   updatedBy: null,
 };

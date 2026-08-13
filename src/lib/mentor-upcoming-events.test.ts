@@ -45,8 +45,13 @@ function event(overrides: Partial<UpcomingCalendarEventRow> = {}): UpcomingCalen
 }
 
 describe("mapPlannedType", () => {
-  it("keeps the mapping the dashboard filter chips depend on", () => {
+  it("maps the three schedulable event types", () => {
     expect(mapPlannedType("Match")).toBe("Attend Live Match");
+    expect(mapPlannedType("Training Ground Visit")).toBe("Training Ground Visit");
+    expect(mapPlannedType("Coffee Catch-up")).toBe("Coffee Catch Up");
+  });
+
+  it("still maps retired types, so older events keep appearing", () => {
     expect(mapPlannedType("Observation")).toBe("Attend Live Match");
     expect(mapPlannedType("Mentor Visit")).toBe("Training Ground Visit");
     expect(mapPlannedType("Meeting")).toBe("Coffee Catch Up");

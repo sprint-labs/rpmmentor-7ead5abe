@@ -23,6 +23,12 @@ describe("refreshInteractionViews", () => {
     expect(keys).toContainEqual(["calendar", "report-coverage"]);
   });
 
+  it("refreshes follow-up statuses, so a saved write-up reads as Completed", async () => {
+    const { client, keys } = recordingClient();
+    await refreshInteractionViews(client);
+    expect(keys).toContainEqual(["events", "follow-ups"]);
+  });
+
   it("still refreshes the interaction log and the dashboard stats", async () => {
     const { client, keys } = recordingClient();
     await refreshInteractionViews(client);

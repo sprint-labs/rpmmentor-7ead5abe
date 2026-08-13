@@ -1,11 +1,18 @@
 import { Link, Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
-import { LayoutDashboard, Users, UserCog, MessageSquare, FileText, FolderOpen, BellRing, Calendar, BarChart3, Plus, LogOut, ShieldCheck, History, Check, Trash2, X, Menu, KeyRound, Sun, Moon, Plug, Database } from "lucide-react";
+import { LayoutDashboard, Users, UserCog, MessageSquare, FileText, FolderOpen, BellRing, Calendar, ClipboardCheck, BarChart3, Plus, LogOut, ShieldCheck, History, Check, Trash2, X, Menu, KeyRound, Sun, Moon, Plug, Database } from "lucide-react";
 import { useTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 import { useAuth, ROLE_LABEL, type Permission, type Role } from "@/lib/auth";
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { WorkflowDialog, type WorkflowKind } from "@/components/workflows";
 import { useNotifications } from "@/lib/notifications";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import {
+  listNotifications,
+  markNotificationsRead,
+} from "@/lib/events/notifications.functions";
+import { notificationsQueryKey } from "@/lib/events/query-keys";
 import { formatRelative } from "@/lib/mock-data";
 import { BrandMark } from "@/components/brand-mark";
 import { OfflineBanner } from "@/components/offline-banner";
@@ -28,6 +35,7 @@ const NAV: NavItem[] = [
   { to: "/audit", label: "Audit Log", icon: History, perm: "audit.view" },
   { to: "/alerts", label: "Notification Centre", icon: BellRing, perm: "alerts.view" },
   { to: "/calendar", label: "Calendar", icon: Calendar, perm: "calendar.view" },
+  { to: "/follow-ups", label: "Follow-ups", icon: ClipboardCheck, perm: "calendar.view" },
   { to: "/executive", label: "Executive", icon: BarChart3, perm: "executive.view" },
   { to: "/system/users", label: "Manage Users", icon: ShieldCheck, perm: "system.manage" },
   { to: "/system/permissions", label: "Permission Check", icon: ShieldCheck, perm: "system.manage" },
@@ -49,6 +57,33 @@ export function AppShell() {
   const menuDialogRef = useRef<HTMLElement>(null);
   const wasMenuOpenRef = useRef(false);
   const notif = useNotifications();
+
+  /**
+   * The durable inbox. Available to every role that can see the calendar, not
+   * only to the alerts-view roles: an assigned mentor is exactly who needs to be
+   * told about a new event or a write-up that has gone past its deadline.
+   */
+  const canSeeEventInbox = can("calendar.view");
+  const queryClient = useQueryClient();
+  const fetchInbox = useServerFn(listNotifications);
+  const markInboxRead = useServerFn(markNotificationsRead);
+  const { data: inbox } = useQuery({
+    queryKey: notificationsQueryKey,
+    queryFn: () => fetchInbox(),
+    staleTime: 60_000,
+    enabled: canSeeEventInbox,
+  });
+  const inboxItems = inbox?.items ?? [];
+  const inboxUnread = inbox?.unread ?? 0;
+
+  async function markInboxAllRead() {
+    try {
+      await markInboxRead({ data: { ids: [] } });
+      await queryClient.invalidateQueries({ queryKey: notificationsQueryKey });
+    } catch {
+      // Nothing to recover: the inbox simply stays unread until the next attempt.
+    }
+  }
 
   // Public routes must remain available without auth. Password recovery must
   // also remain reachable while maintenance mode is enabled.
@@ -185,32 +220,100 @@ export function AppShell() {
             <div className="hidden md:inline-flex items-center gap-1.5 h-7 px-2 rounded-md bg-primary/10 border border-primary/30 text-primary text-[10px] font-medium uppercase tracking-wider"><ShieldCheck className="size-3" />{ROLE_LABEL[user.role]}</div>
           )}
           <ThemeToggle />
-          {can("alerts.view") && (
+          {(can("alerts.view") || canSeeEventInbox) && (
             <div ref={bellRef} className="relative">
               <button
                 onClick={() => setBellOpen((v) => !v)}
                 aria-label={
-                  notif.unread > 0
-                    ? `${bellOpen ? "Close" : "Open"} duty notifications, ${notif.unread > 9 ? "9+" : notif.unread} unread`
+                  notif.unread + inboxUnread > 0
+                    ? `${bellOpen ? "Close" : "Open"} notifications, ${notif.unread + inboxUnread > 9 ? "9+" : notif.unread + inboxUnread} unread`
                     : bellOpen
-                      ? "Close duty notifications"
-                      : "Open duty notifications"
+                      ? "Close notifications"
+                      : "Open notifications"
                 }
                 aria-expanded={bellOpen}
                 aria-controls="duty-notifications"
                 className="relative size-11 md:size-9 grid place-items-center rounded-md border border-border hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               >
                 <BellRing className="size-4" aria-hidden="true" />
-                {notif.unread > 0 && (
+                {notif.unread + inboxUnread > 0 && (
                   <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-destructive text-destructive-foreground text-[10px] font-mono font-semibold grid place-items-center" aria-hidden="true">
-                    {notif.unread > 9 ? "9+" : notif.unread}
+                    {notif.unread + inboxUnread > 9 ? "9+" : notif.unread + inboxUnread}
                   </span>
                 )}
               </button>
               {bellOpen && (
                 <>
                   <div className="fixed inset-0 z-20" onClick={() => setBellOpen(false)} />
-                  <div id="duty-notifications" role="region" aria-label="Duty notifications" className="fixed inset-x-3 top-16 z-30 w-auto rounded-md border border-border bg-popover shadow-xl overflow-hidden md:absolute md:inset-x-auto md:top-auto md:right-0 md:mt-2 md:w-[360px]">
+                  <div id="duty-notifications" role="region" aria-label="Notifications" className="fixed inset-x-3 top-16 z-30 w-auto rounded-md border border-border bg-popover shadow-xl overflow-hidden md:absolute md:inset-x-auto md:top-auto md:right-0 md:mt-2 md:w-[360px]">
+                    {/* Event notifications come from the database, so they are the
+                        same on every device and survive signing out. */}
+                    {canSeeEventInbox && (
+                      <div className="border-b border-border">
+                        <div className="flex items-center justify-between px-3 py-2">
+                          <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                            Events &amp; Follow-ups
+                          </div>
+                          {inboxUnread > 0 && (
+                            <button
+                              onClick={() => void markInboxAllRead()}
+                              title="Mark all read"
+                              className="size-11 grid place-items-center rounded hover:bg-accent text-muted-foreground"
+                            >
+                              <Check className="size-3.5" />
+                            </button>
+                          )}
+                        </div>
+                        <div className="max-h-[260px] overflow-y-auto">
+                          {inboxItems.length === 0 ? (
+                            <div className="px-4 py-6 text-center text-xs text-muted-foreground">
+                              Nothing about your scheduled events yet.
+                            </div>
+                          ) : (
+                            inboxItems.slice(0, 20).map((n) => (
+                              <Link
+                                key={n.id}
+                                to={n.linkPath.split("?")[0] || "/calendar"}
+                                search={Object.fromEntries(
+                                  new URLSearchParams(n.linkPath.split("?")[1] ?? ""),
+                                )}
+                                onClick={() => {
+                                  void markInboxRead({ data: { ids: [n.id] } }).then(() =>
+                                    queryClient.invalidateQueries({ queryKey: notificationsQueryKey }),
+                                  );
+                                  setBellOpen(false);
+                                }}
+                                className={cn(
+                                  "block px-3 py-2.5 border-b border-border/60 last:border-0 hover:bg-accent/40",
+                                  !n.readAt && "bg-accent/20",
+                                )}
+                              >
+                                <div className="flex items-start gap-2">
+                                  <span
+                                    className={cn(
+                                      "mt-1.5 size-2 rounded-full shrink-0",
+                                      n.kind === "follow_up_overdue"
+                                        ? "bg-destructive"
+                                        : n.kind === "event_cancelled"
+                                          ? "bg-muted-foreground/50"
+                                          : "bg-primary",
+                                    )}
+                                  />
+                                  <div className="min-w-0 flex-1">
+                                    <div className="text-sm font-medium">{n.title}</div>
+                                    <div className="mt-0.5 whitespace-pre-line text-[11px] text-muted-foreground">
+                                      {n.body}
+                                    </div>
+                                  </div>
+                                </div>
+                              </Link>
+                            ))
+                          )}
+                        </div>
+                      </div>
+                    )}
+                    {can("alerts.view") && (
+                    <>
                     <div className="flex items-center justify-between px-3 py-2 border-b border-border">
                       <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Duty Notifications</div>
                       <div className="flex items-center gap-1">
@@ -249,6 +352,13 @@ export function AppShell() {
                     <Link to="/alerts" onClick={() => setBellOpen(false)} className="block px-3 py-2 border-t border-border text-center text-xs text-primary hover:bg-accent/40">
                       Open alerts & email settings →
                     </Link>
+                    </>
+                    )}
+                    {canSeeEventInbox && (
+                      <Link to="/follow-ups" onClick={() => setBellOpen(false)} className="block px-3 py-2 border-t border-border text-center text-xs text-primary hover:bg-accent/40">
+                        Open follow-ups →
+                      </Link>
+                    )}
                   </div>
                 </>
               )}

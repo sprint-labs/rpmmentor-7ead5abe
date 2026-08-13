@@ -20,6 +20,15 @@ import { logDashboardClick } from "@/lib/analytics.functions";
 import { mentorDashboardMetricCardLabels } from "./mentor-dashboard-cards";
 import { WorkflowDialog, type WorkflowKind } from "@/components/workflows";
 import { useAuth } from "@/lib/auth";
+import { listEventFollowUps } from "@/lib/events/follow-up.functions";
+import { eventFollowUpsQueryKey } from "@/lib/events/query-keys";
+import { followUpRequirementLabel } from "@/lib/events/follow-up";
+import {
+  FollowUpActionLink,
+  FollowUpStatusPill,
+  followUpDetail,
+} from "@/components/events/follow-up-status";
+import { formatDateOnly } from "@/lib/interactions/schema";
 
 import { lastNDaysPeriod } from "@/lib/dashboard-period";
 
@@ -102,6 +111,27 @@ export function MentorDashboard({ user }: Props) {
     window.addEventListener("rpm:report-submitted", handleReportSubmitted);
     return () => window.removeEventListener("rpm:report-submitted", handleReportSubmitted);
   }, [queryClient]);
+
+  // Write-ups this mentor owes after an event that has already happened. Read
+  // from the database, so a saved Match Report or Interaction clears it.
+  const fetchFollowUps = useServerFn(listEventFollowUps);
+  const { data: followUpData } = useQuery({
+    queryKey: eventFollowUpsQueryKey,
+    queryFn: () => fetchFollowUps(),
+    staleTime: 30_000,
+  });
+  const writeUpsDue = useMemo(
+    () =>
+      (followUpData?.rows ?? [])
+        .filter(
+          (r) =>
+            r.mine &&
+            r.followUp.kind !== null &&
+            (r.followUp.status === "pending" || r.followUp.status === "overdue"),
+        )
+        .sort((a, b) => a.followUp.deadlineMs - b.followUp.deadlineMs),
+    [followUpData],
+  );
 
   const firstName = user.name.split(" ")[0];
   const upcoming = data?.upcomingList ?? [];
@@ -315,6 +345,57 @@ export function MentorDashboard({ user }: Props) {
       </Card>
 
 
+
+      {writeUpsDue.length > 0 && (
+        <Card className="p-4">
+          <div className="flex items-center justify-between gap-2">
+            <SectionTitle>Write-ups Due</SectionTitle>
+            <Link to="/follow-ups" className="text-[11px] text-primary hover:underline">
+              See all follow-ups
+            </Link>
+          </div>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Each of these events has happened. You have 48 hours from the scheduled time to record
+            what came out of it.
+          </p>
+          <div className="mt-3 divide-y divide-border">
+            {writeUpsDue.map((row) => (
+              <div key={row.eventId} className="flex flex-wrap items-center gap-3 py-2.5">
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <FollowUpStatusPill status={row.followUp.status} />
+                    <span className="truncate text-sm font-medium">
+                      {row.goalkeeperName || "Unnamed goalkeeper"}
+                    </span>
+                    <span className="text-xs text-muted-foreground">{row.eventType}</span>
+                  </div>
+                  <div className="mt-0.5 text-xs text-muted-foreground">
+                    {formatDateOnly(row.eventDate)}
+                    {row.startTime ? ` · ${row.startTime.slice(0, 5)}` : ""}
+                  </div>
+                  <div className="mt-0.5 text-[11px] text-muted-foreground">
+                    {followUpDetail(row.followUp, row.waiverReason, row.cancellationReason)}
+                  </div>
+                </div>
+                <FollowUpActionLink
+                  event={{
+                    id: row.eventId,
+                    title: row.title,
+                    eventType: row.eventType,
+                    eventDate: row.eventDate,
+                    startTime: row.startTime,
+                    endTime: row.endTime,
+                    goalkeeperName: row.goalkeeperName,
+                    playerId: row.playerId,
+                  }}
+                  followUp={row.followUp}
+                  label={`Submit ${followUpRequirementLabel(row.followUp.kind)}`}
+                />
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
 
       <Card className="p-4">
         <SectionTitle>Upcoming Interactions and Matches</SectionTitle>

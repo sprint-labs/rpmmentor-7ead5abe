@@ -129,7 +129,12 @@ export interface MatchReportHandoff {
   club: string;
 }
 
-export function WorkflowDialog({ kind, onClose, prefillGoalkeeper, prefillMatchDate, prefillOpponent, prefillGkId, editingInteraction }: { kind: WorkflowKind | null; onClose: () => void; prefillGoalkeeper?: string; prefillMatchDate?: string; prefillOpponent?: string; prefillGkId?: string; editingInteraction?: LoggedInteraction | null }) {
+/**
+ * `followUpEventId` is set when the form was opened to write up a specific
+ * scheduled event. It travels with the save so the saved record is linked back to
+ * the event, which is what turns that event's follow-up to Completed.
+ */
+export function WorkflowDialog({ kind, onClose, prefillGoalkeeper, prefillMatchDate, prefillOpponent, prefillGkId, editingInteraction, followUpEventId }: { kind: WorkflowKind | null; onClose: () => void; prefillGoalkeeper?: string; prefillMatchDate?: string; prefillOpponent?: string; prefillGkId?: string; editingInteraction?: LoggedInteraction | null; followUpEventId?: string }) {
   /**
    * Change #1: choosing Live Match Observation in Log Interaction hands over to
    * the Match Report workflow in place, carrying the goalkeeper, date and club
@@ -176,6 +181,7 @@ export function WorkflowDialog({ kind, onClose, prefillGoalkeeper, prefillMatchD
               onOpenMatchReport={setHandoff}
               prefillGkId={prefillGkId}
               prefillDate={prefillMatchDate}
+              followUpEventId={followUpEventId}
             />
           )}
           {activeKind === "report" && (
@@ -185,6 +191,10 @@ export function WorkflowDialog({ kind, onClose, prefillGoalkeeper, prefillMatchD
               prefillMatchDate={handoff?.matchDate ?? prefillMatchDate}
               prefillOpponent={prefillOpponent}
               prefillTeam={handoff?.club}
+              // A handoff from Log Interaction is a different event's write-up
+              // path, so the link is only carried when the report form was opened
+              // for a Match event directly.
+              followUpEventId={handoff ? undefined : followUpEventId}
             />
           )}
           {activeKind === "media" && <MediaForm onDone={onClose} prefillGkId={prefillGkId} />}
@@ -434,6 +444,7 @@ export function InteractionForm({
   onOpenMatchReport,
   prefillGkId,
   prefillDate,
+  followUpEventId,
 }: {
   onDone: () => void;
   editing?: LoggedInteraction | null;
@@ -442,6 +453,11 @@ export function InteractionForm({
   prefillGkId?: string;
   /** Date to pre-select when opened from a calendar day (YYYY-MM-DD). */
   prefillDate?: string;
+  /**
+   * The scheduled event being written up, when the form was opened from a
+   * follow-up. Sent with the save so the interaction is linked to that event.
+   */
+  followUpEventId?: string;
 }) {
   const queryClient = useQueryClient();
   const createFn = useServerFn(createInteraction);
@@ -982,6 +998,7 @@ export function InteractionForm({
       followUp: followUp.trim(),
       createdAt: new Date().toISOString(),
       matchReportId: null,
+      calendarEventId: followUpEventId ?? null,
       updatedAt: null,
       updatedBy: null,
       optimistic: true,
@@ -1005,6 +1022,7 @@ export function InteractionForm({
           notes: currentNotes.trim(),
           outcome,
           followUp: followUp.trim(),
+          calendarEventId: followUpEventId ?? null,
         },
       });
       // Only a confirmed inserted row counts as success.
@@ -1363,7 +1381,7 @@ export function InteractionForm({
  * Match Report form — writes to the RPM Match Reports Google Sheet via
  * a server function. Fields locked to the confirmed 14-column schema.
  */
-function ReportForm({ onDone, prefillGoalkeeper, prefillMatchDate, prefillOpponent, prefillTeam }: { onDone: () => void; prefillGoalkeeper?: string; prefillMatchDate?: string; prefillOpponent?: string; prefillTeam?: string }) {
+function ReportForm({ onDone, prefillGoalkeeper, prefillMatchDate, prefillOpponent, prefillTeam, followUpEventId }: { onDone: () => void; prefillGoalkeeper?: string; prefillMatchDate?: string; prefillOpponent?: string; prefillTeam?: string; followUpEventId?: string }) {
   const { user } = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -1892,6 +1910,9 @@ function ReportForm({ onDone, prefillGoalkeeper, prefillMatchDate, prefillOppone
             allowDuplicate: force,
             replay: false,
             submissionKey: submissionKeyRef.current,
+            // Present only when this form was opened to write up a scheduled
+            // Match, so the report is linked to the event that asked for it.
+            ...(followUpEventId ? { calendarEventId: followUpEventId } : {}),
           },
         },
       });

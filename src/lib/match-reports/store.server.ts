@@ -27,6 +27,20 @@ export const CANONICAL_COLUMNS =
 /** Postgres unique-violation — another writer got there first. */
 const UNIQUE_VIOLATION = "23505";
 
+/**
+ * The index that keeps one Match Report per scheduled event.
+ *
+ * A conflict on it is NOT the retryable kind: allocating another occurrence id
+ * would not resolve it, because the clash is over the event rather than over the
+ * fixture identity. It has to be reported instead of retried.
+ */
+const CALENDAR_EVENT_INDEX = "match_reports_cache_calendar_event_id_key";
+
+function isCalendarEventConflict(error: { message?: string; details?: string } | null): boolean {
+  const text = `${error?.message ?? ""} ${error?.details ?? ""}`;
+  return text.includes(CALENDAR_EVENT_INDEX);
+}
+
 /** PostgREST caps a single response; page through so a large history is complete. */
 const PAGE_SIZE = 1000;
 
@@ -176,6 +190,13 @@ export interface InsertCanonicalInput {
   comments: string;
   submittedBy: string;
   submissionKey: string;
+  /**
+   * The scheduled Match event this report writes up, when it was submitted from
+   * one. The event carries the canonical goalkeeper and mentor ids, so a report
+   * reached through this link is provably about the right people without any name
+   * matching.
+   */
+  calendarEventId?: string | null;
 }
 
 export type InsertCanonicalResult =
@@ -284,6 +305,7 @@ export async function insertCanonicalReport(
         submitted_at: nowIso,
         submitted_by: input.submittedBy,
         submission_key: input.submissionKey,
+        calendar_event_id: input.calendarEventId ?? null,
         synced_at: nowIso,
       })
       .select("report_id")
@@ -291,6 +313,12 @@ export async function insertCanonicalReport(
 
     if (!error && data) {
       return { ok: true, report_id: (data as { report_id: string }).report_id, created: true };
+    }
+    if (error && isCalendarEventConflict(error)) {
+      return {
+        ok: false,
+        message: "that scheduled event already has a Match Report",
+      };
     }
     if (error && error.code !== UNIQUE_VIOLATION) {
       return { ok: false, message: error.message };

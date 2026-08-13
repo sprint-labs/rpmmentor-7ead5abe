@@ -94,6 +94,12 @@ export const createInteractionInput = z.object({
   notes: z.string().trim().min(1, "Notes are required").max(8000),
   outcome: z.string().trim().max(120).default(""),
   followUp: z.string().trim().max(500).default(""),
+  /**
+   * The scheduled event this interaction writes up, when it was opened from one.
+   * Confirmed server-side against `calendar_events`; a unique index guarantees a
+   * single event cannot be closed out twice.
+   */
+  calendarEventId: z.string().regex(UUID, "calendarEventId must be a calendar_events.id").nullish(),
 });
 // NOTE: mentor identity is never accepted from the client. It is derived
 // server-side from the authenticated user id.
@@ -141,6 +147,8 @@ export interface LoggedInteraction {
   createdAt: string;
   /** Set when this interaction was produced by a Match Report submission. */
   matchReportId: string | null;
+  /** Set when this interaction is the write-up for a scheduled event. */
+  calendarEventId: string | null;
   /** Present once the interaction has been edited. */
   updatedAt: string | null;
   updatedBy: string | null;

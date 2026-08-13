@@ -23,6 +23,8 @@ const reportsSearchSchema = z.object({
   source: fallback(z.string(), "").default(""),
   gk: fallback(z.string(), "").default(""),
   openSubmit: fallback(z.string(), "").default(""),
+  /** The scheduled Match this report writes up, when opened from a follow-up. */
+  eventId: fallback(z.string(), "").default(""),
   last5Gk: fallback(z.string(), "").default(""),
   matchDate: fallback(z.string(), "").default(""),
   opponent: fallback(z.string(), "").default(""),
@@ -52,12 +54,15 @@ function formatDate(iso: string | null) {
 
 function ReportsPage() {
   const { can } = useAuth();
-  const { from, to, coach, source, gk, openSubmit, last5Gk, matchDate, opponent } = Route.useSearch();
+  const { from, to, coach, source, gk, openSubmit, last5Gk, matchDate, opponent, eventId } =
+    Route.useSearch();
   const navSource = getNavSource(source);
   const [workflow, setWorkflow] = useState<WorkflowKind | null>(null);
   const [prefillGoalkeeper, setPrefillGoalkeeper] = useState<string>("");
   const [prefillMatchDate, setPrefillMatchDate] = useState<string>("");
   const [prefillOpponent, setPrefillOpponent] = useState<string>("");
+  /** The scheduled Match this submission writes up, if opened from a follow-up. */
+  const [followUpEventId, setFollowUpEventId] = useState<string>("");
   /** Goalkeeper/date carried into Log Interaction from a report row. */
   const [logPrefill, setLogPrefill] = useState<{ gkId?: string; date?: string }>({});
   const [coachFilter, setCoachFilter] = useState<string>(coach || "All");
@@ -93,16 +98,17 @@ function ReportsPage() {
       setPrefillGoalkeeper(gk || "");
       setPrefillMatchDate(matchDate || "");
       setPrefillOpponent(opponent || "");
+      setFollowUpEventId(eventId || "");
       setWorkflow("report");
       // Strip the one-shot params so a refresh doesn't reopen the dialog.
       router.navigate({
         to: "/reports",
-        search: { from, to, coach, mentorProfileId: "", source, gk: "", openSubmit: "", last5Gk, matchDate: "", opponent: "" },
+        search: { from, to, coach, mentorProfileId: "", source, gk: "", openSubmit: "", last5Gk, matchDate: "", opponent: "", eventId: "" },
         replace: true,
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [openSubmit, gk, matchDate, opponent]);
+  }, [openSubmit, gk, matchDate, opponent, eventId]);
 
   const coaches = useMemo(() => {
     const s = new Set<string>();
@@ -379,7 +385,15 @@ function ReportsPage() {
       </Card>
 
       <SectionTitle>Showing {Math.min(100, filtered.length)} of {filtered.length}</SectionTitle>
-      <WorkflowDialog kind={workflow} onClose={() => { setWorkflow(null); setPrefillGoalkeeper(""); setPrefillMatchDate(""); setPrefillOpponent(""); setLogPrefill({}); }} prefillGoalkeeper={prefillGoalkeeper} prefillMatchDate={workflow === "interaction" ? logPrefill.date : prefillMatchDate} prefillOpponent={prefillOpponent} prefillGkId={logPrefill.gkId} />
+      <WorkflowDialog
+        kind={workflow}
+        onClose={() => { setWorkflow(null); setPrefillGoalkeeper(""); setPrefillMatchDate(""); setPrefillOpponent(""); setFollowUpEventId(""); setLogPrefill({}); }}
+        prefillGoalkeeper={prefillGoalkeeper}
+        prefillMatchDate={workflow === "interaction" ? logPrefill.date : prefillMatchDate}
+        prefillOpponent={prefillOpponent}
+        prefillGkId={logPrefill.gkId}
+        followUpEventId={workflow === "report" ? followUpEventId || undefined : undefined}
+      />
     </div>
   );
 }

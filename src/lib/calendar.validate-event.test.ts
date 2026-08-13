@@ -10,6 +10,7 @@ function valid(overrides: Record<string, unknown> = {}) {
     title: "Watford v Luton — attending",
     event_type: "Match",
     event_date: "2026-08-14",
+    start_time: "15:00",
     player_id: GK,
     assigned_mentor_id: MENTOR,
     ...overrides,
@@ -22,9 +23,27 @@ describe("calendar event required fields", () => {
       title: "Watford v Luton — attending",
       event_type: "Match",
       event_date: "2026-08-14",
+      start_time: "15:00",
       player_id: GK,
       assigned_mentor_id: MENTOR,
     });
+  });
+
+  it("accepts each of the three schedulable types and nothing else", () => {
+    for (const type of ["Match", "Training Ground Visit", "Coffee Catch-up"]) {
+      expect(validateEvent(valid({ event_type: type })).event_type).toBe(type);
+    }
+    for (const retired of ["Observation", "Mentor Visit", "Meeting", "Follow Up", "Other"]) {
+      expect(() => validateEvent(valid({ event_type: retired }))).toThrow(/Match, Training Ground/i);
+    }
+    expect(() => validateEvent(valid({ event_type: "" }))).toThrow(/Match, Training Ground/i);
+  });
+
+  it("requires a start time, because the deadline is measured from it", () => {
+    expect(() => validateEvent(valid({ start_time: "" }))).toThrow(/start time is required/i);
+    expect(() => validateEvent(valid({ start_time: "  " }))).toThrow(/start time is required/i);
+    expect(() => validateEvent(valid({ start_time: undefined }))).toThrow(/start time is required/i);
+    expect(() => validateEvent(valid({ start_time: "4pm" }))).toThrow(/HH:MM/);
   });
 
   it("requires a goalkeeper", () => {
@@ -51,12 +70,6 @@ describe("calendar event required fields", () => {
 });
 
 describe("calendar event optional fields", () => {
-  it("treats start time as optional and keeps a supplied one", () => {
-    expect(validateEvent(valid()).start_time).toBeNull();
-    expect(validateEvent(valid({ start_time: "16:00" })).start_time).toBe("16:00");
-    expect(validateEvent(valid({ start_time: "  " })).start_time).toBeNull();
-  });
-
   it("accepts location and notes of any length up to their caps, including empty", () => {
     const blank = validateEvent(valid({ location: "", notes: "" }));
     expect(blank.location).toBeNull();
