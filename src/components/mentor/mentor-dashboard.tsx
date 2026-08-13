@@ -3,6 +3,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { ArrowUpRight, CalendarClock, CalendarPlus, ChevronDown, ChevronRight, FileText, Video, AlertTriangle, Plus } from "lucide-react";
+import { MentorPrimaryActions } from "./mentor-primary-actions";
 import { cn } from "@/lib/utils";
 import { Card, StatCard, SectionTitle, Avatar, TierBadge, TierLevelBadge, Pill } from "@/components/primitives";
 import { getMentorDashboardStats } from "@/lib/mentor-dashboard.functions";
@@ -83,6 +84,8 @@ const PLANNED_TYPE_OPTIONS = ["Coffee Catch Up", "Attend Live Match", "Training 
 export function MentorDashboard({ user }: Props) {
   const { can } = useAuth();
   const canLog = can("interactions.log");
+  const canSubmitReport = can("reports.submit");
+  const canViewCalendar = can("calendar.view");
   const [workflow, setWorkflow] = useState<WorkflowKind | null>(null);
   const [logPrefill, setLogPrefill] = useState<{ gkId?: string; gkName?: string }>({});
   function openLog(gkId?: string | null, gkName?: string | null) {
@@ -185,7 +188,7 @@ export function MentorDashboard({ user }: Props) {
             ? "Loading your dashboard…"
             : isError
               ? "Couldn't load your dashboard."
-              : `Your reporting activity — last ${rangeDays} days`}
+              : "Match reports and interactions first"}
         </p>
         {isError && (
           <button
@@ -197,6 +200,15 @@ export function MentorDashboard({ user }: Props) {
         )}
       </header>
 
+      <MentorPrimaryActions
+        canSubmitReport={canSubmitReport}
+        canLogInteraction={canLog}
+        canViewCalendar={canViewCalendar}
+        onLogReport={() => setWorkflow("report")}
+        onLogInteraction={() => openLog()}
+      />
+
+      <section aria-label="Your activity">
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
         <Link
           to="/reports"
@@ -245,6 +257,7 @@ export function MentorDashboard({ user }: Props) {
           />
         </Link>
       </div>
+      </section>
 
       <Card className="p-4">
         <button
@@ -265,18 +278,6 @@ export function MentorDashboard({ user }: Props) {
             {showOutstanding ? "Hide" : "Show"}
           </span>
         </button>
-
-        {canLog && (
-          <div className="mt-3 flex justify-end">
-            <button
-              type="button"
-              onClick={() => openLog()}
-              className="text-xs px-2.5 py-1.5 rounded-md border border-border hover:bg-accent/40 text-primary inline-flex items-center gap-1"
-            >
-              <Plus className="size-3" /> Log interaction
-            </button>
-          </div>
-        )}
 
         {showOutstanding && (
           outstanding.length === 0 ? (
@@ -351,26 +352,7 @@ export function MentorDashboard({ user }: Props) {
 
 
       <Card className="p-4">
-        <SectionTitle
-          action={
-            <span className="inline-flex items-center gap-3">
-              {canLog && (
-                <button
-                  type="button"
-                  onClick={() => openLog()}
-                  className="text-xs text-primary inline-flex items-center gap-1"
-                >
-                  <Plus className="size-3" /> Log interaction
-                </button>
-              )}
-              <Link to="/calendar" className="text-xs text-primary inline-flex items-center gap-1">
-                Open calendar <ArrowUpRight className="size-3" />
-              </Link>
-            </span>
-          }
-        >
-          Upcoming Interactions
-        </SectionTitle>
+        <SectionTitle>Upcoming Interactions</SectionTitle>
 
         <div className="flex items-center justify-between gap-3 mb-3">
           <span className="text-xs text-muted-foreground">

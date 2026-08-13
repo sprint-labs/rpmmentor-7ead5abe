@@ -4,3 +4,10 @@ export const mentorDashboardMetricCardLabels = {
   interactionsLogged: "Interactions Logged",
   outstandingActions: "Outstanding Actions",
 } as const;
+
+/** Primary mentor-home actions. Match report and interaction come first; calendar is next. */
+export const mentorPrimaryActionLabels = {
+  logMatchReport: "Log match report",
+  logInteraction: "Log interaction",
+  viewCalendar: "View calendar",
+} as const;
