@@ -1,6 +1,7 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { LOGIN_LOCKUP_SRC } from "@/lib/brand";
 
 // Beta namespace: keep a local typed shim rather than digging into SDK internals.
 interface OAuthAuthorizationDetails {
@@ -90,7 +91,7 @@ function Consent() {
     <main className="min-h-screen flex items-center justify-center bg-background p-6">
       <div className="w-full max-w-md">
         <div className="mb-10">
-          <img src="/gkhq-lockup.svg" alt="Mentor Hub by RPM" className="h-16 w-auto" />
+          <img src={LOGIN_LOCKUP_SRC} alt="Mentor Hub by RPM" className="h-16 w-auto" />
         </div>
 
 

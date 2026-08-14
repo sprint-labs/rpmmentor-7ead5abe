@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { ArrowLeft, CheckCircle2, Eye, EyeOff, Lock, Mail } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable";
-import loginLogo from "@/assets/gkhq-design-system.svg.asset.json";
+import { LOGIN_LOCKUP_SRC } from "@/lib/brand";
 import { CANONICAL_ORIGIN } from "@/lib/canonical-url";
 import { MAINTENANCE_MODE } from "@/lib/maintenance";
 
@@ -66,7 +66,7 @@ function LoginPage() {
     <main id="main-content" tabIndex={-1} className="min-h-screen flex items-center justify-center bg-background p-6">
       <div className="w-full max-w-md">
         <div className="mb-10">
-          <img src={loginLogo.url} alt="Mentor Hub by RPM" className="h-40 w-auto" />
+          <img src={LOGIN_LOCKUP_SRC} alt="Mentor Hub by RPM" className="h-40 w-auto" />
         </div>
 
         {MAINTENANCE_MODE && (
