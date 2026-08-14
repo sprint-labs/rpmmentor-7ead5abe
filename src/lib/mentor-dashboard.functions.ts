@@ -60,8 +60,10 @@ export interface MentorDashboardStats {
  *
  * Activity stats are scoped to the signed-in mentor's OWN submissions, not to
  * a roster of assigned goalkeepers — mentors work collaboratively across the
- * whole RPM roster. The upcoming list is the SHARED team calendar, because
- * `calendar_events` has no assigned-mentor column to scope it by.
+ * whole RPM roster. Upcoming events are this mentor's diary: rows whose
+ * `assigned_mentor_id` is the signed-in profile, inside the forward window.
+ * Events scheduled before mentors were assignable have a null assignee and
+ * do not appear here until they are reassigned on `/calendar`.
  */
 const dashboardInputSchema = z
   .object({

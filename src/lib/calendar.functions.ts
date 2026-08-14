@@ -8,6 +8,7 @@
  */
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import type { Database } from "@/integrations/supabase/types";
 import { requireRole, type AppRole } from "@/lib/roles.server";
 
 export const CALENDAR_MANAGE_ROLES: readonly AppRole[] = [
@@ -25,6 +26,56 @@ export const CALENDAR_EVENT_TYPES = [
   "Other",
 ] as const;
 export type CalendarEventType = (typeof CALENDAR_EVENT_TYPES)[number];
+
+type CalendarEventRow = Database["public"]["Tables"]["calendar_events"]["Row"];
+
+/** Columns the calendar reads. A missing assigned-mentor field fails type-checking instead of being cast away. */
+export type CalendarEventSelect = Pick<
+  CalendarEventRow,
+  | "id"
+  | "title"
+  | "event_type"
+  | "event_date"
+  | "start_time"
+  | "location"
+  | "notes"
+  | "player_id"
+  | "goalkeeper_name"
+  | "assigned_mentor_id"
+  | "assigned_mentor_name"
+  | "created_by"
+  | "created_by_name"
+>;
+
+export function isCalendarEventType(value: string): value is CalendarEventType {
+  return (CALENDAR_EVENT_TYPES as readonly string[]).includes(value);
+}
+
+/**
+ * Narrow a stored `calendar_events` row into the shape the UI consumes.
+ * `event_type` is a free-text column; anything outside the known set is rejected
+ * rather than asserted.
+ */
+export function toTeamCalendarEvent(row: CalendarEventSelect): TeamCalendarEvent {
+  if (!isCalendarEventType(row.event_type)) {
+    throw new Error("Unknown event type.");
+  }
+  return {
+    id: row.id,
+    title: row.title,
+    event_type: row.event_type,
+    event_date: row.event_date,
+    start_time: row.start_time,
+    location: row.location,
+    notes: row.notes,
+    player_id: row.player_id,
+    goalkeeper_name: row.goalkeeper_name,
+    assigned_mentor_id: row.assigned_mentor_id,
+    assigned_mentor_name: row.assigned_mentor_name,
+    created_by: row.created_by,
+    created_by_name: row.created_by_name,
+  };
+}
 
 export interface TeamCalendarEvent {
   id: string;
@@ -67,8 +118,8 @@ export function validateEvent(data: EventInput) {
   const title = (data?.title ?? "").trim();
   if (!title) throw new Error("A title is required.");
   if (title.length > 160) throw new Error("Title must be 160 characters or fewer.");
-  const type = (data?.event_type ?? "Other") as CalendarEventType;
-  if (!CALENDAR_EVENT_TYPES.includes(type)) throw new Error("Unknown event type.");
+  const type = data?.event_type ?? "Other";
+  if (!isCalendarEventType(type)) throw new Error("Unknown event type.");
   if (!/^\d{4}-\d{2}-\d{2}$/.test(data?.event_date ?? "")) throw new Error("A valid date is required.");
   const time = (v: string | null | undefined) => {
     const s = (v ?? "").trim();
@@ -114,12 +165,12 @@ async function resolveEventPeople(
       .from("players")
       .select("full_name")
       .eq("id", playerId)
-      .maybeSingle<{ full_name: string }>(),
+      .maybeSingle(),
     supabase
       .from("profiles")
       .select("name")
       .eq("id", mentorId)
-      .maybeSingle<{ name: string | null }>(),
+      .maybeSingle(),
   ]);
   if (!player) throw new Error("That goalkeeper is not on the roster.");
   if (!mentor) throw new Error("That mentor could not be found.");
@@ -149,7 +200,7 @@ export const listAssignableMentors = createServerFn({ method: "GET" })
       .select("id, name")
       .order("name", { ascending: true });
     if (error) throw new Error(error.message);
-    return (data ?? []).map((p) => ({ id: p.id as string, name: (p.name as string | null) ?? "" }));
+    return (data ?? []).map((p) => ({ id: p.id, name: p.name ?? "" }));
   });
 
 export const listCalendarEvents = createServerFn({ method: "GET" })
@@ -162,7 +213,7 @@ export const listCalendarEvents = createServerFn({ method: "GET" })
       .order("start_time", { ascending: true, nullsFirst: true })
       .limit(1000);
     if (error) throw new Error(error.message);
-    return (data ?? []) as TeamCalendarEvent[];
+    return (data ?? []).map(toTeamCalendarEvent);
   });
 
 export const createCalendarEvent = createServerFn({ method: "POST" })
@@ -175,7 +226,7 @@ export const createCalendarEvent = createServerFn({ method: "POST" })
       .from("profiles")
       .select("name")
       .eq("id", context.userId)
-      .maybeSingle<{ name: string }>();
+      .maybeSingle();
 
     const people = await resolveEventPeople(
       context.supabase,
@@ -195,7 +246,7 @@ export const createCalendarEvent = createServerFn({ method: "POST" })
       .select(COLUMNS)
       .single();
     if (error) throw new Error(error.message);
-    return row as TeamCalendarEvent;
+    return toTeamCalendarEvent(row);
   });
 
 export const updateCalendarEvent = createServerFn({ method: "POST" })
@@ -222,7 +273,7 @@ export const updateCalendarEvent = createServerFn({ method: "POST" })
       .maybeSingle();
     if (error) throw new Error(error.message);
     if (!row) throw new Error("That calendar event could not be updated.");
-    return row as TeamCalendarEvent;
+    return toTeamCalendarEvent(row);
   });
 
 export const deleteCalendarEvent = createServerFn({ method: "POST" })
