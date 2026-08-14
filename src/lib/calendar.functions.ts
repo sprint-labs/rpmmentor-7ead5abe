@@ -8,6 +8,7 @@
  */
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import type { Database } from "@/integrations/supabase/types";
 import { requireRole, type AppRole } from "@/lib/roles.server";
 import { EVENT_TYPES, isEventType, type EventType } from "@/lib/events/follow-up";
 
@@ -26,6 +27,62 @@ export const CALENDAR_MANAGE_ROLES: readonly AppRole[] = [
  */
 export const CALENDAR_EVENT_TYPES = EVENT_TYPES;
 export type CalendarEventType = EventType;
+
+type CalendarEventRow = Database["public"]["Tables"]["calendar_events"]["Row"];
+
+/** Columns the calendar list and write-backs actually read. */
+export type CalendarEventSelect = Pick<
+  CalendarEventRow,
+  | "id"
+  | "title"
+  | "event_type"
+  | "event_date"
+  | "start_time"
+  | "end_time"
+  | "location"
+  | "notes"
+  | "player_id"
+  | "goalkeeper_name"
+  | "assigned_mentor_id"
+  | "assigned_mentor_name"
+  | "status"
+  | "cancellation_reason"
+  | "follow_up_waived_at"
+  | "follow_up_waiver_reason"
+  | "created_by"
+  | "created_by_name"
+>;
+
+/**
+ * Narrow a stored row into the shape the UI consumes.
+ *
+ * Reads must tolerate retired types (Meeting, Observation, …) and any other
+ * free-text value already in the table. One unfamiliar type must not blank the
+ * whole calendar. Writes still go through `validateEvent`, which only accepts
+ * the three schedulable types.
+ */
+export function toTeamCalendarEvent(row: CalendarEventSelect): TeamCalendarEvent {
+  return {
+    id: row.id,
+    title: row.title,
+    event_type: row.event_type,
+    event_date: row.event_date,
+    start_time: row.start_time,
+    end_time: row.end_time,
+    location: row.location,
+    notes: row.notes,
+    player_id: row.player_id,
+    goalkeeper_name: row.goalkeeper_name,
+    assigned_mentor_id: row.assigned_mentor_id,
+    assigned_mentor_name: row.assigned_mentor_name,
+    status: row.status,
+    cancellation_reason: row.cancellation_reason,
+    follow_up_waived_at: row.follow_up_waived_at,
+    follow_up_waiver_reason: row.follow_up_waiver_reason,
+    created_by: row.created_by,
+    created_by_name: row.created_by_name,
+  };
+}
 
 export interface TeamCalendarEvent {
   id: string;
@@ -130,12 +187,12 @@ async function resolveEventPeople(
       .from("players")
       .select("full_name")
       .eq("id", playerId)
-      .maybeSingle<{ full_name: string }>(),
+      .maybeSingle(),
     supabase
       .from("profiles")
       .select("name")
       .eq("id", mentorId)
-      .maybeSingle<{ name: string | null }>(),
+      .maybeSingle(),
   ]);
   if (!player) throw new Error("That goalkeeper is not on the roster.");
   if (!mentor) throw new Error("That mentor could not be found.");
@@ -175,10 +232,10 @@ export const listAssignableMentors = createServerFn({ method: "GET" })
     );
     const { data, error } = await context.supabase.rpc("list_mentor_directory");
     if (error) throw new Error(error.message);
-    return ((data ?? []) as { id: string; name: string | null; is_manager: boolean }[]).map((m) => ({
-      id: m.id,
-      name: m.name ?? "",
-      isManager: Boolean(m.is_manager),
+    return (data ?? []).map((mentor) => ({
+      id: mentor.id,
+      name: mentor.name ?? "",
+      isManager: Boolean(mentor.is_manager),
     }));
   });
 
@@ -192,7 +249,7 @@ export const listCalendarEvents = createServerFn({ method: "GET" })
       .order("start_time", { ascending: true, nullsFirst: true })
       .limit(1000);
     if (error) throw new Error(error.message);
-    return (data ?? []) as TeamCalendarEvent[];
+    return (data ?? []).map(toTeamCalendarEvent);
   });
 
 export const createCalendarEvent = createServerFn({ method: "POST" })
@@ -206,7 +263,7 @@ export const createCalendarEvent = createServerFn({ method: "POST" })
       .from("profiles")
       .select("name")
       .eq("id", context.userId)
-      .maybeSingle<{ name: string }>();
+      .maybeSingle();
 
     const people = await resolveEventPeople(
       context.supabase,
@@ -226,11 +283,12 @@ export const createCalendarEvent = createServerFn({ method: "POST" })
       .select(COLUMNS)
       .single();
     if (error) throw new Error(error.message);
+    if (!row) throw new Error("That calendar event could not be created.");
 
     // The event is saved and confirmed before anyone is told about it, and a
     // failed notification never undoes a legitimate schedule.
-    await notifyEventAssigned(context.supabase, context.userId, row as TeamCalendarEvent);
-    return row as TeamCalendarEvent;
+    await notifyEventAssigned(context.supabase, context.userId, toTeamCalendarEvent(row));
+    return toTeamCalendarEvent(row);
   });
 
 export const updateCalendarEvent = createServerFn({ method: "POST" })
@@ -272,11 +330,11 @@ export const updateCalendarEvent = createServerFn({ method: "POST" })
       await notifyEventChanged(
         context.supabase,
         context.userId,
-        row as TeamCalendarEvent,
-        before as Parameters<typeof notifyEventChanged>[3],
+        toTeamCalendarEvent(row),
+        before,
       );
     }
-    return row as TeamCalendarEvent;
+    return toTeamCalendarEvent(row);
   });
 
 export const deleteCalendarEvent = createServerFn({ method: "POST" })
