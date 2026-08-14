@@ -8,8 +8,11 @@
  * client input, a display name, or an email address.
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/integrations/supabase/types";
 
-export type AppRole = "super_admin" | "admin" | "mentor_manager" | "mentor";
+export type AppRole = Database["public"]["Enums"]["app_role"];
+
+type AuthedClient = SupabaseClient<Database>;
 
 /**
  * Roles that may correct a player's club, and edit any interaction rather than
@@ -42,14 +45,10 @@ export const USER_DIRECTORY_VIEW_ROLES: readonly AppRole[] = [
   "mentor",
 ];
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
-export async function getUserRoles(
-  supabase: SupabaseClient<any, any, any>,
-  userId: string,
-): Promise<AppRole[]> {
+export async function getUserRoles(supabase: AuthedClient, userId: string): Promise<AppRole[]> {
   const { data, error } = await supabase.from("user_roles").select("role").eq("user_id", userId);
   if (error) throw new Error(error.message);
-  return (data ?? []).map((r: { role: string }) => r.role as AppRole);
+  return (data ?? []).map((r) => r.role);
 }
 
 export function hasAnyRole(roles: readonly AppRole[], allowed: readonly AppRole[]): boolean {
@@ -58,7 +57,7 @@ export function hasAnyRole(roles: readonly AppRole[], allowed: readonly AppRole[
 
 /** Throws unless the signed-in user holds one of `allowed`. */
 export async function requireRole(
-  supabase: SupabaseClient<any, any, any>,
+  supabase: AuthedClient,
   userId: string,
   allowed: readonly AppRole[],
   action: string,
