@@ -34,7 +34,9 @@ describe("calendar event required fields", () => {
       expect(validateEvent(valid({ event_type: type })).event_type).toBe(type);
     }
     for (const retired of ["Observation", "Mentor Visit", "Meeting", "Follow Up", "Other"]) {
-      expect(() => validateEvent(valid({ event_type: retired }))).toThrow(/Match, Training Ground/i);
+      expect(() => validateEvent(valid({ event_type: retired }))).toThrow(
+        /Match, Training Ground/i,
+      );
     }
     expect(() => validateEvent(valid({ event_type: "" }))).toThrow(/Match, Training Ground/i);
   });
@@ -42,7 +44,9 @@ describe("calendar event required fields", () => {
   it("requires a start time, because the deadline is measured from it", () => {
     expect(() => validateEvent(valid({ start_time: "" }))).toThrow(/start time is required/i);
     expect(() => validateEvent(valid({ start_time: "  " }))).toThrow(/start time is required/i);
-    expect(() => validateEvent(valid({ start_time: undefined }))).toThrow(/start time is required/i);
+    expect(() => validateEvent(valid({ start_time: undefined }))).toThrow(
+      /start time is required/i,
+    );
     expect(() => validateEvent(valid({ start_time: "4pm" }))).toThrow(/HH:MM/);
   });
 

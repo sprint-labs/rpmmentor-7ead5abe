@@ -5,9 +5,25 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Card, TierBadge, Avatar, Pill, SectionTitle, ProgressBar } from "@/components/primitives";
 import { goalkeepers, formatDate, formatRelative, type Tier } from "@/lib/mock-data";
 import { useLoggedInteractions } from "@/lib/interactions/use-interactions";
-import { ArrowLeft, Info, Video, FileText, Phone, Eye, Users as UsersIcon, Calendar as CalendarIcon, Upload, ExternalLink } from "lucide-react";
+import {
+  ArrowLeft,
+  Info,
+  Video,
+  FileText,
+  Phone,
+  Eye,
+  Users as UsersIcon,
+  Calendar as CalendarIcon,
+  Upload,
+  ExternalLink,
+} from "lucide-react";
 import { listMatchReports } from "@/lib/match-reports/reports.functions";
-import { PILLAR_IDS, PILLAR_LABELS, type MatchReportRow, type PillarId } from "@/lib/match-reports/schema";
+import {
+  PILLAR_IDS,
+  PILLAR_LABELS,
+  type MatchReportRow,
+  type PillarId,
+} from "@/lib/match-reports/schema";
 import { ReportPreviewModal } from "@/components/report-preview-modal";
 import { WorkflowDialog, type WorkflowKind } from "@/components/workflows";
 import { useAuth } from "@/lib/auth";
@@ -28,13 +44,19 @@ export const Route = createFileRoute("/goalkeepers/$gkId")({
     return { gk };
   },
   component: GkDetail,
-  notFoundComponent: () => <div className="p-8 text-sm text-muted-foreground">Goalkeeper not found.</div>,
-  errorComponent: ({ error }) => <div className="p-8 text-sm text-destructive">{error.message}</div>,
+  notFoundComponent: () => (
+    <div className="p-8 text-sm text-muted-foreground">Goalkeeper not found.</div>
+  ),
+  errorComponent: ({ error }) => (
+    <div className="p-8 text-sm text-destructive">{error.message}</div>
+  ),
 });
 
 const TYPE_ICON: Record<string, typeof Video> = {
-  "Live Match Observation": Eye, "Training Ground Visit": UsersIcon,
-  "Coffee Catch Up": UsersIcon, "Phone Call": Phone,
+  "Live Match Observation": Eye,
+  "Training Ground Visit": UsersIcon,
+  "Coffee Catch Up": UsersIcon,
+  "Phone Call": Phone,
 };
 
 function normaliseName(s: string): string {
@@ -45,8 +67,11 @@ function formatContractExpiry(value: string): string {
   if (value === "—") return "-";
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return "Not recorded";
   const [year, month] = value.split("-").map(Number);
-  return new Intl.DateTimeFormat("en-GB", { month: "long", year: "numeric", timeZone: "UTC" })
-    .format(new Date(Date.UTC(year, month - 1, 1)));
+  return new Intl.DateTimeFormat("en-GB", {
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(Date.UTC(year, month - 1, 1)));
 }
 
 /** Sort match-report dates newest-first; undated reports sink to the bottom. */
@@ -67,10 +92,7 @@ function GkDetail() {
     queryFn: () => listPlayersFn(),
     staleTime: 5 * 60_000,
   });
-  const linkedPlayer = useMemo(
-    () => findPlayerByName(players, gk.name),
-    [players, gk.name],
-  );
+  const linkedPlayer = useMemo(() => findPlayerByName(players, gk.name), [players, gk.name]);
   const linkedPlayerId = linkedPlayer?.id ?? (gk as { playerId?: string | null }).playerId ?? null;
   const displayClub = linkedPlayer?.current_club || gk.club;
   const displayLeague = linkedPlayer?.league || gk.league;
@@ -81,7 +103,7 @@ function GkDetail() {
         .sort((a, b) => +new Date(b.occurredAt) - +new Date(a.occurredAt)),
     [loggedInteractions, gk, linkedPlayerId],
   );
-  
+
   const [gkMedia, setGkMedia] = useState<MediaAsset[]>([]);
   const [mediaLoading, setMediaLoading] = useState(true);
   const [mediaError, setMediaError] = useState<string | null>(null);
@@ -96,9 +118,13 @@ function GkDetail() {
       setMediaLoading(false);
     }
   }, [gk.id]);
-  useEffect(() => { void loadMedia(); }, [loadMedia]);
   useEffect(() => {
-    const h = () => { void loadMedia(); };
+    void loadMedia();
+  }, [loadMedia]);
+  useEffect(() => {
+    const h = () => {
+      void loadMedia();
+    };
     window.addEventListener("rpm:media-uploaded", h);
     window.addEventListener("rpm:media-updated", h);
     return () => {
@@ -149,20 +175,32 @@ function GkDetail() {
 
   const pillarAverages = useMemo(() => {
     const out: Record<PillarId, number | null> = {
-      protect_goal: null, protect_space: null, protect_air: null,
-      control_play: null, change_play: null, psych: null, physical: null,
+      protect_goal: null,
+      protect_space: null,
+      protect_air: null,
+      control_play: null,
+      change_play: null,
+      psych: null,
+      physical: null,
     };
     for (const id of PILLAR_IDS) {
       const vals = last5.map((r) => r.scores[id]).filter(isValidScore);
-      out[id] = vals.length ? Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 10) / 10 : null;
+      out[id] = vals.length
+        ? Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 10) / 10
+        : null;
     }
     return out;
   }, [last5]);
 
   const pillarContributors = useMemo(() => {
     const out: Record<PillarId, MatchReportRow[]> = {
-      protect_goal: [], protect_space: [], protect_air: [],
-      control_play: [], change_play: [], psych: [], physical: [],
+      protect_goal: [],
+      protect_space: [],
+      protect_air: [],
+      control_play: [],
+      change_play: [],
+      psych: [],
+      physical: [],
     };
     for (const id of PILLAR_IDS) {
       out[id] = last5.filter((r) => isValidScore(r.scores[id]));
@@ -184,11 +222,21 @@ function GkDetail() {
       `Opponent: ${r.opponent?.trim() || "not recorded"}`,
       pillarLine,
       extra ?? "",
-    ].filter(Boolean).join("\n");
+    ]
+      .filter(Boolean)
+      .join("\n");
   };
 
   type TimelineItem =
-    | { kind: "interaction"; id: string; date: string; type: string; notes: string; outcome: string; followUp: string }
+    | {
+        kind: "interaction";
+        id: string;
+        date: string;
+        type: string;
+        notes: string;
+        outcome: string;
+        followUp: string;
+      }
     | { kind: "report"; id: string; date: string | null; report: MatchReportRow };
 
   const timelineItems = useMemo<TimelineItem[]>(() => {
@@ -223,32 +271,51 @@ function GkDetail() {
     </div>
   );
 
-
   return (
     <div className="space-y-5">
-      <Link to="/goalkeepers" className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"><ArrowLeft className="size-3.5" /> Goalkeepers</Link>
+      <Link
+        to="/goalkeepers"
+        className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+      >
+        <ArrowLeft className="size-3.5" /> Goalkeepers
+      </Link>
 
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="flex min-w-0 items-start gap-3 sm:gap-4">
-          <Avatar initials={gk.initials} size={56} imageUrl={gk.profileImage} alt={`${gk.name} portrait`} />
+          <Avatar
+            initials={gk.initials}
+            size={56}
+            imageUrl={gk.profileImage}
+            alt={`${gk.name} portrait`}
+          />
           <div className="min-w-0">
             <div className="flex items-center gap-2.5 flex-wrap">
               <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">{gk.name}</h1>
               <TierBadge tier={gk.tier} />
-              {gk.tags.map((tag: string) => <TierBadge key={tag} tier={tag as Tier} />)}
-              {gk.onLoan && <Pill tone="info">On loan{gk.parentClub ? ` from ${gk.parentClub}` : ""}</Pill>}
+              {gk.tags.map((tag: string) => (
+                <TierBadge key={tag} tier={tag as Tier} />
+              ))}
+              {gk.onLoan && (
+                <Pill tone="info">On loan{gk.parentClub ? ` from ${gk.parentClub}` : ""}</Pill>
+              )}
             </div>
             <div className="mt-1 text-sm leading-snug text-muted-foreground">
-              {gk.tags.includes("Free Agent") ? "Free Agent" : (displayClub || "Club not recorded")}
+              {gk.tags.includes("Free Agent") ? "Free Agent" : displayClub || "Club not recorded"}
               {!gk.tags.includes("Free Agent") && displayLeague ? ` · ${displayLeague}` : ""}
-              {" · "}{gk.nationality || "Nationality not recorded"}
-              {" · "}{gk.age} yrs · {gk.height} · {gk.foot} foot
+              {" · "}
+              {gk.nationality || "Nationality not recorded"}
+              {" · "}
+              {gk.age} yrs · {gk.height} · {gk.foot} foot
             </div>
             {/* Prefer a name-matched players row so club corrections work even
                 when the legacy profile has no stored playerId. */}
             {linkedPlayerId ? (
               <div className="mt-1 flex flex-wrap items-center gap-3 text-xs">
-                <Link to="/system/players/$playerId" params={{ playerId: linkedPlayerId }} className="text-primary hover:underline">
+                <Link
+                  to="/system/players/$playerId"
+                  params={{ playerId: linkedPlayerId }}
+                  className="text-primary hover:underline"
+                >
                   View player record
                 </Link>
                 <UpdateClubButton
@@ -258,7 +325,9 @@ function GkDetail() {
                 />
               </div>
             ) : (
-              <div className="mt-1 text-xs text-muted-foreground">Player record not linked — this profile is read-only.</div>
+              <div className="mt-1 text-xs text-muted-foreground">
+                Player record not linked — this profile is read-only.
+              </div>
             )}
 
             {gk.instagram && (
@@ -270,7 +339,10 @@ function GkDetail() {
                   className="text-primary hover:underline inline-flex items-center gap-1"
                   aria-label={`${gk.name} on Instagram (opens in new tab)`}
                 >
-                  @{gk.instagram.replace(/^https?:\/\/(www\.)?instagram\.com\//i, "").replace(/\/$/, "") || "instagram"}
+                  @
+                  {gk.instagram
+                    .replace(/^https?:\/\/(www\.)?instagram\.com\//i, "")
+                    .replace(/\/$/, "") || "instagram"}
                 </a>
               </div>
             )}
@@ -307,16 +379,24 @@ function GkDetail() {
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <Card className="p-4">
-          <div className="text-[10px] uppercase text-muted-foreground">Rating (avg of Match Reports)</div>
+          <div className="text-[10px] uppercase text-muted-foreground">
+            Rating (avg of Match Reports)
+          </div>
           <div className="text-xl font-semibold tabular-nums font-mono mt-1">
-            {isLoading ? <span className="text-muted-foreground text-sm font-sans font-normal">Loading…</span>
-              : isError ? <span className="text-destructive text-sm font-sans font-normal">Unavailable</span>
-              : averageRating != null ? `${averageRating.toFixed(1)}/5`
-              : <span className="text-muted-foreground">-</span>}
+            {isLoading ? (
+              <span className="text-muted-foreground text-sm font-sans font-normal">Loading…</span>
+            ) : isError ? (
+              <span className="text-destructive text-sm font-sans font-normal">Unavailable</span>
+            ) : averageRating != null ? (
+              `${averageRating.toFixed(1)}/5`
+            ) : (
+              <span className="text-muted-foreground">-</span>
+            )}
           </div>
           {!isLoading && !isError && averageRating != null && (
             <div className="mt-1 text-[11px] text-muted-foreground">
-              Based on {ratingContributors.length} scored Match Report{ratingContributors.length === 1 ? "" : "s"}
+              Based on {ratingContributors.length} scored Match Report
+              {ratingContributors.length === 1 ? "" : "s"}
             </div>
           )}
         </Card>
@@ -332,7 +412,9 @@ function GkDetail() {
           <SectionTitle>Activity Timeline</SectionTitle>
           <div className="relative pl-5 space-y-3 before:absolute before:left-1.5 before:top-1 before:bottom-1 before:w-px before:bg-border">
             {timelineItems.length === 0 ? (
-              <div className="text-xs text-muted-foreground italic py-2">No activity recorded yet.</div>
+              <div className="text-xs text-muted-foreground italic py-2">
+                No activity recorded yet.
+              </div>
             ) : (
               timelineItems.map((item) => {
                 if (item.kind === "report") {
@@ -341,15 +423,25 @@ function GkDetail() {
                     <div key={item.id} className="relative">
                       <div className="absolute -left-[15px] top-1 size-3 rounded-full bg-success ring-4 ring-background" />
                       <div className="flex items-center justify-between gap-2 flex-wrap">
-                        <div className="flex items-center gap-1.5 text-sm font-medium"><FileText className="size-3.5 text-muted-foreground" />Match Report</div>
-                        <div className="text-[11px] text-muted-foreground tabular-nums font-mono">{r.match_date ? formatDate(r.match_date) : "undated"} · {r.match_date ? formatRelative(r.match_date) : formatRelative(new Date().toISOString())}</div>
+                        <div className="flex items-center gap-1.5 text-sm font-medium">
+                          <FileText className="size-3.5 text-muted-foreground" />
+                          Match Report
+                        </div>
+                        <div className="text-[11px] text-muted-foreground tabular-nums font-mono">
+                          {r.match_date ? formatDate(r.match_date) : "undated"} ·{" "}
+                          {r.match_date
+                            ? formatRelative(r.match_date)
+                            : formatRelative(new Date().toISOString())}
+                        </div>
                       </div>
                       <div className="text-sm text-muted-foreground mt-0.5">
                         {r.opponent ? `Match report vs ${r.opponent}` : "Match report submitted"}
                         {r.competition ? ` · ${r.competition}` : ""}
                       </div>
                       <div className="flex gap-1.5 mt-1.5">
-                        {r.average != null && <Pill tone="success">Avg {r.average.toFixed(1)}/5</Pill>}
+                        {r.average != null && (
+                          <Pill tone="success">Avg {r.average.toFixed(1)}/5</Pill>
+                        )}
                         {r.coach && <Pill tone="info">{r.coach}</Pill>}
                       </div>
                     </div>
@@ -360,11 +452,19 @@ function GkDetail() {
                   <div key={item.id} className="relative">
                     <div className="absolute -left-[15px] top-1 size-3 rounded-full bg-primary ring-4 ring-background" />
                     <div className="flex items-center justify-between gap-2 flex-wrap">
-                      <div className="flex items-center gap-1.5 text-sm font-medium"><Icon className="size-3.5 text-muted-foreground" />{item.type}</div>
-                      <div className="text-[11px] text-muted-foreground tabular-nums font-mono">{formatDate(item.date)} · {formatRelative(item.date)}</div>
+                      <div className="flex items-center gap-1.5 text-sm font-medium">
+                        <Icon className="size-3.5 text-muted-foreground" />
+                        {item.type}
+                      </div>
+                      <div className="text-[11px] text-muted-foreground tabular-nums font-mono">
+                        {formatDate(item.date)} · {formatRelative(item.date)}
+                      </div>
                     </div>
                     <div className="text-sm text-muted-foreground mt-0.5">{item.notes}</div>
-                    <div className="mt-1.5 flex flex-wrap gap-1.5"><Pill>{item.outcome}</Pill><Pill tone="info">↳ {item.followUp}</Pill></div>
+                    <div className="mt-1.5 flex flex-wrap gap-1.5">
+                      <Pill>{item.outcome}</Pill>
+                      <Pill tone="info">↳ {item.followUp}</Pill>
+                    </div>
                   </div>
                 );
               })
@@ -380,25 +480,43 @@ function GkDetail() {
                 {gkReports.length > 0 && (
                   <Link
                     to="/reports"
-                    search={{ from: "", to: "", coach: "", mentorProfileId: "", source: "", gk: "", openSubmit: "", last5Gk: gk.name }}
+                    search={{
+                      from: "",
+                      to: "",
+                      coach: "",
+                      mentorProfileId: "",
+                      source: "",
+                      gk: "",
+                      openSubmit: "",
+                      last5Gk: gk.name,
+                    }}
                     className="text-[11px] text-primary hover:underline"
                   >
                     View last 5 in Reports →
                   </Link>
                 )}
                 {isError && (
-                  <button onClick={() => refetch()} className="text-[11px] text-primary hover:underline">Retry</button>
+                  <button
+                    onClick={() => refetch()}
+                    className="text-[11px] text-primary hover:underline"
+                  >
+                    Retry
+                  </button>
                 )}
               </div>
             </div>
             {isLoading ? (
-              <div className="text-xs text-muted-foreground italic py-2">Loading real Match Reports…</div>
+              <div className="text-xs text-muted-foreground italic py-2">
+                Loading real Match Reports…
+              </div>
             ) : isError ? (
               <div className="text-xs text-destructive py-2">
                 Couldn't load Match Reports. {isFetching ? "Retrying…" : "Try again."}
               </div>
             ) : gkReports.length === 0 ? (
-              <div className="text-xs text-muted-foreground italic py-2">No Match Reports recorded for this goalkeeper yet.</div>
+              <div className="text-xs text-muted-foreground italic py-2">
+                No Match Reports recorded for this goalkeeper yet.
+              </div>
             ) : (
               <div className="space-y-2">
                 {gkReports.slice(0, 5).map((r) => (
@@ -435,11 +553,25 @@ function GkDetail() {
               <div className="text-xs text-destructive py-2">Couldn't load skill scores.</div>
             ) : gkReports.length === 0 ? (
               <div className="space-y-1.5 py-2">
-                <div className="text-xs text-muted-foreground italic">No skill scores available</div>
+                <div className="text-xs text-muted-foreground italic">
+                  No skill scores available
+                </div>
                 <div className="text-[11px] text-muted-foreground leading-snug">
                   Pillar means are calculated from valid 1–5 scores across the last 5 match reports.
                 </div>
-                <Link to="/reports" search={{ from: "", to: "", coach: "", mentorProfileId: "", source: "", gk: gk.name, openSubmit: "1" }} className="text-[11px] text-primary hover:underline inline-flex items-center gap-0.5">
+                <Link
+                  to="/reports"
+                  search={{
+                    from: "",
+                    to: "",
+                    coach: "",
+                    mentorProfileId: "",
+                    source: "",
+                    gk: gk.name,
+                    openSubmit: "1",
+                  }}
+                  className="text-[11px] text-primary hover:underline inline-flex items-center gap-0.5"
+                >
                   Submit a Match Report for {gk.name}
                 </Link>
               </div>
@@ -460,24 +592,44 @@ function GkDetail() {
                       <div className="flex justify-between text-[11px] mb-1">
                         <span className="text-muted-foreground">{PILLAR_LABELS[id]}</span>
                         <span className="tabular-nums font-mono font-medium">
-                          {hasEnough && v != null
-                            ? `${v.toFixed(1)}/5`
-                            : <span className="text-muted-foreground italic" title="At least 5 valid 1–5 scores for this pillar in the last 5 reports are needed to show an average">not recorded</span>}
+                          {hasEnough && v != null ? (
+                            `${v.toFixed(1)}/5`
+                          ) : (
+                            <span
+                              className="text-muted-foreground italic"
+                              title="At least 5 valid 1–5 scores for this pillar in the last 5 reports are needed to show an average"
+                            >
+                              not recorded
+                            </span>
+                          )}
                         </span>
                       </div>
-                      <div className="flex gap-1.5 mb-1" aria-label={`${PILLAR_LABELS[id]} status: ${contributors.length} of 5 valid scores submitted`}>
+                      <div
+                        className="flex gap-1.5 mb-1"
+                        aria-label={`${PILLAR_LABELS[id]} status: ${contributors.length} of 5 valid scores submitted`}
+                      >
                         <Pill tone="success">{contributors.length} submitted</Pill>
-                        <Pill tone={5 - contributors.length > 0 ? "warning" : "muted"}>{5 - contributors.length} missing</Pill>
+                        <Pill tone={5 - contributors.length > 0 ? "warning" : "muted"}>
+                          {5 - contributors.length} missing
+                        </Pill>
                       </div>
                       {hasEnough && <ProgressBar value={v != null ? (v / 5) * 100 : 0} />}
                       {!hasEnough && (
                         <div className="text-[11px] text-muted-foreground leading-snug mt-1 space-y-1">
                           <div>
-                            <span className="font-medium text-foreground">{contributors.length} of 5</span> scored reports available for this pillar.
-                            Need <span className="font-medium text-foreground">{5 - contributors.length}</span> more with a valid {PILLAR_LABELS[id]} score (1–5).
+                            <span className="font-medium text-foreground">
+                              {contributors.length} of 5
+                            </span>{" "}
+                            scored reports available for this pillar. Need{" "}
+                            <span className="font-medium text-foreground">
+                              {5 - contributors.length}
+                            </span>{" "}
+                            more with a valid {PILLAR_LABELS[id]} score (1–5).
                           </div>
                           <ValidityHint>
-                            A valid scored report has a <span className="font-medium text-foreground">{PILLAR_LABELS[id]}</span> score between 1 and 5.
+                            A valid scored report has a{" "}
+                            <span className="font-medium text-foreground">{PILLAR_LABELS[id]}</span>{" "}
+                            score between 1 and 5.
                           </ValidityHint>
 
                           {contributors.length > 0 && (
@@ -487,7 +639,10 @@ function GkDetail() {
                                   key={r.report_id}
                                   type="button"
                                   onClick={() => setPreviewId(r.report_id)}
-                                  title={reportTooltip(r, `${PILLAR_LABELS[id]}: ${r.scores[id]}/5\nClick to preview`)}
+                                  title={reportTooltip(
+                                    r,
+                                    `${PILLAR_LABELS[id]}: ${r.scores[id]}/5\nClick to preview`,
+                                  )}
                                   aria-label={`Preview match report for ${r.match_date ? formatDate(r.match_date) : "undated match"} versus ${r.opponent?.trim() || "opponent TBC"}, ${PILLAR_LABELS[id]} score ${r.scores[id]} of 5`}
                                   className="px-1.5 py-0.5 rounded border border-border/60 bg-accent/20 text-[10px] text-muted-foreground hover:text-foreground hover:border-primary/40 tabular-nums focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                                 >
@@ -508,16 +663,28 @@ function GkDetail() {
                           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                             <Link
                               to="/reports"
-                              search={{ from: "", to: "", coach: "", mentorProfileId: "", source: "", gk: gk.name, openSubmit: "1", last5Gk: "" }}
+                              search={{
+                                from: "",
+                                to: "",
+                                coach: "",
+                                mentorProfileId: "",
+                                source: "",
+                                gk: gk.name,
+                                openSubmit: "1",
+                                last5Gk: "",
+                              }}
                               className="text-primary hover:underline inline-flex items-center gap-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
                             >
                               Submit a Match Report for {gk.name}
                             </Link>
-                            <Link to="/calendar" search={{ gkId: gk.id }} className="text-muted-foreground hover:text-foreground hover:underline inline-flex items-center gap-0.5">
+                            <Link
+                              to="/calendar"
+                              search={{ gkId: gk.id }}
+                              className="text-muted-foreground hover:text-foreground hover:underline inline-flex items-center gap-0.5"
+                            >
                               <CalendarIcon className="size-3.5" /> See upcoming matches
                             </Link>
                           </div>
-
                         </div>
                       )}
                       {hasEnough && contributors.length > 0 && (
@@ -527,7 +694,10 @@ function GkDetail() {
                               key={r.report_id}
                               type="button"
                               onClick={() => setPreviewId(r.report_id)}
-                              title={reportTooltip(r, `${PILLAR_LABELS[id]}: ${r.scores[id]}/5\nClick to preview`)}
+                              title={reportTooltip(
+                                r,
+                                `${PILLAR_LABELS[id]}: ${r.scores[id]}/5\nClick to preview`,
+                              )}
                               aria-label={`Preview match report for ${r.match_date ? formatDate(r.match_date) : "undated match"} versus ${r.opponent?.trim() || "opponent TBC"}, ${PILLAR_LABELS[id]} score ${r.scores[id]} of 5`}
                               className="px-1.5 py-0.5 rounded border border-border/60 bg-accent/20 text-[10px] text-muted-foreground hover:text-foreground hover:border-primary/40 tabular-nums focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:border-primary"
                             >
@@ -541,16 +711,32 @@ function GkDetail() {
                 })}
                 {gkReports.length > 0 && gkReports.length < 5 && (
                   <div className="text-[11px] text-muted-foreground leading-snug border-t border-border/40 pt-2">
-                    <span className="font-medium text-foreground">{gkReports.length} of 5</span> match reports available for this goalkeeper.
-                    <Link to="/reports" search={{ from: "", to: "", coach: "", mentorProfileId: "", source: "", gk: gk.name, openSubmit: "1" }} className="ml-1 text-primary hover:underline">
+                    <span className="font-medium text-foreground">{gkReports.length} of 5</span>{" "}
+                    match reports available for this goalkeeper.
+                    <Link
+                      to="/reports"
+                      search={{
+                        from: "",
+                        to: "",
+                        coach: "",
+                        mentorProfileId: "",
+                        source: "",
+                        gk: gk.name,
+                        openSubmit: "1",
+                      }}
+                      className="ml-1 text-primary hover:underline"
+                    >
                       Submit a Match Report for {gk.name}
                     </Link>
-                    <Link to="/calendar" search={{ gkId: gk.id }} className="ml-2 text-muted-foreground hover:text-foreground hover:underline inline-flex items-center gap-0.5">
+                    <Link
+                      to="/calendar"
+                      search={{ gkId: gk.id }}
+                      className="ml-2 text-muted-foreground hover:text-foreground hover:underline inline-flex items-center gap-0.5"
+                    >
                       <CalendarIcon className="size-3.5" /> See upcoming matches
                     </Link>
                   </div>
                 )}
-
               </div>
             )}
           </Card>
@@ -576,7 +762,9 @@ function GkDetail() {
               {gkMedia.map((m) => (
                 <div key={m.id} className="flex items-center justify-between gap-2 text-xs">
                   <button
-                    onClick={() => { void openAsset(m, user); }}
+                    onClick={() => {
+                      void openAsset(m, user);
+                    }}
                     className="min-w-0 flex-1 truncate text-left hover:underline inline-flex items-center gap-1"
                     title={`${m.title} · ${formatBytes(m.file_size)}`}
                   >
@@ -600,7 +788,9 @@ function GkDetail() {
       <ReportPreviewModal
         reportId={previewId}
         open={previewId !== null}
-        onOpenChange={(o) => { if (!o) setPreviewId(null); }}
+        onOpenChange={(o) => {
+          if (!o) setPreviewId(null);
+        }}
       />
     </div>
   );

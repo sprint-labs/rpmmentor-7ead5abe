@@ -65,7 +65,9 @@ export interface ReportDraft extends ReportDraftSnapshot {
 const RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 const KEY_PREFIX = "rpm.report-draft.v2.";
 
-function keyFor(userId: string): string { return `${KEY_PREFIX}${userId}`; }
+function keyFor(userId: string): string {
+  return `${KEY_PREFIX}${userId}`;
+}
 
 function isBrowser(): boolean {
   return typeof window !== "undefined" && typeof window.localStorage !== "undefined";
@@ -73,8 +75,11 @@ function isBrowser(): boolean {
 
 /** One-per-mount tab identifier for conflict detection. */
 export function newTabId(): string {
-  try { return crypto.randomUUID(); }
-  catch { return `t-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`; }
+  try {
+    return crypto.randomUUID();
+  } catch {
+    return `t-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  }
 }
 
 function readRaw(userId: string): ReportDraft | null {
@@ -89,7 +94,9 @@ function readRaw(userId: string): ReportDraft | null {
       return null;
     }
     return parsed as ReportDraft;
-  } catch { return null; }
+  } catch {
+    return null;
+  }
 }
 
 export function loadDraft(userId: string): ReportDraft | null {
@@ -102,8 +109,7 @@ export type SaveResult =
   | { ok: false; error: string };
 
 export type OverwriteResult =
-  | { ok: true; savedAt: string; version: number }
-  | { ok: false; error: string };
+  { ok: true; savedAt: string; version: number } | { ok: false; error: string };
 
 /**
  * Save with optimistic version check. Pass `expectedVersion = 0` for a
@@ -149,7 +155,10 @@ export function overwriteDraft(
     try {
       window.localStorage.setItem(keyFor(userId), JSON.stringify(draft));
     } catch {
-      return { ok: false, error: "Could not save draft — localStorage may be full or unavailable." };
+      return {
+        ok: false,
+        error: "Could not save draft — localStorage may be full or unavailable.",
+      };
     }
   }
   return { ok: true, savedAt: now, version: nextVersion };
@@ -157,7 +166,11 @@ export function overwriteDraft(
 
 export function clearDraft(userId: string): void {
   if (!isBrowser()) return;
-  try { window.localStorage.removeItem(keyFor(userId)); } catch { /* ignore */ }
+  try {
+    window.localStorage.removeItem(keyFor(userId));
+  } catch {
+    /* ignore */
+  }
 }
 
 /**
@@ -169,15 +182,23 @@ export function subscribeDraftChanges(
   userId: string,
   cb: (draft: ReportDraft | null) => void,
 ): () => void {
-  if (!isBrowser()) return () => { /* noop */ };
+  if (!isBrowser())
+    return () => {
+      /* noop */
+    };
   const key = keyFor(userId);
   const handler = (e: StorageEvent) => {
     if (e.key !== key) return;
-    if (!e.newValue) { cb(null); return; }
+    if (!e.newValue) {
+      cb(null);
+      return;
+    }
     try {
       const parsed = JSON.parse(e.newValue) as ReportDraft;
       cb(parsed);
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   };
   window.addEventListener("storage", handler);
   return () => window.removeEventListener("storage", handler);

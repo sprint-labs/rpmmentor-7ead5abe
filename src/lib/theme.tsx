@@ -36,14 +36,18 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     const d = document.documentElement;
     if (next === "dark") d.classList.add("dark");
     else d.classList.remove("dark");
-    try { localStorage.setItem(STORAGE_KEY, next); } catch {}
+    try {
+      localStorage.setItem(STORAGE_KEY, next);
+    } catch {}
   }, []);
 
   const toggle = useCallback(() => {
     setTheme(theme === "dark" ? "light" : "dark");
   }, [theme, setTheme]);
 
-  return <ThemeContext.Provider value={{ theme, setTheme, toggle }}>{children}</ThemeContext.Provider>;
+  return (
+    <ThemeContext.Provider value={{ theme, setTheme, toggle }}>{children}</ThemeContext.Provider>
+  );
 }
 
 export function useTheme(): Ctx {

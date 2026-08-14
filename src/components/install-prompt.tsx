@@ -51,7 +51,11 @@ function readState(): InstallState {
 }
 
 function writeState(next: InstallState) {
-  try { localStorage.setItem(STATE_KEY, JSON.stringify(next)); } catch { /* ignore */ }
+  try {
+    localStorage.setItem(STATE_KEY, JSON.stringify(next));
+  } catch {
+    /* ignore */
+  }
 }
 
 // Display-mode media queries that indicate the app is running as an installed
@@ -68,7 +72,11 @@ const STANDALONE_QUERIES = [
 function matchesStandaloneMedia(): boolean {
   if (typeof window === "undefined" || !window.matchMedia) return false;
   return STANDALONE_QUERIES.some((q) => {
-    try { return window.matchMedia(q).matches; } catch { return false; }
+    try {
+      return window.matchMedia(q).matches;
+    } catch {
+      return false;
+    }
   });
 }
 
@@ -78,7 +86,8 @@ function isStandalone(): boolean {
   if ((window.navigator as unknown as { standalone?: boolean }).standalone === true) return true;
   if (matchesStandaloneMedia()) return true;
   // Android TWA / WebAPK launches document with this referrer.
-  if (typeof document !== "undefined" && document.referrer.startsWith("android-app://")) return true;
+  if (typeof document !== "undefined" && document.referrer.startsWith("android-app://"))
+    return true;
   return false;
 }
 
@@ -86,12 +95,16 @@ function isStandalone(): boolean {
 // this origin can be discovered without waiting for beforeinstallprompt.
 async function hasRelatedInstalledApp(): Promise<boolean> {
   const nav = navigator as unknown as {
-    getInstalledRelatedApps?: () => Promise<Array<{ platform?: string; id?: string; url?: string }>>;
+    getInstalledRelatedApps?: () => Promise<
+      Array<{ platform?: string; id?: string; url?: string }>
+    >;
   };
   if (typeof nav.getInstalledRelatedApps !== "function") return false;
   try {
     const apps = await nav.getInstalledRelatedApps();
-    return Array.isArray(apps) && apps.some((a) => a.platform === "webapp" || a.platform === "play");
+    return (
+      Array.isArray(apps) && apps.some((a) => a.platform === "webapp" || a.platform === "play")
+    );
   } catch {
     return false;
   }
@@ -100,7 +113,8 @@ async function hasRelatedInstalledApp(): Promise<boolean> {
 function isIos(): boolean {
   if (typeof navigator === "undefined") return false;
   const ua = navigator.userAgent;
-  const iOS = /iPad|iPhone|iPod/.test(ua) && !(window as unknown as { MSStream?: unknown }).MSStream;
+  const iOS =
+    /iPad|iPhone|iPod/.test(ua) && !(window as unknown as { MSStream?: unknown }).MSStream;
   const iPadOS = navigator.platform === "MacIntel" && (navigator.maxTouchPoints ?? 0) > 1;
   return iOS || iPadOS;
 }
@@ -112,13 +126,15 @@ function isSafari(): boolean {
   // the common social webviews which we don't want prompting either).
   return (
     /Safari/.test(ua) &&
-    !/CriOS|FxiOS|EdgiOS|OPiOS|GSA\/|YaBrowser|DuckDuckGo|FBAN|FBAV|Instagram|Line\/|Twitter|LinkedInApp|Snapchat/.test(ua)
+    !/CriOS|FxiOS|EdgiOS|OPiOS|GSA\/|YaBrowser|DuckDuckGo|FBAN|FBAV|Instagram|Line\/|Twitter|LinkedInApp|Snapchat/.test(
+      ua,
+    )
   );
 }
 
-
 type InstallSurface = "native" | "ios" | "failure";
-type InstallEventName = "shown" | "accepted" | "dismissed" | "failed" | "installed" | "manual_close" | "retry";
+type InstallEventName =
+  "shown" | "accepted" | "dismissed" | "failed" | "installed" | "manual_close" | "retry";
 
 function detectPlatform(): string {
   const ua = typeof navigator === "undefined" ? "" : navigator.userAgent;
@@ -149,7 +165,11 @@ export function InstallPrompt() {
   const logEvent = useServerFn(logInstallEvent);
   const seenShowRef = useRef<Set<string>>(new Set());
 
-  function track(event: InstallEventName, surface: InstallSurface, metadata?: Record<string, unknown>) {
+  function track(
+    event: InstallEventName,
+    surface: InstallSurface,
+    metadata?: Record<string, unknown>,
+  ) {
     // De-dupe "shown" per surface within the tab lifetime so refreshing state
     // doesn't inflate the funnel numerator.
     if (event === "shown") {
@@ -169,7 +189,9 @@ export function InstallPrompt() {
         failures: st.failures,
         metadata,
       },
-    }).catch(() => { /* analytics is best-effort */ });
+    }).catch(() => {
+      /* analytics is best-effort */
+    });
   }
 
   useEffect(() => {
@@ -183,7 +205,10 @@ export function InstallPrompt() {
     const state = readState();
     if (state.snoozedUntil && Date.now() < state.snoozedUntil) {
       setSnoozed(true);
-      const t = window.setTimeout(() => setSnoozed(false), Math.min(state.snoozedUntil - Date.now(), 2_147_483_000));
+      const t = window.setTimeout(
+        () => setSnoozed(false),
+        Math.min(state.snoozedUntil - Date.now(), 2_147_483_000),
+      );
       return () => window.clearTimeout(t);
     }
 
@@ -195,7 +220,7 @@ export function InstallPrompt() {
     window.addEventListener("beforeinstallprompt", onBip);
 
     const onInstalled = () => {
-      track("installed", deferred ? "native" : (showIos ? "ios" : "native"));
+      track("installed", deferred ? "native" : showIos ? "ios" : "native");
       setDeferred(null);
       setShowIos(false);
       setFailure(null);
@@ -207,7 +232,11 @@ export function InstallPrompt() {
     // tab is open, or resize into a WCO window. Hide immediately when that
     // happens so we never double-prompt.
     const mqls = STANDALONE_QUERIES.map((q) => {
-      try { return window.matchMedia(q); } catch { return null; }
+      try {
+        return window.matchMedia(q);
+      } catch {
+        return null;
+      }
     }).filter((m): m is MediaQueryList => m !== null);
     const onModeChange = () => {
       if (matchesStandaloneMedia()) {
@@ -231,7 +260,9 @@ export function InstallPrompt() {
     // in real Safari (not Chrome iOS / in-app webviews) and never when the
     // page is already home-screen-launched.
     if (isIos() && isSafari()) {
-      t = setTimeout(() => { if (!isStandalone()) setShowIos(true); }, 4000);
+      t = setTimeout(() => {
+        if (!isStandalone()) setShowIos(true);
+      }, 4000);
     }
 
     return () => {
@@ -243,20 +274,22 @@ export function InstallPrompt() {
     };
   }, []);
 
-
   // Fire "shown" once per surface as it appears.
-  useEffect(() => { if (deferred) track("shown", "native"); }, [deferred]); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { if (showIos) track("shown", "ios"); }, [showIos]); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { if (failure) track("shown", "failure", { reason: failure.reason }); }, [failure]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (deferred) track("shown", "native");
+  }, [deferred]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (showIos) track("shown", "ios");
+  }, [showIos]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (failure) track("shown", "failure", { reason: failure.reason });
+  }, [failure]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function snooze(reason: Outcome) {
     // Attribute the close event to whichever card was on screen.
-    const surface: InstallSurface = failure ? "failure" : (deferred ? "native" : "ios");
-    const eventName: InstallEventName = reason === "failed"
-      ? "failed"
-      : reason === "manual-close"
-        ? "manual_close"
-        : "dismissed";
+    const surface: InstallSurface = failure ? "failure" : deferred ? "native" : "ios";
+    const eventName: InstallEventName =
+      reason === "failed" ? "failed" : reason === "manual-close" ? "manual_close" : "dismissed";
     track(eventName, surface);
 
     const prev = readState();
@@ -303,7 +336,6 @@ export function InstallPrompt() {
     // Most browsers refire on the next user gesture / navigation.
     window.dispatchEvent(new Event("pointerdown"));
   }
-
 
   if (snoozed) return null;
 
@@ -352,7 +384,9 @@ export function InstallPrompt() {
             <p className="text-[13px] font-semibold text-foreground">Install Mentor Hub</p>
             <p className="text-[11px] text-muted-foreground">
               Add to your home screen for a fullscreen app experience.{" "}
-              <Link to="/install" className="text-primary hover:underline">Learn how</Link>
+              <Link to="/install" className="text-primary hover:underline">
+                Learn how
+              </Link>
             </p>
           </div>
           <button
@@ -375,7 +409,9 @@ export function InstallPrompt() {
             <Download className="size-4" />
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-[13px] font-semibold text-foreground">Add Mentor Hub to Home Screen</p>
+            <p className="text-[13px] font-semibold text-foreground">
+              Add Mentor Hub to Home Screen
+            </p>
             <p className="mt-1 flex flex-wrap items-center gap-1 text-[11px] text-muted-foreground">
               Tap
               <Share className="inline size-3.5" aria-label="Share" />
@@ -384,7 +420,10 @@ export function InstallPrompt() {
                 <Plus className="size-3" /> Add to Home Screen
               </span>
             </p>
-            <Link to="/install" className="mt-1 inline-block text-[11px] text-primary hover:underline">
+            <Link
+              to="/install"
+              className="mt-1 inline-block text-[11px] text-primary hover:underline"
+            >
               Step-by-step guide
             </Link>
           </div>

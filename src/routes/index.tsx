@@ -8,10 +8,8 @@ import {
   activity,
   alerts,
   goalkeepers,
-  
   stats,
   formatRelative,
-  
   computeDutyOverview,
   type Alert,
 } from "@/lib/mock-data";
@@ -29,7 +27,15 @@ function initialsOf(name: string) {
   );
 }
 
-import { ArrowUpRight, AlertTriangle, CalendarClock, FileText, Users, UserCog, Plus } from "lucide-react";
+import {
+  ArrowUpRight,
+  AlertTriangle,
+  CalendarClock,
+  FileText,
+  Users,
+  UserCog,
+  Plus,
+} from "lucide-react";
 import { useAuth, ROLE_LABEL } from "@/lib/auth";
 import { MentorDashboard } from "@/components/mentor/mentor-dashboard";
 import { SyncStatusChip } from "@/components/sync-status-chip";
@@ -191,7 +197,8 @@ function Dashboard() {
                 onClick={() => setWorkflow("report")}
                 className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md bg-primary text-primary-foreground text-xs uppercase tracking-[0.06em] font-semibold hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
-                <FileText className="size-4" />Submit a Match report
+                <FileText className="size-4" />
+                Submit a Match report
               </button>
             )}
             {can("interactions.log") && (
@@ -199,7 +206,8 @@ function Dashboard() {
                 onClick={() => setWorkflow("interaction")}
                 className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md border border-border text-xs uppercase tracking-[0.06em] font-semibold hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
-                <Plus className="size-4" />Log interaction
+                <Plus className="size-4" />
+                Log interaction
               </button>
             )}
           </div>
@@ -280,7 +288,6 @@ function Dashboard() {
           />
         </Link>
       </div>
-
 
       {/* Operational grid */}
       <div className="grid grid-cols-12 gap-4">
@@ -376,7 +383,6 @@ function Dashboard() {
                   </div>
                 </Link>
               );
-
             })}
           </div>
         </div>
@@ -595,7 +601,6 @@ function Dashboard() {
                 All <ArrowUpRight className="size-3" />
               </Link>
             }
-
           >
             System Alerts
           </SectionTitle>

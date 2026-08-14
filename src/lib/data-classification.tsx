@@ -31,7 +31,7 @@ export const ROUTE_CLASSIFICATION: Record<string, Classification> = {
   "/reports": "transitional",
   "/reports/$reportId": "transitional",
   "/media": "unverified",
-  
+
   "/alerts": "mock",
   "/calendar": "mock",
   "/executive": "mock",
@@ -59,7 +59,8 @@ const META: Record<Classification, Meta> = {
   mock: {
     label: "Preview data",
     short: "MOCK",
-    description: "Illustrative data seeded locally for interface work. Not real operational records.",
+    description:
+      "Illustrative data seeded locally for interface work. Not real operational records.",
     Icon: FlaskConical,
     tone: "bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/30",
     toneSolid: "bg-amber-500",
@@ -140,7 +141,9 @@ export function DataSourceBanner({ classification, extra, className }: BannerPro
     >
       <m.Icon className="size-4 mt-0.5 shrink-0" />
       <div className="min-w-0">
-        <div className="font-semibold text-[12px] leading-snug">{BANNER_HEADING[classification]}</div>
+        <div className="font-semibold text-[12px] leading-snug">
+          {BANNER_HEADING[classification]}
+        </div>
         <div className="opacity-90 mt-0.5">{m.description}</div>
         {extra ? <div className="mt-1 opacity-90">{extra}</div> : null}
       </div>

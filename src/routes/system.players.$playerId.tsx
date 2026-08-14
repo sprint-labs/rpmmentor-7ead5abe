@@ -13,9 +13,15 @@ export const Route = createFileRoute("/system/players/$playerId")({
   head: () => ({
     meta: [
       { title: "Edit Player Record · Mentor Hub" },
-      { name: "description", content: "Edit the current club stored on a canonical Mentor Hub player record." },
+      {
+        name: "description",
+        content: "Edit the current club stored on a canonical Mentor Hub player record.",
+      },
       { property: "og:title", content: "Edit Player Record · Mentor Hub" },
-      { property: "og:description", content: "Edit the current club on a canonical player record." },
+      {
+        property: "og:description",
+        content: "Edit the current club on a canonical player record.",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
     ],
@@ -36,7 +42,11 @@ function PlayerRecordEditor() {
   const fetchPlayer = useServerFn(getPlayer);
   const saveClub = useServerFn(updatePlayerClub);
 
-  const { data: player, isLoading, error } = useQuery({
+  const {
+    data: player,
+    isLoading,
+    error,
+  } = useQuery({
     queryKey: ["player", playerId],
     queryFn: () => fetchPlayer({ data: { id: playerId } }),
     retry: false,
@@ -79,7 +89,10 @@ function PlayerRecordEditor() {
 
   return (
     <div className="p-4 md:p-6 space-y-4 max-w-xl">
-      <Link to="/system/players" className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground">
+      <Link
+        to="/system/players"
+        className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+      >
         <ArrowLeft className="size-3.5" /> All player records
       </Link>
 
@@ -99,8 +112,12 @@ function PlayerRecordEditor() {
           </div>
 
           {saveError && (
-            <div role="alert" className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
-              <span className="font-medium">Club was not saved.</span> {saveError} Your entry has been kept.
+            <div
+              role="alert"
+              className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive"
+            >
+              <span className="font-medium">Club was not saved.</span> {saveError} Your entry has
+              been kept.
             </div>
           )}
           {savedClub && !saveError && (
@@ -121,9 +138,15 @@ function PlayerRecordEditor() {
                   className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
                   value={club}
                   maxLength={120}
-                  onChange={(e) => { setClub(e.target.value); setDirty(true); setSavedClub(null); }}
+                  onChange={(e) => {
+                    setClub(e.target.value);
+                    setDirty(true);
+                    setSavedClub(null);
+                  }}
                 />
-                <p className="mt-1 text-[11px] text-muted-foreground">Saved value: {player.current_club || "—"}</p>
+                <p className="mt-1 text-[11px] text-muted-foreground">
+                  Saved value: {player.current_club || "—"}
+                </p>
               </div>
               <button
                 type="submit"

@@ -15,7 +15,15 @@ function row(overrides: Partial<Record<keyof typeof COLUMN_INDEX, string>>): str
   r[COLUMN_INDEX.team] = overrides.team ?? "Wigan";
   r[COLUMN_INDEX.opponent] = overrides.opponent ?? "Blackburn";
   r[COLUMN_INDEX.match_date] = overrides.match_date ?? "04/01/2026";
-  for (const id of ["protect_goal", "protect_space", "protect_air", "control_play", "change_play", "psych", "physical"] as const) {
+  for (const id of [
+    "protect_goal",
+    "protect_space",
+    "protect_air",
+    "control_play",
+    "change_play",
+    "psych",
+    "physical",
+  ] as const) {
     r[COLUMN_INDEX[id]] = "3";
   }
   r[COLUMN_INDEX.comments] = overrides.comments ?? "Summary:\nSolid.";
@@ -24,15 +32,37 @@ function row(overrides: Partial<Record<keyof typeof COLUMN_INDEX, string>>): str
 
 describe("report identity", () => {
   it("separates same goalkeeper/opponent/date across different teams", () => {
-    const a = computeReportUid({ goalkeeper: "Sam Beadle", team: "Wigan", opponent: "Blackburn", match_date: "2026-01-04" });
-    const b = computeReportUid({ goalkeeper: "Sam Beadle", team: "Bolton", opponent: "Blackburn", match_date: "2026-01-04" });
+    const a = computeReportUid({
+      goalkeeper: "Sam Beadle",
+      team: "Wigan",
+      opponent: "Blackburn",
+      match_date: "2026-01-04",
+    });
+    const b = computeReportUid({
+      goalkeeper: "Sam Beadle",
+      team: "Bolton",
+      opponent: "Blackburn",
+      match_date: "2026-01-04",
+    });
     expect(a).not.toBe(b);
   });
 
   it("is stable across casing and spacing", () => {
     expect(
-      computeReportUid({ goalkeeper: " sam  BEADLE", team: "wigan ", opponent: "Blackburn", match_date: "2026-01-04" }),
-    ).toBe(computeReportUid({ goalkeeper: "Sam Beadle", team: "Wigan", opponent: "blackburn", match_date: "2026-01-04" }));
+      computeReportUid({
+        goalkeeper: " sam  BEADLE",
+        team: "wigan ",
+        opponent: "Blackburn",
+        match_date: "2026-01-04",
+      }),
+    ).toBe(
+      computeReportUid({
+        goalkeeper: "Sam Beadle",
+        team: "Wigan",
+        opponent: "blackburn",
+        match_date: "2026-01-04",
+      }),
+    );
   });
 
   it("keeps historic detail URLs resolvable via the legacy id", () => {

@@ -5,11 +5,13 @@ Today the header shows a role-based primary CTA on every page (Log Interaction f
 ## What changes
 
 **Header (`src/components/app-shell.tsx`)**
+
 - Remove the persistent primary-action button from the header entirely.
 - Header keeps: brand, role chip, theme toggle, notifications bell, Menu.
 - Keep the "Log Interaction" action available in the slide-out menu drawer (for users with `interactions.log`), so it is never more than one tap away on mobile without cluttering the header.
 
 **Pages that get the button (contextual placement)**
+
 - Dashboard (`src/routes/index.tsx`) — CTA in the page header row, opens the Log Interaction dialog.
 - Calendar (`src/routes/calendar.tsx`) — CTA next to the existing "Add event" control.
 - Goalkeeper profile (`src/routes/goalkeepers.$gkId.tsx`) — already present, no change.

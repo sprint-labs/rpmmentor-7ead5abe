@@ -13,7 +13,11 @@ export type DutyNotif = {
 };
 
 export type EmailFrequency = "off" | "daily" | "weekly";
-export interface EmailPrefs { frequency: EmailFrequency; recipients: string[]; lastSent?: string }
+export interface EmailPrefs {
+  frequency: EmailFrequency;
+  recipients: string[];
+  lastSent?: string;
+}
 
 const STORAGE_KEY = "rpm.notifications.v1";
 const PREFS_KEY = "rpm.notif.prefs.v1";
@@ -34,14 +38,33 @@ const C = createContext<Ctx | null>(null);
 
 function load<T>(k: string, fallback: T): T {
   if (typeof window === "undefined") return fallback;
-  try { const v = window.localStorage.getItem(k); return v ? (JSON.parse(v) as T) : fallback; } catch { return fallback; }
+  try {
+    const v = window.localStorage.getItem(k);
+    return v ? (JSON.parse(v) as T) : fallback;
+  } catch {
+    return fallback;
+  }
 }
-function persist(k: string, v: unknown) { if (typeof window !== "undefined") { try { window.localStorage.setItem(k, JSON.stringify(v)); } catch { /* ignore */ } } }
+function persist(k: string, v: unknown) {
+  if (typeof window !== "undefined") {
+    try {
+      window.localStorage.setItem(k, JSON.stringify(v));
+    } catch {
+      /* ignore */
+    }
+  }
+}
 
 const RANK: Record<DutyLevel, number> = {
-  not_required: 0, up_to_date: 1, not_enough_data: 2, due_soon: 3, overdue: 4,
+  not_required: 0,
+  up_to_date: 1,
+  not_enough_data: 2,
+  due_soon: 3,
+  overdue: 4,
 };
-function rank(l: DutyLevel) { return RANK[l]; }
+function rank(l: DutyLevel) {
+  return RANK[l];
+}
 export function severityFor(from: DutyLevel, to: DutyLevel): "high" | "medium" | "low" {
   if (to === "overdue" && rank(to) > rank(from)) return "high";
   if (rank(to) > rank(from)) return "medium";
@@ -103,7 +126,8 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
     } else if (fresh.length) {
       fresh.forEach((n) => {
         const verb = rank(n.to) > rank(n.from) ? "escalated" : "improved";
-        const fn = n.to === "overdue" ? toast.error : n.to === "due_soon" ? toast.warning : toast.success;
+        const fn =
+          n.to === "overdue" ? toast.error : n.to === "due_soon" ? toast.warning : toast.success;
         const label = (l: DutyLevel) => l.replace(/_/g, " ").toUpperCase();
         fn(`Duty ${verb}: ${n.gkName}`, { description: `${label(n.from)} → ${label(n.to)}` });
       });
@@ -116,15 +140,34 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const setPrefs = (p: EmailPrefs) => { setPrefsState(p); persist(PREFS_KEY, p); };
-  const markAllRead = () => setItems((p) => { const n = p.map((x) => ({ ...x, read: true })); persist(STORAGE_KEY, n); return n; });
-  const markRead = (id: string) => setItems((p) => { const n = p.map((x) => (x.id === id ? { ...x, read: true } : x)); persist(STORAGE_KEY, n); return n; });
-  const clearAll = () => { setItems([]); persist(STORAGE_KEY, []); };
+  const setPrefs = (p: EmailPrefs) => {
+    setPrefsState(p);
+    persist(PREFS_KEY, p);
+  };
+  const markAllRead = () =>
+    setItems((p) => {
+      const n = p.map((x) => ({ ...x, read: true }));
+      persist(STORAGE_KEY, n);
+      return n;
+    });
+  const markRead = (id: string) =>
+    setItems((p) => {
+      const n = p.map((x) => (x.id === id ? { ...x, read: true } : x));
+      persist(STORAGE_KEY, n);
+      return n;
+    });
+  const clearAll = () => {
+    setItems([]);
+    persist(STORAGE_KEY, []);
+  };
 
   const sendSummaryNow = () => {
     const attn = items.filter((i) => i.to === "overdue" || i.to === "due_soon").length;
     const recipients = prefs.recipients.filter(Boolean);
-    if (!recipients.length) { toast.error("Add at least one recipient first"); return; }
+    if (!recipients.length) {
+      toast.error("Add at least one recipient first");
+      return;
+    }
     const next = { ...prefs, lastSent: new Date().toISOString() };
     setPrefs(next);
     toast.success("Duty-of-care summary queued", {
@@ -135,7 +178,9 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
   const unread = useMemo(() => items.filter((i) => !i.read).length, [items]);
 
   return (
-    <C.Provider value={{ items, unread, markAllRead, markRead, clearAll, prefs, setPrefs, sendSummaryNow }}>
+    <C.Provider
+      value={{ items, unread, markAllRead, markRead, clearAll, prefs, setPrefs, sendSummaryNow }}
+    >
       {children}
     </C.Provider>
   );

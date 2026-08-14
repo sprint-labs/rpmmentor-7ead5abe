@@ -5,10 +5,7 @@ import { z } from "zod";
 
 const changePasswordSchema = z.object({
   currentPassword: z.string().min(1, "Current password is required").max(200),
-  newPassword: z
-    .string()
-    .min(8, "New password must be at least 8 characters")
-    .max(200),
+  newPassword: z.string().min(8, "New password must be at least 8 characters").max(200),
 });
 
 /**
@@ -65,17 +62,14 @@ export const changePassword = createServerFn({ method: "POST" })
 
     // Now update the password using the admin client.
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { error: updErr } = await supabaseAdmin.auth.admin.updateUserById(
-      context.userId,
-      { password: newPassword },
-    );
+    const { error: updErr } = await supabaseAdmin.auth.admin.updateUserById(context.userId, {
+      password: newPassword,
+    });
     if (updErr) {
       throw new Error(updErr.message || "Could not update password.");
     }
 
-    const { logPasswordChange } = await import(
-      "@/lib/security/password-audit.server"
-    );
+    const { logPasswordChange } = await import("@/lib/security/password-audit.server");
     await logPasswordChange({
       userId: context.userId,
       actorId: context.userId,
@@ -93,9 +87,7 @@ export const changePassword = createServerFn({ method: "POST" })
 export const recordPasswordRecovery = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { logPasswordChange } = await import(
-      "@/lib/security/password-audit.server"
-    );
+    const { logPasswordChange } = await import("@/lib/security/password-audit.server");
     await logPasswordChange({
       userId: context.userId,
       actorId: context.userId,

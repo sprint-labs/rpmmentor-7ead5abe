@@ -14,12 +14,20 @@ describe("post-reservation race", () => {
   it("re-check sees a success that landed after the precheck", () => {
     const mine: LedgerRecord = { id: "mine", status: "pending", reserved_at: ago(1000) };
     const theirs: LedgerRecord = {
-      id: "theirs", status: "succeeded", submitted_at: ago(60_000), report_id: "mr2_a",
+      id: "theirs",
+      status: "succeeded",
+      submitted_at: ago(60_000),
+      report_id: "mr2_a",
     };
     // precheck (only pending 'theirs') -> nothing blocking, no duplicate
-    expect(duplicateWindowForRecords([{ ...theirs, status: "pending", submitted_at: null }], NOW).window).toBeNull();
+    expect(
+      duplicateWindowForRecords([{ ...theirs, status: "pending", submitted_at: null }], NOW).window,
+    ).toBeNull();
     // post-reservation re-check, excluding our own reservation
-    const dup = duplicateWindowForRecords([mine, theirs].filter((r) => r.id !== "mine"), NOW);
+    const dup = duplicateWindowForRecords(
+      [mine, theirs].filter((r) => r.id !== "mine"),
+      NOW,
+    );
     expect(dup.window).toBe("strong");
     expect(dup.report_id).toBe("mr2_a");
     expect(openFingerprintBlock([mine, theirs], NOW, "mine")).toBeNull();
@@ -35,7 +43,9 @@ describe("cross-key ambiguity block", () => {
   });
 
   it("an expired pending row degrades to ambiguous, not in-progress", () => {
-    const rows: LedgerRecord[] = [{ id: "stale", status: "pending", reserved_at: ago(20 * 60_000) }];
+    const rows: LedgerRecord[] = [
+      { id: "stale", status: "pending", reserved_at: ago(20 * 60_000) },
+    ];
     expect(openFingerprintBlock(rows, NOW)).toBe("ambiguous");
   });
 
@@ -52,7 +62,9 @@ describe("cross-key ambiguity block", () => {
 
 describe("same-key failed retry", () => {
   it("reuses the failed reservation instead of inserting a conflicting row", () => {
-    expect(decideForSubmissionKey({ id: "x", status: "failed" }, NOW)).toEqual({ action: "reuse_failed" });
+    expect(decideForSubmissionKey({ id: "x", status: "failed" }, NOW)).toEqual({
+      action: "reuse_failed",
+    });
   });
   it("a fresh key reserves", () => {
     expect(decideForSubmissionKey(null, NOW)).toEqual({ action: "reserve" });
@@ -62,10 +74,14 @@ describe("same-key failed retry", () => {
 describe("ledger write error classification", () => {
   it("unique violation is a conflict", () => {
     expect(classifyLedgerWriteError({ code: "23505" })).toBe("conflict");
-    expect(classifyLedgerWriteError({ message: "duplicate key value violates unique constraint" })).toBe("conflict");
+    expect(
+      classifyLedgerWriteError({ message: "duplicate key value violates unique constraint" }),
+    ).toBe("conflict");
   });
   it("any other failure is an error, never in-progress", () => {
-    expect(classifyLedgerWriteError({ code: "08006", message: "connection failure" })).toBe("error");
+    expect(classifyLedgerWriteError({ code: "08006", message: "connection failure" })).toBe(
+      "error",
+    );
     expect(classifyLedgerWriteError(new Error("boom"))).toBe("error");
   });
 });

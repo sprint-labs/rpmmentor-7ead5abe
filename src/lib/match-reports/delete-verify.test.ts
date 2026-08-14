@@ -1,16 +1,18 @@
 import { describe, it, expect } from "vitest";
-import {
-  rawRowSignature,
-  countSignature,
-  classifyDeleteReadback,
-} from "./delete-verify";
+import { rawRowSignature, countSignature, classifyDeleteReadback } from "./delete-verify";
 import { parseSheetRows } from "./schema";
 
 function row(gk: string, team: string, opp: string, date: string): string[] {
   const r = new Array(15).fill("");
-  r[0] = gk; r[1] = "Coach A"; r[2] = team; r[3] = opp; r[4] = date;
+  r[0] = gk;
+  r[1] = "Coach A";
+  r[2] = team;
+  r[3] = opp;
+  r[4] = date;
   for (let i = 5; i <= 11; i++) r[i] = "3";
-  r[12] = "3"; r[13] = "Summary:\nGood game"; r[14] = "League";
+  r[12] = "3";
+  r[13] = "Summary:\nGood game";
+  r[14] = "League";
   return r;
 }
 

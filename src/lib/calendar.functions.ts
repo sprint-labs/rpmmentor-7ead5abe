@@ -12,11 +12,7 @@ import type { Database } from "@/integrations/supabase/types";
 import { requireRole, type AppRole } from "@/lib/roles.server";
 import { EVENT_TYPES, isEventType, type EventType } from "@/lib/events/follow-up";
 
-export const CALENDAR_MANAGE_ROLES: readonly AppRole[] = [
-  "mentor_manager",
-  "admin",
-  "super_admin",
-];
+export const CALENDAR_MANAGE_ROLES: readonly AppRole[] = ["mentor_manager", "admin", "super_admin"];
 
 /**
  * The schedulable event types, defined with the follow-up rules they trigger.
@@ -142,7 +138,8 @@ export function validateEvent(data: EventInput) {
   if (!isEventType(type)) {
     throw new Error("Choose Match, Training Ground Visit or Coffee Catch-up.");
   }
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(data?.event_date ?? "")) throw new Error("A valid date is required.");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(data?.event_date ?? ""))
+    throw new Error("A valid date is required.");
   const time = (v: string | null | undefined) => {
     const s = (v ?? "").trim();
     if (!s) throw new Error("A start time is required so the follow-up deadline can be set.");
@@ -183,16 +180,8 @@ async function resolveEventPeople(
   mentorId: string,
 ): Promise<{ goalkeeper_name: string; assigned_mentor_name: string }> {
   const [{ data: player }, { data: mentor }] = await Promise.all([
-    supabase
-      .from("players")
-      .select("full_name")
-      .eq("id", playerId)
-      .maybeSingle(),
-    supabase
-      .from("profiles")
-      .select("name")
-      .eq("id", mentorId)
-      .maybeSingle(),
+    supabase.from("players").select("full_name").eq("id", playerId).maybeSingle(),
+    supabase.from("profiles").select("name").eq("id", mentorId).maybeSingle(),
   ]);
   if (!player) throw new Error("That goalkeeper is not on the roster.");
   if (!mentor) throw new Error("That mentor could not be found.");
@@ -257,7 +246,12 @@ export const createCalendarEvent = createServerFn({ method: "POST" })
   .validator((data: EventInput) => validateEvent(data))
   .handler(async ({ data, context }): Promise<TeamCalendarEvent> => {
     const { notifyEventAssigned } = await import("@/lib/events/notify.server");
-    await requireRole(context.supabase, context.userId, CALENDAR_MANAGE_ROLES, "add calendar events");
+    await requireRole(
+      context.supabase,
+      context.userId,
+      CALENDAR_MANAGE_ROLES,
+      "add calendar events",
+    );
 
     const { data: profile } = await context.supabase
       .from("profiles")
@@ -299,7 +293,12 @@ export const updateCalendarEvent = createServerFn({ method: "POST" })
   })
   .handler(async ({ data, context }): Promise<TeamCalendarEvent> => {
     const { notifyEventChanged } = await import("@/lib/events/notify.server");
-    await requireRole(context.supabase, context.userId, CALENDAR_MANAGE_ROLES, "edit calendar events");
+    await requireRole(
+      context.supabase,
+      context.userId,
+      CALENDAR_MANAGE_ROLES,
+      "edit calendar events",
+    );
     const { id, ...fields } = data;
     const people = await resolveEventPeople(
       context.supabase,
@@ -327,12 +326,7 @@ export const updateCalendarEvent = createServerFn({ method: "POST" })
     if (!row) throw new Error("That calendar event could not be updated.");
 
     if (before) {
-      await notifyEventChanged(
-        context.supabase,
-        context.userId,
-        toTeamCalendarEvent(row),
-        before,
-      );
+      await notifyEventChanged(context.supabase, context.userId, toTeamCalendarEvent(row), before);
     }
     return toTeamCalendarEvent(row);
   });
@@ -344,7 +338,12 @@ export const deleteCalendarEvent = createServerFn({ method: "POST" })
     return { id: data.id };
   })
   .handler(async ({ data, context }): Promise<{ ok: true }> => {
-    await requireRole(context.supabase, context.userId, CALENDAR_MANAGE_ROLES, "delete calendar events");
+    await requireRole(
+      context.supabase,
+      context.userId,
+      CALENDAR_MANAGE_ROLES,
+      "delete calendar events",
+    );
     const { error } = await context.supabase.from("calendar_events").delete().eq("id", data.id);
     if (error) throw new Error(error.message);
     return { ok: true };

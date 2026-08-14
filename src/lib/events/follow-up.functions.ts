@@ -142,7 +142,12 @@ export const waiveEventFollowUp = createServerFn({ method: "POST" })
     return { id: data.id, reason };
   })
   .handler(async ({ data, context }): Promise<{ ok: true }> => {
-    await requireRole(context.supabase, context.userId, FOLLOW_UP_MANAGE_ROLES, "waive a follow-up");
+    await requireRole(
+      context.supabase,
+      context.userId,
+      FOLLOW_UP_MANAGE_ROLES,
+      "waive a follow-up",
+    );
     const { data: row, error } = await context.supabase
       .from("calendar_events")
       .update({

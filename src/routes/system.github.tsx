@@ -22,12 +22,14 @@ export const Route = createFileRoute("/system/github")({
       { title: "GitHub Sync · Mentor Hub" },
       {
         name: "description",
-        content: "Last sync time, current main branch SHA and sync errors for the connected GitHub repository.",
+        content:
+          "Last sync time, current main branch SHA and sync errors for the connected GitHub repository.",
       },
       { property: "og:title", content: "GitHub Sync · Mentor Hub" },
       {
         property: "og:description",
-        content: "Last sync time, current main branch SHA and sync errors for the connected GitHub repository.",
+        content:
+          "Last sync time, current main branch SHA and sync errors for the connected GitHub repository.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
@@ -92,7 +94,11 @@ function GithubSyncPage() {
           disabled={q.isFetching}
           className="inline-flex items-center gap-2 rounded-md border border-border bg-background px-3 py-2 text-sm hover:bg-accent disabled:opacity-50"
         >
-          {q.isFetching ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+          {q.isFetching ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <RefreshCw className="h-4 w-4" />
+          )}
           Refresh
         </button>
       </header>
@@ -114,7 +120,13 @@ function GithubSyncPage() {
             healthy={healthy}
             loading={q.isLoading}
             label={
-              q.isLoading ? "Checking…" : queryError ? "Error" : !s?.reachable ? "Unreachable" : "In sync"
+              q.isLoading
+                ? "Checking…"
+                : queryError
+                  ? "Error"
+                  : !s?.reachable
+                    ? "Unreachable"
+                    : "In sync"
             }
           />
         </div>
@@ -188,7 +200,9 @@ function GithubSyncPage() {
             </span>
           </Row>
           <Row label="Checked">
-            <span className="text-muted-foreground">{s?.checkedAt ? fmtRelative(s.checkedAt) : "—"}</span>
+            <span className="text-muted-foreground">
+              {s?.checkedAt ? fmtRelative(s.checkedAt) : "—"}
+            </span>
           </Row>
         </dl>
 
@@ -206,7 +220,9 @@ function GithubSyncPage() {
       </section>
 
       <section className="rounded-lg border border-border bg-card overflow-hidden">
-        <h2 className="border-b border-border p-4 text-sm font-medium">Recent commits on {s?.branch ?? "main"}</h2>
+        <h2 className="border-b border-border p-4 text-sm font-medium">
+          Recent commits on {s?.branch ?? "main"}
+        </h2>
         {q.isLoading ? (
           <div className="p-4 text-sm text-muted-foreground">Loading…</div>
         ) : s && s.recent.length > 0 ? (
@@ -247,14 +263,27 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
   );
 }
 
-function StatusPill({ healthy, loading, label }: { healthy: boolean; loading: boolean; label: string }) {
+function StatusPill({
+  healthy,
+  loading,
+  label,
+}: {
+  healthy: boolean;
+  loading: boolean;
+  label: string;
+}) {
   const tone = loading
     ? "border-border bg-accent text-muted-foreground"
     : healthy
       ? "border-success/30 bg-success/15 text-success"
       : "border-destructive/30 bg-destructive/15 text-destructive";
   return (
-    <span className={cn("inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium", tone)}>
+    <span
+      className={cn(
+        "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium",
+        tone,
+      )}
+    >
       {loading ? (
         <Loader2 className="h-3 w-3 animate-spin" />
       ) : healthy ? (

@@ -78,9 +78,7 @@ function runChecks(): { group: string; checks: Check[] }[] {
     "p2",
   );
 
-  const harrison = goalkeepers.find(
-    (g) => normalisePersonName(g.name) === "harrison male",
-  );
+  const harrison = goalkeepers.find((g) => normalisePersonName(g.name) === "harrison male");
 
   return [
     {
@@ -177,8 +175,8 @@ function SyncVerificationPage() {
       <header>
         <h1 className="text-2xl font-semibold tracking-tight">Sync verification</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Runtime checks that the synced competitions list, player-linking helpers and roster
-          data are loaded in this build.{" "}
+          Runtime checks that the synced competitions list, player-linking helpers and roster data
+          are loaded in this build.{" "}
           <Link to="/system/github" className="text-primary hover:underline">
             GitHub sync
           </Link>

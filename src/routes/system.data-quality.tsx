@@ -1,6 +1,14 @@
 import { useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { AlertTriangle, AlertCircle, Info, CheckCircle2, Search, Download, Wrench } from "lucide-react";
+import {
+  AlertTriangle,
+  AlertCircle,
+  Info,
+  CheckCircle2,
+  Search,
+  Download,
+  Wrench,
+} from "lucide-react";
 import { RequirePermission } from "@/components/require-permission";
 import { goalkeepers } from "@/lib/mock-data";
 import {
@@ -19,19 +27,44 @@ export const Route = createFileRoute("/system/data-quality")({
   head: () => ({
     meta: [
       { title: "Roster Data Quality · Mentor Hub" },
-      { name: "description", content: "Flags missing or inconsistent goalkeeper roster fields such as nationality, parent club, and contract status." },
+      {
+        name: "description",
+        content:
+          "Flags missing or inconsistent goalkeeper roster fields such as nationality, parent club, and contract status.",
+      },
       { property: "og:title", content: "Roster Data Quality · Mentor Hub" },
-      { property: "og:description", content: "Flags missing or inconsistent goalkeeper roster fields." },
+      {
+        property: "og:description",
+        content: "Flags missing or inconsistent goalkeeper roster fields.",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
     ],
   }),
 });
 
-const SEVERITY_STYLE: Record<IssueSeverity, { icon: typeof AlertCircle; badge: string; row: string; label: string }> = {
-  error: { icon: AlertCircle, badge: "bg-destructive/15 text-destructive border-destructive/30", row: "border-l-destructive", label: "Error" },
-  warning: { icon: AlertTriangle, badge: "bg-warning/15 text-warning border-warning/30", row: "border-l-warning", label: "Warning" },
-  info: { icon: Info, badge: "bg-muted text-muted-foreground border-border", row: "border-l-border", label: "Info" },
+const SEVERITY_STYLE: Record<
+  IssueSeverity,
+  { icon: typeof AlertCircle; badge: string; row: string; label: string }
+> = {
+  error: {
+    icon: AlertCircle,
+    badge: "bg-destructive/15 text-destructive border-destructive/30",
+    row: "border-l-destructive",
+    label: "Error",
+  },
+  warning: {
+    icon: AlertTriangle,
+    badge: "bg-warning/15 text-warning border-warning/30",
+    row: "border-l-warning",
+    label: "Warning",
+  },
+  info: {
+    icon: Info,
+    badge: "bg-muted text-muted-foreground border-border",
+    row: "border-l-border",
+    label: "Info",
+  },
 };
 
 function DataQualityPage() {
@@ -107,7 +140,8 @@ function DataQualityInner() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Roster data quality</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Automated checks for missing or inconsistent goalkeeper fields — nationality, parent club, contract status and more.
+            Automated checks for missing or inconsistent goalkeeper fields — nationality, parent
+            club, contract status and more.
           </p>
         </div>
         <button
@@ -120,10 +154,30 @@ function DataQualityInner() {
 
       {/* Summary tiles */}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <SummaryTile label="Roster size" value={summary.totalKeepers} tone="muted" icon={CheckCircle2} />
-        <SummaryTile label="Keepers with issues" value={summary.keepersWithIssues} tone={summary.keepersWithIssues > 0 ? "warning" : "success"} icon={AlertTriangle} />
-        <SummaryTile label="Errors" value={summary.bySeverity.error} tone={summary.bySeverity.error > 0 ? "error" : "success"} icon={AlertCircle} />
-        <SummaryTile label="Warnings" value={summary.bySeverity.warning} tone={summary.bySeverity.warning > 0 ? "warning" : "success"} icon={AlertTriangle} />
+        <SummaryTile
+          label="Roster size"
+          value={summary.totalKeepers}
+          tone="muted"
+          icon={CheckCircle2}
+        />
+        <SummaryTile
+          label="Keepers with issues"
+          value={summary.keepersWithIssues}
+          tone={summary.keepersWithIssues > 0 ? "warning" : "success"}
+          icon={AlertTriangle}
+        />
+        <SummaryTile
+          label="Errors"
+          value={summary.bySeverity.error}
+          tone={summary.bySeverity.error > 0 ? "error" : "success"}
+          icon={AlertCircle}
+        />
+        <SummaryTile
+          label="Warnings"
+          value={summary.bySeverity.warning}
+          tone={summary.bySeverity.warning > 0 ? "warning" : "success"}
+          icon={AlertTriangle}
+        />
       </div>
 
       {/* Filters */}
@@ -144,7 +198,8 @@ function DataQualityInner() {
 
         <div className="flex flex-wrap gap-2">
           <Chip active={code === "all"} onClick={() => setCode("all")}>
-            All issue types <span className="ml-1 text-muted-foreground">({summary.totalIssues})</span>
+            All issue types{" "}
+            <span className="ml-1 text-muted-foreground">({summary.totalIssues})</span>
           </Chip>
           {activeCodes.map(([c, n]) => (
             <Chip key={c} active={code === c} onClick={() => setCode(c)}>
@@ -253,7 +308,9 @@ function Chip({
       onClick={onClick}
       className={cn(
         "inline-flex items-center h-7 px-2.5 rounded-full border text-xs",
-        active ? "bg-primary text-primary-foreground border-primary" : "bg-card border-border hover:bg-accent",
+        active
+          ? "bg-primary text-primary-foreground border-primary"
+          : "bg-card border-border hover:bg-accent",
       )}
     >
       {children}
@@ -262,12 +319,11 @@ function Chip({
 }
 
 function ReportCard({ report }: { report: GoalkeeperQualityReport }) {
-  const topSeverity: IssueSeverity =
-    report.issues.some((i) => i.severity === "error")
-      ? "error"
-      : report.issues.some((i) => i.severity === "warning")
-        ? "warning"
-        : "info";
+  const topSeverity: IssueSeverity = report.issues.some((i) => i.severity === "error")
+    ? "error"
+    : report.issues.some((i) => i.severity === "warning")
+      ? "warning"
+      : "info";
   const s = SEVERITY_STYLE[topSeverity];
   return (
     <li className={cn("rounded-lg border border-border bg-card border-l-4 p-4", s.row)}>
@@ -299,7 +355,12 @@ function ReportCard({ report }: { report: GoalkeeperQualityReport }) {
           return (
             <li key={idx} className="rounded-md border border-border bg-background/40 p-2.5">
               <div className="flex items-start gap-2 text-sm">
-                <span className={cn("inline-flex items-center gap-1 h-5 px-1.5 rounded border text-[10px] uppercase tracking-wide shrink-0", st.badge)}>
+                <span
+                  className={cn(
+                    "inline-flex items-center gap-1 h-5 px-1.5 rounded border text-[10px] uppercase tracking-wide shrink-0",
+                    st.badge,
+                  )}
+                >
                   <Icon className="size-3" /> {st.label}
                 </span>
                 <span className="text-muted-foreground">

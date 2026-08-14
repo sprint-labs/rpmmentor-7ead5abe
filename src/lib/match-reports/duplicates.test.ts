@@ -15,14 +15,34 @@ describe("normaliseKeyPart", () => {
 
 describe("submissionFingerprint", () => {
   it("is stable across casing and spacing", () => {
-    const a = submissionFingerprint({ goalkeeper: "Sam Beadle", team: "Wigan", opponent: "Blackburn", match_date: "2026-01-04" });
-    const b = submissionFingerprint({ goalkeeper: " sam  BEADLE ", team: "wigan ", opponent: " blackburn", match_date: "2026-01-04" });
+    const a = submissionFingerprint({
+      goalkeeper: "Sam Beadle",
+      team: "Wigan",
+      opponent: "Blackburn",
+      match_date: "2026-01-04",
+    });
+    const b = submissionFingerprint({
+      goalkeeper: " sam  BEADLE ",
+      team: "wigan ",
+      opponent: " blackburn",
+      match_date: "2026-01-04",
+    });
     expect(a).toBe(b);
   });
 
   it("differs when team differs (cache report_id would collide)", () => {
-    const a = submissionFingerprint({ goalkeeper: "Sam Beadle", team: "Wigan", opponent: "Blackburn", match_date: "2026-01-04" });
-    const b = submissionFingerprint({ goalkeeper: "Sam Beadle", team: "Bolton", opponent: "Blackburn", match_date: "2026-01-04" });
+    const a = submissionFingerprint({
+      goalkeeper: "Sam Beadle",
+      team: "Wigan",
+      opponent: "Blackburn",
+      match_date: "2026-01-04",
+    });
+    const b = submissionFingerprint({
+      goalkeeper: "Sam Beadle",
+      team: "Bolton",
+      opponent: "Blackburn",
+      match_date: "2026-01-04",
+    });
     expect(a).not.toBe(b);
   });
 });

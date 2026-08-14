@@ -37,7 +37,6 @@ export function authHeaders(): HeadersInit {
   };
 }
 
-
 /**
  * Fetch through the connector gateway with automatic retry + exponential
  * backoff for transient failures (502/503/504, 429, and network errors).
@@ -101,9 +100,10 @@ async function gatewayFetch(
       }
       // Honor Retry-After when present, else exponential backoff with jitter.
       const retryAfter = Number(res.headers.get("retry-after"));
-      const backoff = Number.isFinite(retryAfter) && retryAfter > 0
-        ? retryAfter * 1000
-        : BASE_DELAY_MS * 2 ** (attempt - 1) + Math.floor(Math.random() * 200);
+      const backoff =
+        Number.isFinite(retryAfter) && retryAfter > 0
+          ? retryAfter * 1000
+          : BASE_DELAY_MS * 2 ** (attempt - 1) + Math.floor(Math.random() * 200);
       console.warn(
         `[sheets] gateway ${res.status} on attempt ${attempt}/${maxAttempts}; retrying in ${backoff}ms`,
       );
@@ -123,7 +123,6 @@ async function gatewayFetch(
     ? lastErr
     : new Error("Google Sheets gateway request failed after retries.");
 }
-
 
 /**
  * Short-lived snapshot cache for the full sheet read.
@@ -181,11 +180,7 @@ export async function readAllRows(opts?: { fresh?: boolean }): Promise<SheetSnap
     } catch (err) {
       // Quota/transient failures must not blank out the Reports page when we
       // still hold a recent snapshot. Verification reads (`fresh`) never do this.
-      if (
-        !opts?.fresh &&
-        cachedRead &&
-        Date.now() - cachedRead.at < READ_STALE_FALLBACK_MS
-      ) {
+      if (!opts?.fresh && cachedRead && Date.now() - cachedRead.at < READ_STALE_FALLBACK_MS) {
         console.warn("[sheets] serving cached rows after read failure:", (err as Error)?.message);
         return cachedRead.value;
       }
@@ -197,7 +192,6 @@ export async function readAllRows(opts?: { fresh?: boolean }): Promise<SheetSnap
   if (!opts?.fresh) inFlightRead = run;
   return run;
 }
-
 
 /** Read the header row (A1:O1) exactly as it currently exists in the sheet. */
 export async function readHeaderRow(): Promise<string[]> {
@@ -279,7 +273,6 @@ export async function appendRow(values: (string | number)[]): Promise<number> {
   return Number(m[1]);
 }
 
-
 /** Look up the numeric sheetId (gid) for SHEET_TAB. Cached in-memory. */
 let cachedSheetGid: number | null = null;
 export async function getSheetGid(): Promise<number> {
@@ -295,9 +288,7 @@ export async function getSheetGid(): Promise<number> {
   const data = (await res.json()) as {
     sheets?: { properties?: { sheetId?: number; title?: string } }[];
   };
-  const match = (data.sheets ?? []).find(
-    (s) => s.properties?.title === SHEET_TAB,
-  );
+  const match = (data.sheets ?? []).find((s) => s.properties?.title === SHEET_TAB);
   if (!match?.properties || match.properties.sheetId == null) {
     throw new Error(`Sheet tab "${SHEET_TAB}" not found in spreadsheet.`);
   }
@@ -364,5 +355,3 @@ export async function deleteRow(rowIndex: number): Promise<void> {
     throw new Error(`Google Sheets delete failed [${res.status}]`);
   }
 }
-
-

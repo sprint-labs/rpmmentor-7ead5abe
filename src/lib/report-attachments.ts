@@ -9,9 +9,7 @@ export interface AttachmentLike {
 }
 
 /** Every id a report's attachments may be stored under, de-duplicated. */
-export function attachmentLookupIds(
-  ...ids: (string | null | undefined)[]
-): string[] {
+export function attachmentLookupIds(...ids: (string | null | undefined)[]): string[] {
   return Array.from(new Set(ids.filter((x): x is string => !!x && x.trim().length > 0)));
 }
 

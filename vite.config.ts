@@ -57,7 +57,8 @@ export default defineConfig({
           runtimeCaching: [
             {
               // Hashed build assets — safe to cache aggressively
-              urlPattern: ({ url, sameOrigin }) => sameOrigin && url.pathname.startsWith("/assets/"),
+              urlPattern: ({ url, sameOrigin }) =>
+                sameOrigin && url.pathname.startsWith("/assets/"),
               handler: "CacheFirst",
               options: {
                 cacheName: "app-assets",

@@ -44,8 +44,12 @@ describe("MentorPrimaryActions", () => {
     const interaction = screen.getByRole("button", { name: /log interaction/i });
     const calendar = screen.getByRole("link", { name: /view calendar/i });
 
-    expect(report.compareDocumentPosition(interaction) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(interaction.compareDocumentPosition(calendar) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(
+      report.compareDocumentPosition(interaction) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      interaction.compareDocumentPosition(calendar) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
     expect(calendar.getAttribute("href")).toBe("/calendar");
   });
 

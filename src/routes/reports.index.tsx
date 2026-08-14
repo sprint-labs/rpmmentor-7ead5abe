@@ -103,7 +103,19 @@ function ReportsPage() {
       // Strip the one-shot params so a refresh doesn't reopen the dialog.
       router.navigate({
         to: "/reports",
-        search: { from, to, coach, mentorProfileId: "", source, gk: "", openSubmit: "", last5Gk, matchDate: "", opponent: "", eventId: "" },
+        search: {
+          from,
+          to,
+          coach,
+          mentorProfileId: "",
+          source,
+          gk: "",
+          openSubmit: "",
+          last5Gk,
+          matchDate: "",
+          opponent: "",
+          eventId: "",
+        },
         replace: true,
       });
     }
@@ -163,18 +175,22 @@ function ReportsPage() {
   }
 
   const hasFilters = Boolean(coach) || (Boolean(from) && Boolean(to)) || Boolean(last5Gk);
-  const clearSearch = { from: "", to: "", coach: "", mentorProfileId: "", source: "", gk: "", openSubmit: "", last5Gk: "" };
+  const clearSearch = {
+    from: "",
+    to: "",
+    coach: "",
+    mentorProfileId: "",
+    source: "",
+    gk: "",
+    openSubmit: "",
+    last5Gk: "",
+  };
 
   return (
     <div className="space-y-5">
       <PageHeader
         breadcrumbs={
-          navSource
-            ? [
-                { label: "Dashboard", to: "/" },
-                { label: navSource.label },
-              ]
-            : undefined
+          navSource ? [{ label: "Dashboard", to: "/" }, { label: navSource.label }] : undefined
         }
         title={navSource?.title ?? "Match Report Submission Centre"}
         description={
@@ -185,27 +201,33 @@ function ReportsPage() {
         action={
           <div className="flex items-center gap-2">
             <SyncStatusChip />
-            <button onClick={() => refetch()} disabled={isFetching}
-              className="h-9 px-3 rounded-md border border-border text-sm inline-flex items-center gap-1.5 disabled:opacity-60">
+            <button
+              onClick={() => refetch()}
+              disabled={isFetching}
+              className="h-9 px-3 rounded-md border border-border text-sm inline-flex items-center gap-1.5 disabled:opacity-60"
+            >
               <RefreshCw className={`size-3.5 ${isFetching ? "animate-spin" : ""}`} />
               Refresh
             </button>
             {can("interactions.log") && (
-              <button onClick={() => openLog()}
-                className="h-9 px-3 rounded-md border border-border text-sm font-medium inline-flex items-center gap-1.5">
+              <button
+                onClick={() => openLog()}
+                className="h-9 px-3 rounded-md border border-border text-sm font-medium inline-flex items-center gap-1.5"
+              >
                 <NotebookPen className="size-3.5" /> Log Interaction
               </button>
             )}
             {can("reports.submit") && (
-              <button onClick={() => setWorkflow("report")}
-                className="h-9 px-3 rounded-md bg-primary text-primary-foreground text-sm font-medium">
+              <button
+                onClick={() => setWorkflow("report")}
+                className="h-9 px-3 rounded-md bg-primary text-primary-foreground text-sm font-medium"
+              >
                 Submit Match Report
               </button>
             )}
           </div>
         }
       />
-
 
       {error ? (
         <Card className="p-4 text-sm text-destructive">
@@ -215,12 +237,15 @@ function ReportsPage() {
 
       <div className="flex flex-wrap gap-1.5">
         {coaches.map((c) => (
-          <button key={c} onClick={() => setCoachFilter(c)}
+          <button
+            key={c}
+            onClick={() => setCoachFilter(c)}
             className={`px-3 py-1.5 rounded-md border text-xs transition-colors ${
               coachFilter === c
                 ? "bg-accent border-accent text-accent-foreground"
                 : "border-border hover:bg-accent/40 text-muted-foreground"
-            }`}>
+            }`}
+          >
             {c}
           </button>
         ))}
@@ -236,7 +261,16 @@ function ReportsPage() {
           onChange={(e) =>
             router.navigate({
               to: "/reports",
-              search: { from, to, coach, mentorProfileId: "", source, gk: "", openSubmit: "", last5Gk: e.target.value },
+              search: {
+                from,
+                to,
+                coach,
+                mentorProfileId: "",
+                source,
+                gk: "",
+                openSubmit: "",
+                last5Gk: e.target.value,
+              },
               replace: true,
             })
           }
@@ -244,13 +278,24 @@ function ReportsPage() {
         >
           <option value="">All reports</option>
           {goalkeepers.map((g) => (
-            <option key={g} value={g}>{g}</option>
+            <option key={g} value={g}>
+              {g}
+            </option>
           ))}
         </select>
         {last5Gk && (
           <Link
             to="/reports"
-            search={{ from, to, coach, mentorProfileId: "", source, gk: "", openSubmit: "", last5Gk: "" }}
+            search={{
+              from,
+              to,
+              coach,
+              mentorProfileId: "",
+              source,
+              gk: "",
+              openSubmit: "",
+              last5Gk: "",
+            }}
             className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground"
           >
             <X className="size-3" /> Clear
@@ -262,9 +307,18 @@ function ReportsPage() {
         <div className="flex flex-wrap items-center gap-2 text-xs">
           <span className="text-muted-foreground uppercase tracking-wider">Scoped to:</span>
           {coach && <Pill tone="muted">{coach}</Pill>}
-          {from && to && <Pill tone="muted">{new Date(from).toLocaleDateString("en-GB", { day: "numeric", month: "short" })} – {new Date(to).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}</Pill>}
+          {from && to && (
+            <Pill tone="muted">
+              {new Date(from).toLocaleDateString("en-GB", { day: "numeric", month: "short" })} –{" "}
+              {new Date(to).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
+            </Pill>
+          )}
           {last5Gk && <Pill tone="muted">Last 5 · {last5Gk}</Pill>}
-          <Link to="/reports" search={clearSearch} className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground ml-2">
+          <Link
+            to="/reports"
+            search={clearSearch}
+            className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground ml-2"
+          >
             <X className="size-3" /> Clear
           </Link>
         </div>
@@ -287,14 +341,20 @@ function ReportsPage() {
             </thead>
             <tbody>
               {isLoading && (
-                <tr><td colSpan={8} className="px-4 py-8 text-center text-muted-foreground">Loading…</td></tr>
+                <tr>
+                  <td colSpan={8} className="px-4 py-8 text-center text-muted-foreground">
+                    Loading…
+                  </td>
+                </tr>
               )}
               {!isLoading && filtered.length === 0 && (
                 <tr>
                   <td colSpan={8} className="px-4 py-2">
                     <EmptyState
                       icon={FileText}
-                      title={hasFilters ? "No match reports match these filters" : "No match reports yet"}
+                      title={
+                        hasFilters ? "No match reports match these filters" : "No match reports yet"
+                      }
                       description={
                         hasFilters
                           ? "Try widening the date range or clearing the coach filter to see more results."
@@ -327,7 +387,8 @@ function ReportsPage() {
                             disabled={isFetching}
                             className="h-9 px-3 rounded-md border border-border text-sm inline-flex items-center gap-1.5 disabled:opacity-60"
                           >
-                            <RefreshCw className={`size-3.5 ${isFetching ? "animate-spin" : ""}`} /> Refresh
+                            <RefreshCw className={`size-3.5 ${isFetching ? "animate-spin" : ""}`} />{" "}
+                            Refresh
                           </button>
                         ) : undefined
                       }
@@ -336,8 +397,13 @@ function ReportsPage() {
                 </tr>
               )}
               {filtered.slice(0, 100).map((r) => (
-                <tr key={r.report_id} className="border-b border-border/60 last:border-0 hover:bg-accent/20">
-                  <td className="px-4 py-2.5 text-muted-foreground tabular-nums font-mono whitespace-nowrap">{formatDate(r.match_date)}</td>
+                <tr
+                  key={r.report_id}
+                  className="border-b border-border/60 last:border-0 hover:bg-accent/20"
+                >
+                  <td className="px-4 py-2.5 text-muted-foreground tabular-nums font-mono whitespace-nowrap">
+                    {formatDate(r.match_date)}
+                  </td>
                   <td className="px-2 font-medium">
                     {rosterByName.get(normaliseName(r.goalkeeper)) ? (
                       <Link
@@ -354,8 +420,12 @@ function ReportsPage() {
                   <td className="px-2 text-muted-foreground">{r.coach}</td>
                   <td className="px-2 text-muted-foreground">{r.team ?? "—"}</td>
                   <td className="px-2 text-muted-foreground">{r.opponent ?? "—"}</td>
-                  <td className="px-2 text-muted-foreground max-w-md"><span className="line-clamp-1">{r.comments}</span></td>
-                  <td className="px-2 text-right tabular-nums font-mono font-semibold">{r.average != null ? r.average.toFixed(1) : "—"}</td>
+                  <td className="px-2 text-muted-foreground max-w-md">
+                    <span className="line-clamp-1">{r.comments}</span>
+                  </td>
+                  <td className="px-2 text-right tabular-nums font-mono font-semibold">
+                    {r.average != null ? r.average.toFixed(1) : "—"}
+                  </td>
                   <td className="px-4 text-right">
                     <div className="inline-flex items-center gap-3">
                       {can("interactions.log") && (
@@ -372,7 +442,11 @@ function ReportsPage() {
                           <NotebookPen className="size-3" /> Log
                         </button>
                       )}
-                      <Link to="/reports/$reportId" params={{ reportId: r.report_id }} className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-0.5">
+                      <Link
+                        to="/reports/$reportId"
+                        params={{ reportId: r.report_id }}
+                        className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-0.5"
+                      >
                         Open <ChevronRight className="size-3" />
                       </Link>
                     </div>
@@ -384,10 +458,19 @@ function ReportsPage() {
         </div>
       </Card>
 
-      <SectionTitle>Showing {Math.min(100, filtered.length)} of {filtered.length}</SectionTitle>
+      <SectionTitle>
+        Showing {Math.min(100, filtered.length)} of {filtered.length}
+      </SectionTitle>
       <WorkflowDialog
         kind={workflow}
-        onClose={() => { setWorkflow(null); setPrefillGoalkeeper(""); setPrefillMatchDate(""); setPrefillOpponent(""); setFollowUpEventId(""); setLogPrefill({}); }}
+        onClose={() => {
+          setWorkflow(null);
+          setPrefillGoalkeeper("");
+          setPrefillMatchDate("");
+          setPrefillOpponent("");
+          setFollowUpEventId("");
+          setLogPrefill({});
+        }}
         prefillGoalkeeper={prefillGoalkeeper}
         prefillMatchDate={workflow === "interaction" ? logPrefill.date : prefillMatchDate}
         prefillOpponent={prefillOpponent}

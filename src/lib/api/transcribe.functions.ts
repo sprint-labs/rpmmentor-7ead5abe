@@ -8,7 +8,10 @@ const InputSchema = z.object({
     .string()
     .min(32)
     .max(15_000_000)
-    .regex(/^data:image\/(png|jpeg|jpg|webp|heic|heif);base64,/i, "Must be a base64 image data URL"),
+    .regex(
+      /^data:image\/(png|jpeg|jpg|webp|heic|heif);base64,/i,
+      "Must be a base64 image data URL",
+    ),
   context: z.string().max(500).optional(),
 });
 
@@ -59,8 +62,13 @@ export const transcribeNotes = createServerFn({ method: "POST" })
     });
 
     if (!res.ok) {
-      if (res.status === 429) return { ok: false as const, error: "Rate limit reached — please try again in a moment." };
-      if (res.status === 402) return { ok: false as const, error: "AI credits exhausted — add credits in your workspace settings." };
+      if (res.status === 429)
+        return { ok: false as const, error: "Rate limit reached — please try again in a moment." };
+      if (res.status === 402)
+        return {
+          ok: false as const,
+          error: "AI credits exhausted — add credits in your workspace settings.",
+        };
       const detail = await res.text().catch(() => "");
       console.error("transcribeNotes gateway error", res.status, detail);
       return { ok: false as const, error: `Transcription failed (${res.status}).` };
@@ -87,7 +95,7 @@ const AUDIO_EXT: Record<string, string> = {
 };
 
 const MAX_AUDIO_BASE64_CHARS = 25_000_000;
-const MAX_AUDIO_BYTES = Math.floor(MAX_AUDIO_BASE64_CHARS * 3 / 4);
+const MAX_AUDIO_BYTES = Math.floor((MAX_AUDIO_BASE64_CHARS * 3) / 4);
 const MIN_AUDIO_BYTES = 2048;
 
 function normalizeAudioMimeType(input: string): string | null {
@@ -109,7 +117,13 @@ function normalizeAudioMimeType(input: string): string | null {
 
 function decodeBase64Audio(input: string): Buffer | null {
   const compact = input.trim().replace(/\s/g, "");
-  if (!compact || compact.startsWith("data:") || compact.startsWith("blob:") || compact.includes(",")) return null;
+  if (
+    !compact ||
+    compact.startsWith("data:") ||
+    compact.startsWith("blob:") ||
+    compact.includes(",")
+  )
+    return null;
   if (compact.length > MAX_AUDIO_BASE64_CHARS || compact.length % 4 === 1) return null;
   if (!/^[A-Za-z0-9+/]+={0,2}$/.test(compact)) return null;
   const firstPadding = compact.indexOf("=");
@@ -123,19 +137,17 @@ function decodeBase64Audio(input: string): Buffer | null {
 
 function safeAudioFileName(fileName: string, mimeType: string): string {
   const ext = AUDIO_EXT[mimeType] ?? "webm";
-  const stem = fileName
-    .replace(/\.[a-z0-9]+$/i, "")
-    .replace(/[^a-z0-9_-]+/gi, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 80) || "voice-note";
+  const stem =
+    fileName
+      .replace(/\.[a-z0-9]+$/i, "")
+      .replace(/[^a-z0-9_-]+/gi, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 80) || "voice-note";
   return `${stem}.${ext}`;
 }
 
 const VoiceInputSchema = z.object({
-  audioBase64: z
-    .string()
-    .min(64)
-    .max(MAX_AUDIO_BASE64_CHARS),
+  audioBase64: z.string().min(64).max(MAX_AUDIO_BASE64_CHARS),
   mimeType: z.string().min(5).max(120),
   fileName: z.string().min(1).max(120),
 });
@@ -179,8 +191,13 @@ export const transcribeVoiceNote = createServerFn({ method: "POST" })
     });
 
     if (!res.ok) {
-      if (res.status === 429) return { ok: false as const, error: "Rate limit reached — try again in a moment." };
-      if (res.status === 402) return { ok: false as const, error: "AI credits exhausted — add credits in workspace settings." };
+      if (res.status === 429)
+        return { ok: false as const, error: "Rate limit reached — try again in a moment." };
+      if (res.status === 402)
+        return {
+          ok: false as const,
+          error: "AI credits exhausted — add credits in workspace settings.",
+        };
       console.error("transcribeVoiceNote OpenAI error", res.status);
       return { ok: false as const, error: `Transcription failed (${res.status}).` };
     }
@@ -195,7 +212,10 @@ export const transcribeVoiceNote = createServerFn({ method: "POST" })
     const tokens = Array.isArray(json.logprobs)
       ? json.logprobs
           .filter((t) => typeof t?.token === "string" && typeof t?.logprob === "number")
-          .map((t) => ({ token: t.token, confidence: Math.max(0, Math.min(1, Math.exp(t.logprob))) }))
+          .map((t) => ({
+            token: t.token,
+            confidence: Math.max(0, Math.min(1, Math.exp(t.logprob))),
+          }))
       : [];
     const avgConfidence = tokens.length
       ? tokens.reduce((s, t) => s + t.confidence, 0) / tokens.length

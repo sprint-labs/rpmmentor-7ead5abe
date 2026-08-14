@@ -10,7 +10,11 @@
  * one fails, the scheduling change it describes still stands: the caller is told
  * the notification did not go out rather than having a legitimate save rejected.
  */
-import { buildEventNotification, type NotifiableEvent, type NotificationKind } from "./notification-copy";
+import {
+  buildEventNotification,
+  type NotifiableEvent,
+  type NotificationKind,
+} from "./notification-copy";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 export type NotifyClient = { from: (table: string) => any };

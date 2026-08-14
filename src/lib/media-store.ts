@@ -97,12 +97,18 @@ async function canvasToBlob(canvas: HTMLCanvasElement, quality = 0.72): Promise<
   return new Promise((resolve) => canvas.toBlob((b) => resolve(b), "image/jpeg", quality));
 }
 
-function drawScaled(source: CanvasImageSource, sw: number, sh: number, max = 640): HTMLCanvasElement {
+function drawScaled(
+  source: CanvasImageSource,
+  sw: number,
+  sh: number,
+  max = 640,
+): HTMLCanvasElement {
   const scale = Math.min(1, max / Math.max(sw, sh));
   const w = Math.max(1, Math.round(sw * scale));
   const h = Math.max(1, Math.round(sh * scale));
   const c = document.createElement("canvas");
-  c.width = w; c.height = h;
+  c.width = w;
+  c.height = h;
   const ctx = c.getContext("2d")!;
   ctx.drawImage(source, 0, 0, w, h);
   return c;
@@ -118,8 +124,11 @@ async function imageThumb(file: File): Promise<Blob | null> {
       i.src = url;
     });
     return await canvasToBlob(drawScaled(img, img.naturalWidth, img.naturalHeight));
-  } catch { return null; }
-  finally { URL.revokeObjectURL(url); }
+  } catch {
+    return null;
+  } finally {
+    URL.revokeObjectURL(url);
+  }
 }
 
 async function videoThumb(file: File): Promise<Blob | null> {
@@ -138,11 +147,18 @@ async function videoThumb(file: File): Promise<Blob | null> {
     await new Promise<void>((res, rej) => {
       video.onseeked = () => res();
       video.onerror = () => rej(new Error("video seek failed"));
-      try { video.currentTime = seekTo; } catch (e) { rej(e as Error); }
+      try {
+        video.currentTime = seekTo;
+      } catch (e) {
+        rej(e as Error);
+      }
     });
     return await canvasToBlob(drawScaled(video, video.videoWidth, video.videoHeight));
-  } catch { return null; }
-  finally { URL.revokeObjectURL(url); }
+  } catch {
+    return null;
+  } finally {
+    URL.revokeObjectURL(url);
+  }
 }
 
 async function generateThumbnail(file: File, kind: MediaKind): Promise<Blob | null> {
@@ -206,7 +222,6 @@ async function currentAccessToken(): Promise<string | null> {
   return session.access_token ?? null;
 }
 
-
 /**
  * Upload the object bytes with real byte-level progress.
  *
@@ -220,8 +235,8 @@ async function uploadObject(
   file: File,
   onProgress?: (fraction: number) => void,
 ): Promise<void> {
-  const url = import.meta.env['VITE_SUPABASE_URL'];
-  const anonKey = import.meta.env['VITE_SUPABASE_PUBLISHABLE_KEY'];
+  const url = import.meta.env["VITE_SUPABASE_URL"];
+  const anonKey = import.meta.env["VITE_SUPABASE_PUBLISHABLE_KEY"];
 
   // Storage RLS only admits requests that arrive as `authenticated`. An expired
   // or missing session reaches Postgres as `anon` and fails with an opaque
@@ -239,7 +254,6 @@ async function uploadObject(
     if (error) throw new Error(`Upload failed: ${error.message}`);
     return;
   }
-
 
   await new Promise<void>((resolve, reject) => {
     const xhr = new XMLHttpRequest();
@@ -293,7 +307,6 @@ export async function uploadMedia(opts: {
 
   await uploadObject(path, file, onProgress);
 
-
   // Best-effort thumbnail
   let thumbPath: string | null = null;
   try {
@@ -301,11 +314,14 @@ export async function uploadMedia(opts: {
     if (thumb) {
       thumbPath = `${gkId}/thumbs/${crypto.randomUUID()}.jpg`;
       const { error: tErr } = await supabase.storage.from(BUCKET).upload(thumbPath, thumb, {
-        contentType: "image/jpeg", upsert: false,
+        contentType: "image/jpeg",
+        upsert: false,
       });
       if (tErr) thumbPath = null;
     }
-  } catch { thumbPath = null; }
+  } catch {
+    thumbPath = null;
+  }
 
   const { data, error: dbErr } = await supabase
     .from("media_assets")
@@ -341,7 +357,7 @@ export interface MediaFilters {
   uploaderId?: string;
   uploaderName?: string;
   from?: string; // ISO date
-  to?: string;   // ISO date
+  to?: string; // ISO date
   tags?: string[];
   search?: string;
 }
@@ -401,7 +417,10 @@ export async function updateMedia(
   if (before) {
     (Object.keys(patch) as (keyof typeof patch)[]).forEach((k) => {
       if (JSON.stringify(before[k]) !== JSON.stringify((asset as MediaAsset)[k])) {
-        changes[k as string] = { from: before[k] as unknown, to: (asset as MediaAsset)[k] as unknown };
+        changes[k as string] = {
+          from: before[k] as unknown,
+          to: (asset as MediaAsset)[k] as unknown,
+        };
       }
     });
   }
@@ -421,7 +440,8 @@ export async function deleteMedia(asset: MediaAsset, user: SessionUser | null): 
 
 export function canEditAsset(asset: MediaAsset, user: SessionUser | null): boolean {
   if (!user) return false;
-  if (user.role === "super_admin" || user.role === "admin" || user.role === "mentor_manager") return true;
+  if (user.role === "super_admin" || user.role === "admin" || user.role === "mentor_manager")
+    return true;
   if (asset.uploaded_by_id && asset.uploaded_by_id === user.id) return true;
   return false;
 }
@@ -445,7 +465,9 @@ export async function listReportAttachments(reportId: string): Promise<MediaAsse
  * now `mr2_`. Querying only the current id hides existing attached media, so we
  * fetch every known id (current + legacy) and dedupe.
  */
-export async function listReportAttachmentsForIds(reportIds: (string | null | undefined)[]): Promise<MediaAsset[]> {
+export async function listReportAttachmentsForIds(
+  reportIds: (string | null | undefined)[],
+): Promise<MediaAsset[]> {
   const ids = attachmentLookupIds(...reportIds);
   if (ids.length === 0) return [];
   const { data, error } = await supabase
@@ -458,7 +480,6 @@ export async function listReportAttachmentsForIds(reportIds: (string | null | un
     .filter((x): x is MediaAsset => !!x);
   return mergeAttachments(assets);
 }
-
 
 export async function attachMediaToReport(
   reportId: string,

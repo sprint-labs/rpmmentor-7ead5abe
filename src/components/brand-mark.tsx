@@ -11,13 +11,5 @@ export function BrandMark({
   alt = "Mentor Hub",
   ...props
 }: Omit<ImgHTMLAttributes<HTMLImageElement>, "src" | "alt"> & { alt?: string }) {
-  return (
-    <img
-      src="/icon-192.png"
-      alt={alt}
-      className={className}
-      draggable={false}
-      {...props}
-    />
-  );
+  return <img src="/icon-192.png" alt={alt} className={className} draggable={false} {...props} />;
 }

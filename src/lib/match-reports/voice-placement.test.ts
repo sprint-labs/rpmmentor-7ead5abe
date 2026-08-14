@@ -1,35 +1,51 @@
 import { describe, expect, it } from "vitest";
 import {
-  resolveInsertPlacement, insertAtOffset, insertUnderSection, sectionAtOffset,
-  BLANK_COMMENTS_TEMPLATE, validateComments,
+  resolveInsertPlacement,
+  insertAtOffset,
+  insertUnderSection,
+  sectionAtOffset,
+  BLANK_COMMENTS_TEMPLATE,
+  validateComments,
 } from "./comments";
 
 describe("voice transcript placement", () => {
   it("action incidents go to Key Moments", () => {
-    expect(resolveInsertPlacement("Great save from the corner", null, 12))
-      .toEqual({ kind: "section", section: "Key Moments" });
+    expect(resolveInsertPlacement("Great save from the corner", null, 12)).toEqual({
+      kind: "section",
+      section: "Key Moments",
+    });
   });
 
   it("clear overview wording goes to Summary", () => {
-    expect(resolveInsertPlacement("Overall a confident, composed display", null, null))
-      .toEqual({ kind: "section", section: "Summary" });
+    expect(resolveInsertPlacement("Overall a confident, composed display", null, null)).toEqual({
+      kind: "section",
+      section: "Summary",
+    });
   });
 
   it("Development Focus is only used when the caret is there", () => {
-    expect(resolveInsertPlacement("work on it next week", "Development Focus", 40))
-      .toEqual({ kind: "section", section: "Development Focus" });
-    expect(resolveInsertPlacement("work on it next week", null, null))
-      .toEqual({ kind: "section", section: "Key Moments" });
+    expect(resolveInsertPlacement("work on it next week", "Development Focus", 40)).toEqual({
+      kind: "section",
+      section: "Development Focus",
+    });
+    expect(resolveInsertPlacement("work on it next week", null, null)).toEqual({
+      kind: "section",
+      section: "Key Moments",
+    });
   });
 
   it("uncertain text with a caret inserts at the caret", () => {
-    expect(resolveInsertPlacement("hmm nothing much", "Summary", 9))
-      .toEqual({ kind: "cursor", offset: 9 });
+    expect(resolveInsertPlacement("hmm nothing much", "Summary", 9)).toEqual({
+      kind: "cursor",
+      offset: 9,
+    });
   });
 
   it("uncertain text with no caret appends under Key Moments", () => {
-    expect(resolveInsertPlacement("hmm nothing much", null, null))
-      .toEqual({ kind: "section", section: "Key Moments" });
+    expect(resolveInsertPlacement("hmm nothing much", null, null)).toEqual({
+      kind: "section",
+      section: "Key Moments",
+    });
   });
 });
 
@@ -62,14 +78,18 @@ describe("legitimate repeated football wording", () => {
   });
 
   it("still rejects testing, testing", () => {
-    const r = validateComments("Summary:\nTesting, testing\n\nKey Moments:\n\nDevelopment Focus:\n");
+    const r = validateComments(
+      "Summary:\nTesting, testing\n\nKey Moments:\n\nDevelopment Focus:\n",
+    );
     expect(r.ok).toBe(false);
   });
 
   it("still rejects a repeated paragraph (A / B / A)", () => {
     const a = "Handled crosses confidently and organised the back line all afternoon well.";
     const b = "Distribution was accurate over both short and long range throughout the game.";
-    const r = validateComments(`Summary:\n${a}\n\nKey Moments:\n${b}\n\nDevelopment Focus:\n${a}\n`);
+    const r = validateComments(
+      `Summary:\n${a}\n\nKey Moments:\n${b}\n\nDevelopment Focus:\n${a}\n`,
+    );
     expect(r.ok).toBe(false);
   });
 });

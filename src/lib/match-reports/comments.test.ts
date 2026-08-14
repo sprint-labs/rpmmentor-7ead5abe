@@ -61,12 +61,16 @@ describe("validateComments", () => {
 
   it("rejects score-only values", () => {
     for (const v of ["3", "4/5", "five"]) {
-      expect(validateComments(`Summary:\n${v}\n\nKey Moments:\n\nDevelopment Focus:\n`).ok).toBe(false);
+      expect(validateComments(`Summary:\n${v}\n\nKey Moments:\n\nDevelopment Focus:\n`).ok).toBe(
+        false,
+      );
     }
   });
 
   it("rejects placeholder/testing text", () => {
-    expect(validateComments("Summary:\ntest\n\nKey Moments:\ntesting\n\nDevelopment Focus:\ntbc\n").ok).toBe(false);
+    expect(
+      validateComments("Summary:\ntest\n\nKey Moments:\ntesting\n\nDevelopment Focus:\ntbc\n").ok,
+    ).toBe(false);
   });
 
   it("rejects an A / B / A duplicate paragraph pattern", () => {
@@ -93,12 +97,14 @@ describe("validateComments", () => {
   });
 
   it("rejects plainly repeated paragraphs", () => {
-    const repeated = "Summary:\nHe played well today.\n\nKey Moments:\nhe played WELL today.\n\nDevelopment Focus:\nHe played well today.\n";
+    const repeated =
+      "Summary:\nHe played well today.\n\nKey Moments:\nhe played WELL today.\n\nDevelopment Focus:\nHe played well today.\n";
     expect(validateComments(repeated).ok).toBe(false);
   });
 
   it("rejects short but distinct notes under 40 meaningful chars", () => {
-    const short = "Summary:\nGood game.\n\nKey Moments:\nOne save.\n\nDevelopment Focus:\nKicking.\n";
+    const short =
+      "Summary:\nGood game.\n\nKey Moments:\nOne save.\n\nDevelopment Focus:\nKicking.\n";
     expect(validateComments(short).ok).toBe(false);
   });
 });
@@ -132,7 +138,9 @@ describe("insertion targeting", () => {
   });
 
   it("respects a cursor explicitly in Development Focus", () => {
-    expect(chooseInsertSection("Good save at 30 minutes", "Development Focus")).toBe("Development Focus");
+    expect(chooseInsertSection("Good save at 30 minutes", "Development Focus")).toBe(
+      "Development Focus",
+    );
   });
 
   it("resolves the section at a caret offset", () => {

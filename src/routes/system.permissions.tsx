@@ -13,53 +13,109 @@ const GROUPS: Group[] = [
   {
     title: "Goalkeepers",
     items: [
-      { perm: "goalkeepers.view", label: "View goalkeepers", description: "See goalkeeper profiles and directory." },
-      { perm: "goalkeepers.create", label: "Create goalkeepers", description: "Add new goalkeeper records." },
-      { perm: "goalkeepers.edit", label: "Edit goalkeepers", description: "Update goalkeeper details and status." },
+      {
+        perm: "goalkeepers.view",
+        label: "View goalkeepers",
+        description: "See goalkeeper profiles and directory.",
+      },
+      {
+        perm: "goalkeepers.create",
+        label: "Create goalkeepers",
+        description: "Add new goalkeeper records.",
+      },
+      {
+        perm: "goalkeepers.edit",
+        label: "Edit goalkeepers",
+        description: "Update goalkeeper details and status.",
+      },
     ],
   },
   {
     title: "Users & roles",
     items: [
-      { perm: "mentors.view", label: "View users and roles", description: "Browse the read-only user directory and activity totals." },
+      {
+        perm: "mentors.view",
+        label: "View users and roles",
+        description: "Browse the read-only user directory and activity totals.",
+      },
     ],
   },
   {
     title: "Interactions",
     items: [
-      { perm: "interactions.view", label: "View interactions", description: "Read the interactions log." },
-      { perm: "interactions.log", label: "Log interactions", description: "Record calls, meetings, and notes." },
+      {
+        perm: "interactions.view",
+        label: "View interactions",
+        description: "Read the interactions log.",
+      },
+      {
+        perm: "interactions.log",
+        label: "Log interactions",
+        description: "Record calls, meetings, and notes.",
+      },
     ],
   },
   {
     title: "Match reports",
     items: [
-      { perm: "reports.view", label: "View reports", description: "Open the reports list and detail pages." },
-      { perm: "reports.submit", label: "Submit reports", description: "Create and file new match reports." },
-      { perm: "reports.manage", label: "Manage reports", description: "Edit or moderate reports across coaches." },
+      {
+        perm: "reports.view",
+        label: "View reports",
+        description: "Open the reports list and detail pages.",
+      },
+      {
+        perm: "reports.submit",
+        label: "Submit reports",
+        description: "Create and file new match reports.",
+      },
+      {
+        perm: "reports.manage",
+        label: "Manage reports",
+        description: "Edit or moderate reports across coaches.",
+      },
     ],
   },
   {
     title: "Media",
     items: [
       { perm: "media.view", label: "View media", description: "Browse the shared media library." },
-      { perm: "media.upload", label: "Upload media", description: "Add clips, images, PDFs, and voice notes." },
-      { perm: "media.edit", label: "Edit media", description: "Rename, tag, and remove media items." },
+      {
+        perm: "media.upload",
+        label: "Upload media",
+        description: "Add clips, images, PDFs, and voice notes.",
+      },
+      {
+        perm: "media.edit",
+        label: "Edit media",
+        description: "Rename, tag, and remove media items.",
+      },
     ],
   },
   {
     title: "Alerts & calendar",
     items: [
       { perm: "alerts.view", label: "View alerts", description: "Read the notification centre." },
-      { perm: "calendar.view", label: "View calendar", description: "See scheduled sessions and events." },
+      {
+        perm: "calendar.view",
+        label: "View calendar",
+        description: "See scheduled sessions and events.",
+      },
     ],
   },
   {
     title: "Oversight",
     items: [
-      { perm: "executive.view", label: "Executive view", description: "Access executive dashboards and KPIs." },
+      {
+        perm: "executive.view",
+        label: "Executive view",
+        description: "Access executive dashboards and KPIs.",
+      },
       { perm: "audit.view", label: "View audit log", description: "Inspect the audit history." },
-      { perm: "system.manage", label: "System management", description: "Manage users, roles, and system settings." },
+      {
+        perm: "system.manage",
+        label: "System management",
+        description: "Manage users, roles, and system settings.",
+      },
     ],
   },
 ];
@@ -115,7 +171,10 @@ function PermissionsReportPage() {
   if (!user) {
     return (
       <div className="max-w-2xl">
-        <PageHeader title="Permission check" description="Sign in to view your permission report." />
+        <PageHeader
+          title="Permission check"
+          description="Sign in to view your permission report."
+        />
       </div>
     );
   }
@@ -158,8 +217,12 @@ function PermissionsReportPage() {
             </div>
           )}
           <div className="ml-auto flex items-center gap-3 text-xs">
-            <span className="inline-flex items-center gap-1"><Check className="size-3.5 text-success" /> {allowed} allowed</span>
-            <span className="inline-flex items-center gap-1"><X className="size-3.5 text-destructive" /> {denied} denied</span>
+            <span className="inline-flex items-center gap-1">
+              <Check className="size-3.5 text-success" /> {allowed} allowed
+            </span>
+            <span className="inline-flex items-center gap-1">
+              <X className="size-3.5 text-destructive" /> {denied} denied
+            </span>
           </div>
         </div>
       </Card>
@@ -182,7 +245,9 @@ function PermissionsReportPage() {
                     <span
                       className={cn(
                         "mt-0.5 inline-flex size-5 items-center justify-center rounded-full",
-                        r.allowed ? "bg-success/15 text-success" : "bg-destructive/15 text-destructive",
+                        r.allowed
+                          ? "bg-success/15 text-success"
+                          : "bg-destructive/15 text-destructive",
                       )}
                       aria-label={r.allowed ? "Allowed" : "Denied"}
                     >

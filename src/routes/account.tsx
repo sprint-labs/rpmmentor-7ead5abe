@@ -35,7 +35,6 @@ function scorePassword(pw: string, disqualifiers: string[] = []): StrengthLevel 
   return Math.max(0, Math.min(4, score)) as StrengthLevel;
 }
 
-
 export const Route = createFileRoute("/account")({
   component: AccountPage,
   head: () => ({
@@ -113,7 +112,9 @@ function AccountPage() {
           </div>
           <div className="min-w-0">
             <div className="text-sm font-semibold truncate">{user?.name ?? "—"}</div>
-            <div className="font-mono text-xs text-muted-foreground truncate">{user?.email ?? "—"}</div>
+            <div className="font-mono text-xs text-muted-foreground truncate">
+              {user?.email ?? "—"}
+            </div>
           </div>
           <span className="col-span-2 shrink-0 inline-flex items-center gap-1 rounded-full border border-border bg-accent/50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
             <Shield className="size-3" />
@@ -125,7 +126,9 @@ function AccountPage() {
       <Card className="p-4">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h2 className="text-sm font-semibold tracking-tight uppercase text-muted-foreground">Change password</h2>
+            <h2 className="text-sm font-semibold tracking-tight uppercase text-muted-foreground">
+              Change password
+            </h2>
             <p className="text-xs text-muted-foreground mt-0.5">
               Confirm your current password, then set a new one of at least 8 characters.
             </p>
@@ -133,24 +136,34 @@ function AccountPage() {
         </div>
         <form onSubmit={onSubmit} className="space-y-4">
           <div className="space-y-1.5">
-            <label className="block text-[11px] uppercase tracking-wider text-muted-foreground font-medium">Current password</label>
+            <label className="block text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
+              Current password
+            </label>
             <input
               type={show ? "text" : "password"}
               autoComplete="current-password"
               value={current}
-              onChange={(e) => { setCurrent(e.target.value); setOk(false); }}
+              onChange={(e) => {
+                setCurrent(e.target.value);
+                setOk(false);
+              }}
               className="w-full h-10 px-3 rounded-md bg-input border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
               placeholder="Enter your current password"
               required
             />
           </div>
           <div className="space-y-2">
-            <label className="block text-[11px] uppercase tracking-wider text-muted-foreground font-medium">New password</label>
+            <label className="block text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
+              New password
+            </label>
             <input
               type={show ? "text" : "password"}
               autoComplete="new-password"
               value={pw}
-              onChange={(e) => { setPw(e.target.value); setOk(false); }}
+              onChange={(e) => {
+                setPw(e.target.value);
+                setOk(false);
+              }}
               aria-invalid={tooShort || sameAsCurrent || undefined}
               className="w-full h-10 px-3 rounded-md bg-input border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 aria-invalid:border-destructive/70"
               placeholder="At least 8 characters"
@@ -186,7 +199,11 @@ function AccountPage() {
                           passed ? "text-gk-green" : "text-muted-foreground"
                         }`}
                       >
-                        {passed ? <Check className="size-3 shrink-0" /> : <X className="size-3 opacity-60 shrink-0" />}
+                        {passed ? (
+                          <Check className="size-3 shrink-0" />
+                        ) : (
+                          <X className="size-3 opacity-60 shrink-0" />
+                        )}
                         <span className="truncate">{r.label}</span>
                       </li>
                     );
@@ -210,12 +227,17 @@ function AccountPage() {
           </div>
 
           <div className="space-y-1.5">
-            <label className="block text-[11px] uppercase tracking-wider text-muted-foreground font-medium">Confirm new password</label>
+            <label className="block text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
+              Confirm new password
+            </label>
             <input
               type={show ? "text" : "password"}
               autoComplete="new-password"
               value={confirm}
-              onChange={(e) => { setConfirm(e.target.value); setOk(false); }}
+              onChange={(e) => {
+                setConfirm(e.target.value);
+                setOk(false);
+              }}
               aria-invalid={mismatch || undefined}
               className="w-full h-10 px-3 rounded-md bg-input border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 aria-invalid:border-destructive/70"
               placeholder="Repeat new password"
@@ -235,7 +257,12 @@ function AccountPage() {
           </div>
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-2">
             <label className="flex items-center gap-2 text-xs text-muted-foreground select-none shrink-0">
-              <input type="checkbox" checked={show} onChange={(e) => setShow(e.target.checked)} className="rounded border-border bg-input shrink-0" />
+              <input
+                type="checkbox"
+                checked={show}
+                onChange={(e) => setShow(e.target.checked)}
+                className="rounded border-border bg-input shrink-0"
+              />
               Show passwords
             </label>
             <button
@@ -243,7 +270,13 @@ function AccountPage() {
               disabled={!canSubmit}
               className="inline-flex items-center justify-center gap-1.5 h-10 sm:h-9 w-full sm:w-auto px-4 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 disabled:opacity-40"
             >
-              {busy ? <Loader2 className="size-4 animate-spin" /> : ok ? <Check className="size-4" /> : <KeyRound className="size-4" />}
+              {busy ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : ok ? (
+                <Check className="size-4" />
+              ) : (
+                <KeyRound className="size-4" />
+              )}
               {busy ? "Updating…" : ok ? "Updated" : "Update password"}
             </button>
           </div>

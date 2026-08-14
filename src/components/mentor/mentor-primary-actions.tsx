@@ -50,9 +50,7 @@ export function MentorPrimaryActions({
               <span className="block text-xl font-display font-bold uppercase tracking-[0.02em]">
                 {mentorPrimaryActionLabels.logInteraction}
               </span>
-              <span className="mt-1 block text-xs text-muted-foreground">
-                Record a touchpoint
-              </span>
+              <span className="mt-1 block text-xs text-muted-foreground">Record a touchpoint</span>
             </span>
           </button>
         )}

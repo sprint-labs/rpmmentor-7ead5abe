@@ -227,9 +227,7 @@ export const importMatchReportsFromSheet = createServerFn({ method: "POST" })
         ["competition", r.competition, found.competition],
         ["match_date", r.match_date, found.match_date],
         ["average", r.average, found.average],
-        ...PILLAR_IDS.map(
-          (p) => [p, r.scores[p], found.scores[p]] as [string, unknown, unknown],
-        ),
+        ...PILLAR_IDS.map((p) => [p, r.scores[p], found.scores[p]] as [string, unknown, unknown]),
       ];
       for (const [field, sheetValue, dbValue] of checks) {
         if (norm(sheetValue) !== norm(dbValue)) {

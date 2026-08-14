@@ -76,7 +76,6 @@ export function isLoggableInteractionType(value: string): value is InteractionTy
   return (MANUAL_INTERACTION_TYPES as readonly string[]).includes(value);
 }
 
-
 export const createInteractionInput = z.object({
   /**
    * Canonical `public.players.id`, present ONLY when the submitted selection
@@ -87,7 +86,10 @@ export const createInteractionInput = z.object({
   /** UI roster slug (e.g. "gk-james-beadle") — display identity only. */
   gkSlug: z.string().trim().max(120).default(""),
   goalkeeperName: z.string().trim().min(1, "Select a goalkeeper").max(120),
-  interactionType: z.enum(MANUAL_INTERACTION_TYPES, { message: "Live Match Observation is recorded by submitting a Match Report, not by logging an interaction" }),
+  interactionType: z.enum(MANUAL_INTERACTION_TYPES, {
+    message:
+      "Live Match Observation is recorded by submitting a Match Report, not by logging an interaction",
+  }),
   /** Editable in the form; snapshot of the club at the time of the touchpoint. */
   club: z.string().trim().max(120).default(""),
   occurredAt: z.string().regex(DATE_ONLY, "Date must be a calendar date (YYYY-MM-DD)"),
@@ -250,7 +252,12 @@ export const listInteractionsQuery = z.object({
   mentorId: z.string().regex(UUID).optional(),
   /** Legacy/display mentor filter, matched against the stored snapshot. */
   mentorName: z.string().trim().max(120).optional(),
-  interactionType: z.enum(MANUAL_INTERACTION_TYPES, { message: "Live Match Observation is recorded by submitting a Match Report, not by logging an interaction" }).optional(),
+  interactionType: z
+    .enum(MANUAL_INTERACTION_TYPES, {
+      message:
+        "Live Match Observation is recorded by submitting a Match Report, not by logging an interaction",
+    })
+    .optional(),
   /** Free-text match on goalkeeper name or club. */
   search: z.string().trim().max(120).optional(),
   page: z.number().int().min(1).default(1),

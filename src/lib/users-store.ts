@@ -20,7 +20,9 @@ function load(): ManagedUser[] {
     // Merge with seed so newly-added demo users still appear.
     const bySeed = seed();
     const byId = new Map(parsed.map((u) => [u.id, u]));
-    return bySeed.map((s) => byId.get(s.id) ?? s).concat(parsed.filter((u) => !bySeed.find((s) => s.id === u.id)));
+    return bySeed
+      .map((s) => byId.get(s.id) ?? s)
+      .concat(parsed.filter((u) => !bySeed.find((s) => s.id === u.id)));
   } catch {
     return seed();
   }
@@ -30,7 +32,9 @@ let state: ManagedUser[] = load();
 const listeners = new Set<Listener>();
 
 function persist() {
-  try { window.localStorage.setItem(KEY, JSON.stringify(state)); } catch {}
+  try {
+    window.localStorage.setItem(KEY, JSON.stringify(state));
+  } catch {}
   listeners.forEach((l) => l());
 }
 

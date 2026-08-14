@@ -3,9 +3,15 @@ import { parseSheetRows, identityForRowIndex, computeReportUid, baseReportUid } 
 
 function row(gk: string, team: string, opp: string, date: string): string[] {
   const r = new Array(15).fill("");
-  r[0] = gk; r[1] = "Coach A"; r[2] = team; r[3] = opp; r[4] = date;
+  r[0] = gk;
+  r[1] = "Coach A";
+  r[2] = team;
+  r[3] = opp;
+  r[4] = date;
   for (let i = 5; i <= 11; i++) r[i] = "3";
-  r[12] = "3"; r[13] = "Summary:\nGood game"; r[14] = "League";
+  r[12] = "3";
+  r[13] = "Summary:\nGood game";
+  r[14] = "League";
   return r;
 }
 
@@ -17,7 +23,10 @@ describe("appended-row identity", () => {
   ];
   const parsed = parseSheetRows(rows, 2);
   const base = computeReportUid({
-    goalkeeper: "Sam Keeper", team: "Club A", opponent: "Rovers", match_date: "2026-01-02",
+    goalkeeper: "Sam Keeper",
+    team: "Club A",
+    opponent: "Rovers",
+    match_date: "2026-01-02",
   });
 
   it("resolves the exact occurrence id for the appended sheet row", () => {
@@ -26,7 +35,9 @@ describe("appended-row identity", () => {
   });
 
   it("a confirmed duplicate does not collapse onto the base identity", () => {
-    expect(identityForRowIndex(parsed, 3)?.report_id).not.toBe(identityForRowIndex(parsed, 2)?.report_id);
+    expect(identityForRowIndex(parsed, 3)?.report_id).not.toBe(
+      identityForRowIndex(parsed, 2)?.report_id,
+    );
     expect(baseReportUid(identityForRowIndex(parsed, 3)!.report_id)).toBe(base);
   });
 

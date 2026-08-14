@@ -9,10 +9,7 @@
  * Everything is in-memory for the current tab/session — no persistence.
  */
 
-import type {
-  MentorInteractionRow,
-  MatchReportRow,
-} from "@/lib/mentor-domain";
+import type { MentorInteractionRow, MatchReportRow } from "@/lib/mentor-domain";
 
 /**
  * Whitelist of approved interaction types. Validated at the insert boundary
@@ -42,13 +39,19 @@ const reports: MatchReportRow[] = [];
 
 function emit() {
   listeners.forEach((l) => {
-    try { l(); } catch { /* noop */ }
+    try {
+      l();
+    } catch {
+      /* noop */
+    }
   });
 }
 
 export function subscribeMentorSession(fn: () => void): () => void {
   listeners.add(fn);
-  return () => { listeners.delete(fn); };
+  return () => {
+    listeners.delete(fn);
+  };
 }
 
 export function getSessionInteractions(): MentorInteractionRow[] {
@@ -71,9 +74,7 @@ export function insertMentorInteraction(
   return full;
 }
 
-export function insertMatchReport(
-  row: Omit<MatchReportRow, "id">,
-): MatchReportRow {
+export function insertMatchReport(row: Omit<MatchReportRow, "id">): MatchReportRow {
   const full: MatchReportRow = { id: `mr-${crypto.randomUUID()}`, ...row };
   reports.unshift(full);
   emit();

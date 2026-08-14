@@ -79,9 +79,7 @@ export const getSheetsIntegrationStatus = createServerFn({ method: "GET" })
             sheets?: Array<{ properties?: { title?: string } }>;
           };
           spreadsheetTitle = body.properties?.title ?? null;
-          sheetTabExists = (body.sheets ?? []).some(
-            (s) => s.properties?.title === SHEET_TAB,
-          );
+          sheetTabExists = (body.sheets ?? []).some((s) => s.properties?.title === SHEET_TAB);
         }
       } catch (e) {
         error = e instanceof Error ? e.message : "Unknown gateway error";

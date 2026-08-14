@@ -10,7 +10,12 @@ export default defineTool({
     "List recent Mentor Hub match reports the signed-in user is allowed to see under Row Level Security. Returns goalkeeper, opponent, match date, coach and overall average.",
   inputSchema: {
     limit: z.number().int().min(1).max(100).optional().describe("Max rows to return (default 25)."),
-    goalkeeper: z.string().trim().min(1).optional().describe("Filter by goalkeeper name (case-insensitive contains)."),
+    goalkeeper: z
+      .string()
+      .trim()
+      .min(1)
+      .optional()
+      .describe("Filter by goalkeeper name (case-insensitive contains)."),
   },
   annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
   handler: async ({ limit, goalkeeper }, ctx) => {

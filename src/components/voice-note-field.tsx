@@ -1,6 +1,17 @@
 import { useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { Mic, Square, Loader2, X, RotateCcw, Sparkles, CheckCircle2, AlertTriangle, History, XCircle } from "lucide-react";
+import {
+  Mic,
+  Square,
+  Loader2,
+  X,
+  RotateCcw,
+  Sparkles,
+  CheckCircle2,
+  AlertTriangle,
+  History,
+  XCircle,
+} from "lucide-react";
 import { toast } from "sonner";
 import { transcribeVoiceNote } from "@/lib/api/transcribe.functions";
 import {
@@ -12,9 +23,9 @@ import {
 import { LatestRequestGate } from "@/lib/async/latest-request";
 import type { InteractionRecording } from "@/lib/interactions/audio";
 
-
 const MAX_SECONDS = 180;
-const TRANSCRIPTION_FAILURE_MESSAGE = "We could not process this audio recording. Your recording is still available. Please retry or save it without a transcript.";
+const TRANSCRIPTION_FAILURE_MESSAGE =
+  "We could not process this audio recording. Your recording is still available. Please retry or save it without a transcript.";
 
 const AUDIO_EXTENSION_BY_MIME: Record<string, string> = {
   "audio/webm": "webm",
@@ -80,7 +91,11 @@ interface AttemptLogEntry {
 
 interface Props {
   onTranscribed: (text: string, mode: "replace" | "append") => boolean | void;
-  onAudioAttach?: (audio: { blob: Blob; mimeType: string; durationSec: number }) => void | Promise<void>;
+  onAudioAttach?: (audio: {
+    blob: Blob;
+    mimeType: string;
+    durationSec: number;
+  }) => void | Promise<void>;
   /**
    * Hand the raw recording to the parent as soon as it exists, and `null` when
    * it is discarded.
@@ -132,7 +147,9 @@ export function VoiceNoteField({
   const [phase, setPhase] = useState<Phase>("idle");
   const [phaseElapsed, setPhaseElapsed] = useState(0);
   const [transcript, setTranscript] = useState<string | null>(draft?.transcript ?? null);
-  const [tokens, setTokens] = useState<Array<{ token: string; confidence: number }>>(draft?.tokens ?? []);
+  const [tokens, setTokens] = useState<Array<{ token: string; confidence: number }>>(
+    draft?.tokens ?? [],
+  );
   const [avgConfidence, setAvgConfidence] = useState<number | null>(draft?.avgConfidence ?? null);
   const [reviewed, setReviewed] = useState<boolean>(draft?.reviewed ?? false);
   const [rewrite, setRewrite] = useState<string | null>(draft?.rewrite ?? null);
@@ -177,7 +194,6 @@ export function VoiceNoteField({
   const [editValue, setEditValue] = useState("");
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [currentTime, setCurrentTime] = useState(0);
-
 
   const run = useServerFn(transcribeVoiceNote);
   const runRewrite = useServerFn(rewriteTranscript);
@@ -276,7 +292,9 @@ export function VoiceNoteField({
   const insertSummary = (mode: "append" | "replace") => {
     if (!summary) return;
     onTranscribed(formatSummary(summary), mode);
-    toast.success(mode === "replace" ? "Comments replaced with summary" : "Summary appended to comments");
+    toast.success(
+      mode === "replace" ? "Comments replaced with summary" : "Summary appended to comments",
+    );
   };
 
   const updateSummaryField = <K extends keyof StructuredSummary>(
@@ -286,10 +304,7 @@ export function VoiceNoteField({
     setSummary((current) => (current ? { ...current, [key]: value } : current));
   };
 
-  const updateSummaryLines = (
-    key: "strengths" | "improvements" | "keyMoments",
-    text: string,
-  ) => {
+  const updateSummaryLines = (key: "strengths" | "improvements" | "keyMoments", text: string) => {
     const lines = text
       .split("\n")
       .map((line) => line.replace(/^[\s•\-*]+/, "").trim())
@@ -300,27 +315,37 @@ export function VoiceNoteField({
   const busy = phase !== "idle";
 
   const clearPhaseTimer = () => {
-    if (phaseTimerRef.current) { clearInterval(phaseTimerRef.current); phaseTimerRef.current = null; }
+    if (phaseTimerRef.current) {
+      clearInterval(phaseTimerRef.current);
+      phaseTimerRef.current = null;
+    }
   };
 
   const cleanupStream = () => {
     streamRef.current?.getTracks().forEach((t) => t.stop());
     streamRef.current = null;
-    if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
   };
 
-  useEffect(() => () => {
-    cleanupStream();
-    clearPhaseTimer();
-    abortRef.current?.abort();
-    if (audioUrl) URL.revokeObjectURL(audioUrl);
-  }, [audioUrl]);
+  useEffect(
+    () => () => {
+      cleanupStream();
+      clearPhaseTimer();
+      abortRef.current?.abort();
+      if (audioUrl) URL.revokeObjectURL(audioUrl);
+    },
+    [audioUrl],
+  );
 
   // Sync transcript/review state up into the parent draft so it persists across reloads.
   useEffect(() => {
     if (!onDraftChange) return;
     if (transcript == null) onDraftChange(null);
-    else onDraftChange({ transcript, tokens, avgConfidence, reviewed, rewrite, original, versions });
+    else
+      onDraftChange({ transcript, tokens, avgConfidence, reviewed, rewrite, original, versions });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [transcript, tokens, avgConfidence, reviewed, rewrite, original, versions]);
 
@@ -347,7 +372,6 @@ export function VoiceNoteField({
     return () => clearTimeout(t);
   }, [transcript, original, versions]);
 
-
   // Tick every 500ms while a retry cooldown is active so the countdown updates.
   useEffect(() => {
     if (!cancelled) return;
@@ -369,7 +393,6 @@ export function VoiceNoteField({
   const cooldownRemainingMs = Math.max(0, retryAvailableAt - nowTick);
   const cooldownRemainingSec = Math.ceil(cooldownRemainingMs / 1000);
   const cooldownActive = cooldownRemainingMs > 0;
-
 
   const reset = () => {
     abortRef.current?.abort();
@@ -413,7 +436,15 @@ export function VoiceNoteField({
   };
 
   const logAttempt = (status: AttemptLogEntry["status"], message?: string) => {
-    setAttemptLog((prev) => [...prev, { id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, timestamp: Date.now(), status, message }]);
+    setAttemptLog((prev) => [
+      ...prev,
+      {
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        timestamp: Date.now(),
+        status,
+        message,
+      },
+    ]);
   };
 
   const transcribe = async () => {
@@ -450,9 +481,15 @@ export function VoiceNoteField({
     try {
       const audioBase64 = await blobToBase64(audioBlob);
       if (controller.signal.aborted) return;
-      const call = run({ data: { audioBase64, mimeType: mimeRef.current, fileName: fileNameRef.current } });
+      const call = run({
+        data: { audioBase64, mimeType: mimeRef.current, fileName: fileNameRef.current },
+      });
       const result = await new Promise<Awaited<typeof call>>((resolve, reject) => {
-        controller.signal.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")), { once: true });
+        controller.signal.addEventListener(
+          "abort",
+          () => reject(new DOMException("Aborted", "AbortError")),
+          { once: true },
+        );
         call.then(resolve, reject);
       });
       if (controller.signal.aborted) return;
@@ -516,7 +553,6 @@ export function VoiceNoteField({
     });
   };
 
-
   const undoCancel = () => {
     const snap = preTranscribeSnapshotRef.current;
     setCancelled(false);
@@ -542,14 +578,13 @@ export function VoiceNoteField({
     void transcribe();
   };
 
-
-
-
   const start = async () => {
     reset();
     let stream: MediaStream;
     try {
-      stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
+      stream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: true, noiseSuppression: true },
+      });
     } catch {
       toast.error("Microphone access is needed to record.");
       return;
@@ -566,7 +601,9 @@ export function VoiceNoteField({
     }
     recorderRef.current = rec;
     chunksRef.current = [];
-    rec.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
+    rec.ondataavailable = (e) => {
+      if (e.data.size > 0) chunksRef.current.push(e.data);
+    };
     rec.onstop = async () => {
       const type = rec.mimeType || mimeType || "audio/webm";
       const blob = new Blob(chunksRef.current, { type });
@@ -596,14 +633,24 @@ export function VoiceNoteField({
     timerRef.current = setInterval(() => {
       setElapsed((s) => {
         const next = s + 1;
-        if (next >= MAX_SECONDS) { try { rec.stop(); } catch { /* noop */ } }
+        if (next >= MAX_SECONDS) {
+          try {
+            rec.stop();
+          } catch {
+            /* noop */
+          }
+        }
         return next;
       });
     }, 1000);
   };
 
   const stop = () => {
-    try { recorderRef.current?.stop(); } catch { /* noop */ }
+    try {
+      recorderRef.current?.stop();
+    } catch {
+      /* noop */
+    }
   };
 
   const retry = () => {
@@ -612,16 +659,21 @@ export function VoiceNoteField({
     void transcribe();
   };
 
-
   const attachAudio = async () => {
     if (!onAudioAttach || attached || attaching) return;
     if (!blobRef.current) return;
     setAttaching(true);
     try {
-      await onAudioAttach({ blob: blobRef.current, mimeType: mimeRef.current, durationSec: durationRef.current });
+      await onAudioAttach({
+        blob: blobRef.current,
+        mimeType: mimeRef.current,
+        durationSec: durationRef.current,
+      });
       setAttached(true);
     } catch {
-      toast.error("Could not save audio to Media Library. Your recording is still available — please try again.");
+      toast.error(
+        "Could not save audio to Media Library. Your recording is still available — please try again.",
+      );
     } finally {
       setAttaching(false);
     }
@@ -652,8 +704,6 @@ export function VoiceNoteField({
     toast.success("Audio saved — type your notes in Comments below");
   };
 
-
-
   const [isEditingText, setIsEditingText] = useState(false);
   const [pendingApply, setPendingApply] = useState<null | "append" | "replace">(null);
 
@@ -675,7 +725,7 @@ export function VoiceNoteField({
     const text = transcript ?? "";
     // Snapshot the exact text at save-time as an immutable "saved" version.
     setVersions((prev) => {
-      const lastText = prev.length > 0 ? prev[prev.length - 1].text : original?.text ?? "";
+      const lastText = prev.length > 0 ? prev[prev.length - 1].text : (original?.text ?? "");
       const entry: TranscriptVersion = {
         at: new Date().toISOString(),
         text,
@@ -697,25 +747,32 @@ export function VoiceNoteField({
   const ss = String(elapsed % 60).padStart(2, "0");
 
   // Confidence bucket for a token: high (≥0.85), medium (0.6–0.85), low (<0.6)
-  const bucketOf = (c: number): "high" | "med" | "low" => (c >= 0.85 ? "high" : c >= 0.6 ? "med" : "low");
+  const bucketOf = (c: number): "high" | "med" | "low" =>
+    c >= 0.85 ? "high" : c >= 0.6 ? "med" : "low";
   const bucketClass = (b: "high" | "med" | "low") =>
     b === "low"
       ? "bg-destructive/25 text-destructive-foreground underline decoration-destructive decoration-wavy underline-offset-2"
       : b === "med"
-      ? "bg-amber-500/25 text-foreground"
-      : "";
+        ? "bg-amber-500/25 text-foreground"
+        : "";
   const lowCount = tokens.filter((t) => bucketOf(t.confidence) === "low").length;
   const medCount = tokens.filter((t) => bucketOf(t.confidence) === "med").length;
   const overallLabel =
-    avgConfidence == null ? null : avgConfidence >= 0.85 ? "High" : avgConfidence >= 0.6 ? "Medium" : "Low";
+    avgConfidence == null
+      ? null
+      : avgConfidence >= 0.85
+        ? "High"
+        : avgConfidence >= 0.6
+          ? "Medium"
+          : "Low";
   const overallClass =
     avgConfidence == null
       ? ""
       : avgConfidence >= 0.85
-      ? "text-gk-green border-gk-green/40"
-      : avgConfidence >= 0.6
-      ? "text-amber-500 border-amber-500/40"
-      : "text-destructive border-destructive/40";
+        ? "text-gk-green border-gk-green/40"
+        : avgConfidence >= 0.6
+          ? "text-amber-500 border-amber-500/40"
+          : "text-destructive border-destructive/40";
 
   // Approximate word/sentence timestamps by distributing across the recorded duration,
   // weighted by character length. The transcription model doesn't return timestamps,
@@ -725,7 +782,10 @@ export function VoiceNoteField({
   const timedSentences: TimedSentence[] = (() => {
     if (!transcript || totalDuration <= 0) return [];
     // Split into sentences, keep terminal punctuation.
-    const parts = transcript.match(/[^.!?\n]+[.!?]?[\s]*/g)?.map((s) => s.trim()).filter(Boolean) ?? [transcript];
+    const parts = transcript
+      .match(/[^.!?\n]+[.!?]?[\s]*/g)
+      ?.map((s) => s.trim())
+      .filter(Boolean) ?? [transcript];
     const weights = parts.map((p) => Math.max(1, p.replace(/\s+/g, " ").length));
     const total = weights.reduce((a, b) => a + b, 0);
     let acc = 0;
@@ -748,27 +808,42 @@ export function VoiceNoteField({
     void el.play().catch(() => {});
   };
 
-
-
-
   return (
-    <div className={`rounded-md border border-dashed border-border bg-accent/10 p-3 space-y-3 ${className ?? ""}`}>
+    <div
+      className={`rounded-md border border-dashed border-border bg-accent/10 p-3 space-y-3 ${className ?? ""}`}
+    >
       <div className="flex items-start justify-between gap-2">
         <div>
           <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            <Sparkles className="size-3.5 text-primary" />Voice Note → Comments
+            <Sparkles className="size-3.5 text-primary" />
+            Voice Note → Comments
           </div>
-          <p className="text-[11px] text-muted-foreground mt-0.5">Record a spoken match note — AI transcribes it into text you can drop into the comments field. Up to {MAX_SECONDS / 60} minutes.</p>
+          <p className="text-[11px] text-muted-foreground mt-0.5">
+            Record a spoken match note — AI transcribes it into text you can drop into the comments
+            field. Up to {MAX_SECONDS / 60} minutes.
+          </p>
         </div>
         {(audioUrl || transcript) && !recording && (
-          <button type="button" onClick={reset} className="size-7 grid place-items-center rounded-md hover:bg-accent text-muted-foreground" aria-label="Reset"><X className="size-3.5" /></button>
+          <button
+            type="button"
+            onClick={reset}
+            className="size-7 grid place-items-center rounded-md hover:bg-accent text-muted-foreground"
+            aria-label="Reset"
+          >
+            <X className="size-3.5" />
+          </button>
         )}
       </div>
 
       {!audioUrl && !recording && !busy && !transcript && (
         <div className="flex flex-wrap gap-2">
-          <button type="button" onClick={start} className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md bg-primary text-primary-foreground text-xs font-medium hover:opacity-90">
-            <Mic className="size-3.5" />Record voice note
+          <button
+            type="button"
+            onClick={start}
+            className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md bg-primary text-primary-foreground text-xs font-medium hover:opacity-90"
+          >
+            <Mic className="size-3.5" />
+            Record voice note
           </button>
         </div>
       )}
@@ -782,9 +857,16 @@ export function VoiceNoteField({
             </span>
             Recording
           </span>
-          <span className="text-xs font-mono tabular-nums text-muted-foreground">{mm}:{ss}</span>
-          <button type="button" onClick={stop} className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md border border-border text-xs font-medium hover:bg-accent">
-            <Square className="size-3.5" />Stop
+          <span className="text-xs font-mono tabular-nums text-muted-foreground">
+            {mm}:{ss}
+          </span>
+          <button
+            type="button"
+            onClick={stop}
+            className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md border border-border text-xs font-medium hover:bg-accent"
+          >
+            <Square className="size-3.5" />
+            Stop
           </button>
         </div>
       )}
@@ -799,10 +881,10 @@ export function VoiceNoteField({
               className="w-full h-8"
               onTimeUpdate={(e) => setCurrentTime((e.target as HTMLAudioElement).currentTime)}
             />
-
           ) : restoredFromDraft ? (
             <div className="text-[11px] text-muted-foreground italic border border-dashed border-border rounded-md p-2">
-              Transcript restored from your saved draft. The original audio isn't kept in the draft — re-record to update it.
+              Transcript restored from your saved draft. The original audio isn't kept in the draft
+              — re-record to update it.
             </div>
           ) : null}
           {busy ? (
@@ -815,19 +897,32 @@ export function VoiceNoteField({
                     {phase === "uploading" && "Uploading to AI…"}
                     {phase === "transcribing" && "Transcribing speech…"}
                   </span>
-                  <span className="text-[10px] font-mono tabular-nums text-muted-foreground">{phaseElapsed}s</span>
+                  <span className="text-[10px] font-mono tabular-nums text-muted-foreground">
+                    {phaseElapsed}s
+                  </span>
                   {attempt > 1 && (
-                    <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">Attempt {attempt}</span>
+                    <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">
+                      Attempt {attempt}
+                    </span>
                   )}
                 </div>
                 <div className="flex items-center gap-1.5">
                   {onAudioAttach && (
-                    <button type="button" onClick={() => void saveWithoutTranscript()} className="inline-flex items-center gap-1 h-7 px-2 rounded-md border border-border text-[11px] font-medium hover:bg-accent">
+                    <button
+                      type="button"
+                      onClick={() => void saveWithoutTranscript()}
+                      className="inline-flex items-center gap-1 h-7 px-2 rounded-md border border-border text-[11px] font-medium hover:bg-accent"
+                    >
                       Save without transcript
                     </button>
                   )}
-                  <button type="button" onClick={cancelTranscription} className="inline-flex items-center gap-1 h-7 px-2 rounded-md border border-border text-[11px] font-medium hover:bg-accent">
-                    <X className="size-3" />Cancel
+                  <button
+                    type="button"
+                    onClick={cancelTranscription}
+                    className="inline-flex items-center gap-1 h-7 px-2 rounded-md border border-border text-[11px] font-medium hover:bg-accent"
+                  >
+                    <X className="size-3" />
+                    Cancel
                   </button>
                 </div>
               </div>
@@ -836,20 +931,34 @@ export function VoiceNoteField({
                   const order = { preparing: 0, uploading: 1, transcribing: 2 };
                   const active = order[phase as keyof typeof order] >= order[p];
                   return (
-                    <div key={p} className={`h-1 flex-1 rounded-full ${active ? "bg-primary" : "bg-border"} ${phase === p ? "animate-pulse" : ""}`} />
+                    <div
+                      key={p}
+                      className={`h-1 flex-1 rounded-full ${active ? "bg-primary" : "bg-border"} ${phase === p ? "animate-pulse" : ""}`}
+                    />
                   );
                 })}
               </div>
-              <p className="text-[10px] text-muted-foreground">Your recording is preserved — cancel any time to keep the audio and retry later.</p>
+              <p className="text-[10px] text-muted-foreground">
+                Your recording is preserved — cancel any time to keep the audio and retry later.
+              </p>
               {attemptLog.length > 1 && (
                 <div className="pt-1 border-t border-border">
                   <div className="flex items-center gap-1 text-[10px] text-muted-foreground mb-1">
-                    <History className="size-3" />Previous attempts: {attemptLog.length - 1}
+                    <History className="size-3" />
+                    Previous attempts: {attemptLog.length - 1}
                   </div>
                   <div className="flex flex-wrap gap-1">
                     {attemptLog.slice(0, -1).map((entry, i) => (
-                      <span key={entry.id} className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-sm text-[10px] ${entry.status === "error" ? "bg-destructive/15 text-destructive" : entry.status === "success" ? "bg-gk-green/15 text-gk-green" : "bg-primary/15 text-primary"}`}>
-                        {i + 1}. {new Date(entry.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+                      <span
+                        key={entry.id}
+                        className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-sm text-[10px] ${entry.status === "error" ? "bg-destructive/15 text-destructive" : entry.status === "success" ? "bg-gk-green/15 text-gk-green" : "bg-primary/15 text-primary"}`}
+                      >
+                        {i + 1}.{" "}
+                        {new Date(entry.timestamp).toLocaleTimeString([], {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                          second: "2-digit",
+                        })}
                         {entry.status === "error" && <AlertTriangle className="size-3" />}
                         {entry.status === "success" && <CheckCircle2 className="size-3" />}
                       </span>
@@ -872,13 +981,20 @@ export function VoiceNoteField({
                 </div>
               </div>
               <div className="flex flex-wrap gap-1.5">
-                <button type="button" onClick={retry} className="inline-flex items-center gap-1 h-7 px-2 rounded-md bg-primary text-primary-foreground text-[11px] font-medium hover:opacity-90">
-                  <RotateCcw className="size-3" />Transcribe now
+                <button
+                  type="button"
+                  onClick={retry}
+                  className="inline-flex items-center gap-1 h-7 px-2 rounded-md bg-primary text-primary-foreground text-[11px] font-medium hover:opacity-90"
+                >
+                  <RotateCcw className="size-3" />
+                  Transcribe now
                 </button>
                 <button
                   type="button"
                   onClick={() => {
-                    const ok = window.confirm("Discard this voice note and its saved audio? This cannot be undone.");
+                    const ok = window.confirm(
+                      "Discard this voice note and its saved audio? This cannot be undone.",
+                    );
                     if (ok) reset();
                   }}
                   className="inline-flex items-center gap-1 h-7 px-2 rounded-md border border-border text-[11px] font-medium hover:bg-accent"
@@ -894,17 +1010,22 @@ export function VoiceNoteField({
                 <div className="text-xs text-foreground">
                   <div className="font-medium">Recording saved ({elapsed}s)</div>
                   <div className="text-[10px] text-muted-foreground mt-0.5">
-                    Choose what to do next — transcribe with AI, save the audio as-is, or discard and re-record.
+                    Choose what to do next — transcribe with AI, save the audio as-is, or discard
+                    and re-record.
                   </div>
                 </div>
               </div>
               <div className="flex flex-wrap gap-1.5">
                 <button
                   type="button"
-                  onClick={() => { setAttempt(1); void transcribe(); }}
+                  onClick={() => {
+                    setAttempt(1);
+                    void transcribe();
+                  }}
                   className="inline-flex items-center gap-1 h-8 px-3 rounded-md bg-primary text-primary-foreground text-xs font-medium hover:opacity-90"
                 >
-                  <Sparkles className="size-3.5" />Transcribe with AI
+                  <Sparkles className="size-3.5" />
+                  Transcribe with AI
                 </button>
                 {onAudioAttach && (
                   <button
@@ -919,7 +1040,9 @@ export function VoiceNoteField({
                 <button
                   type="button"
                   onClick={() => {
-                    const ok = window.confirm("Discard this voice note recording? This cannot be undone.");
+                    const ok = window.confirm(
+                      "Discard this voice note recording? This cannot be undone.",
+                    );
                     if (ok) reset();
                   }}
                   className="inline-flex items-center gap-1 h-8 px-3 rounded-md border border-border text-xs font-medium hover:bg-accent"
@@ -938,35 +1061,73 @@ export function VoiceNoteField({
                 </div>
               </div>
               <div className="flex flex-wrap gap-1.5">
-                <button type="button" onClick={retry} className="inline-flex items-center gap-1 h-7 px-2 rounded-md bg-primary text-primary-foreground text-[11px] font-medium hover:opacity-90">
-                  <RotateCcw className="size-3" />Retry transcription
+                <button
+                  type="button"
+                  onClick={retry}
+                  className="inline-flex items-center gap-1 h-7 px-2 rounded-md bg-primary text-primary-foreground text-[11px] font-medium hover:opacity-90"
+                >
+                  <RotateCcw className="size-3" />
+                  Retry transcription
                 </button>
                 {onAudioAttach && (
-                  <button type="button" onClick={() => void saveWithoutTranscript()} disabled={attaching} className="inline-flex items-center gap-1 h-7 px-2 rounded-md border border-border text-[11px] font-medium hover:bg-accent disabled:opacity-50">
+                  <button
+                    type="button"
+                    onClick={() => void saveWithoutTranscript()}
+                    disabled={attaching}
+                    className="inline-flex items-center gap-1 h-7 px-2 rounded-md border border-border text-[11px] font-medium hover:bg-accent disabled:opacity-50"
+                  >
                     {attaching ? "Saving…" : "Save audio without transcript"}
                   </button>
                 )}
-                <button type="button" onClick={reset} className="inline-flex items-center gap-1 h-7 px-2 rounded-md border border-border text-[11px] font-medium hover:bg-accent">
+                <button
+                  type="button"
+                  onClick={reset}
+                  className="inline-flex items-center gap-1 h-7 px-2 rounded-md border border-border text-[11px] font-medium hover:bg-accent"
+                >
                   Discard
                 </button>
               </div>
               {attemptLog.length > 0 && (
                 <div className="border-t border-destructive/20 pt-2">
                   <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5">
-                    <History className="size-3" />Transcription attempts log
+                    <History className="size-3" />
+                    Transcription attempts log
                   </div>
                   <ul className="space-y-1">
                     {attemptLog.map((entry, i) => (
                       <li key={entry.id} className="flex items-start gap-2 text-[11px]">
-                        <span className="text-muted-foreground font-mono tabular-nums">{i + 1}.</span>
-                        <span className="text-muted-foreground font-mono tabular-nums">{new Date(entry.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</span>
-                        <span className={`shrink-0 inline-flex items-center gap-1 px-1 rounded-sm ${entry.status === "success" ? "bg-gk-green/20 text-gk-green" : entry.status === "error" ? "bg-destructive/20 text-destructive" : "bg-primary/20 text-primary"}`}>
+                        <span className="text-muted-foreground font-mono tabular-nums">
+                          {i + 1}.
+                        </span>
+                        <span className="text-muted-foreground font-mono tabular-nums">
+                          {new Date(entry.timestamp).toLocaleTimeString([], {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                            second: "2-digit",
+                          })}
+                        </span>
+                        <span
+                          className={`shrink-0 inline-flex items-center gap-1 px-1 rounded-sm ${entry.status === "success" ? "bg-gk-green/20 text-gk-green" : entry.status === "error" ? "bg-destructive/20 text-destructive" : "bg-primary/20 text-primary"}`}
+                        >
                           {entry.status === "success" && <CheckCircle2 className="size-3" />}
                           {entry.status === "error" && <AlertTriangle className="size-3" />}
-                          {entry.status === "started" && <Loader2 className="size-3 animate-spin" />}
-                          {entry.status === "success" ? "Success" : entry.status === "error" ? "Failed" : "Started"}
+                          {entry.status === "started" && (
+                            <Loader2 className="size-3 animate-spin" />
+                          )}
+                          {entry.status === "success"
+                            ? "Success"
+                            : entry.status === "error"
+                              ? "Failed"
+                              : "Started"}
                         </span>
-                        {entry.message && <span className="text-muted-foreground truncate max-w-[180px]" title={entry.message}>{entry.message}</span>}
+                        {entry.message && (
+                          <span
+                            className="text-muted-foreground truncate max-w-[180px]"
+                            title={entry.message}
+                          >
+                            {entry.message}
+                          </span>
+                        )}
                       </li>
                     ))}
                   </ul>
@@ -977,86 +1138,137 @@ export function VoiceNoteField({
             (() => {
               const hasSnapshot = !!preTranscribeSnapshotRef.current;
               const undoNeedsNetwork = !hasSnapshot;
-              const cooldownPct = cooldownActive && retryAvailableAt > 0
-                ? Math.min(100, Math.max(0, 100 - (cooldownRemainingMs / cooldownMsForAttempts(attempt || 1)) * 100))
-                : 100;
+              const cooldownPct =
+                cooldownActive && retryAvailableAt > 0
+                  ? Math.min(
+                      100,
+                      Math.max(
+                        0,
+                        100 - (cooldownRemainingMs / cooldownMsForAttempts(attempt || 1)) * 100,
+                      ),
+                    )
+                  : 100;
               const undoDisabled = undoNeedsNetwork && cooldownActive;
               const retryDisabled = cooldownActive;
               return (
-            <div className="rounded-md border border-border bg-background p-2.5 space-y-2">
-              <div className="flex items-start gap-2">
-                <XCircle className="size-3.5 text-muted-foreground mt-0.5 shrink-0" />
-                <div className="text-xs text-foreground">
-                  <div className="font-medium">Transcription cancelled</div>
-                  <div className="text-[10px] text-muted-foreground mt-0.5">
-                    {cancelledPhaseRef.current !== "idle" && (
-                      <>Stopped during <span className="font-mono uppercase tracking-wider">{cancelledPhaseRef.current}</span>{cancelledElapsedRef.current ? ` at ${cancelledElapsedRef.current}s` : ""}. </>
+                <div className="rounded-md border border-border bg-background p-2.5 space-y-2">
+                  <div className="flex items-start gap-2">
+                    <XCircle className="size-3.5 text-muted-foreground mt-0.5 shrink-0" />
+                    <div className="text-xs text-foreground">
+                      <div className="font-medium">Transcription cancelled</div>
+                      <div className="text-[10px] text-muted-foreground mt-0.5">
+                        {cancelledPhaseRef.current !== "idle" && (
+                          <>
+                            Stopped during{" "}
+                            <span className="font-mono uppercase tracking-wider">
+                              {cancelledPhaseRef.current}
+                            </span>
+                            {cancelledElapsedRef.current
+                              ? ` at ${cancelledElapsedRef.current}s`
+                              : ""}
+                            .{" "}
+                          </>
+                        )}
+                        The audio recording is still saved.
+                        {hasSnapshot
+                          ? " Undo to restore your previous transcript, retry, or save without a transcript."
+                          : " Undo to resume, retry, or save without a transcript."}
+                      </div>
+                    </div>
+                  </div>
+                  {cooldownActive && (
+                    <div className="rounded-md border border-border/60 bg-muted/40 p-2 space-y-1">
+                      <div className="flex items-center justify-between text-[10px] font-mono uppercase tracking-wider">
+                        <span className="text-muted-foreground">Retry cooldown</span>
+                        <span className="text-foreground">
+                          Available in {cooldownRemainingSec}s
+                        </span>
+                      </div>
+                      <div className="h-1 rounded-full bg-border overflow-hidden">
+                        <div
+                          className="h-full bg-primary transition-[width] duration-500 ease-linear"
+                          style={{ width: `${cooldownPct}%` }}
+                        />
+                      </div>
+                      <div className="text-[10px] text-muted-foreground">
+                        Backing off after {attempt} attempt{attempt === 1 ? "" : "s"} to protect the
+                        transcription service.{" "}
+                        {hasSnapshot
+                          ? "Undo cancellation is available now — it just restores your prior transcript."
+                          : "You can still save the audio without a transcript while you wait."}
+                      </div>
+                    </div>
+                  )}
+                  {!cooldownActive && attempt >= 1 && (
+                    <div className="text-[10px] font-mono uppercase tracking-wider text-gk-green">
+                      Retry available now
+                    </div>
+                  )}
+                  <div className="flex flex-wrap gap-1.5">
+                    <button
+                      type="button"
+                      onClick={undoCancel}
+                      disabled={undoDisabled}
+                      title={
+                        undoDisabled
+                          ? `Resuming needs the network — available in ${cooldownRemainingSec}s`
+                          : undefined
+                      }
+                      className="inline-flex items-center gap-1 h-7 px-2 rounded-md bg-primary text-primary-foreground text-[11px] font-medium hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <RotateCcw className="size-3" />
+                      Undo cancellation{undoDisabled ? ` (${cooldownRemainingSec}s)` : ""}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={retry}
+                      disabled={retryDisabled}
+                      title={
+                        retryDisabled
+                          ? `Retry cools down for ${cooldownRemainingSec}s more`
+                          : undefined
+                      }
+                      className="inline-flex items-center gap-1 h-7 px-2 rounded-md border border-border text-[11px] font-medium hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Retry from scratch{retryDisabled ? ` (${cooldownRemainingSec}s)` : ""}
+                    </button>
+                    {onAudioAttach && (
+                      <button
+                        type="button"
+                        onClick={() => void saveWithoutTranscript()}
+                        disabled={attaching}
+                        className="inline-flex items-center gap-1 h-7 px-2 rounded-md border border-border text-[11px] font-medium hover:bg-accent disabled:opacity-50"
+                      >
+                        {attaching ? "Saving…" : "Save audio without transcript"}
+                      </button>
                     )}
-                    The audio recording is still saved.{hasSnapshot ? " Undo to restore your previous transcript, retry, or save without a transcript." : " Undo to resume, retry, or save without a transcript."}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const ok = window.confirm(
+                          "Discard this voice note and its saved audio? This cannot be undone.",
+                        );
+                        if (ok) reset();
+                      }}
+                      className="inline-flex items-center gap-1 h-7 px-2 rounded-md border border-border text-[11px] font-medium hover:bg-accent"
+                    >
+                      Discard
+                    </button>
                   </div>
                 </div>
-              </div>
-              {cooldownActive && (
-                <div className="rounded-md border border-border/60 bg-muted/40 p-2 space-y-1">
-                  <div className="flex items-center justify-between text-[10px] font-mono uppercase tracking-wider">
-                    <span className="text-muted-foreground">Retry cooldown</span>
-                    <span className="text-foreground">Available in {cooldownRemainingSec}s</span>
-                  </div>
-                  <div className="h-1 rounded-full bg-border overflow-hidden">
-                    <div className="h-full bg-primary transition-[width] duration-500 ease-linear" style={{ width: `${cooldownPct}%` }} />
-                  </div>
-                  <div className="text-[10px] text-muted-foreground">Backing off after {attempt} attempt{attempt === 1 ? "" : "s"} to protect the transcription service. {hasSnapshot ? "Undo cancellation is available now — it just restores your prior transcript." : "You can still save the audio without a transcript while you wait."}</div>
-                </div>
-              )}
-              {!cooldownActive && attempt >= 1 && (
-                <div className="text-[10px] font-mono uppercase tracking-wider text-gk-green">Retry available now</div>
-              )}
-              <div className="flex flex-wrap gap-1.5">
-                <button
-                  type="button"
-                  onClick={undoCancel}
-                  disabled={undoDisabled}
-                  title={undoDisabled ? `Resuming needs the network — available in ${cooldownRemainingSec}s` : undefined}
-                  className="inline-flex items-center gap-1 h-7 px-2 rounded-md bg-primary text-primary-foreground text-[11px] font-medium hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <RotateCcw className="size-3" />Undo cancellation{undoDisabled ? ` (${cooldownRemainingSec}s)` : ""}
-                </button>
-                <button
-                  type="button"
-                  onClick={retry}
-                  disabled={retryDisabled}
-                  title={retryDisabled ? `Retry cools down for ${cooldownRemainingSec}s more` : undefined}
-                  className="inline-flex items-center gap-1 h-7 px-2 rounded-md border border-border text-[11px] font-medium hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Retry from scratch{retryDisabled ? ` (${cooldownRemainingSec}s)` : ""}
-                </button>
-                {onAudioAttach && (
-                  <button type="button" onClick={() => void saveWithoutTranscript()} disabled={attaching} className="inline-flex items-center gap-1 h-7 px-2 rounded-md border border-border text-[11px] font-medium hover:bg-accent disabled:opacity-50">
-                    {attaching ? "Saving…" : "Save audio without transcript"}
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={() => {
-                    const ok = window.confirm("Discard this voice note and its saved audio? This cannot be undone.");
-                    if (ok) reset();
-                  }}
-                  className="inline-flex items-center gap-1 h-7 px-2 rounded-md border border-border text-[11px] font-medium hover:bg-accent"
-                >
-                  Discard
-                </button>
-              </div>
-            </div>
               );
             })()
           ) : transcript ? (
-
             <>
               <div className="flex items-center justify-between gap-2 flex-wrap">
-                <div className="text-[11px] uppercase tracking-wider text-muted-foreground">Transcript preview — edit before applying</div>
+                <div className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                  Transcript preview — edit before applying
+                </div>
                 <div className="flex items-center gap-1.5">
                   {overallLabel && (
-                    <span className={`inline-flex items-center gap-1 h-5 px-1.5 rounded-md border text-[10px] font-mono uppercase tracking-wider ${overallClass}`}>
+                    <span
+                      className={`inline-flex items-center gap-1 h-5 px-1.5 rounded-md border text-[10px] font-mono uppercase tracking-wider ${overallClass}`}
+                    >
                       {overallLabel} confidence · {Math.round((avgConfidence ?? 0) * 100)}%
                     </span>
                   )}
@@ -1092,9 +1304,13 @@ export function VoiceNoteField({
                 </div>
               </div>
               {showHistory && (original || versions.length > 0) && (
-                <div className="bg-muted/40 border border-border rounded-md p-2 max-h-56 overflow-y-auto space-y-1.5" aria-label="Transcript version history">
+                <div
+                  className="bg-muted/40 border border-border rounded-md p-2 max-h-56 overflow-y-auto space-y-1.5"
+                  aria-label="Transcript version history"
+                >
                   <div className="text-[10px] text-muted-foreground">
-                    The AI original is preserved. Each auto-saved edit and save is timestamped. Reverting replaces the current text and records a new version.
+                    The AI original is preserved. Each auto-saved edit and save is timestamped.
+                    Reverting replaces the current text and records a new version.
                   </div>
                   {[...(original ? [original] : []), ...versions].map((v, i, arr) => {
                     const isCurrent = i === arr.length - 1 && transcript === v.text;
@@ -1102,20 +1318,27 @@ export function VoiceNoteField({
                       v.source === "ai"
                         ? "bg-primary/15 text-primary border-primary/30"
                         : v.source === "saved"
-                        ? "bg-success/15 text-success border-success/30"
-                        : "bg-amber-500/15 text-foreground border-amber-500/30";
+                          ? "bg-success/15 text-success border-success/30"
+                          : "bg-amber-500/15 text-foreground border-amber-500/30";
                     return (
-                      <div key={`${v.at}-${i}`} className="rounded-sm border border-border bg-background p-1.5 space-y-1">
+                      <div
+                        key={`${v.at}-${i}`}
+                        className="rounded-sm border border-border bg-background p-1.5 space-y-1"
+                      >
                         <div className="flex items-center justify-between gap-2 flex-wrap">
                           <div className="flex items-center gap-1.5">
-                            <span className={`inline-flex items-center h-4 px-1 rounded-sm border text-[9px] font-mono uppercase tracking-wider ${badgeClass}`}>
+                            <span
+                              className={`inline-flex items-center h-4 px-1 rounded-sm border text-[9px] font-mono uppercase tracking-wider ${badgeClass}`}
+                            >
                               {v.label ?? v.source}
                             </span>
                             <span className="text-[10px] text-muted-foreground font-mono tabular-nums">
                               {new Date(v.at).toLocaleString()}
                             </span>
                             {isCurrent && (
-                              <span className="text-[9px] uppercase tracking-wider text-muted-foreground">current</span>
+                              <span className="text-[9px] uppercase tracking-wider text-muted-foreground">
+                                current
+                              </span>
                             )}
                           </div>
                           {!isCurrent && (
@@ -1123,10 +1346,17 @@ export function VoiceNoteField({
                               type="button"
                               onClick={() => {
                                 const now = new Date().toISOString();
-                                setVersions((prev) => [
-                                  ...prev,
-                                  { at: now, text: v.text, source: "edit" as const, label: `Reverted to ${v.label ?? v.source}` },
-                                ].slice(-20));
+                                setVersions((prev) =>
+                                  [
+                                    ...prev,
+                                    {
+                                      at: now,
+                                      text: v.text,
+                                      source: "edit" as const,
+                                      label: `Reverted to ${v.label ?? v.source}`,
+                                    },
+                                  ].slice(-20),
+                                );
                                 invalidateAiRequests();
                                 setTranscript(v.text);
                                 setTokens([]);
@@ -1150,7 +1380,9 @@ export function VoiceNoteField({
               )}
               {showTimestamps && audioUrl && timedSentences.length > 0 && (
                 <div className="bg-muted/40 border border-border rounded-md p-2 max-h-40 overflow-y-auto space-y-1">
-                  <div className="text-[10px] text-muted-foreground mb-1">Approximate timings — click a sentence to jump the audio to that point.</div>
+                  <div className="text-[10px] text-muted-foreground mb-1">
+                    Approximate timings — click a sentence to jump the audio to that point.
+                  </div>
                   {timedSentences.map((s, i) => {
                     const active = currentTime >= s.start && currentTime < s.end;
                     return (
@@ -1161,7 +1393,9 @@ export function VoiceNoteField({
                         className={`w-full text-left flex gap-2 items-start text-xs rounded-sm px-1.5 py-1 hover:bg-accent focus:outline-none focus-visible:ring-1 focus-visible:ring-primary ${active ? "bg-primary/10 border-l-2 border-primary" : ""}`}
                         aria-label={`Jump to ${fmtTs(s.start)}: ${s.text}`}
                       >
-                        <span className="font-mono tabular-nums text-[10px] text-primary shrink-0 mt-0.5">{fmtTs(s.start)}</span>
+                        <span className="font-mono tabular-nums text-[10px] text-primary shrink-0 mt-0.5">
+                          {fmtTs(s.start)}
+                        </span>
                         <span className="text-foreground leading-relaxed">{s.text}</span>
                       </button>
                     );
@@ -1211,8 +1445,14 @@ export function VoiceNoteField({
               />
               {tokens.length > 0 && (
                 <div className="flex items-center gap-2 flex-wrap text-[10px] text-muted-foreground">
-                  <span className="inline-flex items-center gap-1"><span className="inline-block size-2 rounded-sm bg-amber-500/50" />Medium ({medCount})</span>
-                  <span className="inline-flex items-center gap-1"><span className="inline-block size-2 rounded-sm bg-destructive/50" />Low ({lowCount})</span>
+                  <span className="inline-flex items-center gap-1">
+                    <span className="inline-block size-2 rounded-sm bg-amber-500/50" />
+                    Medium ({medCount})
+                  </span>
+                  <span className="inline-flex items-center gap-1">
+                    <span className="inline-block size-2 rounded-sm bg-destructive/50" />
+                    Low ({lowCount})
+                  </span>
                   <span className="opacity-70">Editing the text clears highlights.</span>
                 </div>
               )}
@@ -1232,40 +1472,77 @@ export function VoiceNoteField({
                 </div>
               )}
               {pendingApply ? (
-                <div className="rounded-md border border-primary/40 bg-primary/5 p-2 space-y-2" role="alertdialog" aria-label="Confirm save transcript">
+                <div
+                  className="rounded-md border border-primary/40 bg-primary/5 p-2 space-y-2"
+                  role="alertdialog"
+                  aria-label="Confirm save transcript"
+                >
                   <div className="text-[11px] font-medium text-foreground">
-                    Save transcript ({pendingApply === "append" ? "append to comments" : "replace comments"})?
+                    Save transcript (
+                    {pendingApply === "append" ? "append to comments" : "replace comments"})?
                   </div>
                   <div className="text-[11px] text-muted-foreground">
-                    {transcript.trim().length} characters · {transcript.trim().split(/\s+/).filter(Boolean).length} words. This cannot be undone from here.
+                    {transcript.trim().length} characters ·{" "}
+                    {transcript.trim().split(/\s+/).filter(Boolean).length} words. This cannot be
+                    undone from here.
                   </div>
                   <div className="text-[11px] bg-background border border-border rounded-sm p-1.5 max-h-20 overflow-y-auto whitespace-pre-wrap font-mono leading-relaxed">
                     {transcript.length > 240 ? `${transcript.slice(0, 240)}…` : transcript}
                   </div>
                   <div className="flex flex-wrap gap-1.5">
-                    <button type="button" onClick={confirmApply} className="inline-flex items-center gap-1 h-7 px-2 rounded-md bg-primary text-primary-foreground text-[11px] font-medium hover:opacity-90">
+                    <button
+                      type="button"
+                      onClick={confirmApply}
+                      className="inline-flex items-center gap-1 h-7 px-2 rounded-md bg-primary text-primary-foreground text-[11px] font-medium hover:opacity-90"
+                    >
                       Confirm save
                     </button>
-                    <button type="button" onClick={() => setPendingApply(null)} className="inline-flex items-center gap-1 h-7 px-2 rounded-md border border-border text-[11px] font-medium hover:bg-accent">
+                    <button
+                      type="button"
+                      onClick={() => setPendingApply(null)}
+                      className="inline-flex items-center gap-1 h-7 px-2 rounded-md border border-border text-[11px] font-medium hover:bg-accent"
+                    >
                       Keep editing
                     </button>
                   </div>
                 </div>
               ) : (
                 <div className="flex flex-wrap gap-1.5">
-                  <button type="button" disabled={!reviewed || !transcript.trim() || isEditingText} onClick={() => requestApply("append")} className="inline-flex items-center gap-1 h-7 px-2 rounded-md bg-primary text-primary-foreground text-[11px] font-medium hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed">
+                  <button
+                    type="button"
+                    disabled={!reviewed || !transcript.trim() || isEditingText}
+                    onClick={() => requestApply("append")}
+                    className="inline-flex items-center gap-1 h-7 px-2 rounded-md bg-primary text-primary-foreground text-[11px] font-medium hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
                     Append to comments
                   </button>
                   {allowReplace && (
-                    <button type="button" disabled={!reviewed || !transcript.trim() || isEditingText} onClick={() => requestApply("replace")} className="inline-flex items-center gap-1 h-7 px-2 rounded-md border border-border text-[11px] font-medium hover:bg-accent disabled:opacity-40 disabled:cursor-not-allowed">
+                    <button
+                      type="button"
+                      disabled={!reviewed || !transcript.trim() || isEditingText}
+                      onClick={() => requestApply("replace")}
+                      className="inline-flex items-center gap-1 h-7 px-2 rounded-md border border-border text-[11px] font-medium hover:bg-accent disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
                       Replace comments
                     </button>
                   )}
-                  <button type="button" onClick={() => { navigator.clipboard?.writeText(transcript); toast.success("Copied"); }} className="inline-flex items-center gap-1 h-7 px-2 rounded-md border border-border text-[11px] font-medium hover:bg-accent">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard?.writeText(transcript);
+                      toast.success("Copied");
+                    }}
+                    className="inline-flex items-center gap-1 h-7 px-2 rounded-md border border-border text-[11px] font-medium hover:bg-accent"
+                  >
                     Copy
                   </button>
-                  <button type="button" onClick={retry} className="inline-flex items-center gap-1 h-7 px-2 rounded-md border border-border text-[11px] font-medium hover:bg-accent">
-                    <RotateCcw className="size-3" />Retry
+                  <button
+                    type="button"
+                    onClick={retry}
+                    className="inline-flex items-center gap-1 h-7 px-2 rounded-md border border-border text-[11px] font-medium hover:bg-accent"
+                  >
+                    <RotateCcw className="size-3" />
+                    Retry
                   </button>
                   {aiMode === "report-rewrite" ? (
                     <button
@@ -1275,7 +1552,11 @@ export function VoiceNoteField({
                       className="inline-flex items-center gap-1 h-7 px-2 rounded-md border border-primary/40 text-primary text-[11px] font-medium hover:bg-primary/10 disabled:opacity-40 disabled:cursor-not-allowed"
                       title="Create a faithful, polished rewrite using the selected fixture details"
                     >
-                      {rewriting ? <Loader2 className="size-3 animate-spin" /> : <Sparkles className="size-3" />}
+                      {rewriting ? (
+                        <Loader2 className="size-3 animate-spin" />
+                      ) : (
+                        <Sparkles className="size-3" />
+                      )}
                       {rewrite ? "Regenerate AI rewrite" : "Generate AI rewrite"}
                     </button>
                   ) : (
@@ -1286,7 +1567,11 @@ export function VoiceNoteField({
                       className="inline-flex items-center gap-1 h-7 px-2 rounded-md border border-primary/40 text-primary text-[11px] font-medium hover:bg-primary/10 disabled:opacity-40 disabled:cursor-not-allowed"
                       title="Use AI to draft a structured summary from this transcript"
                     >
-                      {summarizing ? <Loader2 className="size-3 animate-spin" /> : <Sparkles className="size-3" />}
+                      {summarizing ? (
+                        <Loader2 className="size-3 animate-spin" />
+                      ) : (
+                        <Sparkles className="size-3" />
+                      )}
                       {summary ? "Regenerate summary" : "Suggest summary"}
                     </button>
                   )}
@@ -1294,18 +1579,26 @@ export function VoiceNoteField({
               )}
 
               {aiMode === "report-rewrite" && rewriting && !rewrite && (
-                <div className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground" role="status">
+                <div
+                  className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground"
+                  role="status"
+                >
                   <Loader2 className="size-3 animate-spin" />
                   Preparing an editable AI rewrite…
                 </div>
               )}
 
               {aiMode === "report-rewrite" && rewriteError && !rewrite && (
-                <div className="text-[11px] text-destructive" role="alert">{rewriteError}</div>
+                <div className="text-[11px] text-destructive" role="alert">
+                  {rewriteError}
+                </div>
               )}
 
               {aiMode === "report-rewrite" && rewrite && (
-                <div className="rounded-md border border-primary/40 bg-primary/5 p-2 space-y-2" aria-label="AI-suggested report rewrite">
+                <div
+                  className="rounded-md border border-primary/40 bg-primary/5 p-2 space-y-2"
+                  aria-label="AI-suggested report rewrite"
+                >
                   <div className="flex items-center justify-between gap-2">
                     <div className="text-[11px] font-semibold uppercase tracking-wider text-primary inline-flex items-center gap-1">
                       <Sparkles className="size-3" /> AI rewrite — review before using
@@ -1319,7 +1612,8 @@ export function VoiceNoteField({
                     </button>
                   </div>
                   <p className="text-[10px] text-muted-foreground">
-                    This keeps the mentor's observations but cleans up speech and uses the selected goalkeeper and fixture names. Edit anything before inserting.
+                    This keeps the mentor's observations but cleans up speech and uses the selected
+                    goalkeeper and fixture names. Edit anything before inserting.
                   </p>
                   <textarea
                     value={rewrite}
@@ -1330,12 +1624,19 @@ export function VoiceNoteField({
                     aria-label="Editable AI rewrite"
                   />
                   <div className="flex flex-wrap gap-1.5 pt-1">
-                    <button type="button" onClick={useRewrite} className="inline-flex items-center gap-1 h-7 px-2 rounded-md bg-primary text-primary-foreground text-[11px] font-medium hover:opacity-90">
+                    <button
+                      type="button"
+                      onClick={useRewrite}
+                      className="inline-flex items-center gap-1 h-7 px-2 rounded-md bg-primary text-primary-foreground text-[11px] font-medium hover:opacity-90"
+                    >
                       Use AI rewrite
                     </button>
                     <button
                       type="button"
-                      onClick={() => { navigator.clipboard?.writeText(rewrite); toast.success("AI rewrite copied"); }}
+                      onClick={() => {
+                        navigator.clipboard?.writeText(rewrite);
+                        toast.success("AI rewrite copied");
+                      }}
                       className="inline-flex items-center gap-1 h-7 px-2 rounded-md border border-border text-[11px] font-medium hover:bg-accent"
                     >
                       Copy
@@ -1345,11 +1646,16 @@ export function VoiceNoteField({
               )}
 
               {aiMode === "structured-summary" && summaryError && !summary && (
-                <div className="text-[11px] text-destructive" role="alert">{summaryError}</div>
+                <div className="text-[11px] text-destructive" role="alert">
+                  {summaryError}
+                </div>
               )}
 
               {aiMode === "structured-summary" && summary && (
-                <div className="rounded-md border border-primary/40 bg-primary/5 p-2 space-y-2" aria-label="AI-suggested structured summary">
+                <div
+                  className="rounded-md border border-primary/40 bg-primary/5 p-2 space-y-2"
+                  aria-label="AI-suggested structured summary"
+                >
                   <div className="flex items-center justify-between gap-2">
                     <div className="text-[11px] font-semibold uppercase tracking-wider text-primary inline-flex items-center gap-1">
                       <Sparkles className="size-3" /> AI suggestion — review before inserting
@@ -1363,7 +1669,9 @@ export function VoiceNoteField({
                     </button>
                   </div>
                   <div className="space-y-1.5">
-                    <label className="block text-[10px] uppercase tracking-wider text-muted-foreground">Headline</label>
+                    <label className="block text-[10px] uppercase tracking-wider text-muted-foreground">
+                      Headline
+                    </label>
                     <input
                       type="text"
                       value={summary.headline}
@@ -1395,17 +1703,28 @@ export function VoiceNoteField({
                     );
                   })}
                   <div className="flex flex-wrap gap-1.5 pt-1">
-                    <button type="button" onClick={() => insertSummary("append")} className="inline-flex items-center gap-1 h-7 px-2 rounded-md bg-primary text-primary-foreground text-[11px] font-medium hover:opacity-90">
+                    <button
+                      type="button"
+                      onClick={() => insertSummary("append")}
+                      className="inline-flex items-center gap-1 h-7 px-2 rounded-md bg-primary text-primary-foreground text-[11px] font-medium hover:opacity-90"
+                    >
                       Append to comments
                     </button>
                     {allowReplace && (
-                      <button type="button" onClick={() => insertSummary("replace")} className="inline-flex items-center gap-1 h-7 px-2 rounded-md border border-border text-[11px] font-medium hover:bg-accent">
+                      <button
+                        type="button"
+                        onClick={() => insertSummary("replace")}
+                        className="inline-flex items-center gap-1 h-7 px-2 rounded-md border border-border text-[11px] font-medium hover:bg-accent"
+                      >
                         Replace comments
                       </button>
                     )}
                     <button
                       type="button"
-                      onClick={() => { navigator.clipboard?.writeText(formatSummary(summary)); toast.success("Summary copied"); }}
+                      onClick={() => {
+                        navigator.clipboard?.writeText(formatSummary(summary));
+                        toast.success("Summary copied");
+                      }}
                       className="inline-flex items-center gap-1 h-7 px-2 rounded-md border border-border text-[11px] font-medium hover:bg-accent"
                     >
                       Copy
@@ -1414,15 +1733,24 @@ export function VoiceNoteField({
                 </div>
               )}
 
-
               {onAudioAttach && blobRef.current && (
                 <div className="text-[11px] mt-1">
                   {attaching ? (
-                    <span className="inline-flex items-center gap-1 text-muted-foreground"><Loader2 className="size-3 animate-spin" />Saving audio to Media Library…</span>
+                    <span className="inline-flex items-center gap-1 text-muted-foreground">
+                      <Loader2 className="size-3 animate-spin" />
+                      Saving audio to Media Library…
+                    </span>
                   ) : attached ? (
-                    <span className="inline-flex items-center gap-1 text-green-600"><CheckCircle2 className="size-3" />Audio saved to Media Library and linked to this report</span>
+                    <span className="inline-flex items-center gap-1 text-green-600">
+                      <CheckCircle2 className="size-3" />
+                      Audio saved to Media Library and linked to this report
+                    </span>
                   ) : (
-                    <button type="button" onClick={attachAudio} className="underline text-muted-foreground hover:text-foreground">
+                    <button
+                      type="button"
+                      onClick={attachAudio}
+                      className="underline text-muted-foreground hover:text-foreground"
+                    >
                       Save audio to Media Library
                     </button>
                   )}
