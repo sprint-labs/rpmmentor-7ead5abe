@@ -20,7 +20,7 @@ For a normal code change, leave: a concise plan, the changed files, focused test
 
 This is a single-process TanStack Start app. Standard commands live in `package.json` and `docs/RPM-LIVE-OPERATING-GUIDE.md`. Use **npm** (the lockfile and operating guide), not bun, even though `bun.lock` is also committed.
 
-- `npm run dev` serves the UI, SSR, and server functions together at **http://localhost:8080/** (not Vite's default 5173). Unauthenticated visits to `/` 307 to `/login`.
+- `npm run dev` serves the UI, SSR, and server functions together at **http://localhost:8080/** (not Vite's default 5173). Unauthenticated visits to `/` hydrate into login; open `/login` directly for UI work. A first-load hydration mismatch (`Expected server HTML to contain a matching <main>`) can leave a logo-only shell until refresh — that is a known local-dev gotcha, not a missing-install failure.
 - The tracked `.env` is enough to boot locally, but it points at the **legacy unrelated** Supabase project, not production `zdxxezquhvpjmoxlecjp`. Do not copy those values into Vercel. `SUPABASE_SERVICE_ROLE_KEY` is not present, so admin/server-function paths that use `client.server.ts` fail until it is added in untracked `.env.local`.
 - Auth/storage smoke tests in `src/lib/auth.smoke.test.ts` and `src/lib/storage/gk-media.test.ts` skip unless `TEST_MENTOR_EMAIL` / `TEST_MENTOR_PASSWORD` (and the admin pair) are set. Broad `npm run lint` hits a large historical Prettier baseline; treat it as documented in the operating guide, not as a focused-change failure.
 - Optional AI/Sheets keys (`LOVABLE_API_KEY`, `OPENAI_API_KEY`, `GOOGLE_SHEETS_API_KEY`) degrade gracefully when absent. Do not start Docker, local Supabase, or `supabase db push` for ordinary cloud-agent work.
