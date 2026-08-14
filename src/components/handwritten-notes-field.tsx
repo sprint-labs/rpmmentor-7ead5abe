@@ -4,7 +4,7 @@ import { Camera, Loader2, Sparkles, X, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 import { transcribeNotes } from "@/lib/api/transcribe.functions";
 
-const MAX_BYTES = 8 * 1024 * 1024; // 8MB upload cap for the gateway
+const MAX_BYTES = 8 * 1024 * 1024; // 8MB upload cap
 
 function readAsDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -37,9 +37,44 @@ export function HandwrittenNotesField({
   const [preview, setPreview] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [transcript, setTranscript] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const run = useServerFn(transcribeNotes);
 
-  const reset = () => { setPreview(null); setTranscript(null); };
+  const reset = () => {
+    setPreview(null);
+    setTranscript(null);
+    setError(null);
+  };
+
+  const transcribePreview = async (url: string) => {
+    setBusy(true);
+    setError(null);
+    try {
+      const result = await run({ data: { imageDataUrl: url, context } });
+      if (!result.ok) {
+        toast.error(result.error);
+        setTranscript(null);
+        setError(result.error);
+      } else {
+        setTranscript(result.text);
+        setError(null);
+        toast.success("Notes transcribed");
+      }
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "Transcription failed";
+      toast.error(message);
+      setTranscript(null);
+      setError(message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const retry = () => {
+    if (!preview) return;
+    setTranscript(null);
+    void transcribePreview(preview);
+  };
 
   const handleFile = async (file: File | undefined | null) => {
     if (!file) return;
@@ -49,19 +84,10 @@ export function HandwrittenNotesField({
       const url = await readAsDataUrl(file);
       setPreview(url);
       setTranscript(null);
-      setBusy(true);
-      const result = await run({ data: { imageDataUrl: url, context } });
-      if (!result.ok) {
-        toast.error(result.error);
-        setTranscript(null);
-      } else {
-        setTranscript(result.text);
-        toast.success("Notes transcribed");
-      }
+      setError(null);
+      await transcribePreview(url);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Transcription failed");
-    } finally {
-      setBusy(false);
     }
   };
 
@@ -117,11 +143,18 @@ export function HandwrittenNotesField({
                   <button type="button" onClick={() => { navigator.clipboard?.writeText(transcript); toast.success("Copied"); }} className="inline-flex items-center gap-1 h-7 px-2 rounded-md border border-border text-[11px] font-medium hover:bg-accent">
                     Copy
                   </button>
-                  <button type="button" onClick={() => { setTranscript(null); setBusy(true); run({ data: { imageDataUrl: preview, context } }).then((r) => { if (r.ok) { setTranscript(r.text); } else { toast.error(r.error); } }).finally(() => setBusy(false)); }} className="inline-flex items-center gap-1 h-7 px-2 rounded-md border border-border text-[11px] font-medium hover:bg-accent">
+                  <button type="button" onClick={retry} className="inline-flex items-center gap-1 h-7 px-2 rounded-md border border-border text-[11px] font-medium hover:bg-accent">
                     <RotateCcw className="size-3" />Retry
                   </button>
                 </div>
               </>
+            ) : error ? (
+              <div className="space-y-2">
+                <div className="text-xs text-destructive" role="alert">{error}</div>
+                <button type="button" onClick={retry} className="inline-flex items-center gap-1 h-7 px-2 rounded-md border border-border text-[11px] font-medium hover:bg-accent">
+                  <RotateCcw className="size-3" />Retry
+                </button>
+              </div>
             ) : null}
           </div>
         </div>

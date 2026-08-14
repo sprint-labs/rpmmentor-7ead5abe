@@ -28,7 +28,7 @@ export const transcribeNotes = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((data: unknown) => InputSchema.parse(data))
   .handler(async ({ data }) => {
-    const apiKey = process.env.LOVABLE_API_KEY;
+    const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) {
       return { ok: false as const, error: "AI service is not configured." };
     }
@@ -37,14 +37,14 @@ export const transcribeNotes = createServerFn({ method: "POST" })
       ? `Context from the mentor: ${data.context.trim()}\n\nTranscribe the handwritten notes in this image.`
       : "Transcribe the handwritten notes in this image.";
 
-    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const res = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model: "gpt-4o-mini",
         messages: [
           { role: "system", content: SYSTEM_PROMPT },
           {
@@ -62,7 +62,7 @@ export const transcribeNotes = createServerFn({ method: "POST" })
       if (res.status === 429) return { ok: false as const, error: "Rate limit reached — please try again in a moment." };
       if (res.status === 402) return { ok: false as const, error: "AI credits exhausted — add credits in your workspace settings." };
       const detail = await res.text().catch(() => "");
-      console.error("transcribeNotes gateway error", res.status, detail);
+      console.error("transcribeNotes OpenAI error", res.status, detail);
       return { ok: false as const, error: `Transcription failed (${res.status}).` };
     }
 

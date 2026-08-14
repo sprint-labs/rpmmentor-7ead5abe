@@ -133,17 +133,17 @@ function coerceStringArray(value: unknown, limit = 6): string[] {
 }
 
 async function callGateway(systemPrompt: string, userText: string) {
-  const apiKey = process.env.LOVABLE_API_KEY;
+  const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) return { ok: false as const, error: "AI service is not configured." };
 
-  const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+  const response = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: "google/gemini-2.5-flash",
+      model: "gpt-4o-mini",
       response_format: { type: "json_object" },
       messages: [
         { role: "system", content: systemPrompt },
@@ -159,7 +159,7 @@ async function callGateway(systemPrompt: string, userText: string) {
     if (response.status === 402) {
       return { ok: false as const, error: "AI credits exhausted — add credits in workspace settings." };
     }
-    console.error("AI gateway error", response.status);
+    console.error("AI OpenAI error", response.status);
     return { ok: false as const, error: `AI request failed (${response.status}).` };
   }
 
