@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Outlet, createRootRouteWithContext, useRouter, HeadContent, Scripts, ScriptOnce } from "@tanstack/react-router";
 import { useEffect, type ReactNode } from "react";
+import { SpeedInsights } from "@vercel/speed-insights/react";
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { AppShell } from "@/components/app-shell";
@@ -153,6 +154,7 @@ function RootComponent() {
           <NotificationsProvider>
             <AppShell />
             <Toaster richColors closeButton position="top-right" />
+            <SpeedInsights />
           </NotificationsProvider>
         </AuthProvider>
       </ThemeProvider>
