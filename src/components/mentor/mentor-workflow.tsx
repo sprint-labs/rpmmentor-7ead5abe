@@ -1,7 +1,15 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
-  CheckCircle2, ClipboardList, FileText, Mic, X, Search,
-  AlertTriangle, ArrowLeft, Play, Square,
+  CheckCircle2,
+  ClipboardList,
+  FileText,
+  Mic,
+  X,
+  Search,
+  AlertTriangle,
+  ArrowLeft,
+  Play,
+  Square,
 } from "lucide-react";
 import { goalkeepers } from "@/lib/mock-data";
 import {
@@ -10,10 +18,7 @@ import {
   selectPlayer,
   type WellbeingFlag,
 } from "@/lib/mentor-domain";
-import {
-  ALLOWED_INTERACTION_TYPES,
-  InvalidInteractionTypeError,
-} from "@/lib/mentor-session-store";
+import { ALLOWED_INTERACTION_TYPES, InvalidInteractionTypeError } from "@/lib/mentor-session-store";
 import { Avatar } from "@/components/primitives";
 import { Link } from "@tanstack/react-router";
 
@@ -51,7 +56,17 @@ const selectCls = inputCls;
 const taCls =
   "w-full px-3 py-2 rounded-md bg-input/60 border border-border text-sm focus:outline-none focus:ring-2 focus:ring-ring/40 resize-none";
 
-function Field({ label, required, hint, children }: { label: string; required?: boolean; hint?: string; children: ReactNode }) {
+function Field({
+  label,
+  required,
+  hint,
+  children,
+}: {
+  label: string;
+  required?: boolean;
+  hint?: string;
+  children: ReactNode;
+}) {
   return (
     <div>
       <label className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
@@ -95,7 +110,10 @@ export function MentorWorkflowDialog({ state, mentorProfileId, onClose }: Dialog
             <h3 className="text-base font-semibold truncate">{TITLES[state.kind]}</h3>
             <p className="text-xs text-muted-foreground mt-0.5 truncate">{SUBTITLES[state.kind]}</p>
           </div>
-          <button onClick={onClose} className="size-9 shrink-0 grid place-items-center rounded-md hover:bg-accent">
+          <button
+            onClick={onClose}
+            className="size-9 shrink-0 grid place-items-center rounded-md hover:bg-accent"
+          >
             <X className="size-4" />
           </button>
         </div>
@@ -128,13 +146,25 @@ export function MentorWorkflowDialog({ state, mentorProfileId, onClose }: Dialog
 // -----------------------------------------------------------------------------
 
 function PlayerPicker({
-  mentorProfileId, value, onChange, required,
-}: { mentorProfileId: string; value: string; onChange: (id: string) => void; required?: boolean }) {
+  mentorProfileId,
+  value,
+  onChange,
+  required,
+}: {
+  mentorProfileId: string;
+  value: string;
+  onChange: (id: string) => void;
+  required?: boolean;
+}) {
   const roster = useMemo(() => selectAssignedPlayers(mentorProfileId), [mentorProfileId]);
   const [q, setQ] = useState("");
   const selected = roster.find((r) => r.id === value);
   const filtered = q
-    ? roster.filter((r) => r.full_name.toLowerCase().includes(q.toLowerCase()) || r.club.toLowerCase().includes(q.toLowerCase()))
+    ? roster.filter(
+        (r) =>
+          r.full_name.toLowerCase().includes(q.toLowerCase()) ||
+          r.club.toLowerCase().includes(q.toLowerCase()),
+      )
     : roster;
 
   if (selected) {
@@ -143,9 +173,15 @@ function PlayerPicker({
         <Avatar initials={selected.initials} size={32} />
         <div className="min-w-0 flex-1">
           <div className="text-sm font-medium truncate">{selected.full_name}</div>
-          <div className="text-[11px] text-muted-foreground truncate">{selected.club} · {selected.league}</div>
+          <div className="text-[11px] text-muted-foreground truncate">
+            {selected.club} · {selected.league}
+          </div>
         </div>
-        <button type="button" onClick={() => onChange("")} className="text-[11px] text-primary hover:underline shrink-0">
+        <button
+          type="button"
+          onClick={() => onChange("")}
+          className="text-[11px] text-primary hover:underline shrink-0"
+        >
           Change
         </button>
       </div>
@@ -194,8 +230,18 @@ function PlayerPicker({
 // -----------------------------------------------------------------------------
 
 function Success({
-  title, body, playerId, onDone, onAnother,
-}: { title: string; body: string; playerId?: string; onDone: () => void; onAnother?: () => void }) {
+  title,
+  body,
+  playerId,
+  onDone,
+  onAnother,
+}: {
+  title: string;
+  body: string;
+  playerId?: string;
+  onDone: () => void;
+  onAnother?: () => void;
+}) {
   const player = playerId ? selectPlayer(playerId) : null;
   return (
     <div className="text-center py-6">
@@ -234,11 +280,32 @@ function Success({
 // Wellbeing traffic-light picker
 // -----------------------------------------------------------------------------
 
-function WellbeingPicker({ value, onChange }: { value: WellbeingFlag; onChange: (v: WellbeingFlag) => void }) {
+function WellbeingPicker({
+  value,
+  onChange,
+}: {
+  value: WellbeingFlag;
+  onChange: (v: WellbeingFlag) => void;
+}) {
   const opts: Array<{ v: WellbeingFlag; label: string; hint: string; tone: string }> = [
-    { v: "green", label: "Green", hint: "Player is well", tone: "border-primary/40 bg-primary/10 text-primary" },
-    { v: "amber", label: "Amber", hint: "Some concern", tone: "border-warning/40 bg-warning/10 text-warning" },
-    { v: "red", label: "Red", hint: "Escalate today", tone: "border-destructive/40 bg-destructive/10 text-destructive" },
+    {
+      v: "green",
+      label: "Green",
+      hint: "Player is well",
+      tone: "border-primary/40 bg-primary/10 text-primary",
+    },
+    {
+      v: "amber",
+      label: "Amber",
+      hint: "Some concern",
+      tone: "border-warning/40 bg-warning/10 text-warning",
+    },
+    {
+      v: "red",
+      label: "Red",
+      hint: "Escalate today",
+      tone: "border-destructive/40 bg-destructive/10 text-destructive",
+    },
   ];
   return (
     <div className="grid grid-cols-3 gap-2">
@@ -250,7 +317,9 @@ function WellbeingPicker({ value, onChange }: { value: WellbeingFlag; onChange: 
             type="button"
             onClick={() => onChange(o.v)}
             className={`h-16 rounded-md border text-xs font-medium flex flex-col items-center justify-center gap-0.5 transition-colors ${
-              active ? o.tone : "border-border bg-background/40 text-muted-foreground hover:bg-accent/30"
+              active
+                ? o.tone
+                : "border-border bg-background/40 text-muted-foreground hover:bg-accent/30"
             }`}
           >
             <span className="uppercase tracking-wider text-[10px]">{o.label}</span>
@@ -276,7 +345,12 @@ interface InteractionFormProps {
 }
 
 function InteractionForm({
-  mentorProfileId, playerId, onDone, initialTranscript = "", transcriptSource = "typed", onBack,
+  mentorProfileId,
+  playerId,
+  onDone,
+  initialTranscript = "",
+  transcriptSource = "typed",
+  onBack,
 }: InteractionFormProps) {
   const [gkId, setGkId] = useState(playerId ?? "");
   const [type, setType] = useState(INTERACTION_TYPES[0]);
@@ -289,7 +363,8 @@ function InteractionForm({
   const [done, setDone] = useState(false);
   const [submitted, setSubmitted] = useState<{ playerId: string } | null>(null);
 
-  const canSubmit = gkId && summary.trim().length > 0 && (!followUpRequired || nextAction.trim().length > 0);
+  const canSubmit =
+    gkId && summary.trim().length > 0 && (!followUpRequired || nextAction.trim().length > 0);
 
   if (done && submitted) {
     return (
@@ -343,31 +418,55 @@ function InteractionForm({
   return (
     <form onSubmit={onSubmit} className="space-y-4">
       {onBack && (
-        <button type="button" onClick={onBack} className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
+        <button
+          type="button"
+          onClick={onBack}
+          className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+        >
           <ArrowLeft className="size-3.5" /> Back to transcript
         </button>
       )}
       {submitError && (
-        <div role="alert" className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+        <div
+          role="alert"
+          className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive"
+        >
           {submitError}
         </div>
       )}
       <Field label="Player" required>
-        <PlayerPicker mentorProfileId={mentorProfileId} value={gkId} onChange={setGkId} required={!playerId} />
+        <PlayerPicker
+          mentorProfileId={mentorProfileId}
+          value={gkId}
+          onChange={setGkId}
+          required={!playerId}
+        />
       </Field>
 
       <div className="grid grid-cols-2 gap-3">
         <Field label="Interaction type" required>
           <select className={selectCls} value={type} onChange={(e) => setType(e.target.value)}>
-            {INTERACTION_TYPES.map((t) => <option key={t}>{t}</option>)}
+            {INTERACTION_TYPES.map((t) => (
+              <option key={t}>{t}</option>
+            ))}
           </select>
         </Field>
         <Field label="Date" required>
-          <input type="date" className={inputCls} value={date} onChange={(e) => setDate(e.target.value)} required />
+          <input
+            type="date"
+            className={inputCls}
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
+            required
+          />
         </Field>
       </div>
 
-      <Field label="Short summary" required hint="One or two sentences — what happened, what stood out.">
+      <Field
+        label="Short summary"
+        required
+        hint="One or two sentences — what happened, what stood out."
+      >
         <textarea
           rows={3}
           className={taCls}
@@ -384,7 +483,9 @@ function InteractionForm({
 
       <Field label="Outcome">
         <select className={selectCls} value={outcome} onChange={(e) => setOutcome(e.target.value)}>
-          {OUTCOMES.map((o) => <option key={o}>{o}</option>)}
+          {OUTCOMES.map((o) => (
+            <option key={o}>{o}</option>
+          ))}
         </select>
       </Field>
 
@@ -414,12 +515,20 @@ function InteractionForm({
       {wellbeing === "red" && (
         <div className="flex items-start gap-2 text-xs rounded-md border border-destructive/40 bg-destructive/10 text-destructive px-3 py-2">
           <AlertTriangle className="size-4 shrink-0 mt-0.5" />
-          <span>Red wellbeing flag will notify the head of goalkeeping in the production build.</span>
+          <span>
+            Red wellbeing flag will notify the head of goalkeeping in the production build.
+          </span>
         </div>
       )}
 
       <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 pt-2">
-        <button type="button" onClick={onDone} className="h-11 sm:h-10 px-4 rounded-md border border-border text-sm">Cancel</button>
+        <button
+          type="button"
+          onClick={onDone}
+          className="h-11 sm:h-10 px-4 rounded-md border border-border text-sm"
+        >
+          Cancel
+        </button>
         <button
           type="submit"
           disabled={!canSubmit}
@@ -457,7 +566,11 @@ function MatchReportRedirect({ playerId, onDone }: { playerId?: string; onDone: 
         </p>
       </div>
       <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
-        <button type="button" onClick={onDone} className="h-11 sm:h-10 px-4 rounded-md border border-border text-sm">
+        <button
+          type="button"
+          onClick={onDone}
+          className="h-11 sm:h-10 px-4 rounded-md border border-border text-sm"
+        >
           Cancel
         </button>
         <Link
@@ -478,8 +591,14 @@ function MatchReportRedirect({ playerId, onDone }: { playerId?: string; onDone: 
 // -----------------------------------------------------------------------------
 
 function VoiceNoteForm({
-  mentorProfileId, playerId, onDone,
-}: { mentorProfileId: string; playerId?: string; onDone: () => void }) {
+  mentorProfileId,
+  playerId,
+  onDone,
+}: {
+  mentorProfileId: string;
+  playerId?: string;
+  onDone: () => void;
+}) {
   const [transcript, setTranscript] = useState("");
   const [recording, setRecording] = useState(false);
   const [seconds, setSeconds] = useState(0);
@@ -493,7 +612,9 @@ function VoiceNoteForm({
       window.clearInterval(timerRef.current);
       timerRef.current = null;
     }
-    return () => { if (timerRef.current) window.clearInterval(timerRef.current); };
+    return () => {
+      if (timerRef.current) window.clearInterval(timerRef.current);
+    };
   }, [recording]);
 
   const mm = String(Math.floor(seconds / 60)).padStart(2, "0");
@@ -524,7 +645,9 @@ function VoiceNoteForm({
               Prototype only — audio isn't captured. Paste or type your transcript below.
             </div>
           </div>
-          <div className={`tabular-nums font-mono text-lg font-semibold shrink-0 ${recording ? "text-destructive" : "text-muted-foreground"}`}>
+          <div
+            className={`tabular-nums font-mono text-lg font-semibold shrink-0 ${recording ? "text-destructive" : "text-muted-foreground"}`}
+          >
             {mm}:{ss}
           </div>
         </div>
@@ -533,15 +656,27 @@ function VoiceNoteForm({
             type="button"
             onClick={() => setRecording((r) => !r)}
             className={`flex-1 h-11 rounded-md text-sm font-medium inline-flex items-center justify-center gap-2 ${
-              recording ? "bg-destructive text-destructive-foreground" : "bg-primary text-primary-foreground"
+              recording
+                ? "bg-destructive text-destructive-foreground"
+                : "bg-primary text-primary-foreground"
             }`}
           >
-            {recording ? <><Square className="size-4" /> Stop</> : <><Mic className="size-4" /> Start</>}
+            {recording ? (
+              <>
+                <Square className="size-4" /> Stop
+              </>
+            ) : (
+              <>
+                <Mic className="size-4" /> Start
+              </>
+            )}
           </button>
           {seconds > 0 && !recording && (
             <button
               type="button"
-              onClick={() => { setSeconds(0); }}
+              onClick={() => {
+                setSeconds(0);
+              }}
               className="h-11 px-4 rounded-md border border-border text-sm"
             >
               Reset
@@ -561,7 +696,13 @@ function VoiceNoteForm({
       </Field>
 
       <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 pt-2">
-        <button type="button" onClick={onDone} className="h-11 sm:h-10 px-4 rounded-md border border-border text-sm">Cancel</button>
+        <button
+          type="button"
+          onClick={onDone}
+          className="h-11 sm:h-10 px-4 rounded-md border border-border text-sm"
+        >
+          Cancel
+        </button>
         <button
           type="button"
           disabled={!transcript.trim()}

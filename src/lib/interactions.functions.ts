@@ -53,8 +53,6 @@ export const createInteraction = createServerFn({ method: "POST" })
       );
     }
 
-
-
     // Mentor identity: derived server-side, never client-supplied.
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
@@ -119,9 +117,8 @@ export const createInteraction = createServerFn({ method: "POST" })
 
     // Read-back is mandatory: no inserted row means no success.
     if (error) {
-      const { isDuplicateFollowUp, DUPLICATE_FOLLOW_UP_MESSAGE } = await import(
-        "@/lib/events/link-follow-up.server"
-      );
+      const { isDuplicateFollowUp, DUPLICATE_FOLLOW_UP_MESSAGE } =
+        await import("@/lib/events/link-follow-up.server");
       if (calendarEventId && isDuplicateFollowUp(error)) {
         throw new Error(DUPLICATE_FOLLOW_UP_MESSAGE);
       }

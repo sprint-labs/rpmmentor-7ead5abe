@@ -97,7 +97,8 @@ export const Route = createFileRoute("/insights/$metric")({
     level: typeof search.level === "string" ? search.level : "",
   }),
   head: ({ params }) => {
-    const meta = META[(params.metric as Metric) in META ? (params.metric as Metric) : "goalkeepers"];
+    const meta =
+      META[(params.metric as Metric) in META ? (params.metric as Metric) : "goalkeepers"];
     const title = `${meta.title} breakdown — Mentor Hub`;
     return {
       meta: [
@@ -340,7 +341,10 @@ function InsightDrilldown() {
 
         {active === "duty" &&
           (() => {
-            const graded = goalkeepers.map((g) => ({ gk: g, duty: dutyStatusForGk(g, dutySource) }));
+            const graded = goalkeepers.map((g) => ({
+              gk: g,
+              duty: dutyStatusForGk(g, dutySource),
+            }));
             const filtered = search.level
               ? graded.filter((r) => r.duty.level === search.level)
               : graded;

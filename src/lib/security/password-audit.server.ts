@@ -1,9 +1,6 @@
 import { getRequest, getRequestHeader } from "@tanstack/react-start/server";
 
-export type PasswordChangeEvent =
-  | "self_change"
-  | "admin_reset"
-  | "recovery_reset";
+export type PasswordChangeEvent = "self_change" | "admin_reset" | "recovery_reset";
 
 /**
  * Record a password change to the audit log. Best-effort: failure to write
@@ -30,9 +27,7 @@ export async function logPasswordChange(params: {
       // no request context (e.g. background); leave null
     }
 
-    const { supabaseAdmin } = await import(
-      "@/integrations/supabase/client.server"
-    );
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     await supabaseAdmin.from("password_change_audit").insert({
       user_id: params.userId,
       actor_id: params.actorId,

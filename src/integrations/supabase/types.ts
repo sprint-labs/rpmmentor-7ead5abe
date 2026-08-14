@@ -1,1183 +1,1171 @@
-export type Json =
-  | string
-  | number
-  | boolean
-  | null
-  | { [key: string]: Json | undefined }
-  | Json[]
+export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
 
 export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.5"
-  }
+    PostgrestVersion: "14.5";
+  };
   public: {
     Tables: {
       calendar_events: {
         Row: {
-          assigned_mentor_id: string | null
-          assigned_mentor_name: string
-          cancellation_reason: string
-          cancelled_at: string | null
-          cancelled_by: string | null
-          created_at: string
-          created_by: string
-          created_by_name: string
-          end_time: string | null
-          event_date: string
-          event_type: string
-          follow_up_waived_at: string | null
-          follow_up_waived_by: string | null
-          follow_up_waiver_reason: string
-          goalkeeper_name: string | null
-          id: string
-          location: string | null
-          notes: string
-          player_id: string | null
-          start_time: string | null
-          status: string
-          title: string
-          updated_at: string
-        }
+          assigned_mentor_id: string | null;
+          assigned_mentor_name: string;
+          cancellation_reason: string;
+          cancelled_at: string | null;
+          cancelled_by: string | null;
+          created_at: string;
+          created_by: string;
+          created_by_name: string;
+          end_time: string | null;
+          event_date: string;
+          event_type: string;
+          follow_up_waived_at: string | null;
+          follow_up_waived_by: string | null;
+          follow_up_waiver_reason: string;
+          goalkeeper_name: string | null;
+          id: string;
+          location: string | null;
+          notes: string;
+          player_id: string | null;
+          start_time: string | null;
+          status: string;
+          title: string;
+          updated_at: string;
+        };
         Insert: {
-          assigned_mentor_id?: string | null
-          assigned_mentor_name?: string
-          cancellation_reason?: string
-          cancelled_at?: string | null
-          cancelled_by?: string | null
-          created_at?: string
-          created_by: string
-          created_by_name?: string
-          end_time?: string | null
-          event_date: string
-          event_type?: string
-          follow_up_waived_at?: string | null
-          follow_up_waived_by?: string | null
-          follow_up_waiver_reason?: string
-          goalkeeper_name?: string | null
-          id?: string
-          location?: string | null
-          notes?: string
-          player_id?: string | null
-          start_time?: string | null
-          status?: string
-          title: string
-          updated_at?: string
-        }
+          assigned_mentor_id?: string | null;
+          assigned_mentor_name?: string;
+          cancellation_reason?: string;
+          cancelled_at?: string | null;
+          cancelled_by?: string | null;
+          created_at?: string;
+          created_by: string;
+          created_by_name?: string;
+          end_time?: string | null;
+          event_date: string;
+          event_type?: string;
+          follow_up_waived_at?: string | null;
+          follow_up_waived_by?: string | null;
+          follow_up_waiver_reason?: string;
+          goalkeeper_name?: string | null;
+          id?: string;
+          location?: string | null;
+          notes?: string;
+          player_id?: string | null;
+          start_time?: string | null;
+          status?: string;
+          title: string;
+          updated_at?: string;
+        };
         Update: {
-          assigned_mentor_id?: string | null
-          assigned_mentor_name?: string
-          cancellation_reason?: string
-          cancelled_at?: string | null
-          cancelled_by?: string | null
-          created_at?: string
-          created_by?: string
-          created_by_name?: string
-          end_time?: string | null
-          event_date?: string
-          event_type?: string
-          follow_up_waived_at?: string | null
-          follow_up_waived_by?: string | null
-          follow_up_waiver_reason?: string
-          goalkeeper_name?: string | null
-          id?: string
-          location?: string | null
-          notes?: string
-          player_id?: string | null
-          start_time?: string | null
-          status?: string
-          title?: string
-          updated_at?: string
-        }
+          assigned_mentor_id?: string | null;
+          assigned_mentor_name?: string;
+          cancellation_reason?: string;
+          cancelled_at?: string | null;
+          cancelled_by?: string | null;
+          created_at?: string;
+          created_by?: string;
+          created_by_name?: string;
+          end_time?: string | null;
+          event_date?: string;
+          event_type?: string;
+          follow_up_waived_at?: string | null;
+          follow_up_waived_by?: string | null;
+          follow_up_waiver_reason?: string;
+          goalkeeper_name?: string | null;
+          id?: string;
+          location?: string | null;
+          notes?: string;
+          player_id?: string | null;
+          start_time?: string | null;
+          status?: string;
+          title?: string;
+          updated_at?: string;
+        };
         Relationships: [
           {
-            foreignKeyName: "calendar_events_assigned_mentor_id_fkey"
-            columns: ["assigned_mentor_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
+            foreignKeyName: "calendar_events_assigned_mentor_id_fkey";
+            columns: ["assigned_mentor_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
           },
           {
-            foreignKeyName: "calendar_events_cancelled_by_fkey"
-            columns: ["cancelled_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
+            foreignKeyName: "calendar_events_cancelled_by_fkey";
+            columns: ["cancelled_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
           },
           {
-            foreignKeyName: "calendar_events_follow_up_waived_by_fkey"
-            columns: ["follow_up_waived_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
+            foreignKeyName: "calendar_events_follow_up_waived_by_fkey";
+            columns: ["follow_up_waived_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
           },
           {
-            foreignKeyName: "calendar_events_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
+            foreignKeyName: "calendar_events_created_by_fkey";
+            columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
           },
           {
-            foreignKeyName: "calendar_events_player_id_fkey"
-            columns: ["player_id"]
-            isOneToOne: false
-            referencedRelation: "players"
-            referencedColumns: ["id"]
+            foreignKeyName: "calendar_events_player_id_fkey";
+            columns: ["player_id"];
+            isOneToOne: false;
+            referencedRelation: "players";
+            referencedColumns: ["id"];
           },
-        ]
-      }
+        ];
+      };
       calendar_event_audit: {
         Row: {
-          action: string
-          after_values: Json | null
-          before_values: Json | null
-          calendar_event_id: string
-          changed_at: string
-          changed_by: string | null
-          id: string
-        }
+          action: string;
+          after_values: Json | null;
+          before_values: Json | null;
+          calendar_event_id: string;
+          changed_at: string;
+          changed_by: string | null;
+          id: string;
+        };
         Insert: {
-          action: string
-          after_values?: Json | null
-          before_values?: Json | null
-          calendar_event_id: string
-          changed_at?: string
-          changed_by?: string | null
-          id?: string
-        }
+          action: string;
+          after_values?: Json | null;
+          before_values?: Json | null;
+          calendar_event_id: string;
+          changed_at?: string;
+          changed_by?: string | null;
+          id?: string;
+        };
         Update: {
-          action?: string
-          after_values?: Json | null
-          before_values?: Json | null
-          calendar_event_id?: string
-          changed_at?: string
-          changed_by?: string | null
-          id?: string
-        }
+          action?: string;
+          after_values?: Json | null;
+          before_values?: Json | null;
+          calendar_event_id?: string;
+          changed_at?: string;
+          changed_by?: string | null;
+          id?: string;
+        };
         Relationships: [
           {
-            foreignKeyName: "calendar_event_audit_calendar_event_id_fkey"
-            columns: ["calendar_event_id"]
-            isOneToOne: false
-            referencedRelation: "calendar_events"
-            referencedColumns: ["id"]
+            foreignKeyName: "calendar_event_audit_calendar_event_id_fkey";
+            columns: ["calendar_event_id"];
+            isOneToOne: false;
+            referencedRelation: "calendar_events";
+            referencedColumns: ["id"];
           },
-        ]
-      }
+        ];
+      };
       dashboard_click_events: {
         Row: {
-          created_at: string
-          destination: string
-          effective_role: string | null
-          id: string
-          mentor_name: string | null
-          mentor_profile_id: string | null
-          metadata: Json
-          period_days: number | null
-          period_from: string | null
-          period_to: string | null
-          source: string
-          user_id: string
-        }
+          created_at: string;
+          destination: string;
+          effective_role: string | null;
+          id: string;
+          mentor_name: string | null;
+          mentor_profile_id: string | null;
+          metadata: Json;
+          period_days: number | null;
+          period_from: string | null;
+          period_to: string | null;
+          source: string;
+          user_id: string;
+        };
         Insert: {
-          created_at?: string
-          destination: string
-          effective_role?: string | null
-          id?: string
-          mentor_name?: string | null
-          mentor_profile_id?: string | null
-          metadata?: Json
-          period_days?: number | null
-          period_from?: string | null
-          period_to?: string | null
-          source: string
-          user_id: string
-        }
+          created_at?: string;
+          destination: string;
+          effective_role?: string | null;
+          id?: string;
+          mentor_name?: string | null;
+          mentor_profile_id?: string | null;
+          metadata?: Json;
+          period_days?: number | null;
+          period_from?: string | null;
+          period_to?: string | null;
+          source: string;
+          user_id: string;
+        };
         Update: {
-          created_at?: string
-          destination?: string
-          effective_role?: string | null
-          id?: string
-          mentor_name?: string | null
-          mentor_profile_id?: string | null
-          metadata?: Json
-          period_days?: number | null
-          period_from?: string | null
-          period_to?: string | null
-          source?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
+          created_at?: string;
+          destination?: string;
+          effective_role?: string | null;
+          id?: string;
+          mentor_name?: string | null;
+          mentor_profile_id?: string | null;
+          metadata?: Json;
+          period_days?: number | null;
+          period_from?: string | null;
+          period_to?: string | null;
+          source?: string;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
       install_prompt_events: {
         Row: {
-          browser: string | null
-          created_at: string
-          declines: number
-          event: string
-          failures: number
-          id: string
-          metadata: Json
-          platform: string | null
-          surface: string
-          user_agent: string | null
-          user_id: string | null
-        }
+          browser: string | null;
+          created_at: string;
+          declines: number;
+          event: string;
+          failures: number;
+          id: string;
+          metadata: Json;
+          platform: string | null;
+          surface: string;
+          user_agent: string | null;
+          user_id: string | null;
+        };
         Insert: {
-          browser?: string | null
-          created_at?: string
-          declines?: number
-          event: string
-          failures?: number
-          id?: string
-          metadata?: Json
-          platform?: string | null
-          surface: string
-          user_agent?: string | null
-          user_id?: string | null
-        }
+          browser?: string | null;
+          created_at?: string;
+          declines?: number;
+          event: string;
+          failures?: number;
+          id?: string;
+          metadata?: Json;
+          platform?: string | null;
+          surface: string;
+          user_agent?: string | null;
+          user_id?: string | null;
+        };
         Update: {
-          browser?: string | null
-          created_at?: string
-          declines?: number
-          event?: string
-          failures?: number
-          id?: string
-          metadata?: Json
-          platform?: string | null
-          surface?: string
-          user_agent?: string | null
-          user_id?: string | null
-        }
-        Relationships: []
-      }
+          browser?: string | null;
+          created_at?: string;
+          declines?: number;
+          event?: string;
+          failures?: number;
+          id?: string;
+          metadata?: Json;
+          platform?: string | null;
+          surface?: string;
+          user_agent?: string | null;
+          user_id?: string | null;
+        };
+        Relationships: [];
+      };
       interaction_audit: {
         Row: {
-          action: string
-          after_values: Json | null
-          before_values: Json | null
-          changed_at: string
-          changed_by: string | null
-          id: string
-          interaction_id: string
-        }
+          action: string;
+          after_values: Json | null;
+          before_values: Json | null;
+          changed_at: string;
+          changed_by: string | null;
+          id: string;
+          interaction_id: string;
+        };
         Insert: {
-          action: string
-          after_values?: Json | null
-          before_values?: Json | null
-          changed_at?: string
-          changed_by?: string | null
-          id?: string
-          interaction_id: string
-        }
+          action: string;
+          after_values?: Json | null;
+          before_values?: Json | null;
+          changed_at?: string;
+          changed_by?: string | null;
+          id?: string;
+          interaction_id: string;
+        };
         Update: {
-          action?: string
-          after_values?: Json | null
-          before_values?: Json | null
-          changed_at?: string
-          changed_by?: string | null
-          id?: string
-          interaction_id?: string
-        }
+          action?: string;
+          after_values?: Json | null;
+          before_values?: Json | null;
+          changed_at?: string;
+          changed_by?: string | null;
+          id?: string;
+          interaction_id?: string;
+        };
         Relationships: [
           {
-            foreignKeyName: "interaction_audit_interaction_id_fkey"
-            columns: ["interaction_id"]
-            isOneToOne: false
-            referencedRelation: "interactions"
-            referencedColumns: ["id"]
+            foreignKeyName: "interaction_audit_interaction_id_fkey";
+            columns: ["interaction_id"];
+            isOneToOne: false;
+            referencedRelation: "interactions";
+            referencedColumns: ["id"];
           },
-        ]
-      }
+        ];
+      };
       interaction_media: {
         Row: {
-          attached_by: string | null
-          created_at: string
-          id: string
-          interaction_id: string
-          media_id: string
-        }
+          attached_by: string | null;
+          created_at: string;
+          id: string;
+          interaction_id: string;
+          media_id: string;
+        };
         Insert: {
-          attached_by?: string | null
-          created_at?: string
-          id?: string
-          interaction_id: string
-          media_id: string
-        }
+          attached_by?: string | null;
+          created_at?: string;
+          id?: string;
+          interaction_id: string;
+          media_id: string;
+        };
         Update: {
-          attached_by?: string | null
-          created_at?: string
-          id?: string
-          interaction_id?: string
-          media_id?: string
-        }
+          attached_by?: string | null;
+          created_at?: string;
+          id?: string;
+          interaction_id?: string;
+          media_id?: string;
+        };
         Relationships: [
           {
-            foreignKeyName: "interaction_media_attached_by_fkey"
-            columns: ["attached_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
+            foreignKeyName: "interaction_media_attached_by_fkey";
+            columns: ["attached_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
           },
           {
-            foreignKeyName: "interaction_media_interaction_id_fkey"
-            columns: ["interaction_id"]
-            isOneToOne: false
-            referencedRelation: "interactions"
-            referencedColumns: ["id"]
+            foreignKeyName: "interaction_media_interaction_id_fkey";
+            columns: ["interaction_id"];
+            isOneToOne: false;
+            referencedRelation: "interactions";
+            referencedColumns: ["id"];
           },
           {
-            foreignKeyName: "interaction_media_media_id_fkey"
-            columns: ["media_id"]
-            isOneToOne: false
-            referencedRelation: "media_assets"
-            referencedColumns: ["id"]
+            foreignKeyName: "interaction_media_media_id_fkey";
+            columns: ["media_id"];
+            isOneToOne: false;
+            referencedRelation: "media_assets";
+            referencedColumns: ["id"];
           },
-        ]
-      }
+        ];
+      };
       interactions: {
         Row: {
-          calendar_event_id: string | null
-          club: string
-          created_at: string
-          follow_up: string
-          gk_slug: string
-          goalkeeper_name: string
-          id: string
-          interaction_type: string
-          match_report_id: string | null
-          mentor_id: string
-          mentor_name: string
-          notes: string
-          occurred_at: string
-          outcome: string
-          player_id: string | null
-          updated_at: string
-          updated_by: string | null
-        }
+          calendar_event_id: string | null;
+          club: string;
+          created_at: string;
+          follow_up: string;
+          gk_slug: string;
+          goalkeeper_name: string;
+          id: string;
+          interaction_type: string;
+          match_report_id: string | null;
+          mentor_id: string;
+          mentor_name: string;
+          notes: string;
+          occurred_at: string;
+          outcome: string;
+          player_id: string | null;
+          updated_at: string;
+          updated_by: string | null;
+        };
         Insert: {
-          calendar_event_id?: string | null
-          club?: string
-          created_at?: string
-          follow_up?: string
-          gk_slug?: string
-          goalkeeper_name: string
-          id?: string
-          interaction_type: string
-          match_report_id?: string | null
-          mentor_id: string
-          mentor_name?: string
-          notes?: string
-          occurred_at: string
-          outcome?: string
-          player_id?: string | null
-          updated_at?: string
-          updated_by?: string | null
-        }
+          calendar_event_id?: string | null;
+          club?: string;
+          created_at?: string;
+          follow_up?: string;
+          gk_slug?: string;
+          goalkeeper_name: string;
+          id?: string;
+          interaction_type: string;
+          match_report_id?: string | null;
+          mentor_id: string;
+          mentor_name?: string;
+          notes?: string;
+          occurred_at: string;
+          outcome?: string;
+          player_id?: string | null;
+          updated_at?: string;
+          updated_by?: string | null;
+        };
         Update: {
-          calendar_event_id?: string | null
-          club?: string
-          created_at?: string
-          follow_up?: string
-          gk_slug?: string
-          goalkeeper_name?: string
-          id?: string
-          interaction_type?: string
-          match_report_id?: string | null
-          mentor_id?: string
-          mentor_name?: string
-          notes?: string
-          occurred_at?: string
-          outcome?: string
-          player_id?: string | null
-          updated_at?: string
-          updated_by?: string | null
-        }
+          calendar_event_id?: string | null;
+          club?: string;
+          created_at?: string;
+          follow_up?: string;
+          gk_slug?: string;
+          goalkeeper_name?: string;
+          id?: string;
+          interaction_type?: string;
+          match_report_id?: string | null;
+          mentor_id?: string;
+          mentor_name?: string;
+          notes?: string;
+          occurred_at?: string;
+          outcome?: string;
+          player_id?: string | null;
+          updated_at?: string;
+          updated_by?: string | null;
+        };
         Relationships: [
           {
-            foreignKeyName: "interactions_calendar_event_id_fkey"
-            columns: ["calendar_event_id"]
-            isOneToOne: false
-            referencedRelation: "calendar_events"
-            referencedColumns: ["id"]
+            foreignKeyName: "interactions_calendar_event_id_fkey";
+            columns: ["calendar_event_id"];
+            isOneToOne: false;
+            referencedRelation: "calendar_events";
+            referencedColumns: ["id"];
           },
           {
-            foreignKeyName: "interactions_mentor_id_fkey"
-            columns: ["mentor_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
+            foreignKeyName: "interactions_mentor_id_fkey";
+            columns: ["mentor_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
           },
           {
-            foreignKeyName: "interactions_player_id_fkey"
-            columns: ["player_id"]
-            isOneToOne: false
-            referencedRelation: "players"
-            referencedColumns: ["id"]
+            foreignKeyName: "interactions_player_id_fkey";
+            columns: ["player_id"];
+            isOneToOne: false;
+            referencedRelation: "players";
+            referencedColumns: ["id"];
           },
           {
-            foreignKeyName: "interactions_updated_by_fkey"
-            columns: ["updated_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
+            foreignKeyName: "interactions_updated_by_fkey";
+            columns: ["updated_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
           },
-        ]
-      }
+        ];
+      };
       match_report_cutover_state: {
         Row: {
-          created_at: string
-          expected_sheet_count: number | null
-          id: string
-          reconciled_at: string | null
-          reconciled_by: string | null
-          reconciled_by_label: string | null
-          reconciliation: Json
-          run_id: string | null
-          sheet_digest: string | null
-          status: string
-          updated_at: string
-        }
+          created_at: string;
+          expected_sheet_count: number | null;
+          id: string;
+          reconciled_at: string | null;
+          reconciled_by: string | null;
+          reconciled_by_label: string | null;
+          reconciliation: Json;
+          run_id: string | null;
+          sheet_digest: string | null;
+          status: string;
+          updated_at: string;
+        };
         Insert: {
-          created_at?: string
-          expected_sheet_count?: number | null
-          id: string
-          reconciled_at?: string | null
-          reconciled_by?: string | null
-          reconciled_by_label?: string | null
-          reconciliation?: Json
-          run_id?: string | null
-          sheet_digest?: string | null
-          status?: string
-          updated_at?: string
-        }
+          created_at?: string;
+          expected_sheet_count?: number | null;
+          id: string;
+          reconciled_at?: string | null;
+          reconciled_by?: string | null;
+          reconciled_by_label?: string | null;
+          reconciliation?: Json;
+          run_id?: string | null;
+          sheet_digest?: string | null;
+          status?: string;
+          updated_at?: string;
+        };
         Update: {
-          created_at?: string
-          expected_sheet_count?: number | null
-          id?: string
-          reconciled_at?: string | null
-          reconciled_by?: string | null
-          reconciled_by_label?: string | null
-          reconciliation?: Json
-          run_id?: string | null
-          sheet_digest?: string | null
-          status?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
+          created_at?: string;
+          expected_sheet_count?: number | null;
+          id?: string;
+          reconciled_at?: string | null;
+          reconciled_by?: string | null;
+          reconciled_by_label?: string | null;
+          reconciliation?: Json;
+          run_id?: string | null;
+          sheet_digest?: string | null;
+          status?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       match_report_submissions: {
         Row: {
-          confirmed_duplicate: boolean
-          created_at: string
-          fingerprint: string
-          goalkeeper: string
-          id: string
-          match_date: string | null
-          opponent: string
-          report_id: string | null
-          report_uid: string | null
-          reserved_at: string
-          sheet_row_index: number | null
-          status: string
-          submission_key: string
-          submitted_at: string
-          team: string
-          updated_at: string
-          user_id: string
-        }
+          confirmed_duplicate: boolean;
+          created_at: string;
+          fingerprint: string;
+          goalkeeper: string;
+          id: string;
+          match_date: string | null;
+          opponent: string;
+          report_id: string | null;
+          report_uid: string | null;
+          reserved_at: string;
+          sheet_row_index: number | null;
+          status: string;
+          submission_key: string;
+          submitted_at: string;
+          team: string;
+          updated_at: string;
+          user_id: string;
+        };
         Insert: {
-          confirmed_duplicate?: boolean
-          created_at?: string
-          fingerprint: string
-          goalkeeper: string
-          id?: string
-          match_date?: string | null
-          opponent?: string
-          report_id?: string | null
-          report_uid?: string | null
-          reserved_at?: string
-          sheet_row_index?: number | null
-          status?: string
-          submission_key: string
-          submitted_at?: string
-          team?: string
-          updated_at?: string
-          user_id: string
-        }
+          confirmed_duplicate?: boolean;
+          created_at?: string;
+          fingerprint: string;
+          goalkeeper: string;
+          id?: string;
+          match_date?: string | null;
+          opponent?: string;
+          report_id?: string | null;
+          report_uid?: string | null;
+          reserved_at?: string;
+          sheet_row_index?: number | null;
+          status?: string;
+          submission_key: string;
+          submitted_at?: string;
+          team?: string;
+          updated_at?: string;
+          user_id: string;
+        };
         Update: {
-          confirmed_duplicate?: boolean
-          created_at?: string
-          fingerprint?: string
-          goalkeeper?: string
-          id?: string
-          match_date?: string | null
-          opponent?: string
-          report_id?: string | null
-          report_uid?: string | null
-          reserved_at?: string
-          sheet_row_index?: number | null
-          status?: string
-          submission_key?: string
-          submitted_at?: string
-          team?: string
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
+          confirmed_duplicate?: boolean;
+          created_at?: string;
+          fingerprint?: string;
+          goalkeeper?: string;
+          id?: string;
+          match_date?: string | null;
+          opponent?: string;
+          report_id?: string | null;
+          report_uid?: string | null;
+          reserved_at?: string;
+          sheet_row_index?: number | null;
+          status?: string;
+          submission_key?: string;
+          submitted_at?: string;
+          team?: string;
+          updated_at?: string;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
       match_reports_cache: {
         Row: {
-          average: number | null
-          calendar_event_id: string | null
-          change_play: number | null
-          coach: string
-          comments: string | null
-          competition: string | null
-          control_play: number | null
-          created_at: string
-          deleted_at: string | null
-          goalkeeper: string
-          id: string
-          legacy_report_id: string | null
-          match_date: string | null
-          opponent: string | null
-          physical: number | null
-          protect_air: number | null
-          protect_goal: number | null
-          protect_space: number | null
-          psych: number | null
-          report_id: string
-          row_index: number | null
-          source: string | null
-          submission_key: string | null
-          submitted_at: string | null
-          submitted_by: string | null
-          synced_at: string
-          team: string | null
-          updated_at: string
-        }
+          average: number | null;
+          calendar_event_id: string | null;
+          change_play: number | null;
+          coach: string;
+          comments: string | null;
+          competition: string | null;
+          control_play: number | null;
+          created_at: string;
+          deleted_at: string | null;
+          goalkeeper: string;
+          id: string;
+          legacy_report_id: string | null;
+          match_date: string | null;
+          opponent: string | null;
+          physical: number | null;
+          protect_air: number | null;
+          protect_goal: number | null;
+          protect_space: number | null;
+          psych: number | null;
+          report_id: string;
+          row_index: number | null;
+          source: string | null;
+          submission_key: string | null;
+          submitted_at: string | null;
+          submitted_by: string | null;
+          synced_at: string;
+          team: string | null;
+          updated_at: string;
+        };
         Insert: {
-          average?: number | null
-          calendar_event_id?: string | null
-          change_play?: number | null
-          coach: string
-          comments?: string | null
-          competition?: string | null
-          control_play?: number | null
-          created_at?: string
-          deleted_at?: string | null
-          goalkeeper: string
-          id?: string
-          legacy_report_id?: string | null
-          match_date?: string | null
-          opponent?: string | null
-          physical?: number | null
-          protect_air?: number | null
-          protect_goal?: number | null
-          protect_space?: number | null
-          psych?: number | null
-          report_id: string
-          row_index?: number | null
-          source?: string | null
-          submission_key?: string | null
-          submitted_at?: string | null
-          submitted_by?: string | null
-          synced_at?: string
-          team?: string | null
-          updated_at?: string
-        }
+          average?: number | null;
+          calendar_event_id?: string | null;
+          change_play?: number | null;
+          coach: string;
+          comments?: string | null;
+          competition?: string | null;
+          control_play?: number | null;
+          created_at?: string;
+          deleted_at?: string | null;
+          goalkeeper: string;
+          id?: string;
+          legacy_report_id?: string | null;
+          match_date?: string | null;
+          opponent?: string | null;
+          physical?: number | null;
+          protect_air?: number | null;
+          protect_goal?: number | null;
+          protect_space?: number | null;
+          psych?: number | null;
+          report_id: string;
+          row_index?: number | null;
+          source?: string | null;
+          submission_key?: string | null;
+          submitted_at?: string | null;
+          submitted_by?: string | null;
+          synced_at?: string;
+          team?: string | null;
+          updated_at?: string;
+        };
         Update: {
-          average?: number | null
-          calendar_event_id?: string | null
-          change_play?: number | null
-          coach?: string
-          comments?: string | null
-          competition?: string | null
-          control_play?: number | null
-          created_at?: string
-          deleted_at?: string | null
-          goalkeeper?: string
-          id?: string
-          legacy_report_id?: string | null
-          match_date?: string | null
-          opponent?: string | null
-          physical?: number | null
-          protect_air?: number | null
-          protect_goal?: number | null
-          protect_space?: number | null
-          psych?: number | null
-          report_id?: string
-          row_index?: number | null
-          source?: string | null
-          submission_key?: string | null
-          submitted_at?: string | null
-          submitted_by?: string | null
-          synced_at?: string
-          team?: string | null
-          updated_at?: string
-        }
+          average?: number | null;
+          calendar_event_id?: string | null;
+          change_play?: number | null;
+          coach?: string;
+          comments?: string | null;
+          competition?: string | null;
+          control_play?: number | null;
+          created_at?: string;
+          deleted_at?: string | null;
+          goalkeeper?: string;
+          id?: string;
+          legacy_report_id?: string | null;
+          match_date?: string | null;
+          opponent?: string | null;
+          physical?: number | null;
+          protect_air?: number | null;
+          protect_goal?: number | null;
+          protect_space?: number | null;
+          psych?: number | null;
+          report_id?: string;
+          row_index?: number | null;
+          source?: string | null;
+          submission_key?: string | null;
+          submitted_at?: string | null;
+          submitted_by?: string | null;
+          synced_at?: string;
+          team?: string | null;
+          updated_at?: string;
+        };
         Relationships: [
           {
-            foreignKeyName: "match_reports_cache_calendar_event_id_fkey"
-            columns: ["calendar_event_id"]
-            isOneToOne: false
-            referencedRelation: "calendar_events"
-            referencedColumns: ["id"]
+            foreignKeyName: "match_reports_cache_calendar_event_id_fkey";
+            columns: ["calendar_event_id"];
+            isOneToOne: false;
+            referencedRelation: "calendar_events";
+            referencedColumns: ["id"];
           },
-        ]
-      }
+        ];
+      };
       media_assets: {
         Row: {
-          created_at: string
-          file_path: string
-          file_size: number | null
-          gk_id: string
-          id: string
-          media_type: string
-          mime_type: string | null
-          notes: string | null
-          rating_tags: string[]
-          thumbnail_path: string | null
-          title: string
-          updated_at: string
-          uploaded_by_id: string | null
-          uploaded_by_name: string | null
-          uploaded_by_role: string | null
-        }
+          created_at: string;
+          file_path: string;
+          file_size: number | null;
+          gk_id: string;
+          id: string;
+          media_type: string;
+          mime_type: string | null;
+          notes: string | null;
+          rating_tags: string[];
+          thumbnail_path: string | null;
+          title: string;
+          updated_at: string;
+          uploaded_by_id: string | null;
+          uploaded_by_name: string | null;
+          uploaded_by_role: string | null;
+        };
         Insert: {
-          created_at?: string
-          file_path: string
-          file_size?: number | null
-          gk_id: string
-          id?: string
-          media_type: string
-          mime_type?: string | null
-          notes?: string | null
-          rating_tags?: string[]
-          thumbnail_path?: string | null
-          title: string
-          updated_at?: string
-          uploaded_by_id?: string | null
-          uploaded_by_name?: string | null
-          uploaded_by_role?: string | null
-        }
+          created_at?: string;
+          file_path: string;
+          file_size?: number | null;
+          gk_id: string;
+          id?: string;
+          media_type: string;
+          mime_type?: string | null;
+          notes?: string | null;
+          rating_tags?: string[];
+          thumbnail_path?: string | null;
+          title: string;
+          updated_at?: string;
+          uploaded_by_id?: string | null;
+          uploaded_by_name?: string | null;
+          uploaded_by_role?: string | null;
+        };
         Update: {
-          created_at?: string
-          file_path?: string
-          file_size?: number | null
-          gk_id?: string
-          id?: string
-          media_type?: string
-          mime_type?: string | null
-          notes?: string | null
-          rating_tags?: string[]
-          thumbnail_path?: string | null
-          title?: string
-          updated_at?: string
-          uploaded_by_id?: string | null
-          uploaded_by_name?: string | null
-          uploaded_by_role?: string | null
-        }
-        Relationships: []
-      }
+          created_at?: string;
+          file_path?: string;
+          file_size?: number | null;
+          gk_id?: string;
+          id?: string;
+          media_type?: string;
+          mime_type?: string | null;
+          notes?: string | null;
+          rating_tags?: string[];
+          thumbnail_path?: string | null;
+          title?: string;
+          updated_at?: string;
+          uploaded_by_id?: string | null;
+          uploaded_by_name?: string | null;
+          uploaded_by_role?: string | null;
+        };
+        Relationships: [];
+      };
       media_audit_log: {
         Row: {
-          action: string
-          actor_id: string | null
-          actor_name: string | null
-          actor_role: string | null
-          created_at: string
-          gk_id: string | null
-          id: string
-          media_id: string | null
-          media_title: string | null
-          metadata: Json
-        }
+          action: string;
+          actor_id: string | null;
+          actor_name: string | null;
+          actor_role: string | null;
+          created_at: string;
+          gk_id: string | null;
+          id: string;
+          media_id: string | null;
+          media_title: string | null;
+          metadata: Json;
+        };
         Insert: {
-          action: string
-          actor_id?: string | null
-          actor_name?: string | null
-          actor_role?: string | null
-          created_at?: string
-          gk_id?: string | null
-          id?: string
-          media_id?: string | null
-          media_title?: string | null
-          metadata?: Json
-        }
+          action: string;
+          actor_id?: string | null;
+          actor_name?: string | null;
+          actor_role?: string | null;
+          created_at?: string;
+          gk_id?: string | null;
+          id?: string;
+          media_id?: string | null;
+          media_title?: string | null;
+          metadata?: Json;
+        };
         Update: {
-          action?: string
-          actor_id?: string | null
-          actor_name?: string | null
-          actor_role?: string | null
-          created_at?: string
-          gk_id?: string | null
-          id?: string
-          media_id?: string | null
-          media_title?: string | null
-          metadata?: Json
-        }
-        Relationships: []
-      }
+          action?: string;
+          actor_id?: string | null;
+          actor_name?: string | null;
+          actor_role?: string | null;
+          created_at?: string;
+          gk_id?: string | null;
+          id?: string;
+          media_id?: string | null;
+          media_title?: string | null;
+          metadata?: Json;
+        };
+        Relationships: [];
+      };
       notifications: {
         Row: {
-          body: string
-          calendar_event_id: string | null
-          created_at: string
-          created_by: string | null
-          id: string
-          kind: string
-          link_path: string
-          read_at: string | null
-          recipient_id: string
-          title: string
-        }
+          body: string;
+          calendar_event_id: string | null;
+          created_at: string;
+          created_by: string | null;
+          id: string;
+          kind: string;
+          link_path: string;
+          read_at: string | null;
+          recipient_id: string;
+          title: string;
+        };
         Insert: {
-          body?: string
-          calendar_event_id?: string | null
-          created_at?: string
-          created_by?: string | null
-          id?: string
-          kind: string
-          link_path?: string
-          read_at?: string | null
-          recipient_id: string
-          title: string
-        }
+          body?: string;
+          calendar_event_id?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          id?: string;
+          kind: string;
+          link_path?: string;
+          read_at?: string | null;
+          recipient_id: string;
+          title: string;
+        };
         Update: {
-          body?: string
-          calendar_event_id?: string | null
-          created_at?: string
-          created_by?: string | null
-          id?: string
-          kind?: string
-          link_path?: string
-          read_at?: string | null
-          recipient_id?: string
-          title?: string
-        }
+          body?: string;
+          calendar_event_id?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          id?: string;
+          kind?: string;
+          link_path?: string;
+          read_at?: string | null;
+          recipient_id?: string;
+          title?: string;
+        };
         Relationships: [
           {
-            foreignKeyName: "notifications_calendar_event_id_fkey"
-            columns: ["calendar_event_id"]
-            isOneToOne: false
-            referencedRelation: "calendar_events"
-            referencedColumns: ["id"]
+            foreignKeyName: "notifications_calendar_event_id_fkey";
+            columns: ["calendar_event_id"];
+            isOneToOne: false;
+            referencedRelation: "calendar_events";
+            referencedColumns: ["id"];
           },
           {
-            foreignKeyName: "notifications_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
+            foreignKeyName: "notifications_created_by_fkey";
+            columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
           },
           {
-            foreignKeyName: "notifications_recipient_id_fkey"
-            columns: ["recipient_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
+            foreignKeyName: "notifications_recipient_id_fkey";
+            columns: ["recipient_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
           },
-        ]
-      }
+        ];
+      };
       password_change_audit: {
         Row: {
-          actor_id: string | null
-          created_at: string
-          event_type: string
-          id: string
-          ip_address: string | null
-          metadata: Json
-          user_agent: string | null
-          user_id: string
-        }
+          actor_id: string | null;
+          created_at: string;
+          event_type: string;
+          id: string;
+          ip_address: string | null;
+          metadata: Json;
+          user_agent: string | null;
+          user_id: string;
+        };
         Insert: {
-          actor_id?: string | null
-          created_at?: string
-          event_type: string
-          id?: string
-          ip_address?: string | null
-          metadata?: Json
-          user_agent?: string | null
-          user_id: string
-        }
+          actor_id?: string | null;
+          created_at?: string;
+          event_type: string;
+          id?: string;
+          ip_address?: string | null;
+          metadata?: Json;
+          user_agent?: string | null;
+          user_id: string;
+        };
         Update: {
-          actor_id?: string | null
-          created_at?: string
-          event_type?: string
-          id?: string
-          ip_address?: string | null
-          metadata?: Json
-          user_agent?: string | null
-          user_id?: string
-        }
-        Relationships: []
-      }
+          actor_id?: string | null;
+          created_at?: string;
+          event_type?: string;
+          id?: string;
+          ip_address?: string | null;
+          metadata?: Json;
+          user_agent?: string | null;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
       players: {
         Row: {
-          contract_until: string | null
-          created_at: string
-          current_club: string
-          full_name: string
-          id: string
-          instagram_url: string | null
-          league: string
-          nationality: string
-          on_loan: boolean
-          parent_club: string | null
-          updated_at: string
-        }
+          contract_until: string | null;
+          created_at: string;
+          current_club: string;
+          full_name: string;
+          id: string;
+          instagram_url: string | null;
+          league: string;
+          nationality: string;
+          on_loan: boolean;
+          parent_club: string | null;
+          updated_at: string;
+        };
         Insert: {
-          contract_until?: string | null
-          created_at?: string
-          current_club?: string
-          full_name: string
-          id?: string
-          instagram_url?: string | null
-          league?: string
-          nationality?: string
-          on_loan?: boolean
-          parent_club?: string | null
-          updated_at?: string
-        }
+          contract_until?: string | null;
+          created_at?: string;
+          current_club?: string;
+          full_name: string;
+          id?: string;
+          instagram_url?: string | null;
+          league?: string;
+          nationality?: string;
+          on_loan?: boolean;
+          parent_club?: string | null;
+          updated_at?: string;
+        };
         Update: {
-          contract_until?: string | null
-          created_at?: string
-          current_club?: string
-          full_name?: string
-          id?: string
-          instagram_url?: string | null
-          league?: string
-          nationality?: string
-          on_loan?: boolean
-          parent_club?: string | null
-          updated_at?: string
-        }
-        Relationships: []
-      }
+          contract_until?: string | null;
+          created_at?: string;
+          current_club?: string;
+          full_name?: string;
+          id?: string;
+          instagram_url?: string | null;
+          league?: string;
+          nationality?: string;
+          on_loan?: boolean;
+          parent_club?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       profiles: {
         Row: {
-          created_at: string
-          email: string
-          id: string
-          initials: string
-          mentor_id: string | null
-          name: string
-          title: string
-          updated_at: string
-        }
+          created_at: string;
+          email: string;
+          id: string;
+          initials: string;
+          mentor_id: string | null;
+          name: string;
+          title: string;
+          updated_at: string;
+        };
         Insert: {
-          created_at?: string
-          email: string
-          id: string
-          initials?: string
-          mentor_id?: string | null
-          name?: string
-          title?: string
-          updated_at?: string
-        }
+          created_at?: string;
+          email: string;
+          id: string;
+          initials?: string;
+          mentor_id?: string | null;
+          name?: string;
+          title?: string;
+          updated_at?: string;
+        };
         Update: {
-          created_at?: string
-          email?: string
-          id?: string
-          initials?: string
-          mentor_id?: string | null
-          name?: string
-          title?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
+          created_at?: string;
+          email?: string;
+          id?: string;
+          initials?: string;
+          mentor_id?: string | null;
+          name?: string;
+          title?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       purged_demo_records: {
         Row: {
-          created_at: string
-          fingerprint: string
-          id: string
-          reason: string
-          table_name: string
-        }
+          created_at: string;
+          fingerprint: string;
+          id: string;
+          reason: string;
+          table_name: string;
+        };
         Insert: {
-          created_at?: string
-          fingerprint: string
-          id?: string
-          reason?: string
-          table_name: string
-        }
+          created_at?: string;
+          fingerprint: string;
+          id?: string;
+          reason?: string;
+          table_name: string;
+        };
         Update: {
-          created_at?: string
-          fingerprint?: string
-          id?: string
-          reason?: string
-          table_name?: string
-        }
-        Relationships: []
-      }
+          created_at?: string;
+          fingerprint?: string;
+          id?: string;
+          reason?: string;
+          table_name?: string;
+        };
+        Relationships: [];
+      };
       report_attachments: {
         Row: {
-          attached_by_id: string | null
-          attached_by_name: string | null
-          created_at: string
-          id: string
-          media_id: string
-          report_id: string
-        }
+          attached_by_id: string | null;
+          attached_by_name: string | null;
+          created_at: string;
+          id: string;
+          media_id: string;
+          report_id: string;
+        };
         Insert: {
-          attached_by_id?: string | null
-          attached_by_name?: string | null
-          created_at?: string
-          id?: string
-          media_id: string
-          report_id: string
-        }
+          attached_by_id?: string | null;
+          attached_by_name?: string | null;
+          created_at?: string;
+          id?: string;
+          media_id: string;
+          report_id: string;
+        };
         Update: {
-          attached_by_id?: string | null
-          attached_by_name?: string | null
-          created_at?: string
-          id?: string
-          media_id?: string
-          report_id?: string
-        }
+          attached_by_id?: string | null;
+          attached_by_name?: string | null;
+          created_at?: string;
+          id?: string;
+          media_id?: string;
+          report_id?: string;
+        };
         Relationships: [
           {
-            foreignKeyName: "report_attachments_media_id_fkey"
-            columns: ["media_id"]
-            isOneToOne: false
-            referencedRelation: "media_assets"
-            referencedColumns: ["id"]
+            foreignKeyName: "report_attachments_media_id_fkey";
+            columns: ["media_id"];
+            isOneToOne: false;
+            referencedRelation: "media_assets";
+            referencedColumns: ["id"];
           },
-        ]
-      }
+        ];
+      };
       user_deletion_audit: {
         Row: {
-          actor_email: string
-          actor_id: string | null
-          actor_name: string
-          affected_sections: Json
-          created_at: string
-          deleted_email: string
-          deleted_name: string
-          deleted_role: string | null
-          deleted_user_id: string
-          id: string
-          metadata: Json
-        }
+          actor_email: string;
+          actor_id: string | null;
+          actor_name: string;
+          affected_sections: Json;
+          created_at: string;
+          deleted_email: string;
+          deleted_name: string;
+          deleted_role: string | null;
+          deleted_user_id: string;
+          id: string;
+          metadata: Json;
+        };
         Insert: {
-          actor_email?: string
-          actor_id?: string | null
-          actor_name?: string
-          affected_sections?: Json
-          created_at?: string
-          deleted_email?: string
-          deleted_name?: string
-          deleted_role?: string | null
-          deleted_user_id: string
-          id?: string
-          metadata?: Json
-        }
+          actor_email?: string;
+          actor_id?: string | null;
+          actor_name?: string;
+          affected_sections?: Json;
+          created_at?: string;
+          deleted_email?: string;
+          deleted_name?: string;
+          deleted_role?: string | null;
+          deleted_user_id: string;
+          id?: string;
+          metadata?: Json;
+        };
         Update: {
-          actor_email?: string
-          actor_id?: string | null
-          actor_name?: string
-          affected_sections?: Json
-          created_at?: string
-          deleted_email?: string
-          deleted_name?: string
-          deleted_role?: string | null
-          deleted_user_id?: string
-          id?: string
-          metadata?: Json
-        }
-        Relationships: []
-      }
+          actor_email?: string;
+          actor_id?: string | null;
+          actor_name?: string;
+          affected_sections?: Json;
+          created_at?: string;
+          deleted_email?: string;
+          deleted_name?: string;
+          deleted_role?: string | null;
+          deleted_user_id?: string;
+          id?: string;
+          metadata?: Json;
+        };
+        Relationships: [];
+      };
       user_roles: {
         Row: {
-          created_at: string
-          id: string
-          role: Database["public"]["Enums"]["app_role"]
-          user_id: string
-        }
+          created_at: string;
+          id: string;
+          role: Database["public"]["Enums"]["app_role"];
+          user_id: string;
+        };
         Insert: {
-          created_at?: string
-          id?: string
-          role: Database["public"]["Enums"]["app_role"]
-          user_id: string
-        }
+          created_at?: string;
+          id?: string;
+          role: Database["public"]["Enums"]["app_role"];
+          user_id: string;
+        };
         Update: {
-          created_at?: string
-          id?: string
-          role?: Database["public"]["Enums"]["app_role"]
-          user_id?: string
-        }
-        Relationships: []
-      }
-    }
+          created_at?: string;
+          id?: string;
+          role?: Database["public"]["Enums"]["app_role"];
+          user_id?: string;
+        };
+        Relationships: [];
+      };
+    };
     Views: {
-      [_ in never]: never
-    }
+      [_ in never]: never;
+    };
     Functions: {
       has_role: {
         Args: {
-          _role: Database["public"]["Enums"]["app_role"]
-          _user_id: string
-        }
-        Returns: boolean
-      }
+          _role: Database["public"]["Enums"]["app_role"];
+          _user_id: string;
+        };
+        Returns: boolean;
+      };
       import_match_report_sheet_batch: {
-        Args: { _rows: Json; _run_id: string }
+        Args: { _rows: Json; _run_id: string };
         Returns: {
-          imported_report_id: string
-        }[]
-      }
+          imported_report_id: string;
+        }[];
+      };
       interaction_demo_fingerprint: {
-        Args: { _goalkeeper_name: string; _notes: string; _occurred_at: string }
-        Returns: string
-      }
+        Args: { _goalkeeper_name: string; _notes: string; _occurred_at: string };
+        Returns: string;
+      };
       list_mentor_directory: {
-        Args: Record<PropertyKey, never>
+        Args: Record<PropertyKey, never>;
         Returns: {
-          id: string
-          is_manager: boolean
-          name: string
-        }[]
-      }
+          id: string;
+          is_manager: boolean;
+          name: string;
+        }[];
+      };
       soft_delete_match_report_journey_exact: {
-        Args: { _report_id: string }
+        Args: { _report_id: string };
         Returns: {
-          deleted_interaction_id: string
-          deleted_ledger_count: number
-          deleted_report_id: string
-          deleted_row_index: number
-        }[]
-      }
-    }
+          deleted_interaction_id: string;
+          deleted_ledger_count: number;
+          deleted_report_id: string;
+          deleted_row_index: number;
+        }[];
+      };
+    };
     Enums: {
-      app_role: "super_admin" | "admin" | "mentor_manager" | "mentor"
-    }
+      app_role: "super_admin" | "admin" | "mentor_manager" | "mentor";
+    };
     CompositeTypes: {
-      [_ in never]: never
-    }
-  }
-}
+      [_ in never]: never;
+    };
+  };
+};
 
-type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
+type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">;
 
-type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
+type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">];
 
 export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals;
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
+  schema: keyof DatabaseWithoutInternals;
 }
   ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
       DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
-      Row: infer R
+      Row: infer R;
     }
     ? R
     : never
-  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
-        DefaultSchema["Views"])
-    ? (DefaultSchema["Tables"] &
-        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
-        Row: infer R
+  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
+    ? (DefaultSchema["Tables"] & DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
+        Row: infer R;
       }
       ? R
       : never
-    : never
+    : never;
 
 export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema["Tables"]
-    | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
+    keyof DefaultSchema["Tables"] | { schema: keyof DatabaseWithoutInternals },
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals;
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
+  schema: keyof DatabaseWithoutInternals;
 }
   ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
-      Insert: infer I
+      Insert: infer I;
     }
     ? I
     : never
   : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
     ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
-        Insert: infer I
+        Insert: infer I;
       }
       ? I
       : never
-    : never
+    : never;
 
 export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema["Tables"]
-    | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
+    keyof DefaultSchema["Tables"] | { schema: keyof DatabaseWithoutInternals },
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals;
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
+  schema: keyof DatabaseWithoutInternals;
 }
   ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
-      Update: infer U
+      Update: infer U;
     }
     ? U
     : never
   : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
     ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
-        Update: infer U
+        Update: infer U;
       }
       ? U
       : never
-    : never
+    : never;
 
 export type Enums<
   DefaultSchemaEnumNameOrOptions extends
-    | keyof DefaultSchema["Enums"]
-    | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
+    keyof DefaultSchema["Enums"] | { schema: keyof DatabaseWithoutInternals },
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals;
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
+  schema: keyof DatabaseWithoutInternals;
 }
   ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
   : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
     ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
-    : never
+    : never;
 
 export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
-    | keyof DefaultSchema["CompositeTypes"]
-    | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
+    keyof DefaultSchema["CompositeTypes"] | { schema: keyof DatabaseWithoutInternals },
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals;
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
+  schema: keyof DatabaseWithoutInternals;
 }
   ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
   : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
     ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
-    : never
+    : never;
 
 export const Constants = {
   public: {
@@ -1185,4 +1173,4 @@ export const Constants = {
       app_role: ["super_admin", "admin", "mentor_manager", "mentor"],
     },
   },
-} as const
+} as const;

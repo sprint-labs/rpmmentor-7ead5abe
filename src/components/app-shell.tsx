@@ -1,5 +1,29 @@
 import { Link, Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
-import { LayoutDashboard, Users, UserCog, MessageSquare, FileText, FolderOpen, BellRing, Calendar, ClipboardCheck, BarChart3, Plus, LogOut, ShieldCheck, History, Check, Trash2, X, Menu, KeyRound, Sun, Moon, Plug, Database } from "lucide-react";
+import {
+  LayoutDashboard,
+  Users,
+  UserCog,
+  MessageSquare,
+  FileText,
+  FolderOpen,
+  BellRing,
+  Calendar,
+  ClipboardCheck,
+  BarChart3,
+  Plus,
+  LogOut,
+  ShieldCheck,
+  History,
+  Check,
+  Trash2,
+  X,
+  Menu,
+  KeyRound,
+  Sun,
+  Moon,
+  Plug,
+  Database,
+} from "lucide-react";
 import { useTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 import { useAuth, ROLE_LABEL, type Permission, type Role } from "@/lib/auth";
@@ -8,10 +32,7 @@ import { WorkflowDialog, type WorkflowKind } from "@/components/workflows";
 import { useNotifications } from "@/lib/notifications";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import {
-  listNotifications,
-  markNotificationsRead,
-} from "@/lib/events/notifications.functions";
+import { listNotifications, markNotificationsRead } from "@/lib/events/notifications.functions";
 import { notificationsQueryKey } from "@/lib/events/query-keys";
 import { formatRelative } from "@/lib/mock-data";
 import { BrandMark } from "@/components/brand-mark";
@@ -22,15 +43,26 @@ import { MaintenanceScreen } from "@/components/maintenance-screen";
 import { isRestrictedDuringMaintenance } from "@/lib/maintenance";
 import { isPublicRoute } from "@/lib/public-routes";
 
-type NavItem = { to: string; label: string; icon: typeof LayoutDashboard; exact?: boolean; perm: Permission };
+type NavItem = {
+  to: string;
+  label: string;
+  icon: typeof LayoutDashboard;
+  exact?: boolean;
+  perm: Permission;
+};
 const NAV: NavItem[] = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, exact: true, perm: "goalkeepers.view" },
   { to: "/goalkeepers", label: "Goalkeepers", icon: Users, perm: "goalkeepers.view" },
   { to: "/system/players", label: "Player Records", icon: Database, perm: "players.edit_club" },
   { to: "/mentors", label: "Users & Roles", icon: UserCog, perm: "mentors.view" },
-  { to: "/interactions", label: "Interactions Log", icon: MessageSquare, perm: "interactions.view" },
+  {
+    to: "/interactions",
+    label: "Interactions Log",
+    icon: MessageSquare,
+    perm: "interactions.view",
+  },
   { to: "/reports", label: "Match Reports", icon: FileText, perm: "reports.view" },
-  
+
   { to: "/media", label: "Media Library", icon: FolderOpen, perm: "media.view" },
   { to: "/audit", label: "Audit Log", icon: History, perm: "audit.view" },
   { to: "/alerts", label: "Notification Centre", icon: BellRing, perm: "alerts.view" },
@@ -38,10 +70,20 @@ const NAV: NavItem[] = [
   { to: "/follow-ups", label: "Follow-ups", icon: ClipboardCheck, perm: "calendar.view" },
   { to: "/executive", label: "Executive", icon: BarChart3, perm: "executive.view" },
   { to: "/system/users", label: "Manage Users", icon: ShieldCheck, perm: "system.manage" },
-  { to: "/system/permissions", label: "Permission Check", icon: ShieldCheck, perm: "system.manage" },
+  {
+    to: "/system/permissions",
+    label: "Permission Check",
+    icon: ShieldCheck,
+    perm: "system.manage",
+  },
   { to: "/system/integrations", label: "Integrations", icon: Plug, perm: "system.manage" },
   { to: "/system/data-quality", label: "Data Quality", icon: Database, perm: "system.manage" },
-  { to: "/system/sync-verification", label: "Sync Verification", icon: ShieldCheck, perm: "system.manage" },
+  {
+    to: "/system/sync-verification",
+    label: "Sync Verification",
+    icon: ShieldCheck,
+    perm: "system.manage",
+  },
 ];
 
 export function AppShell() {
@@ -96,7 +138,9 @@ export function AppShell() {
   }, [loading, user, isPublic, navigate, path]);
 
   // Close drawer on route change
-  useEffect(() => { setNavOpen(false); }, [path]);
+  useEffect(() => {
+    setNavOpen(false);
+  }, [path]);
 
   useEffect(() => {
     if (navOpen) {
@@ -119,9 +163,11 @@ export function AppShell() {
     }
     if (event.key !== "Tab" || !menuDialogRef.current) return;
 
-    const focusable = Array.from(menuDialogRef.current.querySelectorAll<HTMLElement>(
-      'a[href], button:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])',
-    )).filter((element) => !element.hasAttribute("hidden"));
+    const focusable = Array.from(
+      menuDialogRef.current.querySelectorAll<HTMLElement>(
+        'a[href], button:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      ),
+    ).filter((element) => !element.hasAttribute("hidden"));
     if (!focusable.length) return;
 
     const first = focusable[0];
@@ -135,8 +181,21 @@ export function AppShell() {
     }
   }
 
-  if (loading) return <main id="main-content" tabIndex={-1} className="min-h-screen bg-background" aria-busy="true" />;
-  if (!user) return isPublic ? <Outlet /> : <main id="main-content" tabIndex={-1} className="min-h-screen bg-background" />;
+  if (loading)
+    return (
+      <main
+        id="main-content"
+        tabIndex={-1}
+        className="min-h-screen bg-background"
+        aria-busy="true"
+      />
+    );
+  if (!user)
+    return isPublic ? (
+      <Outlet />
+    ) : (
+      <main id="main-content" tabIndex={-1} className="min-h-screen bg-background" />
+    );
   if (!isPublic && isRestrictedDuringMaintenance(user)) {
     return (
       <MaintenanceScreen
@@ -154,33 +213,54 @@ export function AppShell() {
 
   // Pick a primary CTA per role
   const canLog = can("interactions.log");
-  const primaryAction: { kind: WorkflowKind; label: string } | null =
-    canLog ? { kind: "interaction", label: "Log Interaction" }
-    : can("reports.submit") ? { kind: "report", label: "Submit Report" }
-    : can("goalkeepers.create") ? { kind: "goalkeeper", label: "Add Goalkeeper" }
-    : null;
+  const primaryAction: { kind: WorkflowKind; label: string } | null = canLog
+    ? { kind: "interaction", label: "Log Interaction" }
+    : can("reports.submit")
+      ? { kind: "report", label: "Submit Report" }
+      : can("goalkeepers.create")
+        ? { kind: "goalkeeper", label: "Add Goalkeeper" }
+        : null;
 
   return (
     <div className="flex min-h-screen bg-background text-foreground">
       <div className="flex flex-1 flex-col min-w-0">
         <header className="h-16 md:h-14 flex items-center gap-2 md:gap-3 px-3 sm:px-4 md:px-6 border-b border-border bg-sidebar/95 backdrop-blur sticky top-0 z-10">
-          <Link to="/" aria-label="Mentor Hub" className="size-11 md:w-auto md:h-auto flex items-center justify-center md:justify-start gap-2.5 shrink-0 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+          <Link
+            to="/"
+            aria-label="Mentor Hub"
+            className="size-11 md:w-auto md:h-auto flex items-center justify-center md:justify-start gap-2.5 shrink-0 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          >
             <BrandMark className="size-9 shrink-0" alt="" />
-            <span className="hidden sm:inline font-semibold text-foreground tracking-tight" aria-hidden="true">Mentor Hub</span>
+            <span
+              className="hidden sm:inline font-semibold text-foreground tracking-tight"
+              aria-hidden="true"
+            >
+              Mentor Hub
+            </span>
           </Link>
           <div className="flex-1" />
 
           {user.actualRole === "super_admin" || user.actualRole === "mentor_manager" ? (
-            <div className="hidden md:inline-flex items-center gap-1.5 h-7 pl-2 pr-1 rounded-md bg-primary/10 border border-primary/30 text-primary text-[10px] font-medium uppercase tracking-wider" title="Interface only — server permissions are unchanged. This preview does not grant or restrict backend access.">
+            <div
+              className="hidden md:inline-flex items-center gap-1.5 h-7 pl-2 pr-1 rounded-md bg-primary/10 border border-primary/30 text-primary text-[10px] font-medium uppercase tracking-wider"
+              title="Interface only — server permissions are unchanged. This preview does not grant or restrict backend access."
+            >
               <ShieldCheck className="size-3" />
               {user.role !== user.actualRole ? (
                 <span className="hidden lg:inline">
                   Viewing as {ROLE_LABEL[user.role]}
                   <span className="mx-1.5 text-primary/60">·</span>
-                  <span className="text-primary/80 normal-case tracking-normal">interface only</span>
+                  <span className="text-primary/80 normal-case tracking-normal">
+                    interface only
+                  </span>
                 </span>
               ) : (
-                <span>View as <span className="text-primary/70 normal-case tracking-normal">(interface only)</span></span>
+                <span>
+                  View as{" "}
+                  <span className="text-primary/70 normal-case tracking-normal">
+                    (interface only)
+                  </span>
+                </span>
               )}
               <label htmlFor="view-as-role" className="sr-only">
                 View interface as role
@@ -208,7 +288,11 @@ export function AppShell() {
               {user.role !== user.actualRole && (
                 <button
                   onClick={() => setViewAsRole(null)}
-                  title={user.actualRole === "super_admin" ? "Exit view as and return to Super Admin" : "Exit view as and return to Mentor Manager"}
+                  title={
+                    user.actualRole === "super_admin"
+                      ? "Exit view as and return to Super Admin"
+                      : "Exit view as and return to Mentor Manager"
+                  }
                   className="ml-1 inline-flex items-center gap-1 h-5 pl-1.5 pr-2 rounded bg-primary text-primary-foreground hover:opacity-90"
                 >
                   <X className="size-3" />
@@ -217,7 +301,10 @@ export function AppShell() {
               )}
             </div>
           ) : (
-            <div className="hidden md:inline-flex items-center gap-1.5 h-7 px-2 rounded-md bg-primary/10 border border-primary/30 text-primary text-[10px] font-medium uppercase tracking-wider"><ShieldCheck className="size-3" />{ROLE_LABEL[user.role]}</div>
+            <div className="hidden md:inline-flex items-center gap-1.5 h-7 px-2 rounded-md bg-primary/10 border border-primary/30 text-primary text-[10px] font-medium uppercase tracking-wider">
+              <ShieldCheck className="size-3" />
+              {ROLE_LABEL[user.role]}
+            </div>
           )}
           <ThemeToggle />
           {(can("alerts.view") || canSeeEventInbox) && (
@@ -237,7 +324,10 @@ export function AppShell() {
               >
                 <BellRing className="size-4" aria-hidden="true" />
                 {notif.unread + inboxUnread > 0 && (
-                  <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-destructive text-destructive-foreground text-[10px] font-mono font-semibold grid place-items-center" aria-hidden="true">
+                  <span
+                    className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-destructive text-destructive-foreground text-[10px] font-mono font-semibold grid place-items-center"
+                    aria-hidden="true"
+                  >
                     {notif.unread + inboxUnread > 9 ? "9+" : notif.unread + inboxUnread}
                   </span>
                 )}
@@ -245,7 +335,12 @@ export function AppShell() {
               {bellOpen && (
                 <>
                   <div className="fixed inset-0 z-20" onClick={() => setBellOpen(false)} />
-                  <div id="duty-notifications" role="region" aria-label="Notifications" className="fixed inset-x-3 top-16 z-30 w-auto rounded-md border border-border bg-popover shadow-xl overflow-hidden md:absolute md:inset-x-auto md:top-auto md:right-0 md:mt-2 md:w-[360px]">
+                  <div
+                    id="duty-notifications"
+                    role="region"
+                    aria-label="Notifications"
+                    className="fixed inset-x-3 top-16 z-30 w-auto rounded-md border border-border bg-popover shadow-xl overflow-hidden md:absolute md:inset-x-auto md:top-auto md:right-0 md:mt-2 md:w-[360px]"
+                  >
                     {/* Event notifications come from the database, so they are the
                         same on every device and survive signing out. */}
                     {canSeeEventInbox && (
@@ -279,7 +374,9 @@ export function AppShell() {
                                 )}
                                 onClick={() => {
                                   void markInboxRead({ data: { ids: [n.id] } }).then(() =>
-                                    queryClient.invalidateQueries({ queryKey: notificationsQueryKey }),
+                                    queryClient.invalidateQueries({
+                                      queryKey: notificationsQueryKey,
+                                    }),
                                   );
                                   setBellOpen(false);
                                 }}
@@ -313,49 +410,95 @@ export function AppShell() {
                       </div>
                     )}
                     {can("alerts.view") && (
-                    <>
-                    <div className="flex items-center justify-between px-3 py-2 border-b border-border">
-                      <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Duty Notifications</div>
-                      <div className="flex items-center gap-1">
-                        <button onClick={() => notif.markAllRead()} title="Mark all read" className="size-11 grid place-items-center rounded hover:bg-accent text-muted-foreground"><Check className="size-3.5" /></button>
-                        <button onClick={() => notif.clearAll()} title="Clear" className="size-11 grid place-items-center rounded hover:bg-accent text-muted-foreground"><Trash2 className="size-3.5" /></button>
-                      </div>
-                    </div>
-                    <div className="max-h-[420px] overflow-y-auto">
-                      {notif.items.length === 0 ? (
-                        <div className="px-4 py-8 text-center text-xs text-muted-foreground">No duty status changes.</div>
-                      ) : (
-                        notif.items.slice(0, 30).map((n) => {
-                          const tone = n.to === "overdue" ? "bg-destructive" : n.to === "due_soon" ? "bg-warning" : n.to === "up_to_date" ? "bg-success" : "bg-muted-foreground/50";
-                          return (
-                            <Link
-                              key={n.id}
-                              to="/goalkeepers/$gkId"
-                              params={{ gkId: n.gkId }}
-                              onClick={() => { notif.markRead(n.id); setBellOpen(false); }}
-                              className={cn("flex gap-2.5 px-3 py-2.5 border-b border-border/60 last:border-0 hover:bg-accent/40", !n.read && "bg-accent/20")}
+                      <>
+                        <div className="flex items-center justify-between px-3 py-2 border-b border-border">
+                          <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                            Duty Notifications
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => notif.markAllRead()}
+                              title="Mark all read"
+                              className="size-11 grid place-items-center rounded hover:bg-accent text-muted-foreground"
                             >
-                              <span className={cn("mt-1.5 size-2 rounded-full shrink-0", tone)} />
-                              <div className="flex-1 min-w-0">
-                                <div className="text-sm font-medium truncate">{n.gkName}</div>
-                                <div className="text-[11px] text-muted-foreground">
-                                  Duty moved <span className="uppercase">{n.from}</span> → <span className="uppercase font-medium text-foreground/80">{n.to}</span>
-                                </div>
-                                <div className="text-[10px] text-muted-foreground mt-0.5">{formatRelative(n.date)}</div>
-                              </div>
-                              {!n.read && <span className="mt-1 size-1.5 rounded-full bg-primary shrink-0" />}
-                            </Link>
-                          );
-                        })
-                      )}
-                    </div>
-                    <Link to="/alerts" onClick={() => setBellOpen(false)} className="block px-3 py-2 border-t border-border text-center text-xs text-primary hover:bg-accent/40">
-                      Open alerts & email settings →
-                    </Link>
-                    </>
+                              <Check className="size-3.5" />
+                            </button>
+                            <button
+                              onClick={() => notif.clearAll()}
+                              title="Clear"
+                              className="size-11 grid place-items-center rounded hover:bg-accent text-muted-foreground"
+                            >
+                              <Trash2 className="size-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                        <div className="max-h-[420px] overflow-y-auto">
+                          {notif.items.length === 0 ? (
+                            <div className="px-4 py-8 text-center text-xs text-muted-foreground">
+                              No duty status changes.
+                            </div>
+                          ) : (
+                            notif.items.slice(0, 30).map((n) => {
+                              const tone =
+                                n.to === "overdue"
+                                  ? "bg-destructive"
+                                  : n.to === "due_soon"
+                                    ? "bg-warning"
+                                    : n.to === "up_to_date"
+                                      ? "bg-success"
+                                      : "bg-muted-foreground/50";
+                              return (
+                                <Link
+                                  key={n.id}
+                                  to="/goalkeepers/$gkId"
+                                  params={{ gkId: n.gkId }}
+                                  onClick={() => {
+                                    notif.markRead(n.id);
+                                    setBellOpen(false);
+                                  }}
+                                  className={cn(
+                                    "flex gap-2.5 px-3 py-2.5 border-b border-border/60 last:border-0 hover:bg-accent/40",
+                                    !n.read && "bg-accent/20",
+                                  )}
+                                >
+                                  <span
+                                    className={cn("mt-1.5 size-2 rounded-full shrink-0", tone)}
+                                  />
+                                  <div className="flex-1 min-w-0">
+                                    <div className="text-sm font-medium truncate">{n.gkName}</div>
+                                    <div className="text-[11px] text-muted-foreground">
+                                      Duty moved <span className="uppercase">{n.from}</span> →{" "}
+                                      <span className="uppercase font-medium text-foreground/80">
+                                        {n.to}
+                                      </span>
+                                    </div>
+                                    <div className="text-[10px] text-muted-foreground mt-0.5">
+                                      {formatRelative(n.date)}
+                                    </div>
+                                  </div>
+                                  {!n.read && (
+                                    <span className="mt-1 size-1.5 rounded-full bg-primary shrink-0" />
+                                  )}
+                                </Link>
+                              );
+                            })
+                          )}
+                        </div>
+                        <Link
+                          to="/alerts"
+                          onClick={() => setBellOpen(false)}
+                          className="block px-3 py-2 border-t border-border text-center text-xs text-primary hover:bg-accent/40"
+                        >
+                          Open alerts & email settings →
+                        </Link>
+                      </>
                     )}
                     {canSeeEventInbox && (
-                      <Link to="/follow-ups" onClick={() => setBellOpen(false)} className="block px-3 py-2 border-t border-border text-center text-xs text-primary hover:bg-accent/40">
+                      <Link
+                        to="/follow-ups"
+                        onClick={() => setBellOpen(false)}
+                        className="block px-3 py-2 border-t border-border text-center text-xs text-primary hover:bg-accent/40"
+                      >
                         Open follow-ups →
                       </Link>
                     )}
@@ -398,7 +541,11 @@ export function AppShell() {
       {/* Slide-out navigation drawer */}
       {navOpen && (
         <>
-          <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm" aria-hidden="true" onClick={closeMenu} />
+          <div
+            className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm"
+            aria-hidden="true"
+            onClick={closeMenu}
+          />
           <aside
             ref={menuDialogRef}
             id="main-navigation"
@@ -411,8 +558,12 @@ export function AppShell() {
             <div className="flex items-center gap-2.5 px-4 min-h-16 md:h-14 border-b border-sidebar-border">
               <BrandMark className="size-7 shrink-0" alt="Mentor Hub" />
               <div className="flex flex-col leading-tight min-w-0 flex-1">
-                <h2 id="menu-title" className="text-sm font-semibold tracking-tight truncate">{user.name}</h2>
-                <span className="text-[10px] uppercase tracking-wider text-muted-foreground truncate">{ROLE_LABEL[user.role]}</span>
+                <h2 id="menu-title" className="text-sm font-semibold tracking-tight truncate">
+                  {user.name}
+                </h2>
+                <span className="text-[10px] uppercase tracking-wider text-muted-foreground truncate">
+                  {ROLE_LABEL[user.role]}
+                </span>
               </div>
               <button
                 ref={menuCloseRef}
@@ -447,40 +598,60 @@ export function AppShell() {
             <div className="p-3 border-t border-sidebar-border space-y-2">
               {can("reports.submit") && (
                 <button
-                  onClick={() => { setWorkflow("report"); setNavOpen(false); }}
+                  onClick={() => {
+                    setWorkflow("report");
+                    setNavOpen(false);
+                  }}
                   className="w-full min-h-11 flex items-center gap-2 px-3 py-2 rounded-md bg-primary text-primary-foreground text-xs uppercase tracking-[0.06em] font-semibold hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
-                  <FileText className="size-4" />Submit a Match report
+                  <FileText className="size-4" />
+                  Submit a Match report
                 </button>
               )}
               {canLog && (
                 <button
-                  onClick={() => { setWorkflow("interaction"); setNavOpen(false); }}
+                  onClick={() => {
+                    setWorkflow("interaction");
+                    setNavOpen(false);
+                  }}
                   className="w-full min-h-11 flex items-center gap-2 px-3 py-2 rounded-md border border-border text-xs uppercase tracking-[0.06em] font-semibold hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
-                  <Plus className="size-4" />Log interaction
+                  <Plus className="size-4" />
+                  Log interaction
                 </button>
               )}
-              {primaryAction && primaryAction.kind !== "interaction" && primaryAction.kind !== "report" && (
-                <button
-                  onClick={() => { setWorkflow(primaryAction.kind); setNavOpen(false); }}
-                  className="w-full min-h-11 flex items-center gap-2 px-3 py-2 rounded-md bg-primary text-primary-foreground text-xs uppercase tracking-[0.06em] font-semibold hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                >
-                  <Plus className="size-4" />{primaryAction.label}
-                </button>
-              )}
+              {primaryAction &&
+                primaryAction.kind !== "interaction" &&
+                primaryAction.kind !== "report" && (
+                  <button
+                    onClick={() => {
+                      setWorkflow(primaryAction.kind);
+                      setNavOpen(false);
+                    }}
+                    className="w-full min-h-11 flex items-center gap-2 px-3 py-2 rounded-md bg-primary text-primary-foreground text-xs uppercase tracking-[0.06em] font-semibold hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    <Plus className="size-4" />
+                    {primaryAction.label}
+                  </button>
+                )}
               <Link
                 to={"/account" as never}
                 onClick={closeMenu}
                 className="w-full min-h-11 flex items-center gap-2 px-3 py-2 rounded-md border border-border text-xs uppercase tracking-[0.06em] font-semibold hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
-                <KeyRound className="size-4" />Account
+                <KeyRound className="size-4" />
+                Account
               </Link>
               <button
-                onClick={() => { signOut(); setNavOpen(false); navigate({ to: "/login" as never }); }}
+                onClick={() => {
+                  signOut();
+                  setNavOpen(false);
+                  navigate({ to: "/login" as never });
+                }}
                 className="w-full min-h-11 flex items-center gap-2 px-3 py-2 rounded-md border border-border text-xs uppercase tracking-[0.06em] font-semibold hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
-                <LogOut className="size-4" />Sign out
+                <LogOut className="size-4" />
+                Sign out
               </button>
             </div>
           </aside>

@@ -193,7 +193,11 @@ export function selectAssignedPlayers(_mentorProfileId: string): PlayerRow[] {
 /** Duty of care rows for the full roster, ordered worst-first. */
 export function selectDutyOfCareForMentor(_mentorProfileId: string): DutyOfCareRow[] {
   const rank: Record<DutyLevel, number> = {
-    overdue: 0, due_soon: 1, up_to_date: 2, not_enough_data: 3, not_required: 4,
+    overdue: 0,
+    due_soon: 1,
+    up_to_date: 2,
+    not_enough_data: 3,
+    not_required: 4,
   };
   return goalkeepers
     .map((g) => toDutyRow(g.id)!)
@@ -209,7 +213,9 @@ export function selectDutyRollup(mentorProfileId: string) {
   const overdue = rows.filter((r) => r.level === "overdue").length;
   return {
     total: rows.length,
-    upToDate, dueSoon, overdue,
+    upToDate,
+    dueSoon,
+    overdue,
     upToDatePct: (upToDate / total) * 100,
     dueSoonPct: (dueSoon / total) * 100,
     overduePct: (overdue / total) * 100,
@@ -225,7 +231,10 @@ export function selectOverduePlayers(mentorProfileId: string, limit = 5) {
 }
 
 /** Recent interactions logged by this mentor (session-store rows first, then seed data). */
-export function selectRecentInteractions(mentorProfileId: string, limit = 8): MentorInteractionRow[] {
+export function selectRecentInteractions(
+  mentorProfileId: string,
+  limit = 8,
+): MentorInteractionRow[] {
   const session = getSessionInteractions().filter((r) => r.mentor_profile_id === mentorProfileId);
   const seeded: MentorInteractionRow[] = interactions
     .filter((i) => i.mentorId === mentorProfileId)
@@ -264,7 +273,11 @@ export function selectRecentReports(mentorProfileId: string, limit = 6): MatchRe
 }
 
 /** Next fixtures/observations across the full client roster. */
-export function selectUpcomingForMentor(_mentorProfileId: string, days = 14, limit = 6): UpcomingFixtureRow[] {
+export function selectUpcomingForMentor(
+  _mentorProfileId: string,
+  days = 14,
+  limit = 6,
+): UpcomingFixtureRow[] {
   const now = Date.now();
   const cutoff = now + days * 86400000;
   return calendarEvents
@@ -284,7 +297,10 @@ export function selectUpcomingForMentor(_mentorProfileId: string, days = 14, lim
 export function selectMentorProgress(mentorProfileId: string) {
   const m = getMentor(mentorProfileId);
   if (!m) return { completed: 0, target: 0, pct: 0 };
-  const pct = m.targetInteractions === 0 ? 0 : Math.min(100, (m.completedThisMonth / m.targetInteractions) * 100);
+  const pct =
+    m.targetInteractions === 0
+      ? 0
+      : Math.min(100, (m.completedThisMonth / m.targetInteractions) * 100);
   return { completed: m.completedThisMonth, target: m.targetInteractions, pct };
 }
 
@@ -301,7 +317,9 @@ export function selectPlayer(playerId: string): PlayerRow | null {
 /** Media count per player across the full roster (used in list badges). */
 export function selectMediaCountByPlayer(_mentorProfileId: string): Record<string, number> {
   const out: Record<string, number> = {};
-  media.forEach((m) => { out[m.gkId] = (out[m.gkId] ?? 0) + 1; });
+  media.forEach((m) => {
+    out[m.gkId] = (out[m.gkId] ?? 0) + 1;
+  });
   return out;
 }
 

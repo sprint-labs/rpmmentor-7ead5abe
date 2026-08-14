@@ -22,7 +22,6 @@ function precedence(roles: string[]): ManagedRole | null {
   return null;
 }
 
-
 export const listManagedUsers = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<ManagedUserRow[]> => {
@@ -34,10 +33,11 @@ export const listManagedUsers = createServerFn({ method: "GET" })
     if (!myRoles?.some((r) => r.role === "super_admin")) throw new Error("Forbidden");
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const [{ data: profiles, error: profErr }, { data: roles, error: rolesErr }] = await Promise.all([
-      supabaseAdmin.from("profiles").select("id,email,name,initials,title").order("email"),
-      supabaseAdmin.from("user_roles").select("user_id,role"),
-    ]);
+    const [{ data: profiles, error: profErr }, { data: roles, error: rolesErr }] =
+      await Promise.all([
+        supabaseAdmin.from("profiles").select("id,email,name,initials,title").order("email"),
+        supabaseAdmin.from("user_roles").select("user_id,role"),
+      ]);
     if (profErr) throw new Error(profErr.message);
     if (rolesErr) throw new Error(rolesErr.message);
 
@@ -123,9 +123,7 @@ export const createManagedUser = createServerFn({ method: "POST" })
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    const password =
-      data.password ??
-      `${crypto.randomUUID().replace(/-/g, "")}Aa1!`;
+    const password = data.password ?? `${crypto.randomUUID().replace(/-/g, "")}Aa1!`;
 
     const { data: created, error: createErr } = await supabaseAdmin.auth.admin.createUser({
       email: data.email,
@@ -145,15 +143,13 @@ export const createManagedUser = createServerFn({ method: "POST" })
 
     // handle_new_user trigger seeds profile + default mentor role.
     // Upsert to ensure fields are correct, then set the requested role.
-    const { error: profErr } = await supabaseAdmin
-      .from("profiles")
-      .upsert({
-        id: userId,
-        email: data.email,
-        name: data.name,
-        title: data.title ?? "",
-        initials: initialsOf(data.name, data.email),
-      });
+    const { error: profErr } = await supabaseAdmin.from("profiles").upsert({
+      id: userId,
+      email: data.email,
+      name: data.name,
+      title: data.title ?? "",
+      initials: initialsOf(data.name, data.email),
+    });
     if (profErr) throw new Error(profErr.message);
 
     const { error: delRolesErr } = await supabaseAdmin
@@ -209,15 +205,13 @@ export const inviteManagedUser = createServerFn({ method: "POST" })
     const userId = link.user.id;
 
     // Trigger seeded a profile with mentor role; upsert canonical fields and set requested role.
-    const { error: profErr } = await supabaseAdmin
-      .from("profiles")
-      .upsert({
-        id: userId,
-        email: data.email,
-        name: data.name,
-        title: data.title ?? "",
-        initials,
-      });
+    const { error: profErr } = await supabaseAdmin.from("profiles").upsert({
+      id: userId,
+      email: data.email,
+      name: data.name,
+      title: data.title ?? "",
+      initials,
+    });
     if (profErr) throw new Error(profErr.message);
 
     const { error: delRolesErr } = await supabaseAdmin
@@ -268,7 +262,12 @@ export const deleteManagedUser = createServerFn({ method: "POST" })
     ]);
 
     const countOf = async (
-      table: "interactions" | "calendar_events" | "dashboard_click_events" | "match_report_submissions" | "interaction_media",
+      table:
+        | "interactions"
+        | "calendar_events"
+        | "dashboard_click_events"
+        | "match_report_submissions"
+        | "interaction_media",
       column: string,
     ) => {
       const { count } = await supabaseAdmin
@@ -357,7 +356,6 @@ export const listUserDeletionAudit = createServerFn({ method: "GET" })
     }));
   });
 
-
 const resetPasswordInput = z.object({ userId: z.string().uuid() });
 
 export const resetManagedUserPassword = createServerFn({ method: "POST" })
@@ -386,9 +384,7 @@ export const resetManagedUserPassword = createServerFn({ method: "POST" })
       throw new Error(updErr?.message ?? "Failed to reset password");
     }
 
-    const { logPasswordChange } = await import(
-      "@/lib/security/password-audit.server"
-    );
+    const { logPasswordChange } = await import("@/lib/security/password-audit.server");
     await logPasswordChange({
       userId: data.userId,
       actorId: context.userId,
@@ -397,4 +393,3 @@ export const resetManagedUserPassword = createServerFn({ method: "POST" })
 
     return { ok: true as const, email: updated.user.email ?? "", tempPassword };
   });
-

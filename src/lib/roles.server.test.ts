@@ -1,10 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Constants } from "@/integrations/supabase/types";
-import {
-  hasAnyRole,
-  USER_DIRECTORY_VIEW_ROLES,
-  type AppRole,
-} from "@/lib/roles.server";
+import { hasAnyRole, USER_DIRECTORY_VIEW_ROLES, type AppRole } from "@/lib/roles.server";
 
 const GENERATED_ROLES = Constants.public.Enums.app_role;
 

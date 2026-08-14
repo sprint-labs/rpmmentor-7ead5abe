@@ -45,7 +45,14 @@ describe("ErrorBoundary", () => {
         fallback={(reset) => (
           <div>
             <p>custom fallback</p>
-            <button onClick={() => { resetHandler(); reset(); }}>Reset</button>
+            <button
+              onClick={() => {
+                resetHandler();
+                reset();
+              }}
+            >
+              Reset
+            </button>
           </div>
         )}
       >
@@ -63,7 +70,14 @@ describe("ErrorBoundary", () => {
         fallback={(reset) => (
           <div>
             <p>custom fallback</p>
-            <button onClick={() => { resetHandler(); reset(); }}>Reset</button>
+            <button
+              onClick={() => {
+                resetHandler();
+                reset();
+              }}
+            >
+              Reset
+            </button>
           </div>
         )}
       >

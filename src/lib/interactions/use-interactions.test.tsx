@@ -27,10 +27,7 @@ vi.mock("@/integrations/supabase/client", () => ({
   },
 }));
 
-import {
-  useLoggedInteractions,
-  interactionsQueryKey,
-} from "@/lib/interactions/use-interactions";
+import { useLoggedInteractions, interactionsQueryKey } from "@/lib/interactions/use-interactions";
 
 function wrapper(client: QueryClient) {
   return ({ children }: { children: ReactNode }) => (

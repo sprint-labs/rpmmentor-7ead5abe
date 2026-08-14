@@ -34,7 +34,11 @@ export function OfflineBanner() {
     >
       <WifiOff className="size-3.5" />
       Offline — showing last synced data
-      {agoLabel && <span className="opacity-80 normal-case tracking-normal font-normal">· last sync {agoLabel}</span>}
+      {agoLabel && (
+        <span className="opacity-80 normal-case tracking-normal font-normal">
+          · last sync {agoLabel}
+        </span>
+      )}
     </div>
   );
 }

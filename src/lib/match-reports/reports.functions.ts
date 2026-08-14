@@ -75,9 +75,7 @@ export const listMatchReports = createServerFn({ method: "GET" })
 
 export const getMatchReport = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .validator((data: { reportId: string }) =>
-    z.object({ reportId: z.string().min(1) }).parse(data),
-  )
+  .validator((data: { reportId: string }) => z.object({ reportId: z.string().min(1) }).parse(data))
   .handler(async ({ data }) => {
     // Resolution order is unchanged: exact identity first, then the base id of
     // an occurrence, then the legacy (pre-Team) identity — so historic detail

@@ -13,18 +13,14 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
  * credentials skip the suite rather than fail the run.
  */
 
-const SUPABASE_URL =
-  process.env.VITE_SUPABASE_URL ?? process.env.SUPABASE_URL ?? "";
+const SUPABASE_URL = process.env.VITE_SUPABASE_URL ?? process.env.SUPABASE_URL ?? "";
 const SUPABASE_KEY =
-  process.env.VITE_SUPABASE_PUBLISHABLE_KEY ??
-  process.env.SUPABASE_PUBLISHABLE_KEY ??
-  "";
+  process.env.VITE_SUPABASE_PUBLISHABLE_KEY ?? process.env.SUPABASE_PUBLISHABLE_KEY ?? "";
 
 const email = process.env.TEST_MENTOR_EMAIL;
 const password = process.env.TEST_MENTOR_PASSWORD;
 
-const suite =
-  SUPABASE_URL && SUPABASE_KEY && email && password ? describe : describe.skip;
+const suite = SUPABASE_URL && SUPABASE_KEY && email && password ? describe : describe.skip;
 
 function makeClient(): SupabaseClient {
   return createClient(SUPABASE_URL, SUPABASE_KEY, {

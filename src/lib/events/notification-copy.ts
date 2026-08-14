@@ -18,11 +18,7 @@ import {
 import { formatLondonInstant, londonWallClockMs } from "@/lib/time/london";
 
 export type NotificationKind =
-  | "event_assigned"
-  | "event_updated"
-  | "event_unassigned"
-  | "event_cancelled"
-  | "follow_up_overdue";
+  "event_assigned" | "event_updated" | "event_unassigned" | "event_cancelled" | "follow_up_overdue";
 
 /** The event facts a notification is built from. */
 export interface NotifiableEvent {
@@ -78,10 +74,7 @@ export function followUpLinkPath(event: NotifiableEvent, kind: FollowUpKind | nu
 function describe(event: NotifiableEvent, kind: FollowUpKind | null, deadlineMs: number): string {
   const gk = event.goalkeeperName || "an unnamed goalkeeper";
   const required = followUpRequirementLabel(kind);
-  const lines = [
-    `${event.eventType} with ${gk}`,
-    `Scheduled: ${formatEventWhen(event)} (London)`,
-  ];
+  const lines = [`${event.eventType} with ${gk}`, `Scheduled: ${formatEventWhen(event)} (London)`];
   if (kind) {
     lines.push(`You need to submit: ${required}`);
     lines.push(`Due by: ${formatLondonInstant(deadlineMs)} (London)`);

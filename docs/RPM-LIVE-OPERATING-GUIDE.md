@@ -4,15 +4,15 @@ This is the durable handoff for the live RPM Mentor Hub. It is written for the o
 
 ## Start here
 
-| Area | Current authority | Safe link |
-| --- | --- | --- |
-| Live application | `https://rpmmentor.com` | [Open RPM Mentor Hub](https://rpmmentor.com) |
-| Application sign-in | RPM Supabase Auth | [Sign in](https://rpmmentor.com/login) · [Set/reset password](https://rpmmentor.com/reset-password) |
-| Source repository | `sprint-labs/rpmmentor-7ead5abe` | [GitHub repository](https://github.com/sprint-labs/rpmmentor-7ead5abe) |
-| Live branch and source | `main` at the live deployment's recorded commit | [GitHub main](https://github.com/sprint-labs/rpmmentor-7ead5abe/tree/main) |
-| Hosting and deployment | Vercel team **Refuel PM**, project **mentor-hub** | [Vercel project](https://vercel.com/gkhq/mentor-hub) · [Deployments](https://vercel.com/gkhq/mentor-hub/deployments) · [Environment variables](https://vercel.com/gkhq/mentor-hub/settings/environment-variables) |
+| Area                         | Current authority                                               | Safe link                                                                                                                                                                                                                                                                                                                |
+| ---------------------------- | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Live application             | `https://rpmmentor.com`                                         | [Open RPM Mentor Hub](https://rpmmentor.com)                                                                                                                                                                                                                                                                             |
+| Application sign-in          | RPM Supabase Auth                                               | [Sign in](https://rpmmentor.com/login) · [Set/reset password](https://rpmmentor.com/reset-password)                                                                                                                                                                                                                      |
+| Source repository            | `sprint-labs/rpmmentor-7ead5abe`                                | [GitHub repository](https://github.com/sprint-labs/rpmmentor-7ead5abe)                                                                                                                                                                                                                                                   |
+| Live branch and source       | `main` at the live deployment's recorded commit                 | [GitHub main](https://github.com/sprint-labs/rpmmentor-7ead5abe/tree/main)                                                                                                                                                                                                                                               |
+| Hosting and deployment       | Vercel team **Refuel PM**, project **mentor-hub**               | [Vercel project](https://vercel.com/gkhq/mentor-hub) · [Deployments](https://vercel.com/gkhq/mentor-hub/deployments) · [Environment variables](https://vercel.com/gkhq/mentor-hub/settings/environment-variables)                                                                                                        |
 | Production database and auth | Supabase project **RPM Mentor Hub**, Sprint Labs UK Org, London | [Supabase project](https://supabase.com/dashboard/project/zdxxezquhvpjmoxlecjp) · [API endpoint](https://zdxxezquhvpjmoxlecjp.supabase.co) · [Users](https://supabase.com/dashboard/project/zdxxezquhvpjmoxlecjp/auth/users) · [API keys](https://supabase.com/dashboard/project/zdxxezquhvpjmoxlecjp/settings/api-keys) |
-| Historical code origin | Lovable project `09000fc3-6e10-463a-b90f-7b0d3fb20b5a` | [Lovable project](https://lovable.dev/projects/09000fc3-6e10-463a-b90f-7b0d3fb20b5a) |
+| Historical code origin       | Lovable project `09000fc3-6e10-463a-b90f-7b0d3fb20b5a`          | [Lovable project](https://lovable.dev/projects/09000fc3-6e10-463a-b90f-7b0d3fb20b5a)                                                                                                                                                                                                                                     |
 
 Do not put passwords, private API keys, service-role keys, or copied environment-variable values in this file, Cursor chat, GitHub, or a commit. Use the account pages above and a password manager.
 
@@ -49,15 +49,15 @@ flowchart LR
 
 Vercel, not the repository, holds the active runtime values. The names below are safe to document; their values are not.
 
-| Variable | Scope | Purpose |
-| --- | --- | --- |
-| `VITE_SUPABASE_URL` | browser build | Public Supabase API URL injected by Vite at build time |
-| `VITE_SUPABASE_PUBLISHABLE_KEY` | browser build | Public Supabase browser key |
-| `VITE_SUPABASE_PROJECT_ID` | browser build / MCP integration | RPM Supabase project reference |
-| `SUPABASE_URL` | server | Supabase API URL for server code |
-| `SUPABASE_PUBLISHABLE_KEY` | server auth middleware | Validates the signed-in user's bearer token |
-| `SUPABASE_SERVICE_ROLE_KEY` | server only | Privileged server operations; never put it in `VITE_*`, source, or chat |
-| `SUPABASE_PROJECT_ID` | server/config compatibility | Project reference used by the existing integration setup |
+| Variable                        | Scope                           | Purpose                                                                 |
+| ------------------------------- | ------------------------------- | ----------------------------------------------------------------------- |
+| `VITE_SUPABASE_URL`             | browser build                   | Public Supabase API URL injected by Vite at build time                  |
+| `VITE_SUPABASE_PUBLISHABLE_KEY` | browser build                   | Public Supabase browser key                                             |
+| `VITE_SUPABASE_PROJECT_ID`      | browser build / MCP integration | RPM Supabase project reference                                          |
+| `SUPABASE_URL`                  | server                          | Supabase API URL for server code                                        |
+| `SUPABASE_PUBLISHABLE_KEY`      | server auth middleware          | Validates the signed-in user's bearer token                             |
+| `SUPABASE_SERVICE_ROLE_KEY`     | server only                     | Privileged server operations; never put it in `VITE_*`, source, or chat |
+| `SUPABASE_PROJECT_ID`           | server/config compatibility     | Project reference used by the existing integration setup                |
 
 Set the relevant values in both **Production** and **Preview** when changing backend configuration, then redeploy. Vite values are compiled into the browser bundle, so a redeploy is required after changing them.
 
@@ -86,14 +86,14 @@ The checked-in `.env` is a legacy, tracked file containing configuration names f
 
 All 18 public tables are RLS-enabled. The most important live counts at this snapshot are:
 
-| Data | Live count / state |
-| --- | --- |
-| `players` | 113 |
-| `match_reports_cache` | 95 canonical Match Reports |
-| `match_report_submissions` | 11 submission-ledger records |
-| `profiles` / `user_roles` | 1 / 1 (the first Super Admin) |
-| `interactions`, `calendar_events`, `interaction_media` | 0 / 0 / 0 |
-| `media_assets` / `report_attachments` | 12 metadata records / 7 links |
+| Data                                                   | Live count / state            |
+| ------------------------------------------------------ | ----------------------------- |
+| `players`                                              | 113                           |
+| `match_reports_cache`                                  | 95 canonical Match Reports    |
+| `match_report_submissions`                             | 11 submission-ledger records  |
+| `profiles` / `user_roles`                              | 1 / 1 (the first Super Admin) |
+| `interactions`, `calendar_events`, `interaction_media` | 0 / 0 / 0                     |
+| `media_assets` / `report_attachments`                  | 12 metadata records / 7 links |
 
 `public.match_reports_cache` is the canonical Match Report store despite its historic `_cache` name. `src/lib/match-reports/store.server.ts` is the one persistence module for reports; `reports.functions.ts` reads, writes and soft-deletes there. `match_report_submissions` provides the idempotency/duplicate ledger. Google Sheets is a dormant archive, one-time backfill input and rollback reference only. It must not be reintroduced into normal reads or writes.
 

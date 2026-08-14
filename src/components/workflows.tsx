@@ -3,11 +3,25 @@ import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import { X, CheckCircle2, Upload, AlertCircle, Paperclip, Search, Trash2, Loader2, RotateCcw } from "lucide-react";
+import {
+  X,
+  CheckCircle2,
+  Upload,
+  AlertCircle,
+  Paperclip,
+  Search,
+  Trash2,
+  Loader2,
+  RotateCcw,
+} from "lucide-react";
 import { goalkeepers } from "@/lib/mock-data";
 import { listPlayers, type PlayerRosterRow } from "@/lib/players.functions";
 import { COMPETITIONS } from "@/lib/competitions";
-import { findPlayerByName, legacyGkSlugForName, normalisePersonName } from "@/lib/goalkeeper-player-link";
+import {
+  findPlayerByName,
+  legacyGkSlugForName,
+  normalisePersonName,
+} from "@/lib/goalkeeper-player-link";
 import {
   attachInteractionAudio,
   createInteraction,
@@ -23,8 +37,11 @@ import {
 } from "@/lib/interactions/audio";
 import type { LoggedInteraction } from "@/lib/interactions/schema";
 import {
-  INTERACTION_OUTCOMES, todayDateOnly, formatDateOnly,
-  MATCH_REPORT_INTERACTION_TYPE, MANUAL_INTERACTION_TYPES,
+  INTERACTION_OUTCOMES,
+  todayDateOnly,
+  formatDateOnly,
+  MATCH_REPORT_INTERACTION_TYPE,
+  MANUAL_INTERACTION_TYPES,
   type InteractionTypeValue,
 } from "@/lib/interactions/schema";
 import { reconcileInteraction } from "@/lib/interactions/map";
@@ -37,25 +54,41 @@ import {
 import { refreshInteractionViews } from "@/lib/query-refresh";
 import { useAuth, type SessionUser } from "@/lib/auth";
 import {
-  ACCEPT_BY_KIND, MAX_FILE_BYTES, detectKind, formatBytes, uploadMedia,
-  updateMedia, listMedia, attachMediaToReport, getMediaByIds, getSignedUrl,
+  ACCEPT_BY_KIND,
+  MAX_FILE_BYTES,
+  detectKind,
+  formatBytes,
+  uploadMedia,
+  updateMedia,
+  listMedia,
+  attachMediaToReport,
+  getMediaByIds,
+  getSignedUrl,
   RATING_TAG_OPTIONS,
-  type MediaAsset, type MediaKind,
+  type MediaAsset,
+  type MediaKind,
 } from "@/lib/media-store";
 import { HandwrittenNotesField } from "@/components/handwritten-notes-field";
 import { VoiceNoteField } from "@/components/voice-note-field";
 import { submitMatchReport } from "@/lib/match-reports/reports.functions";
 import {
-  PILLAR_IDS, PILLAR_LABELS, averageOfScores, type PillarId,
+  PILLAR_IDS,
+  PILLAR_LABELS,
+  averageOfScores,
+  type PillarId,
 } from "@/lib/match-reports/schema";
 import {
-  loadDraft, saveDraft, overwriteDraft, clearDraft, isDraftMeaningful,
-  subscribeDraftChanges, newTabId,
-  type ReportDraft, type ReportDraftSnapshot,
+  loadDraft,
+  saveDraft,
+  overwriteDraft,
+  clearDraft,
+  isDraftMeaningful,
+  subscribeDraftChanges,
+  newTabId,
+  type ReportDraft,
+  type ReportDraftSnapshot,
 } from "@/lib/match-reports/draft-store";
-import {
-  appendCommentText, mergeOcrText, validateComments,
-} from "@/lib/match-reports/comments";
+import { appendCommentText, mergeOcrText, validateComments } from "@/lib/match-reports/comments";
 import { newSubmissionKey } from "@/lib/match-reports/duplicates";
 
 function formatDraftTime(iso: string): string {
@@ -65,7 +98,9 @@ function formatDraftTime(iso: string): string {
     const sameDay = d.toDateString() === today.toDateString();
     const t = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
     return sameDay ? t : `${d.toLocaleDateString()} ${t}`;
-  } catch { return iso; }
+  } catch {
+    return iso;
+  }
 }
 
 type MediaChipInfo = {
@@ -106,7 +141,13 @@ function DraftStatusIndicator({
     return (
       <span className="inline-flex items-center gap-1 text-destructive">
         <AlertCircle className="size-3" /> Failed to save
-        <button type="button" onClick={onRetry} className="underline hover:text-destructive/80 ml-1">Retry</button>
+        <button
+          type="button"
+          onClick={onRetry}
+          className="underline hover:text-destructive/80 ml-1"
+        >
+          Retry
+        </button>
       </span>
     );
   }
@@ -134,7 +175,25 @@ export interface MatchReportHandoff {
  * scheduled event. It travels with the save so the saved record is linked back to
  * the event, which is what turns that event's follow-up to Completed.
  */
-export function WorkflowDialog({ kind, onClose, prefillGoalkeeper, prefillMatchDate, prefillOpponent, prefillGkId, editingInteraction, followUpEventId }: { kind: WorkflowKind | null; onClose: () => void; prefillGoalkeeper?: string; prefillMatchDate?: string; prefillOpponent?: string; prefillGkId?: string; editingInteraction?: LoggedInteraction | null; followUpEventId?: string }) {
+export function WorkflowDialog({
+  kind,
+  onClose,
+  prefillGoalkeeper,
+  prefillMatchDate,
+  prefillOpponent,
+  prefillGkId,
+  editingInteraction,
+  followUpEventId,
+}: {
+  kind: WorkflowKind | null;
+  onClose: () => void;
+  prefillGoalkeeper?: string;
+  prefillMatchDate?: string;
+  prefillOpponent?: string;
+  prefillGkId?: string;
+  editingInteraction?: LoggedInteraction | null;
+  followUpEventId?: string;
+}) {
   /**
    * Change #1: choosing Live Match Observation in Log Interaction hands over to
    * the Match Report workflow in place, carrying the goalkeeper, date and club
@@ -152,8 +211,14 @@ export function WorkflowDialog({ kind, onClose, prefillGoalkeeper, prefillMatchD
   const title = isEditing ? "Edit Interaction" : TITLES[activeKind];
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-background/70 backdrop-blur-sm p-4" onClick={onClose}>
-      <div className="w-full max-w-2xl bg-card border border-border rounded-lg shadow-2xl max-h-[90vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
+    <div
+      className="fixed inset-0 z-50 grid place-items-center bg-background/70 backdrop-blur-sm p-4"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-2xl bg-card border border-border rounded-lg shadow-2xl max-h-[90vh] overflow-hidden flex flex-col"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-border">
           <div>
             <h3 className="text-base font-semibold">{title}</h3>
@@ -171,7 +236,12 @@ export function WorkflowDialog({ kind, onClose, prefillGoalkeeper, prefillMatchD
                     : "Saved locally to this session"}
             </p>
           </div>
-          <button onClick={onClose} className="size-8 grid place-items-center rounded-md hover:bg-accent"><X className="size-4" /></button>
+          <button
+            onClick={onClose}
+            className="size-8 grid place-items-center rounded-md hover:bg-accent"
+          >
+            <X className="size-4" />
+          </button>
         </div>
         <div className="p-5 overflow-y-auto">
           {activeKind === "interaction" && (
@@ -205,17 +275,36 @@ export function WorkflowDialog({ kind, onClose, prefillGoalkeeper, prefillMatchD
   );
 }
 
-export function EditMediaDialog({ asset, onClose }: { asset: MediaAsset | null; onClose: () => void }) {
+export function EditMediaDialog({
+  asset,
+  onClose,
+}: {
+  asset: MediaAsset | null;
+  onClose: () => void;
+}) {
   if (!asset) return null;
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-background/70 backdrop-blur-sm p-4" onClick={onClose}>
-      <div className="w-full max-w-xl bg-card border border-border rounded-lg shadow-2xl" onClick={(e) => e.stopPropagation()}>
+    <div
+      className="fixed inset-0 z-50 grid place-items-center bg-background/70 backdrop-blur-sm p-4"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-xl bg-card border border-border rounded-lg shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-border">
           <div>
             <h3 className="text-base font-semibold">Edit Media</h3>
-            <p className="text-xs text-muted-foreground mt-0.5">Update metadata, tags or the linked goalkeeper.</p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Update metadata, tags or the linked goalkeeper.
+            </p>
           </div>
-          <button onClick={onClose} className="size-8 grid place-items-center rounded-md hover:bg-accent"><X className="size-4" /></button>
+          <button
+            onClick={onClose}
+            className="size-8 grid place-items-center rounded-md hover:bg-accent"
+          >
+            <X className="size-4" />
+          </button>
         </div>
         <div className="p-5">
           <EditMediaForm asset={asset} onDone={onClose} />
@@ -225,12 +314,26 @@ export function EditMediaDialog({ asset, onClose }: { asset: MediaAsset | null; 
   );
 }
 
-function Field({ label, required, error, children }: { label: string; required?: boolean; error?: string | null; children: ReactNode }) {
+function Field({
+  label,
+  required,
+  error,
+  children,
+}: {
+  label: string;
+  required?: boolean;
+  error?: string | null;
+  children: ReactNode;
+}) {
   return (
     <div>
       <label className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
         {label}
-        {required && <span className="text-destructive ml-0.5" aria-hidden="true">*</span>}
+        {required && (
+          <span className="text-destructive ml-0.5" aria-hidden="true">
+            *
+          </span>
+        )}
       </label>
       <div className="mt-1">{children}</div>
       {error && (
@@ -241,9 +344,11 @@ function Field({ label, required, error, children }: { label: string; required?:
     </div>
   );
 }
-const inputCls = "w-full h-9 px-3 rounded-md bg-input/60 border border-border text-sm focus:outline-none focus:ring-2 focus:ring-ring/40";
+const inputCls =
+  "w-full h-9 px-3 rounded-md bg-input/60 border border-border text-sm focus:outline-none focus:ring-2 focus:ring-ring/40";
 const selectCls = inputCls;
-const taCls = "w-full px-3 py-2 rounded-md bg-input/60 border border-border text-sm focus:outline-none focus:ring-2 focus:ring-ring/40 resize-none";
+const taCls =
+  "w-full px-3 py-2 rounded-md bg-input/60 border border-border text-sm focus:outline-none focus:ring-2 focus:ring-ring/40 resize-none";
 
 function Submitted({
   message,
@@ -270,7 +375,10 @@ function Submitted({
       {detail && <div className="mt-3">{detail}</div>}
       <div className="mt-4 flex flex-wrap justify-center gap-2">
         {action && (
-          <button onClick={action.onClick} className="h-9 px-4 rounded-md bg-primary text-primary-foreground text-sm font-medium">
+          <button
+            onClick={action.onClick}
+            className="h-9 px-4 rounded-md bg-primary text-primary-foreground text-sm font-medium"
+          >
             {action.label}
           </button>
         )}
@@ -293,8 +401,12 @@ function TagPicker({ value, onChange }: { value: string[]; onChange: (v: string[
       {RATING_TAG_OPTIONS.map((t) => {
         const active = value.includes(t);
         return (
-          <button key={t} type="button" onClick={() => onChange(active ? value.filter((x) => x !== t) : [...value, t])}
-            className={`px-2 py-0.5 rounded text-[10px] border ${active ? "bg-primary/15 border-primary/40 text-primary" : "border-border text-muted-foreground hover:bg-accent/40"}`}>
+          <button
+            key={t}
+            type="button"
+            onClick={() => onChange(active ? value.filter((x) => x !== t) : [...value, t])}
+            className={`px-2 py-0.5 rounded text-[10px] border ${active ? "bg-primary/15 border-primary/40 text-primary" : "border-border text-muted-foreground hover:bg-accent/40"}`}
+          >
             {t}
           </button>
         );
@@ -351,8 +463,6 @@ async function readAudioDuration(file: File): Promise<number> {
     }
   });
 }
-
-
 
 /**
  * Byte-level upload progress. Falls back to an indeterminate bar when the
@@ -514,7 +624,6 @@ export function InteractionForm({
   /** Hidden picker used by "Choose an audio file" in the retry panel. */
   const audioFileInputRef = useRef<HTMLInputElement | null>(null);
 
-
   const [savedInteraction, setSavedInteraction] = useState<LoggedInteraction | null>(null);
 
   /**
@@ -614,8 +723,6 @@ export function InteractionForm({
   );
   const canSubmit = Object.keys(validationErrors).length === 0 && !saving;
 
-
-
   const listPlayersFn = useServerFn(listPlayers);
   const playersQuery = useQuery({
     queryKey: ["players", "roster"],
@@ -691,7 +798,13 @@ export function InteractionForm({
     }
   }
 
-  function validate(values: { gkId: string; date: string; notes: string; outcome: string; followUp: string }): Record<string, string> {
+  function validate(values: {
+    gkId: string;
+    date: string;
+    notes: string;
+    outcome: string;
+    followUp: string;
+  }): Record<string, string> {
     const next: Record<string, string> = {};
     if (!values.gkId.trim()) next.gkId = "Select a goalkeeper";
     if (!values.date.trim()) next.date = "Date is required";
@@ -700,10 +813,10 @@ export function InteractionForm({
     else if (values.notes.trim().length > 8000) next.notes = "Notes must be under 8,000 characters";
     if (!values.outcome.trim()) next.outcome = "Select an outcome";
     if (!values.followUp.trim()) next.followUp = "Follow-up action is required";
-    else if (values.followUp.trim().length > 200) next.followUp = "Follow-up action must be under 200 characters";
+    else if (values.followUp.trim().length > 200)
+      next.followUp = "Follow-up action must be under 200 characters";
     return next;
   }
-
 
   function clearFieldError(key: string) {
     setErrors((prev) => {
@@ -780,7 +893,6 @@ export function InteractionForm({
     setAudioProgress(null);
     await refreshInteractionViews(queryClient);
     return true;
-
   }
 
   /**
@@ -876,9 +988,6 @@ export function InteractionForm({
     node?.scrollIntoView({ behavior: "smooth", block: "center" });
   }
 
-
-
-
   /**
    * Save the recording and report the outcome separately from the interaction.
    * A failed recording is never allowed to read as a failed interaction.
@@ -904,7 +1013,6 @@ export function InteractionForm({
     }
     return ok;
   }
-
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -969,8 +1077,6 @@ export function InteractionForm({
         // A failed recording keeps the form exactly as it is — every field and
         // note stays on screen — so the upload can be retried in place.
         if (audioOk) onDone();
-
-
       } catch (err) {
         setError(
           err instanceof Error ? err.message : "Could not save the change. Please try again.",
@@ -1007,7 +1113,10 @@ export function InteractionForm({
     await queryClient.cancelQueries({ queryKey: interactionsQueryKey });
     const previous = queryClient.getQueryData<LoggedInteraction[]>(interactionsQueryKey);
     if (previous) {
-      queryClient.setQueryData<LoggedInteraction[]>(interactionsQueryKey, [optimisticRow, ...previous]);
+      queryClient.setQueryData<LoggedInteraction[]>(interactionsQueryKey, [
+        optimisticRow,
+        ...previous,
+      ]);
     }
 
     try {
@@ -1042,7 +1151,9 @@ export function InteractionForm({
       toast.success("Interaction saved", {
         description: `${shownType} with ${shownName} on ${shownDate} — now on the timeline.`,
       });
-      setSavedSummary(`Interaction logged successfully — ${shownType} with ${shownName} on ${shownDate}. It's now in the interactions log.`);
+      setSavedSummary(
+        `Interaction logged successfully — ${shownType} with ${shownName} on ${shownDate}. It's now in the interactions log.`,
+      );
       setSavedInteraction(confirmed);
       // The work is stored server-side now, so the local draft is finished with.
       clearInteractionDraft();
@@ -1054,22 +1165,21 @@ export function InteractionForm({
       // A failed recording holds the form open, with all fields intact, so the
       // upload can be retried without re-entering anything.
       if (audioOk) onDone();
-
-
-
     } catch (err) {
       // Roll the optimistic timeline entry back.
       if (previous) queryClient.setQueryData<LoggedInteraction[]>(interactionsQueryKey, previous);
-      else queryClient.setQueryData<LoggedInteraction[]>(interactionsQueryKey, (curr) =>
-        curr ? curr.filter((i) => i.id !== optimisticId) : curr,
-      );
+      else
+        queryClient.setQueryData<LoggedInteraction[]>(interactionsQueryKey, (curr) =>
+          curr ? curr.filter((i) => i.id !== optimisticId) : curr,
+        );
       // Retain every entered value — no success state without a read-back.
-      setError(err instanceof Error ? err.message : "Could not save the interaction. Please try again.");
+      setError(
+        err instanceof Error ? err.message : "Could not save the interaction. Please try again.",
+      );
     } finally {
       setSaving(false);
     }
   }
-
 
   if (done) {
     const audioFailed = audioStatus === "failed";
@@ -1102,8 +1212,12 @@ export function InteractionForm({
   return (
     <form aria-label="Log interaction form" onSubmit={handleSubmit} className="space-y-4">
       {error && (
-        <div role="alert" className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
-          <span className="font-medium">Not saved.</span> {error} Your entries have been kept — fix the issue and try again.
+        <div
+          role="alert"
+          className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive"
+        >
+          <span className="font-medium">Not saved.</span> {error} Your entries have been kept — fix
+          the issue and try again.
         </div>
       )}
 
@@ -1114,8 +1228,8 @@ export function InteractionForm({
         >
           <p className="font-medium">{AUDIO_PARTIAL_FAILURE_MESSAGE}</p>
           <p className="mt-1 text-muted-foreground">
-            Your notes and every field are saved and still here. The recording was kept too —
-            resend it without re-entering anything.{audioError ? ` ${audioError}` : ""}
+            Your notes and every field are saved and still here. The recording was kept too — resend
+            it without re-entering anything.{audioError ? ` ${audioError}` : ""}
           </p>
           <div className="mt-2.5 flex flex-wrap gap-2">
             <button
@@ -1161,7 +1275,6 @@ export function InteractionForm({
               className="h-8 px-3 rounded-md border border-border text-xs disabled:opacity-60 disabled:cursor-not-allowed"
             >
               Finish without the recording
-
             </button>
           </div>
         </div>
@@ -1175,12 +1288,12 @@ export function InteractionForm({
       )}
 
       {draftRestoredAt && (
-
         <div className="flex items-start justify-between gap-3 rounded-md border border-primary/40 bg-primary/5 px-3 py-2 text-xs">
           <p>
             <span className="font-medium">Unsaved draft restored.</span>{" "}
             <span className="text-muted-foreground">
-              Picked up from {formatDateOnly(draftRestoredAt.slice(0, 10))} — nothing has been saved yet.
+              Picked up from {formatDateOnly(draftRestoredAt.slice(0, 10))} — nothing has been saved
+              yet.
             </span>
           </p>
           <button
@@ -1193,8 +1306,6 @@ export function InteractionForm({
         </div>
       )}
 
-
-
       <fieldset disabled={saving} className="space-y-4 border-0 p-0 m-0 min-w-0">
         <div className="grid grid-cols-2 gap-3">
           <Field label="Goalkeeper" required error={showErrors ? errors.gkId : undefined}>
@@ -1204,17 +1315,32 @@ export function InteractionForm({
               aria-required="true"
               className={`${selectCls} ${showErrors && errors.gkId ? "border-destructive focus:ring-destructive/40" : ""}`}
               value={gkId}
-              onChange={(e) => { setGkId(e.target.value); clearFieldError("gkId"); }}
-              onBlur={() => { if (!gkId) setErrors((prev) => ({ ...prev, gkId: "Select a goalkeeper" })); }}
+              onChange={(e) => {
+                setGkId(e.target.value);
+                clearFieldError("gkId");
+              }}
+              onBlur={() => {
+                if (!gkId) setErrors((prev) => ({ ...prev, gkId: "Select a goalkeeper" }));
+              }}
             >
-              <option value="" disabled>Select…</option>
+              <option value="" disabled>
+                Select…
+              </option>
               {players.length > 0 && (
                 <optgroup label="Player records">
-                  {players.map((p) => <option key={p.id} value={p.id}>{p.full_name}</option>)}
+                  {players.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.full_name}
+                    </option>
+                  ))}
                 </optgroup>
               )}
               <optgroup label="Legacy profiles (no player record)">
-                {goalkeepers.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+                {goalkeepers.map((g) => (
+                  <option key={g.id} value={g.id}>
+                    {g.name}
+                  </option>
+                ))}
               </optgroup>
             </select>
           </Field>
@@ -1228,14 +1354,24 @@ export function InteractionForm({
                 </p>
               </div>
             ) : (
-              <select aria-label="Interaction Type" className={selectCls} required value={type} onChange={(e) => setType(e.target.value as InteractionTypeValue)}>
-                {MANUAL_INTERACTION_TYPES.map((t) => <option key={t}>{t}</option>)}
+              <select
+                aria-label="Interaction Type"
+                className={selectCls}
+                required
+                value={type}
+                onChange={(e) => setType(e.target.value as InteractionTypeValue)}
+              >
+                {MANUAL_INTERACTION_TYPES.map((t) => (
+                  <option key={t}>{t}</option>
+                ))}
               </select>
             )}
           </Field>
           {handOffToMatchReport && (
             <div className="col-span-2 rounded-md border border-primary/40 bg-primary/5 px-3 py-2.5 text-xs">
-              <p className="font-medium">A Live Match Observation is logged from the Match Report.</p>
+              <p className="font-medium">
+                A Live Match Observation is logged from the Match Report.
+              </p>
               <p className="mt-1 text-muted-foreground">
                 Continue to the Match Report and the interaction is created automatically when you
                 submit it — with the same goalkeeper, date and club — so the two can never disagree
@@ -1244,11 +1380,24 @@ export function InteractionForm({
             </div>
           )}
           <Field label="Club">
-            <input aria-label="Club" className={inputCls} value={club} onChange={(e) => handleClubChange(e.target.value)} placeholder="e.g. Brighton & Hove Albion" maxLength={80} />
+            <input
+              aria-label="Club"
+              className={inputCls}
+              value={club}
+              onChange={(e) => handleClubChange(e.target.value)}
+              placeholder="e.g. Brighton & Hove Albion"
+              maxLength={80}
+            />
             {clubAutoFilled ? (
-              <p className="mt-1 text-[11px] text-muted-foreground">Auto-filled from roster · edit to override</p>
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                Auto-filled from roster · edit to override
+              </p>
             ) : autoFilledClubRef.current ? (
-              <button type="button" onClick={resetClub} className="mt-1 inline-flex items-center gap-1 text-[11px] text-primary hover:text-primary/80">
+              <button
+                type="button"
+                onClick={resetClub}
+                className="mt-1 inline-flex items-center gap-1 text-[11px] text-primary hover:text-primary/80"
+              >
                 <RotateCcw className="size-3" /> Reset to roster club
               </button>
             ) : null}
@@ -1262,8 +1411,13 @@ export function InteractionForm({
               type="date"
               className={`${inputCls} ${showErrors && errors.date ? "border-destructive focus:ring-destructive/40" : ""}`}
               value={date}
-              onChange={(e) => { setDate(e.target.value); clearFieldError("date"); }}
-              onBlur={() => { if (!date) setErrors((prev) => ({ ...prev, date: "Date is required" })); }}
+              onChange={(e) => {
+                setDate(e.target.value);
+                clearFieldError("date");
+              }}
+              onBlur={() => {
+                if (!date) setErrors((prev) => ({ ...prev, date: "Date is required" }));
+              }}
             />
           </Field>
           <Field label="Outcome" required error={showErrors ? errors.outcome : undefined}>
@@ -1273,14 +1427,22 @@ export function InteractionForm({
               aria-required="true"
               className={`${selectCls} ${showErrors && errors.outcome ? "border-destructive focus:ring-destructive/40" : ""}`}
               value={outcome}
-              onChange={(e) => { setOutcome(e.target.value); clearFieldError("outcome"); }}
-              onBlur={() => { if (!outcome) setErrors((prev) => ({ ...prev, outcome: "Select an outcome" })); }}
+              onChange={(e) => {
+                setOutcome(e.target.value);
+                clearFieldError("outcome");
+              }}
+              onBlur={() => {
+                if (!outcome) setErrors((prev) => ({ ...prev, outcome: "Select an outcome" }));
+              }}
             >
-              <option value="" disabled>Select…</option>
-              {INTERACTION_OUTCOMES.map((t) => <option key={t}>{t}</option>)}
+              <option value="" disabled>
+                Select…
+              </option>
+              {INTERACTION_OUTCOMES.map((t) => (
+                <option key={t}>{t}</option>
+              ))}
             </select>
           </Field>
-
         </div>
         {/*
           `autoApply` is what fixes change #4. Without it a transcript stays
@@ -1313,8 +1475,13 @@ export function InteractionForm({
             className={`${taCls} ${showErrors && errors.notes ? "border-destructive focus:ring-destructive/40" : ""}`}
             placeholder="What did you observe? Or use the mic above to transcribe notes."
             value={notes}
-            onChange={(e) => { setNotes(e.target.value); clearFieldError("notes"); }}
-            onBlur={() => { if (!notes.trim()) setErrors((prev) => ({ ...prev, notes: "Notes are required" })); }}
+            onChange={(e) => {
+              setNotes(e.target.value);
+              clearFieldError("notes");
+            }}
+            onBlur={() => {
+              if (!notes.trim()) setErrors((prev) => ({ ...prev, notes: "Notes are required" }));
+            }}
           />
         </Field>
         <Field label="Follow-up Action" required error={showErrors ? errors.followUp : undefined}>
@@ -1325,8 +1492,14 @@ export function InteractionForm({
             className={`${inputCls} ${showErrors && errors.followUp ? "border-destructive focus:ring-destructive/40" : ""}`}
             placeholder="e.g. Schedule video review next week"
             value={followUp}
-            onChange={(e) => { setFollowUp(e.target.value); clearFieldError("followUp"); }}
-            onBlur={() => { if (!followUp.trim()) setErrors((prev) => ({ ...prev, followUp: "Follow-up action is required" })); }}
+            onChange={(e) => {
+              setFollowUp(e.target.value);
+              clearFieldError("followUp");
+            }}
+            onBlur={() => {
+              if (!followUp.trim())
+                setErrors((prev) => ({ ...prev, followUp: "Follow-up action is required" }));
+            }}
             maxLength={200}
           />
         </Field>
@@ -1345,11 +1518,15 @@ export function InteractionForm({
             Complete the highlighted fields to save.
           </p>
         )}
-        <button type="button" onClick={onDone} className="h-9 px-3 rounded-md border border-border text-sm" disabled={saving}>
+        <button
+          type="button"
+          onClick={onDone}
+          className="h-9 px-3 rounded-md border border-border text-sm"
+          disabled={saving}
+        >
           {savedInteraction ? "Close" : "Cancel"}
         </button>
         {savedInteraction ? null : handOffToMatchReport ? (
-
           <button
             type="button"
             onClick={handleContinueToMatchReport}
@@ -1358,7 +1535,12 @@ export function InteractionForm({
             Continue to Match Report
           </button>
         ) : (
-          <button type="submit" disabled={saving} aria-disabled={!canSubmit} className={`h-9 px-4 rounded-md bg-primary text-primary-foreground text-sm font-medium inline-flex items-center gap-1.5 ${canSubmit ? "" : "opacity-60"}`}>
+          <button
+            type="submit"
+            disabled={saving}
+            aria-disabled={!canSubmit}
+            className={`h-9 px-4 rounded-md bg-primary text-primary-foreground text-sm font-medium inline-flex items-center gap-1.5 ${canSubmit ? "" : "opacity-60"}`}
+          >
             {saving && <Loader2 className="size-3.5 animate-spin" />}
             {saving
               ? audioStatus === "saving"
@@ -1369,19 +1551,30 @@ export function InteractionForm({
                 : "Save Interaction"}
           </button>
         )}
-
       </div>
     </form>
   );
 }
 
-
-
 /**
  * Match Report form — writes to the RPM Match Reports Google Sheet via
  * a server function. Fields locked to the confirmed 14-column schema.
  */
-function ReportForm({ onDone, prefillGoalkeeper, prefillMatchDate, prefillOpponent, prefillTeam, followUpEventId }: { onDone: () => void; prefillGoalkeeper?: string; prefillMatchDate?: string; prefillOpponent?: string; prefillTeam?: string; followUpEventId?: string }) {
+function ReportForm({
+  onDone,
+  prefillGoalkeeper,
+  prefillMatchDate,
+  prefillOpponent,
+  prefillTeam,
+  followUpEventId,
+}: {
+  onDone: () => void;
+  prefillGoalkeeper?: string;
+  prefillMatchDate?: string;
+  prefillOpponent?: string;
+  prefillTeam?: string;
+  followUpEventId?: string;
+}) {
   const { user } = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -1420,14 +1613,21 @@ function ReportForm({ onDone, prefillGoalkeeper, prefillMatchDate, prefillOppone
   const [opponent, setOpponent] = useState("");
   const [matchDate, setMatchDate] = useState(new Date().toISOString().slice(0, 10));
   const [scores, setScores] = useState<Record<PillarId, number>>({
-    protect_goal: 3, protect_space: 3, protect_air: 3,
-    control_play: 3, change_play: 3, psych: 3, physical: 3,
+    protect_goal: 3,
+    protect_space: 3,
+    protect_air: 3,
+    control_play: 3,
+    change_play: 3,
+    psych: 3,
+    physical: 3,
   });
   const [comments, setComments] = useState("");
   const commentsRef = useRef<HTMLTextAreaElement | null>(null);
   const [commentsError, setCommentsError] = useState<string | null>(null);
   const [selectedMedia, setSelectedMedia] = useState<string[]>([]);
-  const [voiceTranscript, setVoiceTranscript] = useState<import("@/lib/match-reports/draft-store").VoiceTranscriptDraft | null>(null);
+  const [voiceTranscript, setVoiceTranscript] = useState<
+    import("@/lib/match-reports/draft-store").VoiceTranscriptDraft | null
+  >(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Idempotency key for this attempt-set: stable across retries and the
@@ -1435,7 +1635,9 @@ function ReportForm({ onDone, prefillGoalkeeper, prefillMatchDate, prefillOppone
   // produce a second sheet row. Reset only after a successful write.
   const submissionKeyRef = useRef<string>("");
   if (!submissionKeyRef.current) submissionKeyRef.current = newSubmissionKey();
-  const [duplicate, setDuplicate] = useState<null | { window: "strong" | "soft"; message: string }>(null);
+  const [duplicate, setDuplicate] = useState<null | { window: "strong" | "soft"; message: string }>(
+    null,
+  );
   const [, setFieldErrors] = useState<Record<string, string>>({});
 
   // ---------------- Draft persistence + versioning (localStorage) ----------------
@@ -1453,7 +1655,15 @@ function ReportForm({ onDone, prefillGoalkeeper, prefillMatchDate, prefillOppone
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const currentSnapshot = (): ReportDraftSnapshot => ({
-    goalkeeper, coach, competition, team, opponent, matchDate, scores, comments, selectedMedia,
+    goalkeeper,
+    coach,
+    competition,
+    team,
+    opponent,
+    matchDate,
+    scores,
+    comments,
+    selectedMedia,
     voiceTranscript,
   });
 
@@ -1548,9 +1758,26 @@ function ReportForm({ onDone, prefillGoalkeeper, prefillMatchDate, prefillOppone
         setSaveStatus("failed");
       }
     }, 5000);
-    return () => { if (saveTimer.current) clearTimeout(saveTimer.current); };
+    return () => {
+      if (saveTimer.current) clearTimeout(saveTimer.current);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, draftLoaded, done, conflict, goalkeeper, coach, competition, team, opponent, matchDate, scores, comments, selectedMedia, voiceTranscript]);
+  }, [
+    user,
+    draftLoaded,
+    done,
+    conflict,
+    goalkeeper,
+    coach,
+    competition,
+    team,
+    opponent,
+    matchDate,
+    scores,
+    comments,
+    selectedMedia,
+    voiceTranscript,
+  ]);
 
   // Auto-fill Team from the roster when the goalkeeper matches a known player.
   // Only writes when Team is empty OR still equals the last auto-filled value —
@@ -1575,7 +1802,6 @@ function ReportForm({ onDone, prefillGoalkeeper, prefillMatchDate, prefillOppone
     }
   };
 
-
   const discardDraft = () => {
     if (!user) return;
     clearDraft(user.id);
@@ -1585,8 +1811,13 @@ function ReportForm({ onDone, prefillGoalkeeper, prefillMatchDate, prefillOppone
     setOpponent("");
     setMatchDate(new Date().toISOString().slice(0, 10));
     setScores({
-      protect_goal: 3, protect_space: 3, protect_air: 3,
-      control_play: 3, change_play: 3, psych: 3, physical: 3,
+      protect_goal: 3,
+      protect_space: 3,
+      protect_air: 3,
+      control_play: 3,
+      change_play: 3,
+      psych: 3,
+      physical: 3,
     });
     setComments("");
     setSelectedMedia([]);
@@ -1642,10 +1873,11 @@ function ReportForm({ onDone, prefillGoalkeeper, prefillMatchDate, prefillOppone
       if (Array.isArray(v)) return v.length ? `${v.length} item${v.length === 1 ? "" : "s"}` : "—";
       return String(v);
     };
-    const truncate = (s: string, n = 60) => s.length > n ? `${s.slice(0, n)}…` : s;
+    const truncate = (s: string, n = 60) => (s.length > n ? `${s.slice(0, n)}…` : s);
     const rows: Row[] = [];
     const push = (key: string, label: string, m: unknown, t: unknown) => {
-      const ms = fmt(m); const ts = fmt(t);
+      const ms = fmt(m);
+      const ts = fmt(t);
       if (ms !== ts) rows.push({ key, label, mine: ms, theirs: ts });
     };
     push("goalkeeper", "Goalkeeper", mine.goalkeeper, other.goalkeeper);
@@ -1657,9 +1889,12 @@ function ReportForm({ onDone, prefillGoalkeeper, prefillMatchDate, prefillOppone
       push(`score.${pid}`, PILLAR_LABELS[pid], mine.scores[pid], other.scores?.[pid]);
     }
     if ((mine.comments || "") !== (other.comments || "")) {
-      rows.push({ key: "comments", label: "Comments",
+      rows.push({
+        key: "comments",
+        label: "Comments",
         mine: mine.comments ? truncate(mine.comments) : "—",
-        theirs: other.comments ? truncate(other.comments) : "—" });
+        theirs: other.comments ? truncate(other.comments) : "—",
+      });
     }
     const mineIds = mine.selectedMedia ?? [];
     const theirIds = other.selectedMedia ?? [];
@@ -1688,8 +1923,9 @@ function ReportForm({ onDone, prefillGoalkeeper, prefillMatchDate, prefillOppone
     else if (key === "competition") setCompetition(snap.competition);
     else if (key === "team") setTeam(snap.team);
     else if (key === "opponent") setOpponent(snap.opponent);
-    else if (key === "matchDate") { if (snap.matchDate) setMatchDate(snap.matchDate); }
-    else if (key === "comments") setComments(snap.comments);
+    else if (key === "matchDate") {
+      if (snap.matchDate) setMatchDate(snap.matchDate);
+    } else if (key === "comments") setComments(snap.comments);
     else if (key === "media") setSelectedMedia([...snap.selectedMedia]);
   };
   const acceptField = (key: string) => {
@@ -1706,7 +1942,9 @@ function ReportForm({ onDone, prefillGoalkeeper, prefillMatchDate, prefillOppone
     if (!preConflictLocalRef.current) return;
     setFieldFromSnapshot(key, preConflictLocalRef.current);
     setResolutions((prev) => {
-      const n = { ...prev }; delete n[key]; return n;
+      const n = { ...prev };
+      delete n[key];
+      return n;
     });
   };
 
@@ -1719,7 +1957,9 @@ function ReportForm({ onDone, prefillGoalkeeper, prefillMatchDate, prefillOppone
     if (Object.keys(resolutions).length !== rows.length) return;
     const local = preConflictLocalRef.current;
     const merged: ReportDraftSnapshot = {
-      ...local, scores: { ...local.scores }, selectedMedia: [...local.selectedMedia],
+      ...local,
+      scores: { ...local.scores },
+      selectedMedia: [...local.selectedMedia],
     };
     for (const r of rows) {
       if (resolutions[r.key] !== "accepted") continue;
@@ -1761,23 +2001,27 @@ function ReportForm({ onDone, prefillGoalkeeper, prefillMatchDate, prefillOppone
         if (cancelled) return;
         setMediaTitles((prev) => {
           const next = { ...prev };
-          for (const a of assets) next[a.id] = {
-            title: a.title,
-            kind: a.media_type,
-            thumbnailPath: a.thumbnail_path,
-            filePath: a.file_path,
-            mimeType: a.mime_type,
-            fileSize: a.file_size,
-            createdAt: a.created_at,
-          };
+          for (const a of assets)
+            next[a.id] = {
+              title: a.title,
+              kind: a.media_type,
+              thumbnailPath: a.thumbnail_path,
+              filePath: a.file_path,
+              mimeType: a.mime_type,
+              fileSize: a.file_size,
+              createdAt: a.created_at,
+            };
           return next;
         });
       })
-      .catch(() => { /* leave IDs; render fallback */ });
-    return () => { cancelled = true; };
+      .catch(() => {
+        /* leave IDs; render fallback */
+      });
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conflict]);
-
 
   const retrySave = () => {
     if (!user) return;
@@ -1841,7 +2085,9 @@ function ReportForm({ onDone, prefillGoalkeeper, prefillMatchDate, prefillOppone
     if (mode === "replace") {
       if (
         comments.trim() &&
-        !window.confirm("Replace the current Comments with this AI rewrite? Your existing text will be removed.")
+        !window.confirm(
+          "Replace the current Comments with this AI rewrite? Your existing text will be removed.",
+        )
       ) {
         return false;
       }
@@ -1947,7 +2193,11 @@ function ReportForm({ onDone, prefillGoalkeeper, prefillMatchDate, prefillOppone
         average: res.average,
         interactionError: res.interaction_error ?? null,
       });
-      try { window.dispatchEvent(new CustomEvent("rpm:report-submitted", { detail: res })); } catch { /* ignore */ }
+      try {
+        window.dispatchEvent(new CustomEvent("rpm:report-submitted", { detail: res }));
+      } catch {
+        /* ignore */
+      }
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Submission failed. Please try again.";
       if (/^Comments:/i.test(msg)) {
@@ -1967,7 +2217,11 @@ function ReportForm({ onDone, prefillGoalkeeper, prefillMatchDate, prefillOppone
           });
           if (user) clearDraft(user.id);
           setDone({ status: "queued" });
-          try { window.dispatchEvent(new CustomEvent("rpm:report-queued")); } catch { /* ignore */ }
+          try {
+            window.dispatchEvent(new CustomEvent("rpm:report-queued"));
+          } catch {
+            /* ignore */
+          }
         } catch {
           setError(msg);
         }
@@ -1983,36 +2237,69 @@ function ReportForm({ onDone, prefillGoalkeeper, prefillMatchDate, prefillOppone
     <form onSubmit={onSubmit} className="space-y-4">
       <div className="grid grid-cols-2 gap-3">
         <Field label="Goalkeeper *">
-          <input className={inputCls} required list="mr-gk-suggestions" value={goalkeeper}
+          <input
+            className={inputCls}
+            required
+            list="mr-gk-suggestions"
+            value={goalkeeper}
             onChange={(e) => setGoalkeeper(e.target.value)}
-            placeholder="e.g. James Beadle" maxLength={80} />
+            placeholder="e.g. James Beadle"
+            maxLength={80}
+          />
           <datalist id="mr-gk-suggestions">
-            {(players.length ? players.map((p) => ({ id: p.id, name: p.full_name })) : goalkeepers.map((g) => ({ id: g.id, name: g.name }))).map((g) => (
+            {(players.length
+              ? players.map((p) => ({ id: p.id, name: p.full_name }))
+              : goalkeepers.map((g) => ({ id: g.id, name: g.name }))
+            ).map((g) => (
               <option key={g.id} value={g.name} />
             ))}
           </datalist>
         </Field>
         <Field label="Coach (you) *">
-          <input className={`${inputCls} opacity-80 cursor-not-allowed`} required readOnly disabled value={coach} maxLength={80} />
+          <input
+            className={`${inputCls} opacity-80 cursor-not-allowed`}
+            required
+            readOnly
+            disabled
+            value={coach}
+            maxLength={80}
+          />
         </Field>
         <Field label="Competition *">
-          <input className={inputCls} required value={competition}
+          <input
+            className={inputCls}
+            required
+            value={competition}
             list="mr-competition-suggestions"
             onChange={(e) => setCompetition(e.target.value)}
-            placeholder="e.g. EFL Championship" maxLength={80} />
+            placeholder="e.g. EFL Championship"
+            maxLength={80}
+          />
           <datalist id="mr-competition-suggestions">
-            {Array.from(new Set([
-              ...COMPETITIONS,
-              ...players.map((p) => p.league),
-              ...goalkeepers.map((g) => g.league),
-            ].filter(Boolean))).sort((a, b) => a.localeCompare(b)).map((l) => (
-              <option key={l} value={l} />
-            ))}
+            {Array.from(
+              new Set(
+                [
+                  ...COMPETITIONS,
+                  ...players.map((p) => p.league),
+                  ...goalkeepers.map((g) => g.league),
+                ].filter(Boolean),
+              ),
+            )
+              .sort((a, b) => a.localeCompare(b))
+              .map((l) => (
+                <option key={l} value={l} />
+              ))}
           </datalist>
         </Field>
         <Field label="Team *">
-          <input className={inputCls} required value={team} onChange={(e) => handleTeamChange(e.target.value)}
-            placeholder="e.g. Wolves" maxLength={80} />
+          <input
+            className={inputCls}
+            required
+            value={team}
+            onChange={(e) => handleTeamChange(e.target.value)}
+            placeholder="e.g. Wolves"
+            maxLength={80}
+          />
           {teamAutoFilled && (
             <div className="mt-1 text-[10px] text-muted-foreground">
               Auto-filled from roster · edit to override
@@ -2020,13 +2307,24 @@ function ReportForm({ onDone, prefillGoalkeeper, prefillMatchDate, prefillOppone
           )}
         </Field>
         <Field label="Opponent *">
-          <input className={inputCls} required value={opponent} onChange={(e) => setOpponent(e.target.value)}
-            placeholder="e.g. Blackburn Rovers" maxLength={80} />
+          <input
+            className={inputCls}
+            required
+            value={opponent}
+            onChange={(e) => setOpponent(e.target.value)}
+            placeholder="e.g. Blackburn Rovers"
+            maxLength={80}
+          />
         </Field>
         <Field label="Match Date *">
-          <input type="date" className={inputCls} required value={matchDate}
+          <input
+            type="date"
+            className={inputCls}
+            required
+            value={matchDate}
             max={new Date().toISOString().slice(0, 10)}
-            onChange={(e) => setMatchDate(e.target.value)} />
+            onChange={(e) => setMatchDate(e.target.value)}
+          />
         </Field>
         <Field label="Average of scores">
           <div className="h-9 px-3 rounded-md border border-border/60 bg-muted/40 flex items-center text-sm font-semibold tabular-nums font-mono">
@@ -2044,16 +2342,29 @@ function ReportForm({ onDone, prefillGoalkeeper, prefillMatchDate, prefillOppone
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
           {PILLAR_IDS.map((id) => (
-            <div key={id} className="flex items-center justify-between gap-3 px-3 py-2 rounded-md border border-border/60 bg-input/40">
-              <label className="text-xs text-foreground/90 leading-tight">{PILLAR_LABELS[id]}</label>
+            <div
+              key={id}
+              className="flex items-center justify-between gap-3 px-3 py-2 rounded-md border border-border/60 bg-input/40"
+            >
+              <label className="text-xs text-foreground/90 leading-tight">
+                {PILLAR_LABELS[id]}
+              </label>
               <div className="flex items-center gap-1">
                 {[1, 2, 3, 4, 5].map((n) => {
                   const active = scores[id] === n;
                   return (
-                    <button key={n} type="button" onClick={() => setScore(id, n)}
+                    <button
+                      key={n}
+                      type="button"
+                      onClick={() => setScore(id, n)}
                       className={`size-7 rounded text-xs font-semibold tabular-nums font-mono transition-colors ${
-                        active ? "bg-primary text-primary-foreground" : "bg-background border border-border text-muted-foreground hover:bg-accent/40"
-                      }`}>{n}</button>
+                        active
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-background border border-border text-muted-foreground hover:bg-accent/40"
+                      }`}
+                    >
+                      {n}
+                    </button>
                   );
                 })}
               </div>
@@ -2063,7 +2374,9 @@ function ReportForm({ onDone, prefillGoalkeeper, prefillMatchDate, prefillOppone
       </div>
 
       <HandwrittenNotesField
-        context={goalkeeper ? `Match notes on ${goalkeeper} vs ${opponent || "opponent"}` : undefined}
+        context={
+          goalkeeper ? `Match notes on ${goalkeeper} vs ${opponent || "opponent"}` : undefined
+        }
         destinationLabel="comments"
         onTranscribed={(text, mode) => applyOcrText(text, mode)}
       />
@@ -2101,7 +2414,8 @@ function ReportForm({ onDone, prefillGoalkeeper, prefillMatchDate, prefillOppone
       />
       <Field label="Comments *">
         <div className="mb-1.5 text-[10px] leading-relaxed text-muted-foreground">
-          Write a free-form match report, append the reviewed transcript, or use the editable AI rewrite above.
+          Write a free-form match report, append the reviewed transcript, or use the editable AI
+          rewrite above.
         </div>
         <textarea
           ref={commentsRef}
@@ -2128,159 +2442,247 @@ function ReportForm({ onDone, prefillGoalkeeper, prefillMatchDate, prefillOppone
         )}
       </Field>
 
-      {conflict && (() => {
-        const mineSnap: ReportDraftSnapshot = preConflictLocalRef.current ?? {
-          goalkeeper, coach, competition, team, opponent, matchDate, scores, comments, selectedMedia,
-        };
-        const rows = computeDiffRows(mineSnap, conflict);
-        const resolvedCount = rows.reduce((n, r) => n + (resolutions[r.key] ? 1 : 0), 0);
-        return (
-          <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 space-y-2">
-            <div className="flex items-start gap-2">
-              <AlertCircle className="size-4 mt-0.5 text-amber-500 shrink-0" />
-              <div className="text-xs leading-relaxed flex-1 min-w-0">
-                <div className="font-semibold text-foreground">
-                  Draft conflict detected
-                  <span className="ml-2 font-normal text-muted-foreground">
-                    {rows.length} field{rows.length === 1 ? "" : "s"} changed
-                  </span>
-                </div>
-                <div className="text-muted-foreground mt-0.5">
-                  Another tab saved this draft at <strong>{formatDraftTime(conflict.savedAt)}</strong>{" "}
-                  (v{conflict.version}). Accept the other tab's value or reject to keep yours, per field.
-                </div>
-                {rows.length === 0 ? (
-                  <div className="mt-2 text-[11px] text-muted-foreground italic">
-                    No visible field differences — versions diverged but content matches.
+      {conflict &&
+        (() => {
+          const mineSnap: ReportDraftSnapshot = preConflictLocalRef.current ?? {
+            goalkeeper,
+            coach,
+            competition,
+            team,
+            opponent,
+            matchDate,
+            scores,
+            comments,
+            selectedMedia,
+          };
+          const rows = computeDiffRows(mineSnap, conflict);
+          const resolvedCount = rows.reduce((n, r) => n + (resolutions[r.key] ? 1 : 0), 0);
+          return (
+            <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 space-y-2">
+              <div className="flex items-start gap-2">
+                <AlertCircle className="size-4 mt-0.5 text-amber-500 shrink-0" />
+                <div className="text-xs leading-relaxed flex-1 min-w-0">
+                  <div className="font-semibold text-foreground">
+                    Draft conflict detected
+                    <span className="ml-2 font-normal text-muted-foreground">
+                      {rows.length} field{rows.length === 1 ? "" : "s"} changed
+                    </span>
                   </div>
-                ) : (
-                  <div className="mt-2 overflow-hidden rounded border border-border/60">
-                    <div className="grid grid-cols-[minmax(0,7rem)_minmax(0,1fr)_minmax(0,1fr)_auto] text-[11px]">
-                      <div className="bg-background/70 px-2 py-1 font-medium text-muted-foreground uppercase tracking-wider">Field</div>
-                      <div className="bg-background/70 px-2 py-1 font-medium text-muted-foreground uppercase tracking-wider border-l border-border/60">This tab</div>
-                      <div className="bg-background/70 px-2 py-1 font-medium text-muted-foreground uppercase tracking-wider border-l border-border/60">Other tab</div>
-                      <div className="bg-background/70 px-2 py-1 font-medium text-muted-foreground uppercase tracking-wider border-l border-border/60">Action</div>
-                      {rows.map((r) => {
-                        const state = resolutions[r.key];
-                        const cellBase = "px-2 py-1 border-t border-l border-border/60";
-                        const activeCell = "bg-amber-500/15";
-                        const dimCell = "opacity-50";
-                        const mineActive = state === "rejected" || !state;
-                        const theirsActive = state === "accepted" || !state;
-                        const md = r.mediaDiff;
-                        const bothSides = md && md.added.length > 0 && md.removed.length > 0;
-                        return (
-                          <Fragment key={r.key}>
-                            <div className="px-2 py-1 border-t border-border/60 text-foreground/80 truncate">
-                              {r.label}
-                              {md && (
-                                <div className="text-[10px] font-normal text-muted-foreground normal-case tracking-normal mt-0.5">
-                                  {bothSides ? "replaced · " : ""}
-                                  {md.added.length > 0 && <span className="text-emerald-600 dark:text-emerald-400">+{md.added.length}</span>}
-                                  {md.added.length > 0 && md.removed.length > 0 && " / "}
-                                  {md.removed.length > 0 && <span className="text-rose-600 dark:text-rose-400">−{md.removed.length}</span>}
-                                  {md.kept.length > 0 && <span className="text-muted-foreground"> · {md.kept.length} kept</span>}
-                                </div>
-                              )}
-                            </div>
-                            <div className={`${cellBase} ${mineActive ? activeCell : dimCell}`}>
-                              {md ? (
-                                <div className="flex flex-wrap gap-1">
-                                  {md.removed.length === 0 && md.kept.length === 0 && (
-                                    <span className="text-muted-foreground italic">nothing attached</span>
-                                  )}
-                                  {md.removed.map((id) => (
-                                    <MediaChipPreview key={id} id={id} info={mediaTitles[id]} tone="removed" />
-                                  ))}
-                                  {md.kept.map((id) => (
-                                    <MediaChipPreview key={id} id={id} info={mediaTitles[id]} tone="kept" />
-                                  ))}
-                                </div>
-                              ) : (
-                                <span className="rounded px-1 bg-amber-500/20 text-foreground break-words">{r.mine}</span>
-                              )}
-                            </div>
-                            <div className={`${cellBase} ${theirsActive ? activeCell : dimCell}`}>
-                              {md ? (
-                                <div className="flex flex-wrap gap-1">
-                                  {md.added.length === 0 && md.kept.length === 0 && (
-                                    <span className="text-muted-foreground italic">nothing attached</span>
-                                  )}
-                                  {md.added.map((id) => (
-                                    <MediaChipPreview key={id} id={id} info={mediaTitles[id]} tone="added" />
-                                  ))}
-                                  {md.kept.map((id) => (
-                                    <MediaChipPreview key={id} id={id} info={mediaTitles[id]} tone="kept" />
-                                  ))}
-                                </div>
-                              ) : (
-                                <span className="rounded px-1 bg-amber-500/20 text-foreground break-words">{r.theirs}</span>
-                              )}
-                            </div>
-                            <div className={`${cellBase} whitespace-nowrap`}>
-                              {state ? (
-                                <span className="inline-flex items-center gap-1.5 text-[10px]">
-                                  <span className={state === "accepted" ? "text-emerald-600 dark:text-emerald-400 font-medium" : "text-muted-foreground font-medium"}>
-                                    {state === "accepted" ? "Accepted remote" : "Kept local"}
-                                  </span>
-                                  <button type="button" onClick={() => undoField(r.key)}
-                                    className="underline text-muted-foreground hover:text-foreground">
-                                    Undo
-                                  </button>
-                                </span>
-                              ) : (
-                                <div className="inline-flex rounded border border-border overflow-hidden">
-                                  <button type="button" onClick={() => rejectField(r.key)}
-                                    aria-label={`Reject remote change for ${r.label}`}
-                                    className="px-1.5 py-0.5 text-[10px] bg-background text-muted-foreground hover:text-foreground hover:bg-muted">
-                                    Reject
-                                  </button>
-                                  <button type="button" onClick={() => acceptField(r.key)}
-                                    aria-label={`Accept remote change for ${r.label}`}
-                                    className="px-1.5 py-0.5 text-[10px] border-l border-border bg-primary text-primary-foreground hover:opacity-90">
-                                    Accept
-                                  </button>
-                                </div>
-                              )}
-                            </div>
-                          </Fragment>
-                        );
-                      })}
+                  <div className="text-muted-foreground mt-0.5">
+                    Another tab saved this draft at{" "}
+                    <strong>{formatDraftTime(conflict.savedAt)}</strong> (v{conflict.version}).
+                    Accept the other tab's value or reject to keep yours, per field.
+                  </div>
+                  {rows.length === 0 ? (
+                    <div className="mt-2 text-[11px] text-muted-foreground italic">
+                      No visible field differences — versions diverged but content matches.
                     </div>
-                  </div>
+                  ) : (
+                    <div className="mt-2 overflow-hidden rounded border border-border/60">
+                      <div className="grid grid-cols-[minmax(0,7rem)_minmax(0,1fr)_minmax(0,1fr)_auto] text-[11px]">
+                        <div className="bg-background/70 px-2 py-1 font-medium text-muted-foreground uppercase tracking-wider">
+                          Field
+                        </div>
+                        <div className="bg-background/70 px-2 py-1 font-medium text-muted-foreground uppercase tracking-wider border-l border-border/60">
+                          This tab
+                        </div>
+                        <div className="bg-background/70 px-2 py-1 font-medium text-muted-foreground uppercase tracking-wider border-l border-border/60">
+                          Other tab
+                        </div>
+                        <div className="bg-background/70 px-2 py-1 font-medium text-muted-foreground uppercase tracking-wider border-l border-border/60">
+                          Action
+                        </div>
+                        {rows.map((r) => {
+                          const state = resolutions[r.key];
+                          const cellBase = "px-2 py-1 border-t border-l border-border/60";
+                          const activeCell = "bg-amber-500/15";
+                          const dimCell = "opacity-50";
+                          const mineActive = state === "rejected" || !state;
+                          const theirsActive = state === "accepted" || !state;
+                          const md = r.mediaDiff;
+                          const bothSides = md && md.added.length > 0 && md.removed.length > 0;
+                          return (
+                            <Fragment key={r.key}>
+                              <div className="px-2 py-1 border-t border-border/60 text-foreground/80 truncate">
+                                {r.label}
+                                {md && (
+                                  <div className="text-[10px] font-normal text-muted-foreground normal-case tracking-normal mt-0.5">
+                                    {bothSides ? "replaced · " : ""}
+                                    {md.added.length > 0 && (
+                                      <span className="text-emerald-600 dark:text-emerald-400">
+                                        +{md.added.length}
+                                      </span>
+                                    )}
+                                    {md.added.length > 0 && md.removed.length > 0 && " / "}
+                                    {md.removed.length > 0 && (
+                                      <span className="text-rose-600 dark:text-rose-400">
+                                        −{md.removed.length}
+                                      </span>
+                                    )}
+                                    {md.kept.length > 0 && (
+                                      <span className="text-muted-foreground">
+                                        {" "}
+                                        · {md.kept.length} kept
+                                      </span>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                              <div className={`${cellBase} ${mineActive ? activeCell : dimCell}`}>
+                                {md ? (
+                                  <div className="flex flex-wrap gap-1">
+                                    {md.removed.length === 0 && md.kept.length === 0 && (
+                                      <span className="text-muted-foreground italic">
+                                        nothing attached
+                                      </span>
+                                    )}
+                                    {md.removed.map((id) => (
+                                      <MediaChipPreview
+                                        key={id}
+                                        id={id}
+                                        info={mediaTitles[id]}
+                                        tone="removed"
+                                      />
+                                    ))}
+                                    {md.kept.map((id) => (
+                                      <MediaChipPreview
+                                        key={id}
+                                        id={id}
+                                        info={mediaTitles[id]}
+                                        tone="kept"
+                                      />
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <span className="rounded px-1 bg-amber-500/20 text-foreground break-words">
+                                    {r.mine}
+                                  </span>
+                                )}
+                              </div>
+                              <div className={`${cellBase} ${theirsActive ? activeCell : dimCell}`}>
+                                {md ? (
+                                  <div className="flex flex-wrap gap-1">
+                                    {md.added.length === 0 && md.kept.length === 0 && (
+                                      <span className="text-muted-foreground italic">
+                                        nothing attached
+                                      </span>
+                                    )}
+                                    {md.added.map((id) => (
+                                      <MediaChipPreview
+                                        key={id}
+                                        id={id}
+                                        info={mediaTitles[id]}
+                                        tone="added"
+                                      />
+                                    ))}
+                                    {md.kept.map((id) => (
+                                      <MediaChipPreview
+                                        key={id}
+                                        id={id}
+                                        info={mediaTitles[id]}
+                                        tone="kept"
+                                      />
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <span className="rounded px-1 bg-amber-500/20 text-foreground break-words">
+                                    {r.theirs}
+                                  </span>
+                                )}
+                              </div>
+                              <div className={`${cellBase} whitespace-nowrap`}>
+                                {state ? (
+                                  <span className="inline-flex items-center gap-1.5 text-[10px]">
+                                    <span
+                                      className={
+                                        state === "accepted"
+                                          ? "text-emerald-600 dark:text-emerald-400 font-medium"
+                                          : "text-muted-foreground font-medium"
+                                      }
+                                    >
+                                      {state === "accepted" ? "Accepted remote" : "Kept local"}
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={() => undoField(r.key)}
+                                      className="underline text-muted-foreground hover:text-foreground"
+                                    >
+                                      Undo
+                                    </button>
+                                  </span>
+                                ) : (
+                                  <div className="inline-flex rounded border border-border overflow-hidden">
+                                    <button
+                                      type="button"
+                                      onClick={() => rejectField(r.key)}
+                                      aria-label={`Reject remote change for ${r.label}`}
+                                      className="px-1.5 py-0.5 text-[10px] bg-background text-muted-foreground hover:text-foreground hover:bg-muted"
+                                    >
+                                      Reject
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => acceptField(r.key)}
+                                      aria-label={`Accept remote change for ${r.label}`}
+                                      className="px-1.5 py-0.5 text-[10px] border-l border-border bg-primary text-primary-foreground hover:opacity-90"
+                                    >
+                                      Accept
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            </Fragment>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div className="flex flex-wrap items-center gap-2 justify-end">
+                {rows.length > 0 && (
+                  <span className="text-[11px] text-muted-foreground mr-auto">
+                    {resolvedCount} of {rows.length} resolved
+                  </span>
                 )}
+                <button
+                  type="button"
+                  onClick={() =>
+                    exportConflictJson(buildConflictSummary(rows, conflict, mediaTitles))
+                  }
+                  className="h-8 px-3 rounded-md border border-border text-xs"
+                  title="Download a machine-readable summary of this conflict"
+                >
+                  Export JSON
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    void exportConflictPdf(buildConflictSummary(rows, conflict, mediaTitles));
+                  }}
+                  className="h-8 px-3 rounded-md border border-border text-xs"
+                  title="Download a printable summary of this conflict"
+                >
+                  Export PDF
+                </button>
+                <button
+                  type="button"
+                  onClick={useTheirs}
+                  className="h-8 px-3 rounded-md border border-border text-xs"
+                >
+                  Use other tab's version
+                </button>
+                <button
+                  type="button"
+                  onClick={keepMine}
+                  className="h-8 px-3 rounded-md bg-primary text-primary-foreground text-xs font-medium"
+                >
+                  Keep this tab's version
+                </button>
               </div>
             </div>
-            <div className="flex flex-wrap items-center gap-2 justify-end">
-              {rows.length > 0 && (
-                <span className="text-[11px] text-muted-foreground mr-auto">
-                  {resolvedCount} of {rows.length} resolved
-                </span>
-              )}
-              <button type="button"
-                onClick={() => exportConflictJson(buildConflictSummary(rows, conflict, mediaTitles))}
-                className="h-8 px-3 rounded-md border border-border text-xs"
-                title="Download a machine-readable summary of this conflict">
-                Export JSON
-              </button>
-              <button type="button"
-                onClick={() => { void exportConflictPdf(buildConflictSummary(rows, conflict, mediaTitles)); }}
-                className="h-8 px-3 rounded-md border border-border text-xs"
-                title="Download a printable summary of this conflict">
-                Export PDF
-              </button>
-              <button type="button" onClick={useTheirs}
-                className="h-8 px-3 rounded-md border border-border text-xs">
-                Use other tab's version
-              </button>
-              <button type="button" onClick={keepMine}
-                className="h-8 px-3 rounded-md bg-primary text-primary-foreground text-xs font-medium">
-                Keep this tab's version
-              </button>
-            </div>
-          </div>
-        );
-      })()}
+          );
+        })()}
 
       {duplicate && (
         <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-xs space-y-2">
@@ -2288,12 +2690,14 @@ function ReportForm({ onDone, prefillGoalkeeper, prefillMatchDate, prefillOppone
             <AlertCircle className="size-4 mt-0.5 text-amber-500 shrink-0" />
             <div>
               <div className="font-semibold text-foreground">
-                {duplicate.window === "strong" ? "Possible double submission" : "Similar report already submitted"}
+                {duplicate.window === "strong"
+                  ? "Possible double submission"
+                  : "Similar report already submitted"}
               </div>
               <div className="text-muted-foreground mt-0.5">{duplicate.message}</div>
               <div className="text-muted-foreground mt-1">
-                Nothing has been written to the sheet. If this is a genuinely separate
-                report, confirm below.
+                Nothing has been written to the sheet. If this is a genuinely separate report,
+                confirm below.
               </div>
             </div>
           </div>
@@ -2334,14 +2738,25 @@ function ReportForm({ onDone, prefillGoalkeeper, prefillMatchDate, prefillOppone
           )}
           <DraftStatusIndicator status={saveStatus} savedAt={draftSavedAt} onRetry={retrySave} />
           {draftSavedAt && (
-            <button type="button" onClick={discardDraft} disabled={submitting}
-              className="inline-flex items-center gap-1 text-muted-foreground hover:text-destructive">
+            <button
+              type="button"
+              onClick={discardDraft}
+              disabled={submitting}
+              className="inline-flex items-center gap-1 text-muted-foreground hover:text-destructive"
+            >
               <Trash2 className="size-3" /> Discard draft
             </button>
           )}
         </div>
         <div className="flex gap-2">
-          <button type="button" onClick={onDone} className="h-9 px-3 rounded-md border border-border text-sm" disabled={submitting}>Cancel</button>
+          <button
+            type="button"
+            onClick={onDone}
+            className="h-9 px-3 rounded-md border border-border text-sm"
+            disabled={submitting}
+          >
+            Cancel
+          </button>
           <button
             type="submit"
             disabled={submitting || !!conflict}
@@ -2357,7 +2772,10 @@ function ReportForm({ onDone, prefillGoalkeeper, prefillMatchDate, prefillOppone
 }
 
 function MediaAttachPicker({
-  gkId, selected, onChange, user,
+  gkId,
+  selected,
+  onChange,
+  user,
 }: {
   gkId: string;
   selected: string[];
@@ -2371,14 +2789,24 @@ function MediaAttachPicker({
 
   const load = async () => {
     setLoading(true);
-    try { setAssets(await listMedia({ gkId })); } catch { /* ignore */ } finally { setLoading(false); }
+    try {
+      setAssets(await listMedia({ gkId }));
+    } catch {
+      /* ignore */
+    } finally {
+      setLoading(false);
+    }
   };
-  useEffect(() => { load(); }, [gkId]); // eslint-disable-line
+  useEffect(() => {
+    load();
+  }, [gkId]); // eslint-disable-line
 
   const filtered = useMemo(() => {
     const s = search.trim().toLowerCase();
     if (!s) return assets;
-    return assets.filter((a) => a.title.toLowerCase().includes(s) || (a.notes ?? "").toLowerCase().includes(s));
+    return assets.filter(
+      (a) => a.title.toLowerCase().includes(s) || (a.notes ?? "").toLowerCase().includes(s),
+    );
   }, [assets, search]);
 
   const toggle = (id: string) =>
@@ -2388,73 +2816,132 @@ function MediaAttachPicker({
     <div className="space-y-2 border border-border rounded-md p-3 bg-background/40">
       <div className="flex items-center justify-between">
         <div className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium inline-flex items-center gap-1.5">
-          <Paperclip className="size-3.5" />Attach Media {selected.length > 0 && <span className="text-primary normal-case">· {selected.length} selected</span>}
+          <Paperclip className="size-3.5" />
+          Attach Media{" "}
+          {selected.length > 0 && (
+            <span className="text-primary normal-case">· {selected.length} selected</span>
+          )}
         </div>
         {user && (
-          <button type="button" onClick={() => setShowUpload((v) => !v)} className="text-[11px] text-primary hover:underline">
+          <button
+            type="button"
+            onClick={() => setShowUpload((v) => !v)}
+            className="text-[11px] text-primary hover:underline"
+          >
             {showUpload ? "Cancel upload" : "Upload new"}
           </button>
         )}
       </div>
 
       {showUpload && user && (
-        <InlineUploader gkId={gkId} user={user} onUploaded={async (asset) => {
-          await load();
-          onChange([...selected, asset.id]);
-          setShowUpload(false);
-        }} />
+        <InlineUploader
+          gkId={gkId}
+          user={user}
+          onUploaded={async (asset) => {
+            await load();
+            onChange([...selected, asset.id]);
+            setShowUpload(false);
+          }}
+        />
       )}
 
       <div className="relative">
         <Search className="size-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
-        <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search existing media for this goalkeeper…" className="w-full h-8 pl-7 pr-2 rounded-md bg-input/60 border border-border text-xs" />
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search existing media for this goalkeeper…"
+          className="w-full h-8 pl-7 pr-2 rounded-md bg-input/60 border border-border text-xs"
+        />
       </div>
 
       <div className="max-h-40 overflow-y-auto space-y-1 pr-1">
         {loading ? (
           <div className="text-xs text-muted-foreground py-2">Loading…</div>
         ) : filtered.length === 0 ? (
-          <div className="text-xs text-muted-foreground py-2">No existing media for this goalkeeper.</div>
-        ) : filtered.map((a) => {
-          const active = selected.includes(a.id);
-          return (
-            <label key={a.id} className={`flex items-center gap-2 px-2 py-1.5 rounded border text-xs cursor-pointer ${active ? "border-primary/40 bg-primary/10" : "border-border hover:bg-accent/30"}`}>
-              <input type="checkbox" checked={active} onChange={() => toggle(a.id)} className="size-3.5" />
-              <span className="flex-1 truncate">{a.title}</span>
-              <span className="text-[10px] text-muted-foreground uppercase">{a.media_type}</span>
-            </label>
-          );
-        })}
+          <div className="text-xs text-muted-foreground py-2">
+            No existing media for this goalkeeper.
+          </div>
+        ) : (
+          filtered.map((a) => {
+            const active = selected.includes(a.id);
+            return (
+              <label
+                key={a.id}
+                className={`flex items-center gap-2 px-2 py-1.5 rounded border text-xs cursor-pointer ${active ? "border-primary/40 bg-primary/10" : "border-border hover:bg-accent/30"}`}
+              >
+                <input
+                  type="checkbox"
+                  checked={active}
+                  onChange={() => toggle(a.id)}
+                  className="size-3.5"
+                />
+                <span className="flex-1 truncate">{a.title}</span>
+                <span className="text-[10px] text-muted-foreground uppercase">{a.media_type}</span>
+              </label>
+            );
+          })
+        )}
       </div>
     </div>
   );
 }
 
-function InlineUploader({ gkId, user, onUploaded }: { gkId: string; user: SessionUser; onUploaded: (a: MediaAsset) => void }) {
+function InlineUploader({
+  gkId,
+  user,
+  onUploaded,
+}: {
+  gkId: string;
+  user: SessionUser;
+  onUploaded: (a: MediaAsset) => void;
+}) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const onPick = async (file: File | null) => {
     if (!file) return;
     setErr(null);
     const kind = detectKind(file);
-    if (!kind) { setErr("Unsupported file type."); return; }
-    if (file.size > MAX_FILE_BYTES) { setErr(`File exceeds ${formatBytes(MAX_FILE_BYTES)}.`); return; }
+    if (!kind) {
+      setErr("Unsupported file type.");
+      return;
+    }
+    if (file.size > MAX_FILE_BYTES) {
+      setErr(`File exceeds ${formatBytes(MAX_FILE_BYTES)}.`);
+      return;
+    }
     setBusy(true);
     try {
-      const asset = await uploadMedia({ file, gkId, title: file.name.replace(/\.[^.]+$/, ""), kind, user });
+      const asset = await uploadMedia({
+        file,
+        gkId,
+        title: file.name.replace(/\.[^.]+$/, ""),
+        kind,
+        user,
+      });
       window.dispatchEvent(new CustomEvent("rpm:media-uploaded"));
       onUploaded(asset);
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Upload failed.");
-    } finally { setBusy(false); }
+    } finally {
+      setBusy(false);
+    }
   };
   return (
     <div className="border border-dashed border-border rounded-md p-2 text-xs flex items-center gap-2">
       <label className="cursor-pointer inline-flex items-center gap-1.5 px-2 py-1 rounded bg-primary text-primary-foreground">
-        <Upload className="size-3" />{busy ? "Uploading…" : "Choose file"}
-        <input type="file" className="hidden" disabled={busy} onChange={(e) => onPick(e.target.files?.[0] ?? null)} />
+        <Upload className="size-3" />
+        {busy ? "Uploading…" : "Choose file"}
+        <input
+          type="file"
+          className="hidden"
+          disabled={busy}
+          onChange={(e) => onPick(e.target.files?.[0] ?? null)}
+        />
       </label>
-      <span className="text-muted-foreground">Up to {formatBytes(MAX_FILE_BYTES)} · video/image/PDF/audio</span>
+      <span className="text-muted-foreground">
+        Up to {formatBytes(MAX_FILE_BYTES)} · video/image/PDF/audio
+      </span>
       {err && <span className="text-red-400 ml-auto">{err}</span>}
     </div>
   );
@@ -2491,12 +2978,19 @@ function MediaForm({ onDone, prefillGkId }: { onDone: () => void; prefillGkId?: 
     );
   }
 
-  if (done) return <Submitted message="Media uploaded and linked to the goalkeeper." onDone={onDone} />;
+  if (done)
+    return <Submitted message="Media uploaded and linked to the goalkeeper." onDone={onDone} />;
 
   const handleFile = (f: File | null) => {
     setError(null);
-    if (!f) { setFile(null); return; }
-    if (f.size > MAX_FILE_BYTES) { setError(`File is ${formatBytes(f.size)} — limit is ${formatBytes(MAX_FILE_BYTES)}.`); return; }
+    if (!f) {
+      setFile(null);
+      return;
+    }
+    if (f.size > MAX_FILE_BYTES) {
+      setError(`File is ${formatBytes(f.size)} — limit is ${formatBytes(MAX_FILE_BYTES)}.`);
+      return;
+    }
     const detected = detectKind(f);
     if (detected) setKind(detected);
     setFile(f);
@@ -2506,35 +3000,76 @@ function MediaForm({ onDone, prefillGkId }: { onDone: () => void; prefillGkId?: 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    if (!file) { setError("Please choose a file to upload."); return; }
-    if (!gkId) { setError("Please select a goalkeeper."); return; }
+    if (!file) {
+      setError("Please choose a file to upload.");
+      return;
+    }
+    if (!gkId) {
+      setError("Please select a goalkeeper.");
+      return;
+    }
     setBusy(true);
     try {
-      await uploadMedia({ file, gkId, title: title.trim() || file.name, notes, kind, ratingTags: tags, user });
+      await uploadMedia({
+        file,
+        gkId,
+        title: title.trim() || file.name,
+        notes,
+        kind,
+        ratingTags: tags,
+        user,
+      });
       window.dispatchEvent(new CustomEvent("rpm:media-uploaded"));
       setDone(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Upload failed.");
-    } finally { setBusy(false); }
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
     <form onSubmit={onSubmit} className="space-y-4">
       <div className="grid grid-cols-2 gap-3">
         <Field label="Media Type">
-          <select className={selectCls} value={kind} onChange={(e) => setKind(e.target.value as MediaKind)}>
-            {KIND_LABELS.map((k) => <option key={k.value} value={k.value}>{k.label}</option>)}
+          <select
+            className={selectCls}
+            value={kind}
+            onChange={(e) => setKind(e.target.value as MediaKind)}
+          >
+            {KIND_LABELS.map((k) => (
+              <option key={k.value} value={k.value}>
+                {k.label}
+              </option>
+            ))}
           </select>
         </Field>
         <Field label="Linked Goalkeeper">
-          <select className={selectCls} required value={gkId} onChange={(e) => setGkId(e.target.value)}>
-            <option value="" disabled>Select…</option>
-            {allowedGks.map((g) => <option key={g.id} value={g.id}>{g.name} — {g.club}</option>)}
+          <select
+            className={selectCls}
+            required
+            value={gkId}
+            onChange={(e) => setGkId(e.target.value)}
+          >
+            <option value="" disabled>
+              Select…
+            </option>
+            {allowedGks.map((g) => (
+              <option key={g.id} value={g.id}>
+                {g.name} — {g.club}
+              </option>
+            ))}
           </select>
         </Field>
       </div>
       <Field label="Title">
-        <input className={inputCls} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Match clip vs derby — 2nd half" required />
+        <input
+          className={inputCls}
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          placeholder="e.g. Match clip vs derby — 2nd half"
+          required
+        />
       </Field>
       <Field label="File">
         <label className="flex flex-col items-center justify-center gap-1.5 h-32 rounded-md border-2 border-dashed border-border hover:border-primary/40 cursor-pointer bg-input/30 px-4 text-center">
@@ -2542,20 +3077,39 @@ function MediaForm({ onDone, prefillGkId }: { onDone: () => void; prefillGkId?: 
             <>
               <Upload className="size-5 text-primary" />
               <span className="text-sm font-medium truncate max-w-full">{file.name}</span>
-              <span className="text-[11px] text-muted-foreground">{formatBytes(file.size)} · {file.type || "unknown type"}</span>
+              <span className="text-[11px] text-muted-foreground">
+                {formatBytes(file.size)} · {file.type || "unknown type"}
+              </span>
             </>
           ) : (
             <>
               <Upload className="size-5 text-muted-foreground" />
               <span className="text-sm font-medium">Click to select a file</span>
-              <span className="text-[11px] text-muted-foreground">Up to 200MB · video, audio, image or PDF</span>
+              <span className="text-[11px] text-muted-foreground">
+                Up to 200MB · video, audio, image or PDF
+              </span>
             </>
           )}
-          <input type="file" className="hidden" accept={ACCEPT_BY_KIND[kind]} onChange={(e) => handleFile(e.target.files?.[0] ?? null)} />
+          <input
+            type="file"
+            className="hidden"
+            accept={ACCEPT_BY_KIND[kind]}
+            onChange={(e) => handleFile(e.target.files?.[0] ?? null)}
+          />
         </label>
       </Field>
-      <Field label="Rating Tags"><TagPicker value={tags} onChange={setTags} /></Field>
-      <Field label="Notes"><textarea rows={3} className={taCls} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Context for reviewers…" /></Field>
+      <Field label="Rating Tags">
+        <TagPicker value={tags} onChange={setTags} />
+      </Field>
+      <Field label="Notes">
+        <textarea
+          rows={3}
+          className={taCls}
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          placeholder="Context for reviewers…"
+        />
+      </Field>
       {error && (
         <div className="flex items-start gap-2 text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded-md p-2">
           <AlertCircle className="size-4 mt-0.5 shrink-0" />
@@ -2563,8 +3117,19 @@ function MediaForm({ onDone, prefillGkId }: { onDone: () => void; prefillGkId?: 
         </div>
       )}
       <div className="flex justify-end gap-2 pt-2">
-        <button type="button" onClick={onDone} className="h-9 px-3 rounded-md border border-border text-sm" disabled={busy}>Cancel</button>
-        <button type="submit" disabled={busy} className="h-9 px-4 rounded-md bg-primary text-primary-foreground text-sm font-medium disabled:opacity-60">
+        <button
+          type="button"
+          onClick={onDone}
+          className="h-9 px-3 rounded-md border border-border text-sm"
+          disabled={busy}
+        >
+          Cancel
+        </button>
+        <button
+          type="submit"
+          disabled={busy}
+          className="h-9 px-4 rounded-md bg-primary text-primary-foreground text-sm font-medium disabled:opacity-60"
+        >
           {busy ? "Uploading…" : "Upload"}
         </button>
       </div>
@@ -2593,35 +3158,87 @@ function EditMediaForm({ asset, onDone }: { asset: MediaAsset; onDone: () => voi
     setError(null);
     setBusy(true);
     try {
-      await updateMedia(asset.id, { title: title.trim(), notes: notes || null, media_type: kind, gk_id: gkId, rating_tags: tags }, user, asset);
+      await updateMedia(
+        asset.id,
+        {
+          title: title.trim(),
+          notes: notes || null,
+          media_type: kind,
+          gk_id: gkId,
+          rating_tags: tags,
+        },
+        user,
+        asset,
+      );
       window.dispatchEvent(new CustomEvent("rpm:media-updated"));
       setDone(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not update.");
-    } finally { setBusy(false); }
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
     <form onSubmit={onSubmit} className="space-y-4">
-      <Field label="Title"><input className={inputCls} value={title} onChange={(e) => setTitle(e.target.value)} required /></Field>
+      <Field label="Title">
+        <input
+          className={inputCls}
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          required
+        />
+      </Field>
       <div className="grid grid-cols-2 gap-3">
         <Field label="Media Type">
-          <select className={selectCls} value={kind} onChange={(e) => setKind(e.target.value as MediaKind)}>
-            {KIND_LABELS.map((k) => <option key={k.value} value={k.value}>{k.label}</option>)}
+          <select
+            className={selectCls}
+            value={kind}
+            onChange={(e) => setKind(e.target.value as MediaKind)}
+          >
+            {KIND_LABELS.map((k) => (
+              <option key={k.value} value={k.value}>
+                {k.label}
+              </option>
+            ))}
           </select>
         </Field>
         <Field label="Linked Goalkeeper">
           <select className={selectCls} value={gkId} onChange={(e) => setGkId(e.target.value)}>
-            {allowedGks.map((g) => <option key={g.id} value={g.id}>{g.name} — {g.club}</option>)}
+            {allowedGks.map((g) => (
+              <option key={g.id} value={g.id}>
+                {g.name} — {g.club}
+              </option>
+            ))}
           </select>
         </Field>
       </div>
-      <Field label="Rating Tags"><TagPicker value={tags} onChange={setTags} /></Field>
-      <Field label="Notes"><textarea rows={3} className={taCls} value={notes} onChange={(e) => setNotes(e.target.value)} /></Field>
+      <Field label="Rating Tags">
+        <TagPicker value={tags} onChange={setTags} />
+      </Field>
+      <Field label="Notes">
+        <textarea
+          rows={3}
+          className={taCls}
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+        />
+      </Field>
       {error && <div className="text-xs text-red-400">{error}</div>}
       <div className="flex justify-end gap-2 pt-2">
-        <button type="button" onClick={onDone} className="h-9 px-3 rounded-md border border-border text-sm" disabled={busy}>Cancel</button>
-        <button type="submit" disabled={busy} className="h-9 px-4 rounded-md bg-primary text-primary-foreground text-sm font-medium disabled:opacity-60">
+        <button
+          type="button"
+          onClick={onDone}
+          className="h-9 px-3 rounded-md border border-border text-sm"
+          disabled={busy}
+        >
+          Cancel
+        </button>
+        <button
+          type="submit"
+          disabled={busy}
+          className="h-9 px-4 rounded-md bg-primary text-primary-foreground text-sm font-medium disabled:opacity-60"
+        >
           {busy ? "Saving…" : "Save changes"}
         </button>
       </div>
@@ -2633,20 +3250,68 @@ function GoalkeeperForm({ onDone }: { onDone: () => void }) {
   const [done, setDone] = useState(false);
   if (done) return <Submitted message="Goalkeeper added to the database." onDone={onDone} />;
   return (
-    <form onSubmit={(e) => { e.preventDefault(); setDone(true); }} className="space-y-4">
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        setDone(true);
+      }}
+      className="space-y-4"
+    >
       <div className="grid grid-cols-2 gap-3">
-        <Field label="Full Name"><input className={inputCls} placeholder="e.g. Aiden Walsh" required /></Field>
-        <Field label="Date of Birth"><input type="date" className={inputCls} /></Field>
-        <Field label="Nationality"><input className={inputCls} placeholder="e.g. Ireland" /></Field>
-        <Field label="Club"><input className={inputCls} placeholder="e.g. Shamrock Rovers" /></Field>
-        <Field label="League"><input className={inputCls} placeholder="e.g. League of Ireland" /></Field>
-        <Field label="Height"><input className={inputCls} placeholder="e.g. 192cm" /></Field>
-        <Field label="Status"><select className={selectCls}>{["Tier 1", "Tier 2", "Tier 3", "Tier 4", "Academy", "Free Agent"].map((t) => <option key={t}>{t}</option>)}</select></Field>
-        <Field label="Contract Until"><input type="date" className={inputCls} /></Field>
-        <Field label="Recommendation"><select className={selectCls}>{["Monitor", "Sign", "Loan", "Develop", "Retain", "Pass"].map((t) => <option key={t}>{t}</option>)}</select></Field>
+        <Field label="Full Name">
+          <input className={inputCls} placeholder="e.g. Aiden Walsh" required />
+        </Field>
+        <Field label="Date of Birth">
+          <input type="date" className={inputCls} />
+        </Field>
+        <Field label="Nationality">
+          <input className={inputCls} placeholder="e.g. Ireland" />
+        </Field>
+        <Field label="Club">
+          <input className={inputCls} placeholder="e.g. Shamrock Rovers" />
+        </Field>
+        <Field label="League">
+          <input className={inputCls} placeholder="e.g. League of Ireland" />
+        </Field>
+        <Field label="Height">
+          <input className={inputCls} placeholder="e.g. 192cm" />
+        </Field>
+        <Field label="Status">
+          <select className={selectCls}>
+            {["Tier 1", "Tier 2", "Tier 3", "Tier 4", "Academy", "Free Agent"].map((t) => (
+              <option key={t}>{t}</option>
+            ))}
+          </select>
+        </Field>
+        <Field label="Contract Until">
+          <input type="date" className={inputCls} />
+        </Field>
+        <Field label="Recommendation">
+          <select className={selectCls}>
+            {["Monitor", "Sign", "Loan", "Develop", "Retain", "Pass"].map((t) => (
+              <option key={t}>{t}</option>
+            ))}
+          </select>
+        </Field>
       </div>
-      <Field label="Initial Scouting Notes"><textarea rows={4} className={taCls} placeholder="Profile summary, source, context…" /></Field>
-      <div className="flex justify-end gap-2 pt-2"><button type="button" onClick={onDone} className="h-9 px-3 rounded-md border border-border text-sm">Cancel</button><button type="submit" className="h-9 px-4 rounded-md bg-primary text-primary-foreground text-sm font-medium">Add Goalkeeper</button></div>
+      <Field label="Initial Scouting Notes">
+        <textarea rows={4} className={taCls} placeholder="Profile summary, source, context…" />
+      </Field>
+      <div className="flex justify-end gap-2 pt-2">
+        <button
+          type="button"
+          onClick={onDone}
+          className="h-9 px-3 rounded-md border border-border text-sm"
+        >
+          Cancel
+        </button>
+        <button
+          type="submit"
+          className="h-9 px-4 rounded-md bg-primary text-primary-foreground text-sm font-medium"
+        >
+          Add Goalkeeper
+        </button>
+      </div>
     </form>
   );
 }
@@ -2662,7 +3327,8 @@ async function computeWaveform(url: string, bars = 32): Promise<number[]> {
   const buf = await res.arrayBuffer();
   const AC: typeof AudioContext =
     (window.AudioContext as typeof AudioContext) ||
-    ((window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext as typeof AudioContext);
+    ((window as unknown as { webkitAudioContext?: typeof AudioContext })
+      .webkitAudioContext as typeof AudioContext);
   const ctx = new AC();
   try {
     const audio = await ctx.decodeAudioData(buf);
@@ -2683,7 +3349,11 @@ async function computeWaveform(url: string, bars = 32): Promise<number[]> {
     }
     return peaks.map((p) => (max > 0 ? p / max : 0));
   } finally {
-    try { await ctx.close(); } catch { /* noop */ }
+    try {
+      await ctx.close();
+    } catch {
+      /* noop */
+    }
   }
 }
 
@@ -2709,10 +3379,15 @@ function formatUploadedDate(iso: string): string {
     const d = new Date(iso);
     const now = new Date();
     const sameYear = d.getFullYear() === now.getFullYear();
-    return d.toLocaleDateString(undefined, sameYear
-      ? { month: "short", day: "numeric" }
-      : { month: "short", day: "numeric", year: "numeric" });
-  } catch { return ""; }
+    return d.toLocaleDateString(
+      undefined,
+      sameYear
+        ? { month: "short", day: "numeric" }
+        : { month: "short", day: "numeric", year: "numeric" },
+    );
+  } catch {
+    return "";
+  }
 }
 
 function basename(path: string): string {
@@ -2723,16 +3398,23 @@ function basename(path: string): string {
 
 async function probeMediaDuration(url: string, kind: "audio" | "video"): Promise<number> {
   return new Promise((resolve, reject) => {
-    const el: HTMLMediaElement = kind === "video" ? document.createElement("video") : document.createElement("audio");
+    const el: HTMLMediaElement =
+      kind === "video" ? document.createElement("video") : document.createElement("audio");
     el.preload = "metadata";
     el.muted = true;
-    const cleanup = () => { el.src = ""; el.remove(); };
+    const cleanup = () => {
+      el.src = "";
+      el.remove();
+    };
     el.onloadedmetadata = () => {
       const d = el.duration;
       cleanup();
       resolve(Number.isFinite(d) ? d : NaN);
     };
-    el.onerror = () => { cleanup(); reject(new Error("duration probe failed")); };
+    el.onerror = () => {
+      cleanup();
+      reject(new Error("duration probe failed"));
+    };
     el.src = url;
   });
 }
@@ -2750,29 +3432,38 @@ async function probePdfPageCount(url: string): Promise<number> {
   throw new Error("page count not found");
 }
 
-function MediaChipPreview({ id, info, tone }: {
+function MediaChipPreview({
+  id,
+  info,
+  tone,
+}: {
   id: string;
   info: MediaChipInfo | undefined;
   tone: "added" | "removed" | "kept";
 }) {
   const [thumbUrl, setThumbUrl] = useState<string | null>(
-    info?.thumbnailPath ? thumbUrlCache.get(info.thumbnailPath) ?? null : null,
+    info?.thumbnailPath ? (thumbUrlCache.get(info.thumbnailPath) ?? null) : null,
   );
   const [wave, setWave] = useState<number[] | null>(
-    info?.kind === "audio" ? waveformCache.get(id) ?? null : null,
+    info?.kind === "audio" ? (waveformCache.get(id) ?? null) : null,
   );
   const [duration, setDuration] = useState<number | null>(
-    info && (info.kind === "audio" || info.kind === "video") ? durationCache.get(id) ?? null : null,
+    info && (info.kind === "audio" || info.kind === "video")
+      ? (durationCache.get(id) ?? null)
+      : null,
   );
   const [pageCount, setPageCount] = useState<number | null>(
-    info?.kind === "pdf" ? pageCountCache.get(id) ?? null : null,
+    info?.kind === "pdf" ? (pageCountCache.get(id) ?? null) : null,
   );
 
   // Signed URL for image/video thumbnail
   useEffect(() => {
     if (!info?.thumbnailPath) return;
     const cached = thumbUrlCache.get(info.thumbnailPath);
-    if (cached) { setThumbUrl(cached); return; }
+    if (cached) {
+      setThumbUrl(cached);
+      return;
+    }
     let cancelled = false;
     getSignedUrl(info.thumbnailPath, 3600)
       .then((u) => {
@@ -2780,14 +3471,21 @@ function MediaChipPreview({ id, info, tone }: {
         thumbUrlCache.set(info.thumbnailPath!, u);
         setThumbUrl(u);
       })
-      .catch(() => { /* fall back to icon */ });
-    return () => { cancelled = true; };
+      .catch(() => {
+        /* fall back to icon */
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [info?.thumbnailPath]);
 
   // Waveform for audio (bounded by size)
   useEffect(() => {
     if (!info || info.kind !== "audio") return;
-    if (waveformCache.has(id)) { setWave(waveformCache.get(id)!); return; }
+    if (waveformCache.has(id)) {
+      setWave(waveformCache.get(id)!);
+      return;
+    }
     if (info.fileSize && info.fileSize > MAX_WAVEFORM_BYTES) return;
     let cancelled = false;
     getSignedUrl(info.filePath, 3600)
@@ -2797,14 +3495,21 @@ function MediaChipPreview({ id, info, tone }: {
         waveformCache.set(id, peaks);
         setWave(peaks);
       })
-      .catch(() => { /* fall back to icon */ });
-    return () => { cancelled = true; };
+      .catch(() => {
+        /* fall back to icon */
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [id, info?.kind, info?.filePath, info?.fileSize]);
 
   // Duration for audio/video
   useEffect(() => {
     if (!info || (info.kind !== "audio" && info.kind !== "video")) return;
-    if (durationCache.has(id)) { setDuration(durationCache.get(id)!); return; }
+    if (durationCache.has(id)) {
+      setDuration(durationCache.get(id)!);
+      return;
+    }
     let cancelled = false;
     getSignedUrl(info.filePath, 3600)
       .then((u) => probeMediaDuration(u, info.kind as "audio" | "video"))
@@ -2813,14 +3518,21 @@ function MediaChipPreview({ id, info, tone }: {
         durationCache.set(id, d);
         setDuration(d);
       })
-      .catch(() => { /* leave null */ });
-    return () => { cancelled = true; };
+      .catch(() => {
+        /* leave null */
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [id, info?.kind, info?.filePath]);
 
   // Page count for PDF (bounded)
   useEffect(() => {
     if (!info || info.kind !== "pdf") return;
-    if (pageCountCache.has(id)) { setPageCount(pageCountCache.get(id)!); return; }
+    if (pageCountCache.has(id)) {
+      setPageCount(pageCountCache.get(id)!);
+      return;
+    }
     if (info.fileSize && info.fileSize > MAX_PDF_PAGECOUNT_BYTES) return;
     let cancelled = false;
     getSignedUrl(info.filePath, 3600)
@@ -2830,8 +3542,12 @@ function MediaChipPreview({ id, info, tone }: {
         pageCountCache.set(id, n);
         setPageCount(n);
       })
-      .catch(() => { /* leave null */ });
-    return () => { cancelled = true; };
+      .catch(() => {
+        /* leave null */
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [id, info?.kind, info?.filePath, info?.fileSize]);
 
   const toneCls =
@@ -2842,10 +3558,15 @@ function MediaChipPreview({ id, info, tone }: {
         : "bg-background text-foreground/70 border-border";
 
   const kindGlyph =
-    info?.kind === "video" ? "🎬" :
-    info?.kind === "pdf" ? "📄" :
-    info?.kind === "image" ? "🖼️" :
-    info?.kind === "audio" ? "🔊" : "📎";
+    info?.kind === "video"
+      ? "🎬"
+      : info?.kind === "pdf"
+        ? "📄"
+        : info?.kind === "image"
+          ? "🖼️"
+          : info?.kind === "audio"
+            ? "🔊"
+            : "📎";
 
   const title = info?.title ?? `…${id.slice(-6)}`;
   const filename = info ? basename(info.filePath) : "";
@@ -2853,16 +3574,24 @@ function MediaChipPreview({ id, info, tone }: {
   const sizeLabel = info?.fileSize != null ? formatBytes(info.fileSize) : "";
   const primaryDetail =
     info?.kind === "audio" || info?.kind === "video"
-      ? (duration != null ? formatDuration(duration) : "…")
+      ? duration != null
+        ? formatDuration(duration)
+        : "…"
       : info?.kind === "pdf"
-        ? (pageCount != null ? `${pageCount} page${pageCount === 1 ? "" : "s"}` : "PDF")
+        ? pageCount != null
+          ? `${pageCount} page${pageCount === 1 ? "" : "s"}`
+          : "PDF"
         : "";
 
   const titleHint =
-    (tone === "added" ? "Only in other tab — will be added if you accept remote" :
-      tone === "removed" ? "Only in this tab — will be removed if you accept remote" :
-      "In both drafts") +
-    (info ? `\n${filename}${primaryDetail ? " · " + primaryDetail : ""}${sizeLabel ? " · " + sizeLabel : ""}${uploadedLabel ? " · uploaded " + uploadedLabel : ""}` : "");
+    (tone === "added"
+      ? "Only in other tab — will be added if you accept remote"
+      : tone === "removed"
+        ? "Only in this tab — will be removed if you accept remote"
+        : "In both drafts") +
+    (info
+      ? `\n${filename}${primaryDetail ? " · " + primaryDetail : ""}${sizeLabel ? " · " + sizeLabel : ""}${uploadedLabel ? " · uploaded " + uploadedLabel : ""}`
+      : "");
 
   // Preview visual
   let preview: ReactNode = null;
@@ -2871,7 +3600,9 @@ function MediaChipPreview({ id, info, tone }: {
       <span className="relative size-9 shrink-0 rounded overflow-hidden border border-border/60 bg-background">
         <img src={thumbUrl} alt="" className="size-full object-cover" loading="lazy" />
         {info?.kind === "video" && (
-          <span className="absolute inset-0 flex items-center justify-center text-white text-[11px] drop-shadow">▶</span>
+          <span className="absolute inset-0 flex items-center justify-center text-white text-[11px] drop-shadow">
+            ▶
+          </span>
         )}
       </span>
     );
@@ -2902,7 +3633,9 @@ function MediaChipPreview({ id, info, tone }: {
   if (uploadedLabel) metaParts.push(uploadedLabel);
 
   const titleCls =
-    tone === "removed" ? "line-through decoration-rose-500/60 truncate font-medium" : "truncate font-medium";
+    tone === "removed"
+      ? "line-through decoration-rose-500/60 truncate font-medium"
+      : "truncate font-medium";
 
   return (
     <span
@@ -2929,7 +3662,8 @@ function MediaChipPreview({ id, info, tone }: {
 }
 
 function Waveform({ peaks }: { peaks: number[] | null }) {
-  const bars = peaks ?? Array.from({ length: 20 }, (_, i) => 0.25 + 0.35 * Math.abs(Math.sin(i * 1.7)));
+  const bars =
+    peaks ?? Array.from({ length: 20 }, (_, i) => 0.25 + 0.35 * Math.abs(Math.sin(i * 1.7)));
   const isReal = peaks !== null;
   return (
     <span className="flex items-center gap-[1px] h-full w-full">
@@ -2962,7 +3696,13 @@ type ConflictSummary = {
   generatedAt: string;
   savedAt: string;
   otherVersion: number;
-  totals: { added: number; removed: number; replacedFields: number; kept: number; fieldChanges: number };
+  totals: {
+    added: number;
+    removed: number;
+    replacedFields: number;
+    kept: number;
+    fieldChanges: number;
+  };
   media: {
     added: ExportItem[];
     removed: ExportItem[];
@@ -2974,7 +3714,15 @@ type ConflictSummary = {
 
 function toExportItem(id: string, info: MediaChipInfo | undefined): ExportItem {
   if (!info) {
-    return { id, title: `(unknown ${id.slice(-6)})`, filename: "", kind: "unknown", mimeType: null, fileSizeBytes: null, uploadedAt: null };
+    return {
+      id,
+      title: `(unknown ${id.slice(-6)})`,
+      filename: "",
+      kind: "unknown",
+      mimeType: null,
+      fileSizeBytes: null,
+      uploadedAt: null,
+    };
   }
   const b = info.filePath.split("/").pop() || info.filePath;
   const filename = b.replace(/^\d{10,}-[a-z0-9]{4,10}-/i, "");
@@ -2990,7 +3738,13 @@ function toExportItem(id: string, info: MediaChipInfo | undefined): ExportItem {
 }
 
 function buildConflictSummary(
-  rows: { key: string; label: string; mine: string; theirs: string; mediaDiff?: { added: string[]; removed: string[]; kept: string[] } }[],
+  rows: {
+    key: string;
+    label: string;
+    mine: string;
+    theirs: string;
+    mediaDiff?: { added: string[]; removed: string[]; kept: string[] };
+  }[],
   conflict: ReportDraft,
   mediaTitles: Record<string, MediaChipInfo>,
 ): ConflictSummary {
@@ -3075,7 +3829,10 @@ async function exportConflictPdf(summary: ConflictSummary) {
       y = margin;
     }
   };
-  const line = (text: string, opts?: { size?: number; bold?: boolean; color?: [number, number, number]; indent?: number }) => {
+  const line = (
+    text: string,
+    opts?: { size?: number; bold?: boolean; color?: [number, number, number]; indent?: number },
+  ) => {
     const size = opts?.size ?? 10;
     doc.setFont("helvetica", opts?.bold ? "bold" : "normal");
     doc.setFontSize(size);
@@ -3090,7 +3847,9 @@ async function exportConflictPdf(summary: ConflictSummary) {
       y += lineH;
     }
   };
-  const gap = (h = 8) => { y += h; };
+  const gap = (h = 8) => {
+    y += h;
+  };
   const hr = () => {
     ensureRoom(10);
     doc.setDrawColor(200);
@@ -3098,25 +3857,46 @@ async function exportConflictPdf(summary: ConflictSummary) {
     y += 8;
   };
 
-  const fmtBytes = (n: number | null) => n == null ? "—" : (n < 1024 ? `${n} B` : n < 1048576 ? `${(n / 1024).toFixed(1)} KB` : `${(n / 1048576).toFixed(1)} MB`);
+  const fmtBytes = (n: number | null) =>
+    n == null
+      ? "—"
+      : n < 1024
+        ? `${n} B`
+        : n < 1048576
+          ? `${(n / 1024).toFixed(1)} KB`
+          : `${(n / 1048576).toFixed(1)} MB`;
   const fmtDate = (iso: string | null) => {
     if (!iso) return "—";
-    try { return new Date(iso).toLocaleString(); } catch { return iso; }
+    try {
+      return new Date(iso).toLocaleString();
+    } catch {
+      return iso;
+    }
   };
-  const kindLabel = (k: string) => k === "unknown" ? "file" : k;
+  const kindLabel = (k: string) => (k === "unknown" ? "file" : k);
 
   // Header
   line("Draft Conflict Summary", { size: 18, bold: true });
   gap(2);
-  line(`Generated ${new Date(summary.generatedAt).toLocaleString()}`, { size: 9, color: [110, 110, 110] });
-  line(`Other tab saved at ${new Date(summary.savedAt).toLocaleString()} (v${summary.otherVersion})`, { size: 9, color: [110, 110, 110] });
+  line(`Generated ${new Date(summary.generatedAt).toLocaleString()}`, {
+    size: 9,
+    color: [110, 110, 110],
+  });
+  line(
+    `Other tab saved at ${new Date(summary.savedAt).toLocaleString()} (v${summary.otherVersion})`,
+    { size: 9, color: [110, 110, 110] },
+  );
   gap(4);
   hr();
 
   // Totals
   line("Totals", { size: 12, bold: true });
-  line(`Media added: ${summary.totals.added}   ·   removed: ${summary.totals.removed}   ·   kept: ${summary.totals.kept}`);
-  line(`Fields with replacements: ${summary.totals.replacedFields}   ·   Non-media field changes: ${summary.totals.fieldChanges}`);
+  line(
+    `Media added: ${summary.totals.added}   ·   removed: ${summary.totals.removed}   ·   kept: ${summary.totals.kept}`,
+  );
+  line(
+    `Fields with replacements: ${summary.totals.replacedFields}   ·   Non-media field changes: ${summary.totals.fieldChanges}`,
+  );
   gap(6);
   hr();
 
@@ -3135,18 +3915,24 @@ async function exportConflictPdf(summary: ConflictSummary) {
 
   // Added
   line(`Added (${summary.media.added.length})`, { size: 12, bold: true, color: [16, 122, 74] });
-  if (summary.media.added.length === 0) line("None", { size: 9, color: [140, 140, 140], indent: 6 });
+  if (summary.media.added.length === 0)
+    line("None", { size: 9, color: [140, 140, 140], indent: 6 });
   else summary.media.added.forEach((it) => renderItem(it, "+", [16, 122, 74]));
   gap(4);
 
   // Removed
   line(`Removed (${summary.media.removed.length})`, { size: 12, bold: true, color: [176, 47, 62] });
-  if (summary.media.removed.length === 0) line("None", { size: 9, color: [140, 140, 140], indent: 6 });
+  if (summary.media.removed.length === 0)
+    line("None", { size: 9, color: [140, 140, 140], indent: 6 });
   else summary.media.removed.forEach((it) => renderItem(it, "−", [176, 47, 62]));
   gap(4);
 
   // Replaced (per-field)
-  line(`Replaced fields (${summary.media.replacedFields.length})`, { size: 12, bold: true, color: [170, 110, 20] });
+  line(`Replaced fields (${summary.media.replacedFields.length})`, {
+    size: 12,
+    bold: true,
+    color: [170, 110, 20],
+  });
   if (summary.media.replacedFields.length === 0) {
     line("None", { size: 9, color: [140, 140, 140], indent: 6 });
   } else {
@@ -3162,9 +3948,17 @@ async function exportConflictPdf(summary: ConflictSummary) {
   // Kept (compact)
   if (summary.media.kept.length > 0) {
     hr();
-    line(`Kept in both drafts (${summary.media.kept.length})`, { size: 11, bold: true, color: [80, 80, 80] });
+    line(`Kept in both drafts (${summary.media.kept.length})`, {
+      size: 11,
+      bold: true,
+      color: [80, 80, 80],
+    });
     for (const it of summary.media.kept) {
-      line(`• ${it.title}${it.filename && it.filename !== it.title ? ` — ${it.filename}` : ""}`, { size: 9, color: [80, 80, 80], indent: 6 });
+      line(`• ${it.title}${it.filename && it.filename !== it.title ? ` — ${it.filename}` : ""}`, {
+        size: 9,
+        color: [80, 80, 80],
+        indent: 6,
+      });
     }
   }
 

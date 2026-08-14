@@ -2,7 +2,17 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
-import { CheckCircle2, XCircle, RefreshCw, ExternalLink, FileSpreadsheet, Loader2, AlertCircle, Database, DownloadCloud } from "lucide-react";
+import {
+  CheckCircle2,
+  XCircle,
+  RefreshCw,
+  ExternalLink,
+  FileSpreadsheet,
+  Loader2,
+  AlertCircle,
+  Database,
+  DownloadCloud,
+} from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { getSheetsIntegrationStatus } from "@/lib/integrations/sheets-status.functions";
 import {
@@ -16,9 +26,15 @@ export const Route = createFileRoute("/system/integrations")({
   head: () => ({
     meta: [
       { title: "Integrations · Mentor Hub" },
-      { name: "description", content: "Google Sheets connector status and last successful write time." },
+      {
+        name: "description",
+        content: "Google Sheets connector status and last successful write time.",
+      },
       { property: "og:title", content: "Integrations · Mentor Hub" },
-      { property: "og:description", content: "Google Sheets connector status and last successful write time." },
+      {
+        property: "og:description",
+        content: "Google Sheets connector status and last successful write time.",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
     ],
@@ -101,7 +117,11 @@ function IntegrationsPage() {
           disabled={q.isFetching}
           className="inline-flex items-center gap-2 rounded-md border border-border bg-background px-3 py-2 text-sm hover:bg-accent disabled:opacity-50"
         >
-          {q.isFetching ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+          {q.isFetching ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <RefreshCw className="h-4 w-4" />
+          )}
           Refresh
         </button>
       </header>
@@ -114,18 +134,16 @@ function IntegrationsPage() {
             </div>
             <div>
               <h2 className="font-medium leading-tight">Match Reports store</h2>
-              <p className="text-xs text-muted-foreground">
-                Supabase · runtime source of truth
-              </p>
+              <p className="text-xs text-muted-foreground">Supabase · runtime source of truth</p>
             </div>
           </div>
         </div>
 
         <div className="space-y-4 p-4 text-sm">
           <p className="text-muted-foreground">
-            Match Reports are read and written directly in Supabase. The Google Sheet below is
-            kept as a dormant archive — it is only touched by the import here, never by a page
-            load or a submission.
+            Match Reports are read and written directly in Supabase. The Google Sheet below is kept
+            as a dormant archive — it is only touched by the import here, never by a page load or a
+            submission.
           </p>
 
           <div className="flex flex-wrap gap-2">
@@ -237,12 +255,12 @@ function IntegrationsPage() {
               q.isLoading
                 ? "Checking…"
                 : !s?.linked
-                ? "Not linked"
-                : !s?.reachable
-                ? "Unreachable"
-                : !s?.sheetTabExists
-                ? "Tab missing"
-                : "Connected"
+                  ? "Not linked"
+                  : !s?.reachable
+                    ? "Unreachable"
+                    : !s?.sheetTabExists
+                      ? "Tab missing"
+                      : "Connected"
             }
           />
         </div>
@@ -307,8 +325,8 @@ function IntegrationsPage() {
               <div className="space-y-2">
                 <p className="font-medium">Column headers don't match the app's mapping</p>
                 <p className="text-muted-foreground">
-                  The archive is parsed by column position. Fix these headers in the sheet
-                  before importing its history again.
+                  The archive is parsed by column position. Fix these headers in the sheet before
+                  importing its history again.
                 </p>
                 <ul className="space-y-0.5 text-xs text-muted-foreground">
                   {s.headerMismatches.map((m) => (
@@ -360,14 +378,27 @@ function BoolPill({ value }: { value: boolean }) {
   );
 }
 
-function StatusPill({ healthy, loading, label }: { healthy: boolean; loading: boolean; label: string }) {
+function StatusPill({
+  healthy,
+  loading,
+  label,
+}: {
+  healthy: boolean;
+  loading: boolean;
+  label: string;
+}) {
   const tone = loading
     ? "border-border bg-accent text-muted-foreground"
     : healthy
-    ? "border-success/30 bg-success/15 text-success"
-    : "border-destructive/30 bg-destructive/15 text-destructive";
+      ? "border-success/30 bg-success/15 text-success"
+      : "border-destructive/30 bg-destructive/15 text-destructive";
   return (
-    <span className={cn("inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium", tone)}>
+    <span
+      className={cn(
+        "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium",
+        tone,
+      )}
+    >
       {loading ? (
         <Loader2 className="h-3 w-3 animate-spin" />
       ) : healthy ? (

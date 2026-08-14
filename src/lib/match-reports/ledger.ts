@@ -37,7 +37,6 @@ export type KeyDecision =
   | { action: "reuse_failed" }
   | { action: "reserve" };
 
-
 function ms(value: string | null | undefined): number {
   const t = value ? Date.parse(value) : Number.NaN;
   return Number.isFinite(t) ? t : Number.NaN;
@@ -106,12 +105,15 @@ export function classifyLedgerWriteError(err: unknown): "conflict" | "error" {
   const e = (err ?? {}) as { code?: string; message?: string; details?: string };
   const code = String(e.code ?? "");
   const text = `${e.message ?? ""} ${e.details ?? ""}`.toLowerCase();
-  if (code === "23505" || text.includes("duplicate key value") || text.includes("unique constraint")) {
+  if (
+    code === "23505" ||
+    text.includes("duplicate key value") ||
+    text.includes("unique constraint")
+  ) {
     return "conflict";
   }
   return "error";
 }
-
 
 /** Only confirmed successes count as a prior submission. */
 export function countsAsPriorSuccess(rec: LedgerRecord): boolean {
@@ -126,7 +128,10 @@ export function duplicateWindowForRecords(
   records: LedgerRecord[],
   now: number = Date.now(),
 ): { window: DuplicateWindow; report_id: string | null } {
-  let best: { window: DuplicateWindow; report_id: string | null } = { window: null, report_id: null };
+  let best: { window: DuplicateWindow; report_id: string | null } = {
+    window: null,
+    report_id: null,
+  };
   for (const rec of records) {
     if (!countsAsPriorSuccess(rec)) continue;
     const win = classifyDuplicateWindow(ms(rec.submitted_at), now);

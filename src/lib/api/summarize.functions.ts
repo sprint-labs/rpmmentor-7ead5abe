@@ -157,7 +157,10 @@ async function callGateway(systemPrompt: string, userText: string) {
       return { ok: false as const, error: "Rate limit reached — please try again in a moment." };
     }
     if (response.status === 402) {
-      return { ok: false as const, error: "AI credits exhausted — add credits in workspace settings." };
+      return {
+        ok: false as const,
+        error: "AI credits exhausted — add credits in workspace settings.",
+      };
     }
     console.error("AI gateway error", response.status);
     return { ok: false as const, error: `AI request failed (${response.status}).` };
@@ -232,15 +235,18 @@ export const analyzeReport = createServerFn({ method: "POST" })
     );
     if (!result.ok) return result;
 
-    const summary =
-      typeof result.parsed.summary === "string" ? result.parsed.summary.trim() : "";
+    const summary = typeof result.parsed.summary === "string" ? result.parsed.summary.trim() : "";
     const analysis: StructuredAnalysis = {
       summary: summary.length > 1_500 ? `${summary.slice(0, 1_497)}…` : summary,
       keyMoments: coerceStringArray(result.parsed.keyMoments),
       developmentFocus: coerceStringArray(result.parsed.developmentFocus),
     };
 
-    if (!analysis.summary && analysis.keyMoments.length === 0 && analysis.developmentFocus.length === 0) {
+    if (
+      !analysis.summary &&
+      analysis.keyMoments.length === 0 &&
+      analysis.developmentFocus.length === 0
+    ) {
       return { ok: false as const, error: "No structured analysis was returned." };
     }
     return { ok: true as const, analysis };

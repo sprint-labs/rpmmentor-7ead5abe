@@ -10,9 +10,7 @@ import { getLastSyncedAt, listJobs, subscribe, type SyncJob } from "@/lib/sync/q
 export function SyncStatusChip({ className = "" }: { className?: string }) {
   const [jobs, setJobs] = useState<SyncJob[]>([]);
   const [lastSynced, setLastSynced] = useState<number | null>(null);
-  const [online, setOnline] = useState(
-    typeof navigator === "undefined" ? true : navigator.onLine,
-  );
+  const [online, setOnline] = useState(typeof navigator === "undefined" ? true : navigator.onLine);
   const [, forceTick] = useState(0);
 
   useEffect(() => {
@@ -74,7 +72,9 @@ export function SyncStatusChip({ className = "" }: { className?: string }) {
     <span
       role="status"
       aria-live="polite"
-      title={lastSynced ? `Last successful sync: ${new Date(lastSynced).toLocaleString()}` : undefined}
+      title={
+        lastSynced ? `Last successful sync: ${new Date(lastSynced).toLocaleString()}` : undefined
+      }
       className={`inline-flex items-center gap-1.5 h-6 px-2 rounded border text-[10px] uppercase tracking-[0.08em] font-semibold ${tone} ${className}`}
     >
       <Icon className={`size-3 ${spinning ? "animate-spin" : ""}`} />

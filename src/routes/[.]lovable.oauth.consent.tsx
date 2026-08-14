@@ -15,9 +15,15 @@ interface OAuthDecisionResult {
   redirect_to?: string | null;
 }
 type OAuthNamespace = {
-  getAuthorizationDetails: (id: string) => Promise<{ data: OAuthAuthorizationDetails | null; error: { message: string } | null }>;
-  approveAuthorization: (id: string) => Promise<{ data: OAuthDecisionResult | null; error: { message: string } | null }>;
-  denyAuthorization: (id: string) => Promise<{ data: OAuthDecisionResult | null; error: { message: string } | null }>;
+  getAuthorizationDetails: (
+    id: string,
+  ) => Promise<{ data: OAuthAuthorizationDetails | null; error: { message: string } | null }>;
+  approveAuthorization: (
+    id: string,
+  ) => Promise<{ data: OAuthDecisionResult | null; error: { message: string } | null }>;
+  denyAuthorization: (
+    id: string,
+  ) => Promise<{ data: OAuthDecisionResult | null; error: { message: string } | null }>;
 };
 const oauth = (supabase.auth as unknown as { oauth: OAuthNamespace }).oauth;
 
@@ -93,13 +99,12 @@ function Consent() {
           <img src="/gkhq-lockup.svg" alt="Mentor Hub by RPM" className="h-16 w-auto" />
         </div>
 
-
         <h1 className="text-3xl font-display font-bold uppercase tracking-[0.02em] leading-tight">
           Connect {clientName} to Mentor Hub
         </h1>
         <p className="text-sm text-muted-foreground mt-3 leading-relaxed">
-          This lets {clientName} use Mentor Hub as you. Access is limited by your account's permissions
-          and Row Level Security — nothing bypasses them.
+          This lets {clientName} use Mentor Hub as you. Access is limited by your account's
+          permissions and Row Level Security — nothing bypasses them.
         </p>
 
         {redirectUri && (

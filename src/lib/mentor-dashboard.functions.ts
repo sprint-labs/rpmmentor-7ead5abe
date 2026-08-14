@@ -18,10 +18,7 @@ import {
 } from "@/lib/mentor-upcoming-events";
 import { DASHBOARD_INTERACTION_TYPES } from "@/lib/interactions/schema";
 
-export type {
-  MentorUpcomingInteraction,
-  UpcomingPlannedType,
-} from "@/lib/mentor-upcoming-events";
+export type { MentorUpcomingInteraction, UpcomingPlannedType } from "@/lib/mentor-upcoming-events";
 
 export type OutstandingActionKind = "missing_report" | "missing_clip";
 
@@ -72,13 +69,18 @@ const dashboardInputSchema = z
     to: z.string().datetime({ offset: true }),
     // Local calendar days for the same window. Used for `date` columns so the
     // window never shifts by a day for non-UTC users.
-    fromDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-    toDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+    fromDate: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/)
+      .optional(),
+    toDate: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/)
+      .optional(),
   })
   .refine((period) => new Date(period.from).getTime() <= new Date(period.to).getTime(), {
     message: "The reporting period must end after it starts.",
   });
-
 
 export const getMentorDashboardStats = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
@@ -233,7 +235,6 @@ export const getMentorDashboardStats = createServerFn({ method: "GET" })
     const within3d = (a: string, b: string) =>
       Math.abs(+new Date(a) - +new Date(b)) <= 3 * 86400000;
 
-
     const outstandingItems: OutstandingActionItem[] = [];
     const mentorDisplay = mentors.find((m) => m.id === mentorId)?.name ?? "You";
     for (const obs of mentorObservations) {
@@ -247,7 +248,7 @@ export const getMentorDashboardStats = createServerFn({ method: "GET" })
       const hasClip = (allClipRows ?? []).some(
         (m) => m.gk_id === obs.gk_slug && within3d(m.created_at, obs.occurred_at),
       );
-      const gk = obs.gk_slug ? gkById.get(obs.gk_slug) ?? null : null;
+      const gk = obs.gk_slug ? (gkById.get(obs.gk_slug) ?? null) : null;
       const due = +new Date(obs.occurred_at) + 3 * 86400000;
       const daysOverdue = Math.max(0, Math.floor((now - due) / 86400000));
       const base = {

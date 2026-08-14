@@ -1,6 +1,20 @@
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
-import { ShieldCheck, ShieldOff, Users, Search, Loader2, AlertCircle, UserPlus, Trash2, Copy, Pencil, KeyRound, Mail, History } from "lucide-react";
+import {
+  ShieldCheck,
+  ShieldOff,
+  Users,
+  Search,
+  Loader2,
+  AlertCircle,
+  UserPlus,
+  Trash2,
+  Copy,
+  Pencil,
+  KeyRound,
+  Mail,
+  History,
+} from "lucide-react";
 import { useAuth, ROLE_LABEL, type Role } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 import { CANONICAL_ORIGIN } from "@/lib/canonical-url";
@@ -20,8 +34,6 @@ import {
 } from "@/lib/admin-users.functions";
 import { refreshUserDirectoryViews } from "@/lib/query-refresh";
 
-
-
 export const Route = createFileRoute("/system/users")({ component: SystemUsersPage });
 
 const ROLES: Role[] = ["super_admin", "admin", "mentor_manager", "mentor"];
@@ -37,7 +49,6 @@ const ROLE_TONE: Record<Role, string> = {
 const QUERY_KEY = ["managed-users"] as const;
 const AUDIT_KEY = ["user-deletion-audit"] as const;
 
-
 function SystemUsersPage() {
   const { user, can } = useAuth();
   const [q, setQ] = useState("");
@@ -46,7 +57,9 @@ function SystemUsersPage() {
   const [editUser, setEditUser] = useState<ManagedUserRow | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<ManagedUserRow | null>(null);
   const [confirmReset, setConfirmReset] = useState<ManagedUserRow | null>(null);
-  const [tempPassword, setTempPassword] = useState<{ email: string; password: string } | null>(null);
+  const [tempPassword, setTempPassword] = useState<{ email: string; password: string } | null>(
+    null,
+  );
   const [inviteLink, setInviteLink] = useState<{ email: string; url: string } | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [refreshError, setRefreshError] = useState<{ label: string; message: string } | null>(null);
@@ -62,7 +75,6 @@ function SystemUsersPage() {
   const qc = useQueryClient();
   const router = useRouter();
 
-
   const canManage = !!user && can("system.manage");
 
   const query = useQuery({
@@ -76,7 +88,6 @@ function SystemUsersPage() {
     queryFn: () => auditList(),
     enabled: canManage,
   });
-
 
   const mutation = useMutation({
     mutationFn: (vars: { userId: string; role: Role | null; name: string }) =>
@@ -140,7 +151,6 @@ function SystemUsersPage() {
       toast.error(err instanceof Error ? err.message : "Failed to delete user");
     },
   });
-
 
   const resetMutation = useMutation({
     mutationFn: (u: ManagedUserRow) => resetPassword({ data: { userId: u.id } }),
@@ -244,8 +254,6 @@ function SystemUsersPage() {
           </div>
         </div>
       )}
-
-
 
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
@@ -359,16 +367,28 @@ function SystemUsersPage() {
                     <button
                       onClick={() => setEditUser(u)}
                       disabled={isSelf || busy}
-                      title={isSelf ? "You can't change your own role from this screen" : "Edit roles"}
+                      title={
+                        isSelf ? "You can't change your own role from this screen" : "Edit roles"
+                      }
                       className="inline-flex h-8 px-2.5 items-center gap-1.5 rounded-md border border-border text-xs font-medium hover:bg-accent disabled:opacity-30 disabled:cursor-not-allowed"
                     >
-                      {busy ? <Loader2 className="size-3.5 animate-spin" /> : <Pencil className="size-3.5" />}
+                      {busy ? (
+                        <Loader2 className="size-3.5 animate-spin" />
+                      ) : (
+                        <Pencil className="size-3.5" />
+                      )}
                       Edit roles
                     </button>
                     <button
                       onClick={() => setConfirmReset(u)}
-                      disabled={isSelf || (resetMutation.isPending && resetMutation.variables?.id === u.id)}
-                      title={isSelf ? "You can't reset your own password from this screen" : "Reset password"}
+                      disabled={
+                        isSelf || (resetMutation.isPending && resetMutation.variables?.id === u.id)
+                      }
+                      title={
+                        isSelf
+                          ? "You can't reset your own password from this screen"
+                          : "Reset password"
+                      }
                       className="size-8 grid place-items-center rounded-md border border-border text-muted-foreground hover:bg-accent disabled:opacity-30 disabled:cursor-not-allowed"
                     >
                       {resetMutation.isPending && resetMutation.variables?.id === u.id ? (
@@ -406,8 +426,6 @@ function SystemUsersPage() {
         loading={auditQuery.isLoading}
         error={auditQuery.error instanceof Error ? auditQuery.error.message : null}
       />
-
-
 
       {showAdd && (
         <AddUserDialog
@@ -733,9 +751,7 @@ function EditRoleDialog({
                   htmlFor={id}
                   className={cn(
                     "flex items-center gap-3 rounded-md border px-3 py-2 cursor-pointer text-sm",
-                    selected
-                      ? "border-primary/40 bg-primary/5"
-                      : "border-border hover:bg-accent",
+                    selected ? "border-primary/40 bg-primary/5" : "border-border hover:bg-accent",
                   )}
                 >
                   <input
@@ -797,7 +813,8 @@ function InviteUserDialog({
       <div className="w-full max-w-md rounded-lg border border-border bg-card p-5 shadow-lg">
         <h2 className="text-base font-semibold">Invite user</h2>
         <p className="text-xs text-muted-foreground mt-1">
-          Creates the account and generates a one-time sign-up link. The user sets their own password when they open the link.
+          Creates the account and generates a one-time sign-up link. The user sets their own
+          password when they open the link.
         </p>
         <div className="mt-4 space-y-3">
           <Field label="Full name">
@@ -833,7 +850,9 @@ function InviteUserDialog({
             >
               <option value="">— No role —</option>
               {(["super_admin", "admin", "mentor_manager", "mentor"] as Role[]).map((r) => (
-                <option key={r} value={r}>{ROLE_LABEL[r]}</option>
+                <option key={r} value={r}>
+                  {ROLE_LABEL[r]}
+                </option>
               ))}
             </select>
           </Field>
@@ -889,7 +908,9 @@ function InviteLinkDialog({
       <div className="w-full max-w-lg rounded-lg border border-border bg-card p-5 shadow-lg">
         <h2 className="text-base font-semibold">One-time sign-up link</h2>
         <p className="text-sm text-muted-foreground mt-2">
-          Send this link to <span className="font-medium text-foreground">{email}</span>. Opening it signs them in once and prompts them to set a password. The link can only be used once and won't be shown again.
+          Send this link to <span className="font-medium text-foreground">{email}</span>. Opening it
+          signs them in once and prompts them to set a password. The link can only be used once and
+          won't be shown again.
         </p>
         <div className="mt-4 rounded-md border border-border bg-muted/30 p-3 font-mono text-xs break-all">
           {url}
@@ -945,9 +966,7 @@ function DeletionAuditPanel({
       )}
 
       {!loading && !error && rows.length === 0 && (
-        <p className="px-4 py-8 text-sm text-muted-foreground">
-          No deletions recorded yet.
-        </p>
+        <p className="px-4 py-8 text-sm text-muted-foreground">No deletions recorded yet.</p>
       )}
 
       {!loading && !error && rows.length > 0 && (

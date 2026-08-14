@@ -46,7 +46,9 @@ function UsersAndRolesPage() {
             <AlertCircle className="mx-auto mb-2 size-6 text-destructive" />
             <p className="font-medium text-destructive">Could not load Users & Roles</p>
             <p className="mt-1 text-xs text-muted-foreground">
-              {query.error instanceof Error ? query.error.message : "The live source is unavailable."}
+              {query.error instanceof Error
+                ? query.error.message
+                : "The live source is unavailable."}
             </p>
             <button
               type="button"
@@ -69,15 +71,21 @@ function UsersAndRolesPage() {
                 className="grid gap-3 px-4 py-4 md:grid-cols-[1fr_1fr_180px_170px_170px] md:items-center"
               >
                 <div>
-                  <div className="text-[10px] uppercase tracking-wider text-muted-foreground md:hidden">First name</div>
+                  <div className="text-[10px] uppercase tracking-wider text-muted-foreground md:hidden">
+                    First name
+                  </div>
                   <div className="text-sm font-medium">{user.firstName}</div>
                 </div>
                 <div>
-                  <div className="text-[10px] uppercase tracking-wider text-muted-foreground md:hidden">Last name</div>
+                  <div className="text-[10px] uppercase tracking-wider text-muted-foreground md:hidden">
+                    Last name
+                  </div>
                   <div className="text-sm font-medium">{user.lastName}</div>
                 </div>
                 <div>
-                  <div className="text-[10px] uppercase tracking-wider text-muted-foreground md:hidden">Role</div>
+                  <div className="text-[10px] uppercase tracking-wider text-muted-foreground md:hidden">
+                    Role
+                  </div>
                   <span className="inline-flex rounded-full border border-border bg-accent px-2 py-1 text-xs font-medium">
                     {user.role ? ROLE_LABEL[user.role] : "No role"}
                   </span>
@@ -105,7 +113,9 @@ function UsersAndRolesPage() {
       </div>
 
       <p className="text-xs text-muted-foreground">
-        Match Report totals include confirmed submissions made through Mentor Hub. Historic Sheet-only reports cannot be attributed to a user without a stable user ID. Interaction totals exclude the Live Match Observation created automatically by a Match Report.
+        Match Report totals include confirmed submissions made through Mentor Hub. Historic
+        Sheet-only reports cannot be attributed to a user without a stable user ID. Interaction
+        totals exclude the Live Match Observation created automatically by a Match Report.
       </p>
     </div>
   );

@@ -44,7 +44,11 @@ export function FollowUpStatusPill({
  * The one-line explanation that sits under a status: what is owed and by when,
  * or why nothing is.
  */
-export function followUpDetail(followUp: FollowUp, waiverReason: string, cancellationReason: string): string {
+export function followUpDetail(
+  followUp: FollowUp,
+  waiverReason: string,
+  cancellationReason: string,
+): string {
   const required = followUpRequirementLabel(followUp.kind);
   switch (followUp.status) {
     case "scheduled":
@@ -73,18 +77,18 @@ export function FollowUpActionLink({
   label?: string;
 }) {
   if (!followUp.kind) return null;
-  if (followUp.status === "completed" || followUp.status === "cancelled" || followUp.status === "not_required") {
+  if (
+    followUp.status === "completed" ||
+    followUp.status === "cancelled" ||
+    followUp.status === "not_required"
+  ) {
     return null;
   }
   const path = followUpLinkPath(event, followUp.kind);
   const [to, query] = path.split("?");
   const search = Object.fromEntries(new URLSearchParams(query ?? ""));
   return (
-    <Link
-      to={to}
-      search={search}
-      className="text-xs font-medium text-primary hover:underline"
-    >
+    <Link to={to} search={search} className="text-xs font-medium text-primary hover:underline">
       {label ?? `Submit ${followUpRequirementLabel(followUp.kind)}`}
     </Link>
   );

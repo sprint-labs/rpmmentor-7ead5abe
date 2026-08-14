@@ -46,10 +46,6 @@ export function withPermission<P extends object>(
   permission: Permission,
 ) {
   return function Guarded(props: P) {
-    return (
-      <RequirePermission permission={permission}>
-        {Component(props)}
-      </RequirePermission>
-    );
+    return <RequirePermission permission={permission}>{Component(props)}</RequirePermission>;
   };
 }

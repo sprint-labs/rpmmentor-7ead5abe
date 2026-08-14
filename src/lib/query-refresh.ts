@@ -66,4 +66,3 @@ export async function refreshUserDirectoryViews(queryClient: QueryClient): Promi
     refreshInteractionViews(queryClient),
   ]);
 }
-

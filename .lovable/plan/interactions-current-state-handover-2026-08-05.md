@@ -10,19 +10,19 @@ Mentors log touchpoints ("interactions") with goalkeepers. Interactions are dura
 
 Table `public.interactions`:
 
-| Column | Notes |
-| --- | --- |
-| `id` | uuid PK |
-| `mentor_id` | uuid, FK `profiles.id`, NOT NULL — always the signed-in user |
-| `mentor_name` | text snapshot |
-| `player_id` | uuid, FK `players.id`, nullable — resolved server-side by name |
-| `goalkeeper_name` | text |
-| `gk_slug` | text, UI roster slug (display identity only) |
-| `interaction_type` | text, CHECK-constrained |
-| `club` | text snapshot at time of touchpoint |
-| `occurred_at` | **date** (calendar date, not a timestamp) |
-| `notes`, `outcome`, `follow_up` | text |
-| `created_at`, `updated_at` | timestamptz, `updated_at` maintained by trigger |
+| Column                          | Notes                                                          |
+| ------------------------------- | -------------------------------------------------------------- |
+| `id`                            | uuid PK                                                        |
+| `mentor_id`                     | uuid, FK `profiles.id`, NOT NULL — always the signed-in user   |
+| `mentor_name`                   | text snapshot                                                  |
+| `player_id`                     | uuid, FK `players.id`, nullable — resolved server-side by name |
+| `goalkeeper_name`               | text                                                           |
+| `gk_slug`                       | text, UI roster slug (display identity only)                   |
+| `interaction_type`              | text, CHECK-constrained                                        |
+| `club`                          | text snapshot at time of touchpoint                            |
+| `occurred_at`                   | **date** (calendar date, not a timestamp)                      |
+| `notes`, `outcome`, `follow_up` | text                                                           |
+| `created_at`, `updated_at`      | timestamptz, `updated_at` maintained by trigger                |
 
 Indexes on `occurred_at DESC`, `mentor_id`, `player_id`.
 

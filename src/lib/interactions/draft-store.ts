@@ -36,7 +36,9 @@ function storage(): Storage | null {
 
 /** True when the draft holds anything a user would be annoyed to lose. */
 export function isDraftMeaningful(d: Omit<InteractionDraft, "savedAt">): boolean {
-  return Boolean(d.gkId.trim() || d.notes.trim() || d.club.trim() || d.outcome.trim() || d.followUp.trim());
+  return Boolean(
+    d.gkId.trim() || d.notes.trim() || d.club.trim() || d.outcome.trim() || d.followUp.trim(),
+  );
 }
 
 export function saveInteractionDraft(draft: Omit<InteractionDraft, "savedAt">): void {

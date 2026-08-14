@@ -30,7 +30,11 @@ import {
   waiveEventFollowUp,
 } from "@/lib/events/follow-up.functions";
 import { eventFollowUpsQueryKey } from "@/lib/events/query-keys";
-import { isEventType, FOLLOW_UP_KIND_BY_EVENT_TYPE, followUpRequirementLabel } from "@/lib/events/follow-up";
+import {
+  isEventType,
+  FOLLOW_UP_KIND_BY_EVENT_TYPE,
+  followUpRequirementLabel,
+} from "@/lib/events/follow-up";
 import {
   FollowUpActionLink,
   FollowUpStatusPill,
@@ -88,18 +92,14 @@ function MissingReports({
             {shortLabel(t)}
           </span>
         ))}
-        {overflow > 0 && (
-          <span className="text-[9px] text-muted-foreground">+{overflow}</span>
-        )}
+        {overflow > 0 && <span className="text-[9px] text-muted-foreground">+{overflow}</span>}
       </div>
     );
   }
 
   return (
     <div className="mt-1 flex flex-wrap items-center gap-1">
-      <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
-        Missing
-      </span>
+      <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Missing</span>
       {missing.map((t) => (
         <span
           key={t}
@@ -131,25 +131,25 @@ export const Route = createFileRoute("/calendar")({
  * scheduled before the list changed still renders as it always did.
  */
 const TONE: Record<string, "info" | "warning" | "success" | "muted" | "destructive"> = {
-  "Match": "info",
+  Match: "info",
   "Training Ground Visit": "warning",
   "Coffee Catch-up": "success",
-  "Observation": "success",
+  Observation: "success",
   "Mentor Visit": "warning",
-  "Meeting": "muted",
+  Meeting: "muted",
   "Follow Up": "destructive",
-  "Other": "muted",
+  Other: "muted",
 };
 
 const CHIP: Record<string, string> = {
-  "Match": "bg-info/15 text-info border-info/30",
+  Match: "bg-info/15 text-info border-info/30",
   "Training Ground Visit": "bg-warning/15 text-warning border-warning/30",
   "Coffee Catch-up": "bg-success/15 text-success border-success/30",
-  "Observation": "bg-success/15 text-success border-success/30",
+  Observation: "bg-success/15 text-success border-success/30",
   "Mentor Visit": "bg-warning/15 text-warning border-warning/30",
   "Follow Up": "bg-destructive/15 text-destructive border-destructive/30",
-  "Meeting": "bg-muted text-muted-foreground border-border",
-  "Other": "bg-muted text-muted-foreground border-border",
+  Meeting: "bg-muted text-muted-foreground border-border",
+  Other: "bg-muted text-muted-foreground border-border",
 };
 
 interface DisplayEvent {
@@ -378,7 +378,8 @@ function CalendarPage() {
   const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
   const cells: (Date | null)[] = [];
   for (let i = 0; i < startDow; i++) cells.push(null);
-  for (let d = 1; d <= daysInMonth; d++) cells.push(new Date(today.getFullYear(), today.getMonth(), d));
+  for (let d = 1; d <= daysInMonth; d++)
+    cells.push(new Date(today.getFullYear(), today.getMonth(), d));
   while (cells.length % 7 !== 0) cells.push(null);
 
   const eventsByDay = new Map<string, DisplayEvent[]>();
@@ -495,8 +496,18 @@ function CalendarPage() {
         action={
           <div className="flex items-center gap-2">
             <div className="flex rounded-md border border-border overflow-hidden text-xs">
-              <button onClick={() => setView("month")} className={`px-3 py-1.5 ${view === "month" ? "bg-accent" : "hover:bg-accent/40"}`}>Month</button>
-              <button onClick={() => setView("week")} className={`px-3 py-1.5 ${view === "week" ? "bg-accent" : "hover:bg-accent/40"}`}>Week</button>
+              <button
+                onClick={() => setView("month")}
+                className={`px-3 py-1.5 ${view === "month" ? "bg-accent" : "hover:bg-accent/40"}`}
+              >
+                Month
+              </button>
+              <button
+                onClick={() => setView("week")}
+                className={`px-3 py-1.5 ${view === "week" ? "bg-accent" : "hover:bg-accent/40"}`}
+              >
+                Week
+              </button>
             </div>
             {can("interactions.log") && (
               <button
@@ -538,18 +549,29 @@ function CalendarPage() {
       {view === "month" ? (
         <Card className="p-3">
           <div className="grid grid-cols-7 text-[10px] uppercase tracking-wider text-muted-foreground mb-2">
-            {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => <div key={d} className="px-2 py-1">{d}</div>)}
+            {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => (
+              <div key={d} className="px-2 py-1">
+                {d}
+              </div>
+            ))}
           </div>
           <div className="grid grid-cols-7 gap-1">
             {cells.map((d, i) => {
               const isToday = d?.toDateString() === today.toDateString();
-              const dayEvents = d ? eventsByDay.get(d.toDateString()) ?? [] : [];
+              const dayEvents = d ? (eventsByDay.get(d.toDateString()) ?? []) : [];
               const iso = d ? localDateIso(d) : "";
               return (
-                <div key={i} className={`group min-h-24 rounded-md border p-1.5 ${d ? "bg-card border-border" : "border-transparent"} ${isToday ? "ring-1 ring-primary" : ""}`}>
+                <div
+                  key={i}
+                  className={`group min-h-24 rounded-md border p-1.5 ${d ? "bg-card border-border" : "border-transparent"} ${isToday ? "ring-1 ring-primary" : ""}`}
+                >
                   {d && (
                     <div className="mb-1 flex items-center justify-between">
-                      <span className={`text-[11px] tabular-nums font-mono font-medium ${isToday ? "text-primary" : "text-muted-foreground"}`}>{d.getDate()}</span>
+                      <span
+                        className={`text-[11px] tabular-nums font-mono font-medium ${isToday ? "text-primary" : "text-muted-foreground"}`}
+                      >
+                        {d.getDate()}
+                      </span>
                       <span className="flex items-center gap-0.5">
                         {canLog && (
                           <button
@@ -582,13 +604,18 @@ function CalendarPage() {
                           {canManage ? (
                             <button
                               onClick={() => openEdit(e)}
-                              className={cls + " hover:brightness-125 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"}
+                              className={
+                                cls +
+                                " hover:brightness-125 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                              }
                               title={e.notes || e.title}
                             >
                               {label}
                             </button>
                           ) : (
-                            <div className={cls} title={e.notes || e.title}>{label}</div>
+                            <div className={cls} title={e.notes || e.title}>
+                              {label}
+                            </div>
                           )}
                           <MissingReports
                             coverage={coverage}
@@ -600,7 +627,11 @@ function CalendarPage() {
                         </div>
                       );
                     })}
-                    {dayEvents.length > 3 && <div className="text-[10px] text-muted-foreground">+{dayEvents.length - 3}</div>}
+                    {dayEvents.length > 3 && (
+                      <div className="text-[10px] text-muted-foreground">
+                        +{dayEvents.length - 3}
+                      </div>
+                    )}
                   </div>
                 </div>
               );
@@ -614,16 +645,38 @@ function CalendarPage() {
               const dayEvents = eventsByDay.get(d.toDateString()) ?? [];
               const isToday = d.toDateString() === today.toDateString();
               return (
-                <div key={d.toISOString()} className={`min-h-72 rounded-md border border-border p-2 ${isToday ? "ring-1 ring-primary" : ""}`}>
-                  <div className="text-[10px] uppercase text-muted-foreground">{d.toLocaleDateString("en", { weekday: "short" })}</div>
-                  <div className={`text-lg font-semibold tabular-nums font-mono ${isToday ? "text-primary" : ""}`}>{d.getDate()}</div>
+                <div
+                  key={d.toISOString()}
+                  className={`min-h-72 rounded-md border border-border p-2 ${isToday ? "ring-1 ring-primary" : ""}`}
+                >
+                  <div className="text-[10px] uppercase text-muted-foreground">
+                    {d.toLocaleDateString("en", { weekday: "short" })}
+                  </div>
+                  <div
+                    className={`text-lg font-semibold tabular-nums font-mono ${isToday ? "text-primary" : ""}`}
+                  >
+                    {d.getDate()}
+                  </div>
                   <div className="space-y-1.5 mt-2">
                     {dayEvents.map((e) => (
-                      <div key={e.id} className="text-[11px] p-1.5 rounded bg-accent/40 border border-border/60">
+                      <div
+                        key={e.id}
+                        className="text-[11px] p-1.5 rounded bg-accent/40 border border-border/60"
+                      >
                         <div className="font-medium leading-tight line-clamp-2">{e.title}</div>
-                        {startTimeLabel(e) && <div className="text-[10px] text-muted-foreground tabular-nums font-mono">{startTimeLabel(e)}</div>}
-                        <div className="mt-1"><Pill tone={TONE[e.type] ?? "muted"}>{e.type}</Pill></div>
-                        {e.notes && <div className="mt-1 text-[10px] text-muted-foreground line-clamp-3">{e.notes}</div>}
+                        {startTimeLabel(e) && (
+                          <div className="text-[10px] text-muted-foreground tabular-nums font-mono">
+                            {startTimeLabel(e)}
+                          </div>
+                        )}
+                        <div className="mt-1">
+                          <Pill tone={TONE[e.type] ?? "muted"}>{e.type}</Pill>
+                        </div>
+                        {e.notes && (
+                          <div className="mt-1 text-[10px] text-muted-foreground line-clamp-3">
+                            {e.notes}
+                          </div>
+                        )}
                         <MissingReports
                           coverage={coverage}
                           gk={e.gkRef}
@@ -633,12 +686,18 @@ function CalendarPage() {
                         />
                         <div className="mt-1 flex items-center gap-2">
                           {canLog && (
-                            <button onClick={() => openLog({ date: e.date, gkId: e.gkId })} className="inline-flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground">
+                            <button
+                              onClick={() => openLog({ date: e.date, gkId: e.gkId })}
+                              className="inline-flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground"
+                            >
                               <NotebookPen className="size-3" /> Log
                             </button>
                           )}
                           {canManage && (
-                            <button onClick={() => openEdit(e)} className="inline-flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground">
+                            <button
+                              onClick={() => openEdit(e)}
+                              className="inline-flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground"
+                            >
                               <Pencil className="size-3" /> Edit
                             </button>
                           )}
@@ -654,7 +713,9 @@ function CalendarPage() {
       )}
 
       <Card className="p-4">
-        <div className="text-sm font-semibold mb-3 uppercase tracking-wider text-muted-foreground">Upcoming Events</div>
+        <div className="text-sm font-semibold mb-3 uppercase tracking-wider text-muted-foreground">
+          Upcoming Events
+        </div>
         {isLoading ? (
           <div className="text-sm text-muted-foreground">Loading calendar…</div>
         ) : (
@@ -664,7 +725,9 @@ function CalendarPage() {
               .slice(0, 10)
               .map((e) => (
                 <div key={e.id} className="flex items-start gap-3 py-2 text-sm">
-                  <div className="w-24 shrink-0 text-xs text-muted-foreground tabular-nums font-mono">{formatDate(e.date)}</div>
+                  <div className="w-24 shrink-0 text-xs text-muted-foreground tabular-nums font-mono">
+                    {formatDate(e.date)}
+                  </div>
                   <Pill tone={TONE[e.type] ?? "muted"}>{e.type}</Pill>
                   <div className="min-w-0 flex-1">
                     <div className="truncate">{e.title}</div>
@@ -679,7 +742,11 @@ function CalendarPage() {
                         .filter(Boolean)
                         .join(" · ")}
                     </div>
-                    {e.notes && <div className="mt-0.5 whitespace-pre-wrap text-xs text-muted-foreground">{e.notes}</div>}
+                    {e.notes && (
+                      <div className="mt-0.5 whitespace-pre-wrap text-xs text-muted-foreground">
+                        {e.notes}
+                      </div>
+                    )}
                     {(() => {
                       const row = followUpByEvent.get(e.id);
                       if (!row || !row.followUp.kind) return null;
@@ -715,17 +782,27 @@ function CalendarPage() {
                   </div>
                   {canManage && (
                     <div className="flex shrink-0 items-center gap-1">
-                      <button onClick={() => openEdit(e)} aria-label={`Edit ${e.title}`} className="rounded p-1 text-muted-foreground hover:text-foreground">
+                      <button
+                        onClick={() => openEdit(e)}
+                        aria-label={`Edit ${e.title}`}
+                        className="rounded p-1 text-muted-foreground hover:text-foreground"
+                      >
                         <Pencil className="size-3.5" />
                       </button>
-                      <button onClick={() => handleDelete(e.id)} aria-label={`Delete ${e.title}`} className="rounded p-1 text-muted-foreground hover:text-destructive">
+                      <button
+                        onClick={() => handleDelete(e.id)}
+                        aria-label={`Delete ${e.title}`}
+                        className="rounded p-1 text-muted-foreground hover:text-destructive"
+                      >
                         <Trash2 className="size-3.5" />
                       </button>
                     </div>
                   )}
                 </div>
               ))}
-            {displayEvents.filter((e) => new Date(`${e.date}T00:00:00`).getTime() >= Date.now() - 86400000).length === 0 && (
+            {displayEvents.filter(
+              (e) => new Date(`${e.date}T00:00:00`).getTime() >= Date.now() - 86400000,
+            ).length === 0 && (
               <div className="rounded-md border border-dashed border-border px-3 py-6 text-center text-sm text-muted-foreground">
                 Nothing scheduled yet.
                 {canManage && " Use “Add event” to book a mentor in to see a goalkeeper."}
@@ -742,7 +819,11 @@ function CalendarPage() {
               <h2 className="text-sm font-semibold uppercase tracking-wider">
                 {draft.id ? "Edit event" : "Add calendar event"}
               </h2>
-              <button onClick={() => setDraft(null)} aria-label="Close" className="rounded p-1 text-muted-foreground hover:text-foreground">
+              <button
+                onClick={() => setDraft(null)}
+                aria-label="Close"
+                className="rounded p-1 text-muted-foreground hover:text-foreground"
+              >
                 <X className="size-4" />
               </button>
             </div>
@@ -771,9 +852,15 @@ function CalendarPage() {
                         the manager can see what needs reclassifying rather than
                         having it silently swapped for something else. */}
                     {!isEventType(draft.event_type) && draft.event_type && (
-                      <option value={draft.event_type}>{draft.event_type} (retired — please reclassify)</option>
+                      <option value={draft.event_type}>
+                        {draft.event_type} (retired — please reclassify)
+                      </option>
                     )}
-                    {CALENDAR_EVENT_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+                    {CALENDAR_EVENT_TYPES.map((t) => (
+                      <option key={t} value={t}>
+                        {t}
+                      </option>
+                    ))}
                   </select>
                   <span className="mt-1 block text-[11px] text-muted-foreground">
                     {followUpHint(draft.event_type)}
@@ -811,7 +898,9 @@ function CalendarPage() {
                 >
                   <option value="">Choose a goalkeeper…</option>
                   {roster.map((p) => (
-                    <option key={p.id} value={p.id}>{p.full_name}</option>
+                    <option key={p.id} value={p.id}>
+                      {p.full_name}
+                    </option>
                   ))}
                 </select>
               </label>
@@ -825,7 +914,9 @@ function CalendarPage() {
                 >
                   <option value="">Choose a mentor…</option>
                   {assignableMentors.map((m) => (
-                    <option key={m.id} value={m.id}>{m.name}</option>
+                    <option key={m.id} value={m.id}>
+                      {m.name}
+                    </option>
                   ))}
                 </select>
                 <span className="mt-1 block text-[11px] text-muted-foreground">
@@ -834,7 +925,9 @@ function CalendarPage() {
               </label>
 
               <label className="block">
-                <span className="mb-1 block text-xs text-muted-foreground">Location (optional)</span>
+                <span className="mb-1 block text-xs text-muted-foreground">
+                  Location (optional)
+                </span>
                 <input
                   value={draft.location}
                   onChange={(ev) => setDraft({ ...draft, location: ev.target.value })}
@@ -858,54 +951,55 @@ function CalendarPage() {
 
             {/* Cancelling and waiving are kept apart from Delete on purpose:
                 both preserve the event and its history, where Delete removes it. */}
-            {draft.id && (() => {
-              const row = followUpByEvent.get(draft.id);
-              if (!row) return null;
-              const cancelled = row.followUp.status === "cancelled";
-              const waived = row.followUp.status === "not_required";
-              return (
-                <div className="mt-4 space-y-2 rounded-md border border-border bg-muted/30 p-3">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <FollowUpStatusPill status={row.followUp.status} />
-                    <span className="text-[11px] text-muted-foreground">
-                      {followUpDetail(row.followUp, row.waiverReason, row.cancellationReason)}
-                    </span>
+            {draft.id &&
+              (() => {
+                const row = followUpByEvent.get(draft.id);
+                if (!row) return null;
+                const cancelled = row.followUp.status === "cancelled";
+                const waived = row.followUp.status === "not_required";
+                return (
+                  <div className="mt-4 space-y-2 rounded-md border border-border bg-muted/30 p-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <FollowUpStatusPill status={row.followUp.status} />
+                      <span className="text-[11px] text-muted-foreground">
+                        {followUpDetail(row.followUp, row.waiverReason, row.cancellationReason)}
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {cancelled ? (
+                        <button
+                          onClick={() => handleReinstate(draft.id)}
+                          className="rounded-md border border-border px-2.5 py-1 text-[11px] hover:bg-accent"
+                        >
+                          Reinstate event
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => handleCancel(draft.id)}
+                          className="rounded-md border border-border px-2.5 py-1 text-[11px] hover:bg-accent"
+                        >
+                          Cancel event
+                        </button>
+                      )}
+                      {waived ? (
+                        <button
+                          onClick={() => handleUnwaive(draft.id)}
+                          className="rounded-md border border-border px-2.5 py-1 text-[11px] hover:bg-accent"
+                        >
+                          Require write-up again
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => handleWaive(draft.id)}
+                          className="rounded-md border border-border px-2.5 py-1 text-[11px] hover:bg-accent"
+                        >
+                          Mark write-up not required
+                        </button>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex flex-wrap gap-2">
-                    {cancelled ? (
-                      <button
-                        onClick={() => handleReinstate(draft.id)}
-                        className="rounded-md border border-border px-2.5 py-1 text-[11px] hover:bg-accent"
-                      >
-                        Reinstate event
-                      </button>
-                    ) : (
-                      <button
-                        onClick={() => handleCancel(draft.id)}
-                        className="rounded-md border border-border px-2.5 py-1 text-[11px] hover:bg-accent"
-                      >
-                        Cancel event
-                      </button>
-                    )}
-                    {waived ? (
-                      <button
-                        onClick={() => handleUnwaive(draft.id)}
-                        className="rounded-md border border-border px-2.5 py-1 text-[11px] hover:bg-accent"
-                      >
-                        Require write-up again
-                      </button>
-                    ) : (
-                      <button
-                        onClick={() => handleWaive(draft.id)}
-                        className="rounded-md border border-border px-2.5 py-1 text-[11px] hover:bg-accent"
-                      >
-                        Mark write-up not required
-                      </button>
-                    )}
-                  </div>
-                </div>
-              );
-            })()}
+                );
+              })()}
 
             <div className="mt-4 flex items-center justify-between gap-2">
               {draft.id ? (
@@ -915,9 +1009,16 @@ function CalendarPage() {
                 >
                   <Trash2 className="size-3.5" /> Delete
                 </button>
-              ) : <span />}
+              ) : (
+                <span />
+              )}
               <div className="flex items-center gap-2">
-                <button onClick={() => setDraft(null)} className="rounded-md border border-border px-3 py-1.5 text-xs hover:bg-accent">Cancel</button>
+                <button
+                  onClick={() => setDraft(null)}
+                  className="rounded-md border border-border px-3 py-1.5 text-xs hover:bg-accent"
+                >
+                  Cancel
+                </button>
                 <button
                   onClick={saveDraft}
                   disabled={saving}
@@ -933,7 +1034,10 @@ function CalendarPage() {
 
       <WorkflowDialog
         kind={workflow}
-        onClose={() => { setWorkflow(null); setLogPrefill({}); }}
+        onClose={() => {
+          setWorkflow(null);
+          setLogPrefill({});
+        }}
         prefillGkId={logPrefill.gkId}
         prefillMatchDate={logPrefill.date}
       />

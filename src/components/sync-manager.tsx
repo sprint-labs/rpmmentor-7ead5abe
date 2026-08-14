@@ -21,9 +21,7 @@ import {
  */
 export function SyncManager() {
   const [jobs, setJobs] = useState<SyncJob[]>([]);
-  const [online, setOnline] = useState(
-    typeof navigator === "undefined" ? true : navigator.onLine,
-  );
+  const [online, setOnline] = useState(typeof navigator === "undefined" ? true : navigator.onLine);
   const [syncing, setSyncing] = useState(false);
 
   const submitFn = useServerFn(submitMatchReport);
@@ -55,7 +53,6 @@ export function SyncManager() {
           (res as { message?: string }).message ?? "This queued report needs your confirmation.",
         );
       }
-
     },
   };
 
@@ -70,13 +67,13 @@ export function SyncManager() {
       const res = await drainQueue(handlers);
       if (res.processed > 0) {
         toast.success(
-          res.processed === 1
-            ? "Synced 1 queued change"
-            : `Synced ${res.processed} queued changes`,
+          res.processed === 1 ? "Synced 1 queued change" : `Synced ${res.processed} queued changes`,
         );
         try {
           window.dispatchEvent(new CustomEvent("rpm:report-submitted"));
-        } catch { /* ignore */ }
+        } catch {
+          /* ignore */
+        }
       }
       if (res.needsAction > 0) {
         toast.warning(
@@ -104,16 +101,23 @@ export function SyncManager() {
   // Connectivity + visibility triggers.
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const on = () => { setOnline(true); void drain(); };
+    const on = () => {
+      setOnline(true);
+      void drain();
+    };
     const off = () => setOnline(false);
-    const vis = () => { if (document.visibilityState === "visible") void drain(); };
+    const vis = () => {
+      if (document.visibilityState === "visible") void drain();
+    };
     window.addEventListener("online", on);
     window.addEventListener("offline", off);
     document.addEventListener("visibilitychange", vis);
     // Attempt one drain on mount (e.g. reload after being offline).
     void drain();
     // Periodic retry while there are pending jobs.
-    const timer = window.setInterval(() => { void drain(); }, 30_000);
+    const timer = window.setInterval(() => {
+      void drain();
+    }, 30_000);
     return () => {
       window.removeEventListener("online", on);
       window.removeEventListener("offline", off);
@@ -126,7 +130,13 @@ export function SyncManager() {
 
   const needsActionJobs = jobs.filter((j) => j.needsAction);
   const anyFailed = jobs.some((j) => j.attempts > 0);
-  const Icon = syncing ? RefreshCw : anyFailed && !online ? AlertTriangle : online ? Check : CloudUpload;
+  const Icon = syncing
+    ? RefreshCw
+    : anyFailed && !online
+      ? AlertTriangle
+      : online
+        ? Check
+        : CloudUpload;
   const color = syncing
     ? "border-sky-500/40 bg-sky-500/10 text-sky-200"
     : anyFailed && !online
@@ -156,7 +166,9 @@ export function SyncManager() {
           type="button"
           onClick={() => {
             for (const j of needsActionJobs) removeJob(j.id);
-            toast.message("Removed queued duplicates. Re-submit the report if it is genuinely new.");
+            toast.message(
+              "Removed queued duplicates. Re-submit the report if it is genuinely new.",
+            );
             refresh();
           }}
           className="shrink-0 h-6 px-2 rounded border border-current/40 hover:bg-current/10"

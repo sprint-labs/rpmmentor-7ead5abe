@@ -11,7 +11,10 @@ export function normalisePersonName(value: string): string {
 
 /** Deterministic legacy slug used by the mock roster (`gk-harrison-male`). */
 export function legacyGkSlugForName(name: string): string {
-  return `gk-${name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}`;
+  return `gk-${name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "")}`;
 }
 
 export function findPlayerByName<T extends { full_name: string }>(

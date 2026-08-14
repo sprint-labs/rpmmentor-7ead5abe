@@ -146,8 +146,8 @@ function FollowUpsPage() {
               {counts.overdue} write-up{counts.overdue === 1 ? "" : "s"} past the 48-hour deadline
             </div>
             <div className="text-xs text-muted-foreground">
-              This is an operational duty-of-care alert. It is not a safeguarding concern in itself —
-              use the existing escalation route if a completed write-up raises one.
+              This is an operational duty-of-care alert. It is not a safeguarding concern in itself
+              — use the existing escalation route if a completed write-up raises one.
             </div>
           </div>
         </div>
@@ -218,7 +218,9 @@ function FollowUpsPage() {
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <FollowUpStatusPill status={row.followUp.status} />
-                      <span className="font-medium">{row.goalkeeperName || "Unnamed goalkeeper"}</span>
+                      <span className="font-medium">
+                        {row.goalkeeperName || "Unnamed goalkeeper"}
+                      </span>
                       <span className="text-xs text-muted-foreground">{row.eventType}</span>
                     </div>
                     <div className="mt-1 text-xs text-muted-foreground">
@@ -246,7 +248,10 @@ function FollowUpsPage() {
                       followUp={row.followUp}
                       label={`Submit ${followUpRequirementLabel(row.followUp.kind)}`}
                     />
-                    <Link to="/calendar" className="text-[11px] text-muted-foreground hover:underline">
+                    <Link
+                      to="/calendar"
+                      className="text-[11px] text-muted-foreground hover:underline"
+                    >
                       View in calendar
                     </Link>
                   </div>

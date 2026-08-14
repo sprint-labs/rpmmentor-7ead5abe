@@ -8,7 +8,10 @@ async function loadSheets() {
 }
 
 function jsonResponse(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { "content-type": "application/json" },
+  });
 }
 
 describe("sheets append — configuration vs ambiguous transport", () => {
@@ -88,7 +91,9 @@ describe("sheets delete — destructive single-attempt safety", () => {
     return vi.spyOn(globalThis, "fetch").mockImplementation(async () => {
       n += 1;
       if (n === 1) {
-        return jsonResponse({ sheets: [{ properties: { sheetId: 42, title: "GKHQ Propietry Data Hub" } }] });
+        return jsonResponse({
+          sheets: [{ properties: { sheetId: 42, title: "GKHQ Propietry Data Hub" } }],
+        });
       }
       return deleteImpl();
     });

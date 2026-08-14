@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { mentorDashboardMetricCardLabels, mentorPrimaryActionLabels } from "./mentor-dashboard-cards";
+import {
+  mentorDashboardMetricCardLabels,
+  mentorPrimaryActionLabels,
+} from "./mentor-dashboard-cards";
 
 describe("base Mentor dashboard metric cards", () => {
   it("keeps the two supported Mentor metrics", () => {

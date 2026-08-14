@@ -75,7 +75,8 @@ export function useLoggedInteractions(enabled = true) {
 export function useDutySource(): DutySourceInteraction[] {
   const { data } = useLoggedInteractions();
   return useMemo(
-    () => (data ?? []).map((i) => ({ gkId: i.gkSlug, type: i.interactionType, date: i.occurredAt })),
+    () =>
+      (data ?? []).map((i) => ({ gkId: i.gkSlug, type: i.interactionType, date: i.occurredAt })),
     [data],
   );
 }

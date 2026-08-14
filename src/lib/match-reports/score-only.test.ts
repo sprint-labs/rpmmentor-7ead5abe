@@ -1,8 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { isScoreOnly, validateComments } from "./comments";
 
-const wrap = (body: string) =>
-  `Summary:\n${body}\n\nKey Moments:\n\nDevelopment Focus:\n`;
+const wrap = (body: string) => `Summary:\n${body}\n\nKey Moments:\n\nDevelopment Focus:\n`;
 
 describe("score-only comments are blocked deterministically", () => {
   const scoreOnly = [

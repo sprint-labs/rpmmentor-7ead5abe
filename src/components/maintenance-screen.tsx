@@ -14,7 +14,11 @@ export function MaintenanceScreen({ onSignOut, onCheckAgain }: MaintenanceScreen
     });
 
   return (
-    <main id="main-content" tabIndex={-1} className="relative min-h-dvh bg-background px-5 py-10 text-foreground">
+    <main
+      id="main-content"
+      tabIndex={-1}
+      className="relative min-h-dvh bg-background px-5 py-10 text-foreground"
+    >
       <div
         aria-hidden="true"
         className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(0,229,160,0.12),transparent_42%)]"

@@ -95,7 +95,9 @@ describe("validateEvent still refuses retired types on write", () => {
     expect(validateEvent({ ...base, event_type: "Training Ground Visit" }).event_type).toBe(
       "Training Ground Visit",
     );
-    expect(() => validateEvent({ ...base, event_type: "Meeting" })).toThrow(/Match, Training Ground/i);
+    expect(() => validateEvent({ ...base, event_type: "Meeting" })).toThrow(
+      /Match, Training Ground/i,
+    );
   });
 });
 

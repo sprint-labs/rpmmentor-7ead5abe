@@ -77,10 +77,7 @@ describe("deadline", () => {
   });
 
   it("is measured from the end time when one is stored", () => {
-    const { deadlineMs } = resolveFollowUp(
-      matchEvent({ endTime: "17:00" }),
-      KICK_OFF,
-    );
+    const { deadlineMs } = resolveFollowUp(matchEvent({ endTime: "17:00" }), KICK_OFF);
     expect(deadlineMs).toBe(londonWallClockMs("2026-08-15", "17:00") + 48 * HOUR);
   });
 
@@ -128,10 +125,7 @@ describe("status", () => {
   });
 
   it("stays Completed however long ago the deadline was", () => {
-    const late = resolveFollowUp(
-      matchEvent({ completedRecordId: "mr_1" }),
-      KICK_OFF + 1000 * HOUR,
-    );
+    const late = resolveFollowUp(matchEvent({ completedRecordId: "mr_1" }), KICK_OFF + 1000 * HOUR);
     expect(late.status).toBe("completed");
   });
 

@@ -5,7 +5,11 @@ describe("handwritten OCR merge — user-controlled replace/append", () => {
   const EXISTING = "Commanding display with a strong save at 20 minutes.";
 
   it("replace swaps content without adding section labels", () => {
-    const out = mergeOcrText(EXISTING, "Kept a clean sheet and organised the back four.", "replace");
+    const out = mergeOcrText(
+      EXISTING,
+      "Kept a clean sheet and organised the back four.",
+      "replace",
+    );
     expect(out).not.toContain("Commanding display");
     expect(out).not.toContain("Summary:");
     expect(out).toContain("clean sheet");

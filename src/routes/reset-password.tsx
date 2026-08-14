@@ -91,7 +91,11 @@ function ResetPasswordPage() {
   }
 
   return (
-    <main id="main-content" tabIndex={-1} className="min-h-screen flex items-center justify-center bg-background p-6">
+    <main
+      id="main-content"
+      tabIndex={-1}
+      className="min-h-screen flex items-center justify-center bg-background p-6"
+    >
       <div className="w-full max-w-md">
         <div className="mb-10">
           <img src={loginLogo.url} alt="Mentor Hub by RPM" className="h-40 w-auto" />
@@ -108,8 +112,8 @@ function ResetPasswordPage() {
                 Link expired
               </h1>
               <p className="text-sm text-muted-foreground mt-3 leading-relaxed">
-                This password reset link is invalid or has expired. Request a new one from the sign-in
-                screen.
+                This password reset link is invalid or has expired. Request a new one from the
+                sign-in screen.
               </p>
             </div>
             <Link
@@ -130,13 +134,16 @@ function ResetPasswordPage() {
                 Set a new password
               </h1>
               <p className="text-sm text-muted-foreground mt-3 leading-relaxed">
-                Choose a new password for your Mentor Hub account. You'll be signed in with it after this.
+                Choose a new password for your Mentor Hub account. You'll be signed in with it after
+                this.
               </p>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4" noValidate>
               <div>
-                <label htmlFor="pw" className="block text-xs font-medium mb-1.5">New password</label>
+                <label htmlFor="pw" className="block text-xs font-medium mb-1.5">
+                  New password
+                </label>
                 <div className="relative">
                   <Lock className="size-4 text-muted-foreground absolute left-3.5 top-1/2 -translate-y-1/2" />
                   <input
@@ -147,7 +154,10 @@ function ResetPasswordPage() {
                     required
                     minLength={8}
                     value={pw}
-                    onChange={(e) => { setPw(e.target.value); setError(null); }}
+                    onChange={(e) => {
+                      setPw(e.target.value);
+                      setError(null);
+                    }}
                     placeholder="At least 8 characters"
                     className="w-full pl-10 pr-10 py-2.5 rounded-xl border border-border bg-card text-sm focus:outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/10 transition"
                   />
@@ -163,7 +173,9 @@ function ResetPasswordPage() {
               </div>
 
               <div>
-                <label htmlFor="confirm" className="block text-xs font-medium mb-1.5">Confirm password</label>
+                <label htmlFor="confirm" className="block text-xs font-medium mb-1.5">
+                  Confirm password
+                </label>
                 <div className="relative">
                   <Lock className="size-4 text-muted-foreground absolute left-3.5 top-1/2 -translate-y-1/2" />
                   <input
@@ -173,7 +185,10 @@ function ResetPasswordPage() {
                     required
                     minLength={8}
                     value={confirm}
-                    onChange={(e) => { setConfirm(e.target.value); setError(null); }}
+                    onChange={(e) => {
+                      setConfirm(e.target.value);
+                      setError(null);
+                    }}
                     placeholder="Repeat new password"
                     className="w-full pl-10 pr-3 py-2.5 rounded-xl border border-border bg-card text-sm focus:outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/10 transition"
                   />
@@ -181,7 +196,10 @@ function ResetPasswordPage() {
               </div>
 
               {error && (
-                <div role="alert" className="text-xs text-destructive bg-destructive/10 border border-destructive/20 rounded-lg px-3 py-2">
+                <div
+                  role="alert"
+                  className="text-xs text-destructive bg-destructive/10 border border-destructive/20 rounded-lg px-3 py-2"
+                >
                   {error}
                 </div>
               )}

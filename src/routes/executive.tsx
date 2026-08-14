@@ -146,7 +146,9 @@ function Executive() {
           <div className="flex items-end gap-2 h-48">
             {(data?.reportWeeks ?? []).map((w) => (
               <div key={w.label} className="flex-1 flex flex-col items-center gap-1.5">
-                <div className="text-[10px] tabular-nums font-mono text-muted-foreground">{w.count}</div>
+                <div className="text-[10px] tabular-nums font-mono text-muted-foreground">
+                  {w.count}
+                </div>
                 <div
                   className="w-full bg-primary/70 rounded-t hover:bg-primary transition-colors"
                   style={{ height: `${(w.count / maxWeek) * 100}%` }}
@@ -215,12 +217,16 @@ function Executive() {
             <div className="space-y-2">
               {data.mentorLeaderboard.map((m, i) => (
                 <div key={m.name} className="flex items-center gap-3">
-                  <div className="w-6 text-xs tabular-nums font-mono text-muted-foreground">{i + 1}</div>
+                  <div className="w-6 text-xs tabular-nums font-mono text-muted-foreground">
+                    {i + 1}
+                  </div>
                   <div className="flex-1 text-sm font-medium truncate">{m.name}</div>
                   <div className="w-32">
                     <ProgressBar value={(m.interactions / maxLeader) * 100} />
                   </div>
-                  <div className="text-xs tabular-nums font-mono w-8 text-right">{m.interactions}</div>
+                  <div className="text-xs tabular-nums font-mono w-8 text-right">
+                    {m.interactions}
+                  </div>
                 </div>
               ))}
             </div>

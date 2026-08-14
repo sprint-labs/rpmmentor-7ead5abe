@@ -52,7 +52,9 @@ export function getLastSyncedAt(): number | null {
   try {
     const raw = window.localStorage.getItem(LAST_SYNC_KEY);
     return raw ? Number(raw) || null : null;
-  } catch { return null; }
+  } catch {
+    return null;
+  }
 }
 
 function setLastSyncedAt(ts: number) {
@@ -60,7 +62,9 @@ function setLastSyncedAt(ts: number) {
   try {
     window.localStorage.setItem(LAST_SYNC_KEY, String(ts));
     window.dispatchEvent(new CustomEvent("rpm:sync-queue-changed"));
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
 }
 
 function read(): SyncJob[] {

@@ -116,7 +116,6 @@ export function isScoreOnly(text: string): boolean {
   return tokens.every((t) => SCORE_TOKEN_RE.test(t));
 }
 
-
 const PLACEHOLDER_RE =
   /^(?:test(?:ing)?(?:\s*\d+)?|tbc|tba|n\/?a|none|nil|null|xx+|asdf+|qwerty|placeholder|todo|lorem(?:\s+ipsum)?|same as (?:above|last)|no comment|ok|fine|good|bad)$/i;
 
@@ -153,13 +152,15 @@ export function validateComments(text: string): CommentValidation {
     };
   }
 
-
   const frags = fragments(body);
 
   // Placeholder / test-only content, including the classic "testing, testing"
   // (and any case/whitespace variation of it).
   if (frags.length > 0 && frags.every((f) => PLACEHOLDER_RE.test(f))) {
-    return { ok: false, message: "Placeholder or test text isn't accepted — add real match notes." };
+    return {
+      ok: false,
+      message: "Placeholder or test text isn't accepted — add real match notes.",
+    };
   }
 
   // A repeated deterministic TEST/PLACEHOLDER phrase such as "testing, testing"
@@ -172,7 +173,6 @@ export function validateComments(text: string): CommentValidation {
     };
   }
 
-
   // ANY duplicated paragraph (A / B / A) is rejected, not just all-identical.
   const paragraphs = body
     .split(/\n\s*\n/)
@@ -180,7 +180,10 @@ export function validateComments(text: string): CommentValidation {
     .filter(Boolean);
 
   if (paragraphs.length >= 2 && new Set(paragraphs).size < paragraphs.length) {
-    return { ok: false, message: "Comments repeat the same text — add distinct match observations." };
+    return {
+      ok: false,
+      message: "Comments repeat the same text — add distinct match observations.",
+    };
   }
 
   if (meaningfulCharCount(text) < MIN_MEANINGFUL_CHARS) {
@@ -200,7 +203,6 @@ export function appendCommentText(previous: string, incoming: string): string {
   const base = previous.trimEnd();
   return base ? `${base}\n\n${text}` : text;
 }
-
 
 // ---------------------------------------------------------------------------
 // Transcript / OCR insertion — never replaces the user's comments.
@@ -223,8 +225,7 @@ export type InsertTarget = CommentSection;
  * - `cursor` when the classification is uncertain and the mentor has a caret.
  */
 export type InsertPlacement =
-  | { kind: "section"; section: CommentSection }
-  | { kind: "cursor"; offset: number };
+  { kind: "section"; section: CommentSection } | { kind: "cursor"; offset: number };
 
 /** True when the transcript matches neither the action nor the overview cue. */
 export function isUncertainTranscript(transcript: string): boolean {
@@ -268,7 +269,6 @@ export function resolveInsertPlacement(
   if (caret != null && caret >= 0) return { kind: "cursor", offset: caret };
   return { kind: "section", section: "Key Moments" };
 }
-
 
 /** Which section a caret offset sits in (null when not inside any section). */
 export function sectionAtOffset(text: string, offset: number): CommentSection | null {
@@ -336,8 +336,7 @@ export function insertUnderSection(
   const insertLines = hasContent ? ["", trimmed] : [trimmed];
 
   const merged = [...before, ...insertLines, ...after].join("\n");
-  const caret =
-    before.join("\n").length + 1 + insertLines.join("\n").length;
+  const caret = before.join("\n").length + 1 + insertLines.join("\n").length;
   return { text: merged, selectionStart: caret, selectionEnd: caret };
 }
 
@@ -345,11 +344,7 @@ export function insertUnderSection(
  * Insert `snippet` at an exact caret offset, preserving all existing text and
  * returning the caret position at the end of the inserted snippet.
  */
-export function insertAtOffset(
-  text: string,
-  snippet: string,
-  offset: number,
-): InsertResult {
+export function insertAtOffset(text: string, snippet: string, offset: number): InsertResult {
   const base = ensureSections(text);
   const trimmed = snippet.trim();
   if (!trimmed) return { text: base, selectionStart: offset, selectionEnd: offset };
