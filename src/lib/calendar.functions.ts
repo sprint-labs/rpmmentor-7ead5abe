@@ -9,6 +9,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { requireRole, type AppRole } from "@/lib/roles.server";
+import { EVENT_TYPES, isEventType, type EventType } from "@/lib/events/follow-up";
 
 export const CALENDAR_MANAGE_ROLES: readonly AppRole[] = [
   "mentor_manager",
@@ -16,34 +17,41 @@ export const CALENDAR_MANAGE_ROLES: readonly AppRole[] = [
   "super_admin",
 ];
 
-export const CALENDAR_EVENT_TYPES = [
-  "Match",
-  "Observation",
-  "Mentor Visit",
-  "Meeting",
-  "Follow Up",
-  "Other",
-] as const;
-export type CalendarEventType = (typeof CALENDAR_EVENT_TYPES)[number];
+/**
+ * The schedulable event types, defined with the follow-up rules they trigger.
+ *
+ * Retired types (Observation, Mentor Visit, Meeting, Follow Up, Other) are no
+ * longer offered and no longer accepted on save. Events already stored with one
+ * remain readable; they simply have to be reclassified before they can be edited.
+ */
+export const CALENDAR_EVENT_TYPES = EVENT_TYPES;
+export type CalendarEventType = EventType;
 
 export interface TeamCalendarEvent {
   id: string;
   title: string;
-  event_type: CalendarEventType;
+  event_type: string;
   event_date: string;
   start_time: string | null;
+  end_time: string | null;
   location: string | null;
   notes: string;
   player_id: string | null;
   goalkeeper_name: string | null;
   assigned_mentor_id: string | null;
   assigned_mentor_name: string;
+  status: string;
+  cancellation_reason: string;
+  follow_up_waived_at: string | null;
+  follow_up_waiver_reason: string;
   created_by: string;
   created_by_name: string;
 }
 
+// One literal, not a concatenation: supabase-js infers the row type from the
+// select string, and joining pieces together erases that inference.
 const COLUMNS =
-  "id, title, event_type, event_date, start_time, location, notes, player_id, goalkeeper_name, assigned_mentor_id, assigned_mentor_name, created_by, created_by_name";
+  "id, title, event_type, event_date, start_time, end_time, location, notes, player_id, goalkeeper_name, assigned_mentor_id, assigned_mentor_name, status, cancellation_reason, follow_up_waived_at, follow_up_waiver_reason, created_by, created_by_name";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -59,20 +67,28 @@ interface EventInput {
 }
 
 /**
- * Shape and required-field checks. The goalkeeper and the attending mentor are
- * submitted as ids and confirmed against the database in the handler, so a
- * scheduled event always points at a real roster player and a real profile.
+ * Shape and required-field checks.
+ *
+ * Every event must name a goalkeeper, an attending mentor, a date, a time and a
+ * type. The time is required because the 48-hour write-up deadline is measured
+ * from it: without one there is no defensible moment to count from.
+ *
+ * The goalkeeper and the mentor are submitted as ids and confirmed against the
+ * database in the handler, so a scheduled event always points at a real roster
+ * player and a real profile rather than at a name that happened to match.
  */
 export function validateEvent(data: EventInput) {
   const title = (data?.title ?? "").trim();
   if (!title) throw new Error("A title is required.");
   if (title.length > 160) throw new Error("Title must be 160 characters or fewer.");
-  const type = (data?.event_type ?? "Other") as CalendarEventType;
-  if (!CALENDAR_EVENT_TYPES.includes(type)) throw new Error("Unknown event type.");
+  const type = (data?.event_type ?? "").trim();
+  if (!isEventType(type)) {
+    throw new Error("Choose Match, Training Ground Visit or Coffee Catch-up.");
+  }
   if (!/^\d{4}-\d{2}-\d{2}$/.test(data?.event_date ?? "")) throw new Error("A valid date is required.");
   const time = (v: string | null | undefined) => {
     const s = (v ?? "").trim();
-    if (!s) return null;
+    if (!s) throw new Error("A start time is required so the follow-up deadline can be set.");
     if (!/^\d{2}:\d{2}$/.test(s)) throw new Error("Times must be in HH:MM format.");
     return s;
   };
@@ -129,27 +145,41 @@ async function resolveEventPeople(
   };
 }
 
+export interface AssignableMentor {
+  id: string;
+  name: string;
+  /** True for a mentor manager, who may be assigned events as well as set them. */
+  isManager: boolean;
+}
+
 /**
- * Profiles a manager can assign an event to. Deliberately not filtered by role:
- * `user_roles` is read-own-only under RLS, so roles cannot be read here, and
- * excluding people by guesswork would hide legitimate attendees — a mentor
- * manager who attends events himself, for one.
+ * Who an event may be assigned to: everyone holding the `mentor` or
+ * `mentor_manager` role, identified by account id.
+ *
+ * The list comes from `public.list_mentor_directory()`. `user_roles` is
+ * read-own-only under RLS, so a client cannot filter profiles by role directly;
+ * that function answers this one question under SECURITY DEFINER and returns
+ * nothing else about the account.
+ *
+ * Deriving the list from roles rather than from a hard-coded set of names means
+ * adding or removing a mentor is a role change, with no code release.
  */
 export const listAssignableMentors = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .handler(async ({ context }): Promise<{ id: string; name: string }[]> => {
+  .handler(async ({ context }): Promise<AssignableMentor[]> => {
     await requireRole(
       context.supabase,
       context.userId,
       CALENDAR_MANAGE_ROLES,
       "assign calendar events",
     );
-    const { data, error } = await context.supabase
-      .from("profiles")
-      .select("id, name")
-      .order("name", { ascending: true });
+    const { data, error } = await context.supabase.rpc("list_mentor_directory");
     if (error) throw new Error(error.message);
-    return (data ?? []).map((p) => ({ id: p.id as string, name: (p.name as string | null) ?? "" }));
+    return ((data ?? []) as { id: string; name: string | null; is_manager: boolean }[]).map((m) => ({
+      id: m.id,
+      name: m.name ?? "",
+      isManager: Boolean(m.is_manager),
+    }));
   });
 
 export const listCalendarEvents = createServerFn({ method: "GET" })
@@ -169,6 +199,7 @@ export const createCalendarEvent = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((data: EventInput) => validateEvent(data))
   .handler(async ({ data, context }): Promise<TeamCalendarEvent> => {
+    const { notifyEventAssigned } = await import("@/lib/events/notify.server");
     await requireRole(context.supabase, context.userId, CALENDAR_MANAGE_ROLES, "add calendar events");
 
     const { data: profile } = await context.supabase
@@ -195,6 +226,10 @@ export const createCalendarEvent = createServerFn({ method: "POST" })
       .select(COLUMNS)
       .single();
     if (error) throw new Error(error.message);
+
+    // The event is saved and confirmed before anyone is told about it, and a
+    // failed notification never undoes a legitimate schedule.
+    await notifyEventAssigned(context.supabase, context.userId, row as TeamCalendarEvent);
     return row as TeamCalendarEvent;
   });
 
@@ -205,6 +240,7 @@ export const updateCalendarEvent = createServerFn({ method: "POST" })
     return { id: data.id, ...validateEvent(data) };
   })
   .handler(async ({ data, context }): Promise<TeamCalendarEvent> => {
+    const { notifyEventChanged } = await import("@/lib/events/notify.server");
     await requireRole(context.supabase, context.userId, CALENDAR_MANAGE_ROLES, "edit calendar events");
     const { id, ...fields } = data;
     const people = await resolveEventPeople(
@@ -212,6 +248,15 @@ export const updateCalendarEvent = createServerFn({ method: "POST" })
       fields.player_id,
       fields.assigned_mentor_id,
     );
+
+    // Read the previous values first, so the change can be described to whoever
+    // it affects — including a mentor the event has just been taken away from.
+    const { data: before } = await context.supabase
+      .from("calendar_events")
+      .select("assigned_mentor_id, event_date, start_time, end_time, player_id, event_type")
+      .eq("id", id)
+      .maybeSingle();
+
     const { data: row, error } = await context.supabase
       .from("calendar_events")
       // `end_time` is cleared rather than left behind: the form no longer
@@ -222,6 +267,15 @@ export const updateCalendarEvent = createServerFn({ method: "POST" })
       .maybeSingle();
     if (error) throw new Error(error.message);
     if (!row) throw new Error("That calendar event could not be updated.");
+
+    if (before) {
+      await notifyEventChanged(
+        context.supabase,
+        context.userId,
+        row as TeamCalendarEvent,
+        before as Parameters<typeof notifyEventChanged>[3],
+      );
+    }
     return row as TeamCalendarEvent;
   });
 

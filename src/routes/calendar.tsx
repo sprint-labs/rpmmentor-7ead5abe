@@ -23,6 +23,20 @@ import {
 import { listPlayers } from "@/lib/players.functions";
 import { listReportCoverage } from "@/lib/calendar/report-coverage.functions";
 import {
+  cancelCalendarEvent,
+  listEventFollowUps,
+  reinstateCalendarEvent,
+  reinstateEventFollowUp,
+  waiveEventFollowUp,
+} from "@/lib/events/follow-up.functions";
+import { eventFollowUpsQueryKey } from "@/lib/events/query-keys";
+import { isEventType, FOLLOW_UP_KIND_BY_EVENT_TYPE, followUpRequirementLabel } from "@/lib/events/follow-up";
+import {
+  FollowUpActionLink,
+  FollowUpStatusPill,
+  followUpDetail,
+} from "@/components/events/follow-up-status";
+import {
   missingReportTypes,
   reportCoverageQueryKey,
   shortLabel,
@@ -112,8 +126,14 @@ export const Route = createFileRoute("/calendar")({
   component: withPermission(CalendarPage, "calendar.view"),
 });
 
+/**
+ * Colours for the three current types, plus the retired ones so an event
+ * scheduled before the list changed still renders as it always did.
+ */
 const TONE: Record<string, "info" | "warning" | "success" | "muted" | "destructive"> = {
   "Match": "info",
+  "Training Ground Visit": "warning",
+  "Coffee Catch-up": "success",
   "Observation": "success",
   "Mentor Visit": "warning",
   "Meeting": "muted",
@@ -123,6 +143,8 @@ const TONE: Record<string, "info" | "warning" | "success" | "muted" | "destructi
 
 const CHIP: Record<string, string> = {
   "Match": "bg-info/15 text-info border-info/30",
+  "Training Ground Visit": "bg-warning/15 text-warning border-warning/30",
+  "Coffee Catch-up": "bg-success/15 text-success border-success/30",
   "Observation": "bg-success/15 text-success border-success/30",
   "Mentor Visit": "bg-warning/15 text-warning border-warning/30",
   "Follow Up": "bg-destructive/15 text-destructive border-destructive/30",
@@ -167,6 +189,13 @@ function startTimeLabel(e: DisplayEvent) {
 /** The calendar date a user is looking at, not a UTC instant. */
 function localDateIso(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+/** What the chosen type will ask the assigned mentor for. */
+function followUpHint(eventType: string): string {
+  if (!isEventType(eventType)) return "Retired type — reclassify to save this event.";
+  const kind = FOLLOW_UP_KIND_BY_EVENT_TYPE[eventType];
+  return `Needs a ${followUpRequirementLabel(kind)} within 48 hours.`;
 }
 
 function CalendarPage() {
@@ -229,8 +258,87 @@ function CalendarPage() {
     enabled: canManage,
   });
 
+  // Where each event's write-up stands. Read from the database on every load, so
+  // a status is never a stale copy of what was true when the page opened.
+  const fetchFollowUps = useServerFn(listEventFollowUps);
+  const { data: followUpData } = useQuery({
+    queryKey: eventFollowUpsQueryKey,
+    queryFn: () => fetchFollowUps(),
+    staleTime: 30_000,
+  });
+  const followUpByEvent = useMemo(
+    () => new Map((followUpData?.rows ?? []).map((r) => [r.eventId, r])),
+    [followUpData],
+  );
+
+  const cancelEvent = useServerFn(cancelCalendarEvent);
+  const reinstateEvent = useServerFn(reinstateCalendarEvent);
+  const waiveFollowUp = useServerFn(waiveEventFollowUp);
+  const unwaiveFollowUp = useServerFn(reinstateEventFollowUp);
+
   const [draft, setDraft] = useState<Draft | null>(null);
   const [saving, setSaving] = useState(false);
+
+  async function refreshEvents() {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["calendar-events"] }),
+      queryClient.invalidateQueries({ queryKey: eventFollowUpsQueryKey }),
+    ]);
+  }
+
+  /** Cancel an event, keeping it on the record with the reason attached. */
+  async function handleCancel(id: string) {
+    const reason = window.prompt("Why is this event cancelled? (optional)");
+    if (reason === null) return;
+    try {
+      await cancelEvent({ data: { id, reason } });
+      await refreshEvents();
+      toast.success("Event cancelled. The assigned mentor has been notified.");
+      setDraft(null);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not cancel the event.");
+    }
+  }
+
+  async function handleReinstate(id: string) {
+    try {
+      await reinstateEvent({ data: { id } });
+      await refreshEvents();
+      toast.success("Event reinstated.");
+      setDraft(null);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not reinstate the event.");
+    }
+  }
+
+  /** Waive the write-up. A reason is required, and is kept for review. */
+  async function handleWaive(id: string) {
+    const reason = window.prompt("Why is no write-up required? (required)");
+    if (reason === null) return;
+    if (!reason.trim()) {
+      toast.error("A reason is required to waive a write-up.");
+      return;
+    }
+    try {
+      await waiveFollowUp({ data: { id, reason } });
+      await refreshEvents();
+      toast.success("Marked as not required.");
+      setDraft(null);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not waive the follow-up.");
+    }
+  }
+
+  async function handleUnwaive(id: string) {
+    try {
+      await unwaiveFollowUp({ data: { id } });
+      await refreshEvents();
+      toast.success("Write-up required again.");
+      setDraft(null);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not reinstate the follow-up.");
+    }
+  }
 
   const filteredGoalkeeper = gkId ? goalkeepers.find((g) => g.id === gkId) : null;
 
@@ -290,12 +398,14 @@ function CalendarPage() {
     setDraft({ ...emptyDraft, event_date: dateIso ?? emptyDraft.event_date });
   }
 
-  // Deep link from dashboard quick actions: /calendar?new=true
+  // Deep link from dashboard quick actions: /calendar?new=true. The type is left
+  // at its default rather than guessed from the wording — the manager chooses,
+  // because the choice decides which write-up the mentor will owe.
   useEffect(() => {
     if (openNewOnMount && canManage) {
       setDraft({
         ...emptyDraft,
-        ...(prefillTitle ? { title: prefillTitle, event_type: "Follow Up" } : {}),
+        ...(prefillTitle ? { title: prefillTitle } : {}),
         ...(prefillNotes ? { notes: prefillNotes } : {}),
       });
     }
@@ -325,6 +435,14 @@ function CalendarPage() {
       toast.error("Pick a date for this event.");
       return;
     }
+    if (!draft.start_time) {
+      toast.error("Set a start time — the follow-up deadline is measured from it.");
+      return;
+    }
+    if (!isEventType(draft.event_type)) {
+      toast.error("Choose Match, Training Ground Visit or Coffee Catch-up.");
+      return;
+    }
     if (!draft.player_id) {
       toast.error("Choose the goalkeeper this event is about.");
       return;
@@ -347,7 +465,7 @@ function CalendarPage() {
       };
       if (draft.id) await editEvent({ data: { id: draft.id, ...payload } });
       else await createEvent({ data: payload });
-      await queryClient.invalidateQueries({ queryKey: ["calendar-events"] });
+      await refreshEvents();
       toast.success(draft.id ? "Calendar event updated" : "Calendar event added");
       setDraft(null);
     } catch (err) {
@@ -361,7 +479,7 @@ function CalendarPage() {
     if (!window.confirm("Remove this event from the shared calendar?")) return;
     try {
       await removeEvent({ data: { id } });
-      await queryClient.invalidateQueries({ queryKey: ["calendar-events"] });
+      await refreshEvents();
       toast.success("Calendar event removed");
       setDraft(null);
     } catch (err) {
@@ -562,6 +680,31 @@ function CalendarPage() {
                         .join(" · ")}
                     </div>
                     {e.notes && <div className="mt-0.5 whitespace-pre-wrap text-xs text-muted-foreground">{e.notes}</div>}
+                    {(() => {
+                      const row = followUpByEvent.get(e.id);
+                      if (!row || !row.followUp.kind) return null;
+                      return (
+                        <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                          <FollowUpStatusPill status={row.followUp.status} />
+                          <span className="text-[11px] text-muted-foreground">
+                            {followUpDetail(row.followUp, row.waiverReason, row.cancellationReason)}
+                          </span>
+                          <FollowUpActionLink
+                            event={{
+                              id: row.eventId,
+                              title: row.title,
+                              eventType: row.eventType,
+                              eventDate: row.eventDate,
+                              startTime: row.startTime,
+                              endTime: row.endTime,
+                              goalkeeperName: row.goalkeeperName,
+                              playerId: row.playerId,
+                            }}
+                            followUp={row.followUp}
+                          />
+                        </div>
+                      );
+                    })()}
                     <MissingReports
                       coverage={coverage}
                       gk={e.gkRef}
@@ -624,8 +767,17 @@ function CalendarPage() {
                     onChange={(ev) => setDraft({ ...draft, event_type: ev.target.value })}
                     className="w-full rounded-md border border-border bg-background px-2.5 py-1.5"
                   >
+                    {/* An event stored under a retired type keeps showing it, so
+                        the manager can see what needs reclassifying rather than
+                        having it silently swapped for something else. */}
+                    {!isEventType(draft.event_type) && draft.event_type && (
+                      <option value={draft.event_type}>{draft.event_type} (retired — please reclassify)</option>
+                    )}
                     {CALENDAR_EVENT_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
                   </select>
+                  <span className="mt-1 block text-[11px] text-muted-foreground">
+                    {followUpHint(draft.event_type)}
+                  </span>
                 </label>
                 <label className="block">
                   <span className="mb-1 block text-xs text-muted-foreground">Date</span>
@@ -637,13 +789,16 @@ function CalendarPage() {
                   />
                 </label>
                 <label className="block">
-                  <span className="mb-1 block text-xs text-muted-foreground">Start (optional)</span>
+                  <span className="mb-1 block text-xs text-muted-foreground">Start time</span>
                   <input
                     type="time"
                     value={draft.start_time}
                     onChange={(ev) => setDraft({ ...draft, start_time: ev.target.value })}
                     className="w-full rounded-md border border-border bg-background px-2.5 py-1.5"
                   />
+                  <span className="mt-1 block text-[11px] text-muted-foreground">
+                    London time. The 48-hour deadline runs from here.
+                  </span>
                 </label>
               </div>
 
@@ -700,6 +855,57 @@ function CalendarPage() {
                 />
               </label>
             </div>
+
+            {/* Cancelling and waiving are kept apart from Delete on purpose:
+                both preserve the event and its history, where Delete removes it. */}
+            {draft.id && (() => {
+              const row = followUpByEvent.get(draft.id);
+              if (!row) return null;
+              const cancelled = row.followUp.status === "cancelled";
+              const waived = row.followUp.status === "not_required";
+              return (
+                <div className="mt-4 space-y-2 rounded-md border border-border bg-muted/30 p-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <FollowUpStatusPill status={row.followUp.status} />
+                    <span className="text-[11px] text-muted-foreground">
+                      {followUpDetail(row.followUp, row.waiverReason, row.cancellationReason)}
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {cancelled ? (
+                      <button
+                        onClick={() => handleReinstate(draft.id)}
+                        className="rounded-md border border-border px-2.5 py-1 text-[11px] hover:bg-accent"
+                      >
+                        Reinstate event
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => handleCancel(draft.id)}
+                        className="rounded-md border border-border px-2.5 py-1 text-[11px] hover:bg-accent"
+                      >
+                        Cancel event
+                      </button>
+                    )}
+                    {waived ? (
+                      <button
+                        onClick={() => handleUnwaive(draft.id)}
+                        className="rounded-md border border-border px-2.5 py-1 text-[11px] hover:bg-accent"
+                      >
+                        Require write-up again
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => handleWaive(draft.id)}
+                        className="rounded-md border border-border px-2.5 py-1 text-[11px] hover:bg-accent"
+                      >
+                        Mark write-up not required
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
 
             <div className="mt-4 flex items-center justify-between gap-2">
               {draft.id ? (

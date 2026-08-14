@@ -9,12 +9,15 @@
 import type { QueryClient } from "@tanstack/react-query";
 import { interactionsQueryKey } from "@/lib/interactions/use-interactions";
 import { reportCoverageQueryKey } from "@/lib/calendar/report-coverage";
+import { eventFollowUpsQueryKey } from "@/lib/events/query-keys";
 
 /**
  * Everything that reflects an interaction: the interactions log (shared cache
  * and paged queries), the attached voice recordings, the dashboard Recent
  * Activity card, goalkeeper profile timelines, the mentor dashboard stats that
- * drive Duty of Care, and the calendar's missing-report badges.
+ * drive Duty of Care, the calendar's missing-report badges, and the follow-up
+ * statuses — a saved write-up is what turns a requirement to Completed, so the
+ * status has to be re-read rather than left in cache.
  *
  * Submitting a Match Report also lands here, because it writes the report's Live
  * Match Observation interaction alongside it.
@@ -26,6 +29,7 @@ export async function refreshInteractionViews(queryClient: QueryClient): Promise
     queryClient.invalidateQueries({ queryKey: ["interactions", "audio"] }),
     queryClient.invalidateQueries({ queryKey: ["mentor-dashboard-stats"] }),
     queryClient.invalidateQueries({ queryKey: reportCoverageQueryKey }),
+    queryClient.invalidateQueries({ queryKey: eventFollowUpsQueryKey }),
   ]);
 }
 

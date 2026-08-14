@@ -18,54 +18,75 @@ export type Database = {
         Row: {
           assigned_mentor_id: string | null
           assigned_mentor_name: string
+          cancellation_reason: string
+          cancelled_at: string | null
+          cancelled_by: string | null
           created_at: string
           created_by: string
           created_by_name: string
           end_time: string | null
           event_date: string
           event_type: string
+          follow_up_waived_at: string | null
+          follow_up_waived_by: string | null
+          follow_up_waiver_reason: string
           goalkeeper_name: string | null
           id: string
           location: string | null
           notes: string
           player_id: string | null
           start_time: string | null
+          status: string
           title: string
           updated_at: string
         }
         Insert: {
           assigned_mentor_id?: string | null
           assigned_mentor_name?: string
+          cancellation_reason?: string
+          cancelled_at?: string | null
+          cancelled_by?: string | null
           created_at?: string
           created_by: string
           created_by_name?: string
           end_time?: string | null
           event_date: string
           event_type?: string
+          follow_up_waived_at?: string | null
+          follow_up_waived_by?: string | null
+          follow_up_waiver_reason?: string
           goalkeeper_name?: string | null
           id?: string
           location?: string | null
           notes?: string
           player_id?: string | null
           start_time?: string | null
+          status?: string
           title: string
           updated_at?: string
         }
         Update: {
           assigned_mentor_id?: string | null
           assigned_mentor_name?: string
+          cancellation_reason?: string
+          cancelled_at?: string | null
+          cancelled_by?: string | null
           created_at?: string
           created_by?: string
           created_by_name?: string
           end_time?: string | null
           event_date?: string
           event_type?: string
+          follow_up_waived_at?: string | null
+          follow_up_waived_by?: string | null
+          follow_up_waiver_reason?: string
           goalkeeper_name?: string | null
           id?: string
           location?: string | null
           notes?: string
           player_id?: string | null
           start_time?: string | null
+          status?: string
           title?: string
           updated_at?: string
         }
@@ -73,6 +94,20 @@ export type Database = {
           {
             foreignKeyName: "calendar_events_assigned_mentor_id_fkey"
             columns: ["assigned_mentor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "calendar_events_cancelled_by_fkey"
+            columns: ["cancelled_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "calendar_events_follow_up_waived_by_fkey"
+            columns: ["follow_up_waived_by"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -89,6 +124,44 @@ export type Database = {
             columns: ["player_id"]
             isOneToOne: false
             referencedRelation: "players"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      calendar_event_audit: {
+        Row: {
+          action: string
+          after_values: Json | null
+          before_values: Json | null
+          calendar_event_id: string
+          changed_at: string
+          changed_by: string | null
+          id: string
+        }
+        Insert: {
+          action: string
+          after_values?: Json | null
+          before_values?: Json | null
+          calendar_event_id: string
+          changed_at?: string
+          changed_by?: string | null
+          id?: string
+        }
+        Update: {
+          action?: string
+          after_values?: Json | null
+          before_values?: Json | null
+          calendar_event_id?: string
+          changed_at?: string
+          changed_by?: string | null
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "calendar_event_audit_calendar_event_id_fkey"
+            columns: ["calendar_event_id"]
+            isOneToOne: false
+            referencedRelation: "calendar_events"
             referencedColumns: ["id"]
           },
         ]
@@ -266,6 +339,7 @@ export type Database = {
       }
       interactions: {
         Row: {
+          calendar_event_id: string | null
           club: string
           created_at: string
           follow_up: string
@@ -284,6 +358,7 @@ export type Database = {
           updated_by: string | null
         }
         Insert: {
+          calendar_event_id?: string | null
           club?: string
           created_at?: string
           follow_up?: string
@@ -302,6 +377,7 @@ export type Database = {
           updated_by?: string | null
         }
         Update: {
+          calendar_event_id?: string | null
           club?: string
           created_at?: string
           follow_up?: string
@@ -320,6 +396,13 @@ export type Database = {
           updated_by?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "interactions_calendar_event_id_fkey"
+            columns: ["calendar_event_id"]
+            isOneToOne: false
+            referencedRelation: "calendar_events"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "interactions_mentor_id_fkey"
             columns: ["mentor_id"]
@@ -448,6 +531,7 @@ export type Database = {
       match_reports_cache: {
         Row: {
           average: number | null
+          calendar_event_id: string | null
           change_play: number | null
           coach: string
           comments: string | null
@@ -477,6 +561,7 @@ export type Database = {
         }
         Insert: {
           average?: number | null
+          calendar_event_id?: string | null
           change_play?: number | null
           coach: string
           comments?: string | null
@@ -506,6 +591,7 @@ export type Database = {
         }
         Update: {
           average?: number | null
+          calendar_event_id?: string | null
           change_play?: number | null
           coach?: string
           comments?: string | null
@@ -533,7 +619,15 @@ export type Database = {
           team?: string | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "match_reports_cache_calendar_event_id_fkey"
+            columns: ["calendar_event_id"]
+            isOneToOne: false
+            referencedRelation: "calendar_events"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       media_assets: {
         Row: {
@@ -627,6 +721,67 @@ export type Database = {
           metadata?: Json
         }
         Relationships: []
+      }
+      notifications: {
+        Row: {
+          body: string
+          calendar_event_id: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          kind: string
+          link_path: string
+          read_at: string | null
+          recipient_id: string
+          title: string
+        }
+        Insert: {
+          body?: string
+          calendar_event_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          kind: string
+          link_path?: string
+          read_at?: string | null
+          recipient_id: string
+          title: string
+        }
+        Update: {
+          body?: string
+          calendar_event_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          kind?: string
+          link_path?: string
+          read_at?: string | null
+          recipient_id?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_calendar_event_id_fkey"
+            columns: ["calendar_event_id"]
+            isOneToOne: false
+            referencedRelation: "calendar_events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_recipient_id_fkey"
+            columns: ["recipient_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       password_change_audit: {
         Row: {
@@ -879,6 +1034,14 @@ export type Database = {
       interaction_demo_fingerprint: {
         Args: { _goalkeeper_name: string; _notes: string; _occurred_at: string }
         Returns: string
+      }
+      list_mentor_directory: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          id: string
+          is_manager: boolean
+          name: string
+        }[]
       }
       soft_delete_match_report_journey_exact: {
         Args: { _report_id: string }

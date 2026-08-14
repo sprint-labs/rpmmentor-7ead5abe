@@ -132,6 +132,7 @@ const EXISTING: LoggedInteraction = {
   followUp: "Check in next week",
   createdAt: "2026-07-01T10:00:00.000Z",
   matchReportId: null,
+  calendarEventId: null,
   updatedAt: null,
   updatedBy: null,
 };

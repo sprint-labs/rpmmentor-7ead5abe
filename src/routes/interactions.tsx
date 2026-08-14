@@ -35,6 +35,14 @@ const interactionsSearchSchema = z.object({
   source: fallback(z.string(), "").default(""),
   q: fallback(z.string(), "").default(""),
   page: fallback(z.number().int(), 1).default(1),
+  /**
+   * Opening the Log Interaction dialog straight from a follow-up. `eventId` is
+   * the event being written up; the saved interaction is linked back to it.
+   */
+  openLog: fallback(z.string(), "").default(""),
+  gkId: fallback(z.string(), "").default(""),
+  date: fallback(z.string(), "").default(""),
+  eventId: fallback(z.string(), "").default(""),
 });
 
 export const Route = createFileRoute("/interactions")({
@@ -63,11 +71,53 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 function InteractionsPage() {
   const { can, user } = useAuth();
   const navigate = useNavigate({ from: "/interactions" });
-  const { from, to, mentorId, type: typeParam, source, q, page } = Route.useSearch();
+  const {
+    from,
+    to,
+    mentorId,
+    type: typeParam,
+    source,
+    q,
+    page,
+    openLog,
+    gkId: prefillGkId,
+    date: prefillDate,
+    eventId: followUpEventId,
+  } = Route.useSearch();
   const navSource = getNavSource(source);
   const [workflow, setWorkflow] = useState<WorkflowKind | null>(null);
   const [editing, setEditing] = useState<LoggedInteraction | null>(null);
+  const [logContext, setLogContext] = useState<{
+    gkId?: string;
+    date?: string;
+    eventId?: string;
+  }>({});
   const type = resolveType(typeParam);
+
+  // Arriving from a follow-up link: open the form ready to write up that event.
+  // The one-shot parameters are stripped so a refresh does not reopen it.
+  useEffect(() => {
+    if (openLog !== "1" || !can("interactions.log")) return;
+    setLogContext({ gkId: prefillGkId, date: prefillDate, eventId: followUpEventId });
+    setWorkflow("interaction");
+    navigate({
+      search: {
+        from,
+        to,
+        mentorId,
+        type: typeParam,
+        source,
+        q,
+        page,
+        openLog: "",
+        gkId: "",
+        date: "",
+        eventId: "",
+      },
+      replace: true,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openLog, prefillGkId, prefillDate, followUpEventId]);
 
   // Debounced search box: the URL (and therefore the server query) only
   // updates once typing pauses, so each keystroke is not a round trip.
@@ -366,7 +416,16 @@ function InteractionsPage() {
           </div>
         )}
       </Card>
-      <WorkflowDialog kind={workflow} onClose={() => setWorkflow(null)} />
+      <WorkflowDialog
+        kind={workflow}
+        onClose={() => {
+          setWorkflow(null);
+          setLogContext({});
+        }}
+        prefillGkId={logContext.gkId}
+        prefillMatchDate={logContext.date}
+        followUpEventId={logContext.eventId}
+      />
       {/* Correction opens the same form, prefilled, and updates the original row. */}
       <WorkflowDialog
         kind={editing ? "interaction" : null}

@@ -144,6 +144,18 @@ export const submitMatchReport = createServerFn({ method: "POST" })
              * reservation is still claimed before any canonical write.
              */
             submissionKey: z.string().max(80).optional(),
+            /**
+             * The scheduled Match event this report writes up, when the form was
+             * opened from one. Confirmed against `calendar_events` before
+             * anything is written.
+             */
+            calendarEventId: z
+              .string()
+              .regex(
+                /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
+                "calendarEventId must be a calendar_events.id",
+              )
+              .optional(),
           })
           .optional()
           .default({ allowDuplicate: false, replay: false }),
@@ -187,6 +199,15 @@ export const submitMatchReport = createServerFn({ method: "POST" })
     const commentCheck = validateComments(comments);
     if (!commentCheck.ok) {
       throw new Error(`Comments: ${commentCheck.message}`);
+    }
+
+    // ---- Scheduled event link --------------------------------------------
+    // Checked here, before the ledger reserves anything, so an invalid link
+    // fails cleanly with nothing to unwind. A Match Report may only close out a
+    // Match event, and only for the mentor it was assigned to or a manager.
+    if (options.calendarEventId) {
+      const { verifyFollowUpTarget } = await import("@/lib/events/link-follow-up.server");
+      await verifyFollowUpTarget(supabase, userId, options.calendarEventId, "match_report");
     }
 
     const average = averageOfScores(payload);
@@ -456,6 +477,7 @@ export const submitMatchReport = createServerFn({ method: "POST" })
         comments,
         submittedBy: userId,
         submissionKey: submissionKey,
+        calendarEventId: options.calendarEventId ?? null,
       });
     } catch (err) {
       // The insert threw rather than returning an error — the write may or may

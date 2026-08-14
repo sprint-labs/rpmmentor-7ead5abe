@@ -65,12 +65,22 @@ export interface MentorUpcomingInteraction {
   gkFreeAgent: boolean;
 }
 
-// Map calendar event types to the supported in-person planned interaction
-// types the pilot brief lists. Falls back to the original label when no
-// clean mapping exists.
+/**
+ * Map a calendar event type onto the planned interaction type the dashboard
+ * filters on.
+ *
+ * The first three are the current schedulable types. The rest are retired types
+ * that older events still carry, kept here so those events continue to appear
+ * under the right filter chip rather than dropping out of the list.
+ */
 export function mapPlannedType(type: string): UpcomingPlannedType | null {
   switch (type) {
     case "Match":
+      return "Attend Live Match";
+    case "Training Ground Visit":
+      return "Training Ground Visit";
+    case "Coffee Catch-up":
+      return "Coffee Catch Up";
     case "Observation":
       return "Attend Live Match";
     case "Mentor Visit":
