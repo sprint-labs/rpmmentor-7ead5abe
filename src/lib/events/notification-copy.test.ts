@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildEventNotification,
+  cancellationFeedback,
   followUpLinkPath,
   formatEventWhen,
   type NotifiableEvent,
@@ -122,5 +123,19 @@ describe("buildEventNotification", () => {
       { now },
     );
     expect(n.title).toContain("an unnamed goalkeeper");
+  });
+});
+
+describe("cancellationFeedback", () => {
+  it("only claims the mentor was notified when delivery succeeded", () => {
+    expect(cancellationFeedback(true)).toEqual({
+      level: "success",
+      message: "Event cancelled. The assigned mentor has been notified.",
+    });
+    expect(cancellationFeedback(false)).toEqual({
+      level: "warning",
+      message:
+        "Event cancelled, but the mentor notification could not be delivered. Contact them directly.",
+    });
   });
 });

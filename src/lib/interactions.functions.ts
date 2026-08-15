@@ -47,7 +47,8 @@ export const createInteraction = createServerFn({ method: "POST" })
 
     // Defence in depth behind the validator: a manually logged interaction can
     // never be a Match Report observation, so it can never inflate the counts.
-    if (!isLoggableInteractionType(data.interactionType)) {
+    let interactionType = data.interactionType;
+    if (!isLoggableInteractionType(interactionType)) {
       throw new Error(
         `"${MATCH_REPORT_INTERACTION_TYPE}" is recorded by submitting a Match Report, not by logging an interaction.`,
       );
@@ -96,6 +97,10 @@ export const createInteraction = createServerFn({ method: "POST" })
       calendarEventId = target.eventId;
       // The event decides which goalkeeper this is about.
       playerId = target.playerId ?? playerId;
+      // It also decides which interaction category discharges the requirement.
+      // This prevents, for example, a Training Ground Visit from completing a
+      // Coffee Catch-up event simply because both use the interaction form.
+      interactionType = target.interactionType ?? interactionType;
     }
 
     const { data: inserted, error } = await supabase
@@ -106,7 +111,7 @@ export const createInteraction = createServerFn({ method: "POST" })
         player_id: playerId,
         goalkeeper_name: data.goalkeeperName,
         gk_slug: data.gkSlug ?? "",
-        interaction_type: data.interactionType,
+        interaction_type: interactionType,
         club: data.club ?? "",
         occurred_at: data.occurredAt,
         notes: data.notes,
