@@ -290,6 +290,18 @@ describe("InteractionForm (durable)", () => {
     expect(screen.getByRole("button", { name: /save changes/i })).toBeTruthy();
   });
 
+  it("does not offer a different type when editing a calendar-linked interaction", () => {
+    renderForm({
+      editing: {
+        ...EXISTING,
+        interactionType: "Coffee Catch Up",
+        calendarEventId: "22222222-2222-4222-8222-222222222222",
+      },
+    });
+    expect(screen.queryByLabelText("Interaction Type")).toBeNull();
+    expect(screen.getByText(/linked to a scheduled calendar event/i)).toBeTruthy();
+  });
+
   it("updates the original record instead of creating a replacement", async () => {
     updateInteractionMock.mockResolvedValue({
       ...EXISTING,
