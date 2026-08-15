@@ -128,11 +128,15 @@ describe("buildEventNotification", () => {
 
 describe("cancellationFeedback", () => {
   it("only claims the mentor was notified when delivery succeeded", () => {
-    expect(cancellationFeedback(true)).toEqual({
+    expect(cancellationFeedback("delivered")).toEqual({
       level: "success",
       message: "Event cancelled. The assigned mentor has been notified.",
     });
-    expect(cancellationFeedback(false)).toEqual({
+    expect(cancellationFeedback("not_required")).toEqual({
+      level: "success",
+      message: "Event cancelled.",
+    });
+    expect(cancellationFeedback("failed")).toEqual({
       level: "warning",
       message:
         "Event cancelled, but the mentor notification could not be delivered. Contact them directly.",

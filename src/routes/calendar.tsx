@@ -294,7 +294,7 @@ function CalendarPage() {
     try {
       const result = await cancelEvent({ data: { id, reason } });
       await refreshEvents();
-      const feedback = cancellationFeedback(result.notified);
+      const feedback = cancellationFeedback(result.notification);
       toast[feedback.level](feedback.message);
       setDraft(null);
     } catch (err) {

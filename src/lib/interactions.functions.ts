@@ -10,6 +10,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import {
   attachInteractionAudioInput,
   createInteractionInput,
+  interactionTypeForEdit,
   isLoggableInteractionType,
   listInteractionAudioQuery,
   listInteractionsQuery,
@@ -155,7 +156,7 @@ export const updateInteraction = createServerFn({ method: "POST" })
 
     const { data: existing, error: loadError } = await supabase
       .from("interactions")
-      .select("id, mentor_id, interaction_type")
+      .select("id, mentor_id, interaction_type, calendar_event_id")
       .eq("id", data.id)
       .maybeSingle();
     if (loadError) throw new Error(loadError.message);
@@ -165,10 +166,16 @@ export const updateInteraction = createServerFn({ method: "POST" })
     // corrected in place but never reclassified (which would hide it from the
     // report-linked activity), and a manual entry can never become one.
     const wasMatchReportObservation = existing.interaction_type === MATCH_REPORT_INTERACTION_TYPE;
-    const interactionType = wasMatchReportObservation
-      ? MATCH_REPORT_INTERACTION_TYPE
-      : data.interactionType;
-    if (!wasMatchReportObservation && !isLoggableInteractionType(interactionType)) {
+    const interactionType = interactionTypeForEdit(
+      existing.interaction_type,
+      existing.calendar_event_id,
+      data.interactionType,
+    );
+    if (
+      !wasMatchReportObservation &&
+      !existing.calendar_event_id &&
+      !isLoggableInteractionType(interactionType)
+    ) {
       throw new Error(
         `"${MATCH_REPORT_INTERACTION_TYPE}" is recorded by submitting a Match Report, not by logging an interaction.`,
       );
@@ -224,7 +231,11 @@ export const updateInteraction = createServerFn({ method: "POST" })
     if (!readback) throw new Error("The change could not be confirmed as saved.");
 
     const confirmed = mapInteractionRow(readback);
-    if (confirmed.occurredAt !== data.occurredAt || confirmed.notes !== data.notes) {
+    if (
+      confirmed.occurredAt !== data.occurredAt ||
+      confirmed.notes !== data.notes ||
+      confirmed.interactionType !== interactionType
+    ) {
       throw new Error("The saved interaction did not match what was submitted.");
     }
     return confirmed;
