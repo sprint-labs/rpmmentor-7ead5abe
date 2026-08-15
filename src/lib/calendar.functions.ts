@@ -183,11 +183,7 @@ export async function resolveEventPeople(
   mentorId: string,
 ): Promise<{ goalkeeper_name: string; assigned_mentor_name: string }> {
   const [playerResult, mentorResult] = await Promise.all([
-    supabase
-      .from("players")
-      .select("full_name")
-      .eq("id", playerId)
-      .maybeSingle(),
+    supabase.from("players").select("full_name").eq("id", playerId).maybeSingle(),
     supabase.rpc("list_mentor_directory"),
   ]);
   if (playerResult.error) throw new Error(playerResult.error.message);
