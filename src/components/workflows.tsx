@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 33520)
-Total output lines: 3188
-
 import { toast } from "sonner";
 import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useServerFn } from "@tanstack/react-start";
@@ -1473,7 +1470,361 @@ function ReportForm({ onDone, prefillGoalkeeper, prefillMatchDate, prefillOppone
     setScores(d.scores);
     setComments(d.comments);
     setSelectedMedia(d.selectedMedia);
-    setVoiceTranscript(d.voiceTranscript ?? null…3520 tokens truncated…          },
+    setVoiceTranscript(d.voiceTranscript ?? null);
+  };
+
+  // Restore on mount.
+  useEffect(() => {
+    if (!user) return;
+    const d = loadDraft(user.id);
+    if (d) {
+      applySnapshot(d);
+      localVersionRef.current = d.version;
+      setDraftSavedAt(d.savedAt);
+      setDraftRestoredFrom(d.savedAt);
+      setSaveStatus("saved");
+      // Prefill overrides empty fields on the restored draft.
+      if (prefillGoalkeeper && !d.goalkeeper) setGoalkeeper(prefillGoalkeeper);
+      if (prefillMatchDate && !d.matchDate) setMatchDate(prefillMatchDate);
+      if (prefillOpponent && !d.opponent) setOpponent(prefillOpponent);
+      if (prefillTeam && !d.team) setTeam(prefillTeam);
+    } else {
+      if (prefillGoalkeeper) setGoalkeeper(prefillGoalkeeper);
+      if (prefillMatchDate) setMatchDate(prefillMatchDate);
+      if (prefillOpponent) setOpponent(prefillOpponent);
+      if (prefillTeam) setTeam(prefillTeam);
+      setSaveStatus("idle");
+    }
+    setDraftLoaded(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
+
+  // Cross-tab watcher: another tab wrote to the same draft slot.
+  useEffect(() => {
+    if (!user) return;
+    return subscribeDraftChanges(user.id, (remote) => {
+      if (!remote) return; // remote cleared (submit/discard elsewhere)
+      if (remote.tabId === tabIdRef.current) return; // our own write echoed
+      if (remote.version <= localVersionRef.current) return; // stale
+      // Only raise conflict if our unsaved snapshot actually differs.
+      const mine = currentSnapshot();
+      const differs =
+        mine.goalkeeper !== remote.goalkeeper ||
+        mine.coach !== remote.coach ||
+        mine.team !== remote.team ||
+        mine.opponent !== remote.opponent ||
+        mine.matchDate !== remote.matchDate ||
+        mine.comments !== remote.comments ||
+        JSON.stringify(mine.scores) !== JSON.stringify(remote.scores) ||
+        JSON.stringify(mine.selectedMedia) !== JSON.stringify(remote.selectedMedia);
+      if (differs) raiseConflict(remote);
+      else {
+        // No local divergence — silently fast-forward.
+        localVersionRef.current = remote.version;
+        setDraftSavedAt(remote.savedAt);
+        setSaveStatus("saved");
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
+
+  // Autosave (debounced 5s). Blocked while a conflict is pending.
+  useEffect(() => {
+    if (!user || !draftLoaded || done || conflict) return;
+    const snapshot = currentSnapshot();
+    if (!isDraftMeaningful(snapshot)) {
+      if (saveStatus !== "idle") setSaveStatus("idle");
+      return;
+    }
+    setSaveStatus("saving");
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => {
+      const res = saveDraft(user.id, tabIdRef.current, localVersionRef.current, snapshot);
+      if (res.ok) {
+        localVersionRef.current = res.version;
+        setDraftSavedAt(res.savedAt);
+        setSaveStatus("saved");
+      } else if ("conflict" in res) {
+        raiseConflict(res.conflict);
+        setSaveStatus("idle");
+      } else {
+        setSaveStatus("failed");
+      }
+    }, 5000);
+    return () => { if (saveTimer.current) clearTimeout(saveTimer.current); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, draftLoaded, done, conflict, goalkeeper, coach, competition, team, opponent, matchDate, scores, comments, selectedMedia, voiceTranscript]);
+
+  // Auto-fill Team from the roster when the goalkeeper matches a known player.
+  // Only writes when Team is empty OR still equals the last auto-filled value —
+  // a mentor's manual edit is never overwritten.
+  useEffect(() => {
+    if (!playersByName.size) return;
+    const match = playersByName.get(goalkeeper.trim().toLowerCase());
+    if (!match) return;
+    const canOverwrite = !team.trim() || team === autoFilledTeamRef.current;
+    if (!canOverwrite) return;
+    if (team === match.current_club) return;
+    setTeam(match.current_club);
+    autoFilledTeamRef.current = match.current_club;
+    setTeamAutoFilled(true);
+  }, [goalkeeper, playersByName, team]);
+
+  const handleTeamChange = (value: string) => {
+    setTeam(value);
+    if (value !== autoFilledTeamRef.current) {
+      autoFilledTeamRef.current = null;
+      setTeamAutoFilled(false);
+    }
+  };
+
+
+  const discardDraft = () => {
+    if (!user) return;
+    clearDraft(user.id);
+    setGoalkeeper("");
+    setCompetition("");
+    setTeam("");
+    setOpponent("");
+    setMatchDate(new Date().toISOString().slice(0, 10));
+    setScores({
+      protect_goal: 3, protect_space: 3, protect_air: 3,
+      control_play: 3, change_play: 3, psych: 3, physical: 3,
+    });
+    setComments("");
+    setSelectedMedia([]);
+    setVoiceTranscript(null);
+    setDraftSavedAt(null);
+    setDraftRestoredFrom(null);
+    localVersionRef.current = 0;
+    setConflict(null);
+    setSaveStatus("idle");
+  };
+
+  // Conflict resolution actions.
+  const keepMine = () => {
+    if (!user || !conflict) return;
+    const res = overwriteDraft(user.id, tabIdRef.current, currentSnapshot());
+    if (res.ok) {
+      localVersionRef.current = res.version;
+      setDraftSavedAt(res.savedAt);
+      setConflict(null);
+      setSaveStatus("saved");
+    } else {
+      setSaveStatus("failed");
+    }
+  };
+  const useTheirs = () => {
+    if (!conflict) return;
+    applySnapshot(conflict);
+    localVersionRef.current = conflict.version;
+    setDraftSavedAt(conflict.savedAt);
+    setDraftRestoredFrom(conflict.savedAt);
+    setConflict(null);
+    setSaveStatus("saved");
+  };
+  // Capture stable "mine" snapshot when a conflict arises; reset on clear.
+  const raiseConflict = (remote: ReportDraft) => {
+    preConflictLocalRef.current = currentSnapshot();
+    setResolutions({});
+    setConflict(remote);
+  };
+  useEffect(() => {
+    if (!conflict) {
+      preConflictLocalRef.current = null;
+      setResolutions({});
+    }
+  }, [conflict]);
+
+  type MediaDiff = { added: string[]; removed: string[]; kept: string[] };
+  type Row = { key: string; label: string; mine: string; theirs: string; mediaDiff?: MediaDiff };
+
+  const computeDiffRows = (mine: ReportDraftSnapshot, other: ReportDraft): Row[] => {
+    const fmt = (v: unknown): string => {
+      if (v == null || v === "") return "—";
+      if (Array.isArray(v)) return v.length ? `${v.length} item${v.length === 1 ? "" : "s"}` : "—";
+      return String(v);
+    };
+    const truncate = (s: string, n = 60) => s.length > n ? `${s.slice(0, n)}…` : s;
+    const rows: Row[] = [];
+    const push = (key: string, label: string, m: unknown, t: unknown) => {
+      const ms = fmt(m); const ts = fmt(t);
+      if (ms !== ts) rows.push({ key, label, mine: ms, theirs: ts });
+    };
+    push("goalkeeper", "Goalkeeper", mine.goalkeeper, other.goalkeeper);
+    push("competition", "Competition", mine.competition, other.competition);
+    push("team", "Team", mine.team, other.team);
+    push("opponent", "Opponent", mine.opponent, other.opponent);
+    push("matchDate", "Match date", mine.matchDate, other.matchDate);
+    for (const pid of PILLAR_IDS) {
+      push(`score.${pid}`, PILLAR_LABELS[pid], mine.scores[pid], other.scores?.[pid]);
+    }
+    if ((mine.comments || "") !== (other.comments || "")) {
+      rows.push({ key: "comments", label: "Comments",
+        mine: mine.comments ? truncate(mine.comments) : "—",
+        theirs: other.comments ? truncate(other.comments) : "—" });
+    }
+    const mineIds = mine.selectedMedia ?? [];
+    const theirIds = other.selectedMedia ?? [];
+    const mineSet = new Set(mineIds);
+    const theirSet = new Set(theirIds);
+    const added = theirIds.filter((id) => !mineSet.has(id));
+    const removed = mineIds.filter((id) => !theirSet.has(id));
+    const kept = mineIds.filter((id) => theirSet.has(id));
+    if (added.length || removed.length) {
+      rows.push({
+        key: "media",
+        label: "Media attachments",
+        mine: mineIds.length ? `${mineIds.length} attached` : "—",
+        theirs: theirIds.length ? `${theirIds.length} attached` : "—",
+        mediaDiff: { added, removed, kept },
+      });
+    }
+    return rows;
+  };
+
+  const setFieldFromSnapshot = (key: string, snap: ReportDraftSnapshot) => {
+    if (key.startsWith("score.")) {
+      const pid = key.slice(6) as PillarId;
+      setScores((prev) => ({ ...prev, [pid]: snap.scores[pid] }));
+    } else if (key === "goalkeeper") setGoalkeeper(snap.goalkeeper);
+    else if (key === "competition") setCompetition(snap.competition);
+    else if (key === "team") setTeam(snap.team);
+    else if (key === "opponent") setOpponent(snap.opponent);
+    else if (key === "matchDate") { if (snap.matchDate) setMatchDate(snap.matchDate); }
+    else if (key === "comments") setComments(snap.comments);
+    else if (key === "media") setSelectedMedia([...snap.selectedMedia]);
+  };
+  const acceptField = (key: string) => {
+    if (!conflict) return;
+    setFieldFromSnapshot(key, conflict);
+    setResolutions((prev) => ({ ...prev, [key]: "accepted" }));
+  };
+  const rejectField = (key: string) => {
+    if (!preConflictLocalRef.current) return;
+    setFieldFromSnapshot(key, preConflictLocalRef.current);
+    setResolutions((prev) => ({ ...prev, [key]: "rejected" }));
+  };
+  const undoField = (key: string) => {
+    if (!preConflictLocalRef.current) return;
+    setFieldFromSnapshot(key, preConflictLocalRef.current);
+    setResolutions((prev) => {
+      const n = { ...prev }; delete n[key]; return n;
+    });
+  };
+
+  // Auto-finalize when every diff row is resolved: persist the merged snapshot
+  // and clear the conflict.
+  useEffect(() => {
+    if (!user || !conflict || !preConflictLocalRef.current) return;
+    const rows = computeDiffRows(preConflictLocalRef.current, conflict);
+    if (rows.length === 0) return;
+    if (Object.keys(resolutions).length !== rows.length) return;
+    const local = preConflictLocalRef.current;
+    const merged: ReportDraftSnapshot = {
+      ...local, scores: { ...local.scores }, selectedMedia: [...local.selectedMedia],
+    };
+    for (const r of rows) {
+      if (resolutions[r.key] !== "accepted") continue;
+      if (r.key.startsWith("score.")) {
+        const pid = r.key.slice(6) as PillarId;
+        if (conflict.scores?.[pid] != null) merged.scores[pid] = conflict.scores[pid];
+      } else if (r.key === "goalkeeper") merged.goalkeeper = conflict.goalkeeper;
+      else if (r.key === "competition") merged.competition = conflict.competition;
+      else if (r.key === "team") merged.team = conflict.team;
+      else if (r.key === "opponent") merged.opponent = conflict.opponent;
+      else if (r.key === "matchDate") merged.matchDate = conflict.matchDate;
+      else if (r.key === "comments") merged.comments = conflict.comments;
+      else if (r.key === "media") merged.selectedMedia = [...(conflict.selectedMedia ?? [])];
+    }
+    const res = overwriteDraft(user.id, tabIdRef.current, merged);
+    if (res.ok) {
+      localVersionRef.current = res.version;
+      setDraftSavedAt(res.savedAt);
+      setDraftRestoredFrom(res.savedAt);
+      setConflict(null);
+      setSaveStatus("saved");
+    } else {
+      setSaveStatus("failed");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resolutions, conflict]);
+
+  // Fetch titles/kinds for any media IDs involved in the conflict so the diff
+  // panel can show human-readable chips instead of raw counts.
+  useEffect(() => {
+    if (!conflict) return;
+    const mineIds = preConflictLocalRef.current?.selectedMedia ?? selectedMedia;
+    const union = Array.from(new Set([...mineIds, ...(conflict.selectedMedia ?? [])]));
+    const missing = union.filter((id) => !mediaTitles[id]);
+    if (missing.length === 0) return;
+    let cancelled = false;
+    getMediaByIds(missing)
+      .then((assets) => {
+        if (cancelled) return;
+        setMediaTitles((prev) => {
+          const next = { ...prev };
+          for (const a of assets) next[a.id] = {
+            title: a.title,
+            kind: a.media_type,
+            thumbnailPath: a.thumbnail_path,
+            filePath: a.file_path,
+            mimeType: a.mime_type,
+            fileSize: a.file_size,
+            createdAt: a.created_at,
+          };
+          return next;
+        });
+      })
+      .catch(() => { /* leave IDs; render fallback */ });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conflict]);
+
+
+  const retrySave = () => {
+    if (!user) return;
+    setSaveStatus("saving");
+    const res = saveDraft(user.id, tabIdRef.current, localVersionRef.current, currentSnapshot());
+    if (res.ok) {
+      localVersionRef.current = res.version;
+      setDraftSavedAt(res.savedAt);
+      setSaveStatus("saved");
+    } else if ("conflict" in res) {
+      setConflict(res.conflict);
+      setSaveStatus("idle");
+    } else {
+      setSaveStatus("failed");
+    }
+  };
+
+  const liveAverage = useMemo(() => averageOfScores(scores), [scores]);
+
+  if (done) {
+    if (done.status === "queued") {
+      return (
+        <Submitted
+          pending
+          message="This report is queued locally. It has not yet been submitted to the RPM Match Reports Google Sheet, so it is not available to view yet."
+          onDone={onDone}
+        />
+      );
+    }
+    return (
+      <Submitted
+        pending={!!done.interactionError}
+        message={
+          done.interactionError
+            ? `Match report submitted to the RPM Match Reports Google Sheet · Average ${done.average.toFixed(1)}. The Live Match Observation interaction could NOT be created (${done.interactionError}), so it will not appear in the interactions log. Do not resubmit the report — tell an administrator.`
+            : `Match report submitted to the RPM Match Reports Google Sheet · Average ${done.average.toFixed(1)}. A Live Match Observation interaction has been logged against this goalkeeper.`
+        }
+        onDone={onDone}
+        action={{
+          label: "Open submitted report",
+          onClick: () => {
+            onDone();
+            void navigate({ to: "/reports/$reportId", params: { reportId: done.reportId } });
+          },
         }}
       />
     );
