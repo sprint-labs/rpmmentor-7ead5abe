@@ -177,25 +177,25 @@ type AuthedClient = Parameters<typeof requireRole>[0];
  * Confirms both links exist and derives their display names server-side, so a
  * stored name can never disagree with the id it is meant to describe.
  */
-async function resolveEventPeople(
+export async function resolveEventPeople(
   supabase: AuthedClient,
   playerId: string,
   mentorId: string,
 ): Promise<{ goalkeeper_name: string; assigned_mentor_name: string }> {
-  const [{ data: player }, { data: mentor }] = await Promise.all([
+  const [playerResult, mentorResult] = await Promise.all([
     supabase
       .from("players")
       .select("full_name")
       .eq("id", playerId)
       .maybeSingle(),
-    supabase
-      .from("profiles")
-      .select("name")
-      .eq("id", mentorId)
-      .maybeSingle(),
+    supabase.rpc("list_mentor_directory"),
   ]);
+  if (playerResult.error) throw new Error(playerResult.error.message);
+  if (mentorResult.error) throw new Error(mentorResult.error.message);
+  const player = playerResult.data;
+  const mentor = (mentorResult.data ?? []).find(({ id }) => id === mentorId);
   if (!player) throw new Error("That goalkeeper is not on the roster.");
-  if (!mentor) throw new Error("That mentor could not be found.");
+  if (!mentor) throw new Error("That account is not currently an assignable mentor.");
   return {
     goalkeeper_name: player.full_name,
     assigned_mentor_name: mentor.name ?? "",
