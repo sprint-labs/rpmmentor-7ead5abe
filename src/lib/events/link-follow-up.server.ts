@@ -7,7 +7,12 @@
  * rather than stored unlinked: silently dropping the link would leave the mentor
  * believing they had discharged a duty-of-care obligation that still stands.
  */
-import { acceptsFollowUpKind, type FollowUpKind } from "./follow-up";
+import {
+  acceptsFollowUpKind,
+  INTERACTION_TYPE_BY_EVENT_TYPE,
+  isEventType,
+  type FollowUpKind,
+} from "./follow-up";
 import { hasAnyRole, getUserRoles, type AppRole } from "@/lib/roles.server";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -24,6 +29,8 @@ export interface VerifiedEventLink {
   playerId: string | null;
   goalkeeperName: string | null;
   eventDate: string;
+  /** The stored interaction type required by this event, when applicable. */
+  interactionType: string | null;
 }
 
 /**
@@ -69,6 +76,9 @@ export async function verifyFollowUpTarget(
     playerId: event.player_id ?? null,
     goalkeeperName: event.goalkeeper_name ?? null,
     eventDate: String(event.event_date).slice(0, 10),
+    interactionType: isEventType(event.event_type)
+      ? (INTERACTION_TYPE_BY_EVENT_TYPE[event.event_type] ?? null)
+      : null,
   };
 }
 

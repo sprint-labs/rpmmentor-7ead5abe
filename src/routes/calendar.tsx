@@ -31,6 +31,7 @@ import {
 } from "@/lib/events/follow-up.functions";
 import { eventFollowUpsQueryKey } from "@/lib/events/query-keys";
 import { isEventType, FOLLOW_UP_KIND_BY_EVENT_TYPE, followUpRequirementLabel } from "@/lib/events/follow-up";
+import { cancellationFeedback } from "@/lib/events/notification-copy";
 import {
   FollowUpActionLink,
   FollowUpStatusPill,
@@ -291,9 +292,10 @@ function CalendarPage() {
     const reason = window.prompt("Why is this event cancelled? (optional)");
     if (reason === null) return;
     try {
-      await cancelEvent({ data: { id, reason } });
+      const result = await cancelEvent({ data: { id, reason } });
       await refreshEvents();
-      toast.success("Event cancelled. The assigned mentor has been notified.");
+      const feedback = cancellationFeedback(result.notified);
+      toast[feedback.level](feedback.message);
       setDraft(null);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not cancel the event.");

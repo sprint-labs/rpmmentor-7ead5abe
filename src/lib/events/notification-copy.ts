@@ -44,6 +44,25 @@ export interface NotificationCopy {
   linkPath: string;
 }
 
+export interface CancellationFeedback {
+  level: "success" | "warning";
+  message: string;
+}
+
+/** Tell the manager exactly what happened after a cancellation attempt. */
+export function cancellationFeedback(notified: boolean): CancellationFeedback {
+  return notified
+    ? {
+        level: "success",
+        message: "Event cancelled. The assigned mentor has been notified.",
+      }
+    : {
+        level: "warning",
+        message:
+          "Event cancelled, but the mentor notification could not be delivered. Contact them directly.",
+      };
+}
+
 /** "Fri 14 Aug, 16:00" for a scheduled event, in London time. */
 export function formatEventWhen(event: NotifiableEvent): string {
   return formatLondonInstant(londonWallClockMs(event.eventDate, event.startTime));

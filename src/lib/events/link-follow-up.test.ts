@@ -72,7 +72,21 @@ describe("verifyFollowUpTarget", () => {
       playerId: PLAYER,
       goalkeeperName: "James Beadle",
       eventDate: "2026-08-15",
+      interactionType: null,
     });
+  });
+
+  it.each([
+    ["Training Ground Visit", "Training Ground Visit"],
+    ["Coffee Catch-up", "Coffee Catch Up"],
+  ])("returns the required interaction type for a %s", async (eventType, interactionType) => {
+    const target = await verifyFollowUpTarget(
+      fakeDb({ ...matchEvent, event_type: eventType }) as never,
+      MENTOR,
+      EVENT,
+      "interaction",
+    );
+    expect(target.interactionType).toBe(interactionType);
   });
 
   it("refuses a Match Report for an event that expects an interaction", async () => {
