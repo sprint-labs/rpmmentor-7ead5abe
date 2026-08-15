@@ -2,8 +2,10 @@ import { useEffect, useState, useCallback } from "react";
 import { CloudUpload, Check, AlertTriangle, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { useServerFn } from "@tanstack/react-start";
+import { useQueryClient } from "@tanstack/react-query";
 import { newSubmissionKey } from "@/lib/match-reports/duplicates";
 import { submitMatchReport } from "@/lib/match-reports/reports.functions";
+import { refreshInteractionViews } from "@/lib/query-refresh";
 import {
   drainQueue,
   listJobs,
@@ -20,6 +22,7 @@ import {
  * compact pill when jobs are pending and toasts on success/failure.
  */
 export function SyncManager() {
+  const queryClient = useQueryClient();
   const [jobs, setJobs] = useState<SyncJob[]>([]);
   const [online, setOnline] = useState(
     typeof navigator === "undefined" ? true : navigator.onLine,
@@ -69,6 +72,16 @@ export function SyncManager() {
     try {
       const res = await drainQueue(handlers);
       if (res.processed > 0) {
+        // The calendar may not be mounted while an offline report syncs. Mark
+        // every dependent query stale here in the app shell so the next visit
+        // cannot reuse an old coverage badge or follow-up status.
+        try {
+          await refreshInteractionViews(queryClient);
+        } catch (error) {
+          // The report is already saved and removed from the queue. A cache
+          // refresh failure must not misreport or requeue that successful save.
+          console.warn("Failed to refresh views after offline sync", error);
+        }
         toast.success(
           res.processed === 1
             ? "Synced 1 queued change"
@@ -93,7 +106,7 @@ export function SyncManager() {
       refresh();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [syncing, refresh]);
+  }, [syncing, refresh, queryClient]);
 
   // Initial + subscribe to queue changes.
   useEffect(() => {
