@@ -49,18 +49,24 @@ export interface CancellationFeedback {
   message: string;
 }
 
+export type CancellationNotificationResult = "delivered" | "not_required" | "failed";
+
 /** Tell the manager exactly what happened after a cancellation attempt. */
-export function cancellationFeedback(notified: boolean): CancellationFeedback {
-  return notified
-    ? {
-        level: "success",
-        message: "Event cancelled. The assigned mentor has been notified.",
-      }
-    : {
-        level: "warning",
-        message:
-          "Event cancelled, but the mentor notification could not be delivered. Contact them directly.",
-      };
+export function cancellationFeedback(result: CancellationNotificationResult): CancellationFeedback {
+  if (result === "delivered") {
+    return {
+      level: "success",
+      message: "Event cancelled. The assigned mentor has been notified.",
+    };
+  }
+  if (result === "not_required") {
+    return { level: "success", message: "Event cancelled." };
+  }
+  return {
+    level: "warning",
+    message:
+      "Event cancelled, but the mentor notification could not be delivered. Contact them directly.",
+  };
 }
 
 /** "Fri 14 Aug, 16:00" for a scheduled event, in London time. */

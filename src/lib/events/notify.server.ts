@@ -10,7 +10,12 @@
  * one fails, the scheduling change it describes still stands: the caller is told
  * the notification did not go out rather than having a legitimate save rejected.
  */
-import { buildEventNotification, type NotifiableEvent, type NotificationKind } from "./notification-copy";
+import {
+  buildEventNotification,
+  type CancellationNotificationResult,
+  type NotifiableEvent,
+  type NotificationKind,
+} from "./notification-copy";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 export type NotifyClient = { from: (table: string) => any };
@@ -147,10 +152,12 @@ export async function notifyEventCancelled(
   actorId: string,
   row: NotifiableEventRow,
   reason: string,
-): Promise<boolean> {
-  if (!row.assigned_mentor_id || row.assigned_mentor_id === actorId) return true;
+): Promise<CancellationNotificationResult> {
+  if (!row.assigned_mentor_id || row.assigned_mentor_id === actorId) return "not_required";
   const copy = buildEventNotification("event_cancelled", toNotifiable(row), { reason });
-  return insert(supabase, row.assigned_mentor_id, actorId, row.id, "event_cancelled", copy);
+  return (await insert(supabase, row.assigned_mentor_id, actorId, row.id, "event_cancelled", copy))
+    ? "delivered"
+    : "failed";
 }
 
 /**

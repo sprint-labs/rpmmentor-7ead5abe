@@ -607,6 +607,8 @@ export function InteractionForm({
   /** Editing a row created by a Match Report — its type is immutable. */
   const isMatchReportObservation =
     isEditing && editing?.interactionType === MATCH_REPORT_INTERACTION_TYPE;
+  /** A calendar-linked write-up keeps the category required by its event. */
+  const isCalendarFollowUp = isEditing && !!editing?.calendarEventId;
 
   const validationErrors = useMemo(
     () => validate({ gkId, date, notes, outcome, followUp }),
@@ -1219,12 +1221,13 @@ export function InteractionForm({
             </select>
           </Field>
           <Field label="Interaction Type" required>
-            {isMatchReportObservation ? (
+            {isMatchReportObservation || isCalendarFollowUp ? (
               <div className="rounded-md border border-border bg-muted/40 px-3 py-2 text-sm">
-                {MATCH_REPORT_INTERACTION_TYPE}
+                {type}
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Created by a Match Report, so the type stays fixed. You can still correct the
-                  other details.
+                  {isMatchReportObservation
+                    ? "Created by a Match Report, so the type stays fixed. You can still correct the other details."
+                    : "Linked to a scheduled calendar event, so the type stays fixed. You can still correct the other details."}
                 </p>
               </div>
             ) : (

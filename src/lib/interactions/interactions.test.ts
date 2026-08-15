@@ -8,6 +8,7 @@ import {
   MANUAL_INTERACTION_TYPES,
   DASHBOARD_INTERACTION_TYPES,
   MATCH_REPORT_INTERACTION_TYPE,
+  interactionTypeForEdit,
 } from "@/lib/interactions/schema";
 
 import { mapInteractionRow, type InteractionDbRow } from "@/lib/interactions/map";
@@ -77,6 +78,25 @@ describe("interaction input validation", () => {
   it("never accepts mentor identity from the client", () => {
     const parsed = createInteractionInput.parse({ ...validInput, mentorId: "attacker-uuid" }) as Record<string, unknown>;
     expect(parsed["mentorId"]).toBeUndefined();
+  });
+});
+
+describe("interaction type editing", () => {
+  it("keeps the stored type for a calendar-linked interaction", () => {
+    expect(
+      interactionTypeForEdit(
+        "Coffee Catch Up",
+        "11111111-1111-4111-8111-111111111111",
+        "Training Ground Visit",
+      ),
+    ).toBe("Coffee Catch Up");
+  });
+
+  it("keeps Match Report observations immutable and lets ordinary entries change", () => {
+    expect(interactionTypeForEdit(MATCH_REPORT_INTERACTION_TYPE, null, "Phone Call")).toBe(
+      MATCH_REPORT_INTERACTION_TYPE,
+    );
+    expect(interactionTypeForEdit("Phone Call", null, "Coffee Catch Up")).toBe("Coffee Catch Up");
   });
 });
 

@@ -15,6 +15,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { getUserRoles, hasAnyRole, requireRole, type AppRole } from "@/lib/roles.server";
 import type { EventFollowUpRow } from "./follow-up-query.server";
+import type { CancellationNotificationResult } from "./notification-copy";
 
 /** Roles that may cancel an event or waive its write-up. */
 export const FOLLOW_UP_MANAGE_ROLES: readonly AppRole[] = [
@@ -67,7 +68,10 @@ export const cancelCalendarEvent = createServerFn({ method: "POST" })
     if (reason.length > 500) throw new Error("Reason must be 500 characters or fewer.");
     return { id: data.id, reason };
   })
-  .handler(async ({ data, context }): Promise<{ ok: true; notified: boolean }> => {
+  .handler(async ({ data, context }): Promise<{
+    ok: true;
+    notification: CancellationNotificationResult;
+  }> => {
     const { EVENT_COLUMNS } = await import("./follow-up-query.server");
     const { notifyEventCancelled } = await import("./notify.server");
     await requireRole(
@@ -90,13 +94,13 @@ export const cancelCalendarEvent = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     if (!row) throw new Error("That calendar event could not be cancelled.");
 
-    const notified = await notifyEventCancelled(
+    const notification = await notifyEventCancelled(
       context.supabase,
       context.userId,
       row as Parameters<typeof notifyEventCancelled>[2],
       data.reason,
     );
-    return { ok: true, notified };
+    return { ok: true, notification };
   });
 
 /** Undo a cancellation. The write-up requirement comes back with it. */

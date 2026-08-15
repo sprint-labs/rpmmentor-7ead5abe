@@ -76,6 +76,17 @@ export function isLoggableInteractionType(value: string): value is InteractionTy
   return (MANUAL_INTERACTION_TYPES as readonly string[]).includes(value);
 }
 
+/** Event-linked and Match-Report-generated interactions keep their stored type. */
+export function interactionTypeForEdit(
+  storedType: string,
+  calendarEventId: string | null,
+  requestedType: string,
+): string {
+  return calendarEventId || storedType === MATCH_REPORT_INTERACTION_TYPE
+    ? storedType
+    : requestedType;
+}
+
 
 export const createInteractionInput = z.object({
   /**
