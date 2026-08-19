@@ -2,10 +2,28 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowUpRight, CalendarClock, CalendarPlus, ChevronDown, ChevronRight, FileText, Video, AlertTriangle, Plus } from "lucide-react";
+import {
+  ArrowUpRight,
+  CalendarClock,
+  CalendarPlus,
+  ChevronDown,
+  ChevronRight,
+  FileText,
+  Video,
+  AlertTriangle,
+  Plus,
+} from "lucide-react";
 import { MentorPrimaryActions } from "./mentor-primary-actions";
 import { cn } from "@/lib/utils";
-import { Card, StatCard, SectionTitle, Avatar, TierBadge, TierLevelBadge, Pill } from "@/components/primitives";
+import {
+  Card,
+  StatCard,
+  SectionTitle,
+  Avatar,
+  TierBadge,
+  TierLevelBadge,
+  Pill,
+} from "@/components/primitives";
 import { getMentorDashboardStats } from "@/lib/mentor-dashboard.functions";
 import {
   formatUpcomingEventDateTime,
@@ -32,7 +50,6 @@ import { formatDateOnly } from "@/lib/interactions/schema";
 
 import { lastNDaysPeriod } from "@/lib/dashboard-period";
 
-
 interface Props {
   user: SessionUser;
   mentorProfileId: string;
@@ -42,10 +59,13 @@ function formatEventDateTime(iso: string) {
   const d = new Date(iso);
   const day = d.getDate();
   const suffix =
-    day % 10 === 1 && day !== 11 ? "st"
-    : day % 10 === 2 && day !== 12 ? "nd"
-    : day % 10 === 3 && day !== 13 ? "rd"
-    : "th";
+    day % 10 === 1 && day !== 11
+      ? "st"
+      : day % 10 === 2 && day !== 12
+        ? "nd"
+        : day % 10 === 3 && day !== 13
+          ? "rd"
+          : "th";
   const month = d.toLocaleString("en-GB", { month: "long" });
   const time = d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
   return `${month} ${day}${suffix} · ${time}`;
@@ -115,7 +135,11 @@ export function MentorDashboard({ user }: Props) {
   // Write-ups this mentor owes after an event that has already happened. Read
   // from the database, so a saved Match Report or Interaction clears it.
   const fetchFollowUps = useServerFn(listEventFollowUps);
-  const { data: followUpData } = useQuery({
+  const {
+    data: followUpData,
+    isError: isFollowUpsError,
+    refetch: refetchFollowUps,
+  } = useQuery({
     queryKey: eventFollowUpsQueryKey,
     queryFn: () => fetchFollowUps(),
     staleTime: 30_000,
@@ -134,8 +158,10 @@ export function MentorDashboard({ user }: Props) {
   );
 
   const firstName = user.name.split(" ")[0];
-  const upcoming = data?.upcomingList ?? [];
+  const upcoming = useMemo(() => data?.upcomingList ?? [], [data?.upcomingList]);
   const outstanding = data?.outstandingItems ?? [];
+  const outstandingUnavailable = !isLoading && !isError && data?.outstandingAvailable === false;
+  const upcomingUnavailable = !isLoading && !isError && data?.upcomingAvailable === false;
   const updatedAt = data?.lastUpdatedAt ? formatRelativeTime(data.lastUpdatedAt) : undefined;
   const period = `Last ${rangeDays} days`;
   const [showOutstanding, setShowOutstanding] = useState(false);
@@ -163,12 +189,20 @@ export function MentorDashboard({ user }: Props) {
     return undefined;
   }, [data?.mentorProfileId, user.mentorId, user.actualRole, user.name]);
   const effectiveMentorId = data?.mentorProfileId ?? user.mentorId ?? "";
-  const reportsSearch = { ...periodSearch, coach: data?.coachIdentity ?? "", mentorProfileId: effectiveMentorId, source: "reports-submitted" };
-  const interactionsSearch = { ...periodSearch, mentorId: effectiveMentorId, type: filters.length === 1 ? filters[0]! : "", source: "interactions-logged" };
+  const reportsSearch = {
+    ...periodSearch,
+    coach: data?.coachIdentity ?? "",
+    mentorProfileId: effectiveMentorId,
+    source: "reports-submitted",
+  };
+  const interactionsSearch = {
+    ...periodSearch,
+    mentorId: effectiveMentorId,
+    type: filters.length === 1 ? filters[0]! : "",
+    source: "interactions-logged",
+  };
   const toggleFilter = (type: string) => {
-    setFilters((prev) =>
-      prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type]
-    );
+    setFilters((prev) => (prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type]));
   };
 
   const clearFilters = () => setFilters([]);
@@ -220,38 +254,38 @@ export function MentorDashboard({ user }: Props) {
       />
 
       <section aria-label="Your activity">
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <Link
-          to="/reports"
-          search={reportsSearch}
-          onClick={() => trackClick("reports-submitted", "/reports")}
-          className="block rounded-lg transition-transform hover:-translate-y-0.5 hover:ring-1 hover:ring-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-          aria-label="View match reports"
-        >
-          <StatCard
-            label={mentorDashboardMetricCardLabels.matchReportsSubmitted}
-            value={data?.reportsLast14 ?? 0}
-            hint={period}
-            accent="primary"
-            updatedAt={updatedAt}
-          />
-        </Link>
-        <Link
-          to="/interactions"
-          search={interactionsSearch}
-          onClick={() => trackClick("interactions-logged", "/interactions")}
-          className="block rounded-lg transition-transform hover:-translate-y-0.5 hover:ring-1 hover:ring-info/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-info"
-          aria-label="View interactions"
-        >
-          <StatCard
-            label={mentorDashboardMetricCardLabels.interactionsLogged}
-            value={data?.interactionsLast14 ?? 0}
-            hint={period}
-            accent="info"
-            updatedAt={updatedAt}
-          />
-        </Link>
-      </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <Link
+            to="/reports"
+            search={reportsSearch}
+            onClick={() => trackClick("reports-submitted", "/reports")}
+            className="block rounded-lg transition-transform hover:-translate-y-0.5 hover:ring-1 hover:ring-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            aria-label="View match reports"
+          >
+            <StatCard
+              label={mentorDashboardMetricCardLabels.matchReportsSubmitted}
+              value={isLoading ? "…" : isError ? "—" : (data?.reportsLast14 ?? "—")}
+              hint={isError ? "Count unavailable" : `Match dates · ${period.toLowerCase()}`}
+              accent="primary"
+              updatedAt={updatedAt}
+            />
+          </Link>
+          <Link
+            to="/interactions"
+            search={interactionsSearch}
+            onClick={() => trackClick("interactions-logged", "/interactions")}
+            className="block rounded-lg transition-transform hover:-translate-y-0.5 hover:ring-1 hover:ring-info/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-info"
+            aria-label="View interactions"
+          >
+            <StatCard
+              label={mentorDashboardMetricCardLabels.interactionsLogged}
+              value={isLoading ? "…" : isError ? "—" : (data?.interactionsLast14 ?? "—")}
+              hint={isError ? "Count unavailable" : period}
+              accent="info"
+              updatedAt={updatedAt}
+            />
+          </Link>
+        </div>
       </section>
 
       <Card className="p-4">
@@ -261,12 +295,16 @@ export function MentorDashboard({ user }: Props) {
           aria-expanded={showOutstanding}
         >
           <div className="flex items-center gap-2">
-            {showOutstanding ? <ChevronDown className="size-4 text-muted-foreground" /> : <ChevronRight className="size-4 text-muted-foreground" />}
+            {showOutstanding ? (
+              <ChevronDown className="size-4 text-muted-foreground" />
+            ) : (
+              <ChevronRight className="size-4 text-muted-foreground" />
+            )}
             <h2 className="text-sm font-semibold tracking-tight uppercase text-muted-foreground">
               Outstanding Actions Breakdown
             </h2>
             <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium border bg-destructive/15 text-destructive border-destructive/40 tabular-nums font-mono">
-              {outstanding.length}
+              {isLoading ? "…" : isError || outstandingUnavailable ? "—" : outstanding.length}
             </span>
           </div>
           <span className="text-[11px] uppercase tracking-wider text-muted-foreground">
@@ -274,8 +312,16 @@ export function MentorDashboard({ user }: Props) {
           </span>
         </button>
 
-        {showOutstanding && (
-          outstanding.length === 0 ? (
+        {showOutstanding &&
+          (isLoading ? (
+            <div className="text-xs text-muted-foreground py-6 text-center">
+              Loading outstanding actions…
+            </div>
+          ) : isError || outstandingUnavailable ? (
+            <div className="text-xs text-muted-foreground py-6 text-center">
+              Outstanding actions are unavailable right now.
+            </div>
+          ) : outstanding.length === 0 ? (
             <div className="text-xs text-muted-foreground py-6 text-center">
               All caught up — nothing overdue.
             </div>
@@ -289,18 +335,35 @@ export function MentorDashboard({ user }: Props) {
                   : "bg-warning/15 text-warning border-warning/30";
                 const actionHref = isReport ? "/reports" : "/media";
                 const actionSearch = isReport
-                  ? { from: "", to: "", coach: mentorName ?? "", mentorProfileId: effectiveMentorId, source: "outstanding-report" }
-                  : { from: "", to: "", uploaderName: mentorName ?? "", mentorProfileId: effectiveMentorId, kind: "video", source: "outstanding-clip" };
+                  ? {
+                      from: "",
+                      to: "",
+                      coach: mentorName ?? "",
+                      mentorProfileId: effectiveMentorId,
+                      source: "outstanding-report",
+                    }
+                  : {
+                      from: "",
+                      to: "",
+                      uploaderName: mentorName ?? "",
+                      mentorProfileId: effectiveMentorId,
+                      kind: "video",
+                      source: "outstanding-clip",
+                    };
                 return (
                   <div key={item.id} className="flex items-center gap-3 py-2.5">
                     <Avatar initials={item.gkInitials ?? "—"} />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium border ${toneClass}`}>
+                        <span
+                          className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium border ${toneClass}`}
+                        >
                           <Icon className="size-3" />
                           {isReport ? "Missing report" : "Missing clip"}
                         </span>
-                        <span className="font-medium text-sm truncate">{item.gkName ?? "Unassigned"}</span>
+                        <span className="font-medium text-sm truncate">
+                          {item.gkName ?? "Unassigned"}
+                        </span>
                         {item.gkStatus && <TierBadge tier={item.gkStatus as Tier} />}
                         {item.gkTierLevel && <TierLevelBadge level={item.gkTierLevel} />}
                         {item.daysOverdue > 0 && (
@@ -315,13 +378,16 @@ export function MentorDashboard({ user }: Props) {
                         {item.gkClub ? ` · ${item.gkClub}` : ""}
                       </div>
                       <div className="text-[10px] text-muted-foreground/80 mt-0.5 font-mono tabular-nums">
-                        Observed {formatEventDateTime(item.observationDate)} · Due {formatEventDateTime(item.dueDate)} · Actionable by {item.actionableBy}
+                        Observed {formatEventDateTime(item.observationDate)} · Due{" "}
+                        {formatEventDateTime(item.dueDate)} · Actionable by {item.actionableBy}
                       </div>
                     </div>
                     <Link
                       to={actionHref}
                       search={actionSearch}
-                      onClick={() => trackClick(isReport ? "outstanding-report" : "outstanding-clip", actionHref)}
+                      onClick={() =>
+                        trackClick(isReport ? "outstanding-report" : "outstanding-clip", actionHref)
+                      }
                       className="shrink-0 text-xs px-2.5 py-1.5 rounded-md border border-border hover:bg-accent/40 text-primary inline-flex items-center gap-1"
                     >
                       {isReport ? "Submit report" : "Upload clip"}
@@ -340,60 +406,74 @@ export function MentorDashboard({ user }: Props) {
                 );
               })}
             </div>
-          )
-        )}
+          ))}
       </Card>
 
-
-
-      {writeUpsDue.length > 0 && (
+      {(isFollowUpsError || writeUpsDue.length > 0) && (
         <Card className="p-4">
           <div className="flex items-center justify-between gap-2">
             <SectionTitle>Write-ups Due</SectionTitle>
-            <Link to="/follow-ups" className="text-[11px] text-primary hover:underline">
-              See all follow-ups
-            </Link>
+            {!isFollowUpsError && (
+              <Link to="/follow-ups" className="text-[11px] text-primary hover:underline">
+                See all follow-ups
+              </Link>
+            )}
           </div>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Each of these events has happened. You have 48 hours from the scheduled time to record
-            what came out of it.
-          </p>
-          <div className="mt-3 divide-y divide-border">
-            {writeUpsDue.map((row) => (
-              <div key={row.eventId} className="flex flex-wrap items-center gap-3 py-2.5">
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <FollowUpStatusPill status={row.followUp.status} />
-                    <span className="truncate text-sm font-medium">
-                      {row.goalkeeperName || "Unnamed goalkeeper"}
-                    </span>
-                    <span className="text-xs text-muted-foreground">{row.eventType}</span>
+          {isFollowUpsError ? (
+            <div className="py-4 text-xs text-muted-foreground">
+              <p>Write-ups are unavailable right now.</p>
+              <button
+                type="button"
+                onClick={() => void refetchFollowUps()}
+                className="mt-2 uppercase tracking-wider text-primary underline"
+              >
+                Retry
+              </button>
+            </div>
+          ) : (
+            <>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Each of these events has happened. You have 48 hours from the scheduled time to
+                record what came out of it.
+              </p>
+              <div className="mt-3 divide-y divide-border">
+                {writeUpsDue.map((row) => (
+                  <div key={row.eventId} className="flex flex-wrap items-center gap-3 py-2.5">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <FollowUpStatusPill status={row.followUp.status} />
+                        <span className="truncate text-sm font-medium">
+                          {row.goalkeeperName || "Unnamed goalkeeper"}
+                        </span>
+                        <span className="text-xs text-muted-foreground">{row.eventType}</span>
+                      </div>
+                      <div className="mt-0.5 text-xs text-muted-foreground">
+                        {formatDateOnly(row.eventDate)}
+                        {row.startTime ? ` · ${row.startTime.slice(0, 5)}` : ""}
+                      </div>
+                      <div className="mt-0.5 text-[11px] text-muted-foreground">
+                        {followUpDetail(row.followUp, row.waiverReason, row.cancellationReason)}
+                      </div>
+                    </div>
+                    <FollowUpActionLink
+                      event={{
+                        id: row.eventId,
+                        title: row.title,
+                        eventType: row.eventType,
+                        eventDate: row.eventDate,
+                        startTime: row.startTime,
+                        endTime: row.endTime,
+                        goalkeeperName: row.goalkeeperName,
+                        playerId: row.playerId,
+                      }}
+                      followUp={row.followUp}
+                      label={`Submit ${followUpRequirementLabel(row.followUp.kind)}`}
+                    />
                   </div>
-                  <div className="mt-0.5 text-xs text-muted-foreground">
-                    {formatDateOnly(row.eventDate)}
-                    {row.startTime ? ` · ${row.startTime.slice(0, 5)}` : ""}
-                  </div>
-                  <div className="mt-0.5 text-[11px] text-muted-foreground">
-                    {followUpDetail(row.followUp, row.waiverReason, row.cancellationReason)}
-                  </div>
-                </div>
-                <FollowUpActionLink
-                  event={{
-                    id: row.eventId,
-                    title: row.title,
-                    eventType: row.eventType,
-                    eventDate: row.eventDate,
-                    startTime: row.startTime,
-                    endTime: row.endTime,
-                    goalkeeperName: row.goalkeeperName,
-                    playerId: row.playerId,
-                  }}
-                  followUp={row.followUp}
-                  label={`Submit ${followUpRequirementLabel(row.followUp.kind)}`}
-                />
+                ))}
               </div>
-            ))}
-          </div>
+            </>
+          )}
         </Card>
       )}
 
@@ -415,7 +495,7 @@ export function MentorDashboard({ user }: Props) {
                   "px-2.5 py-1 text-[11px] uppercase tracking-wider rounded-md border transition-colors",
                   rangeDays === d
                     ? "bg-primary text-primary-foreground border-primary"
-                    : "bg-transparent text-muted-foreground border-border hover:border-primary/50"
+                    : "bg-transparent text-muted-foreground border-border hover:border-primary/50",
                 )}
               >
                 {d}d
@@ -431,7 +511,7 @@ export function MentorDashboard({ user }: Props) {
               "px-2.5 py-1 text-[11px] uppercase tracking-wider rounded-md border transition-colors",
               filters.length === 0
                 ? "bg-primary text-primary-foreground border-primary"
-                : "bg-transparent text-muted-foreground border-border hover:border-primary/50"
+                : "bg-transparent text-muted-foreground border-border hover:border-primary/50",
             )}
             aria-pressed={filters.length === 0}
           >
@@ -447,7 +527,7 @@ export function MentorDashboard({ user }: Props) {
                   "px-2.5 py-1 text-[11px] uppercase tracking-wider rounded-md border transition-colors",
                   active
                     ? "bg-primary text-primary-foreground border-primary"
-                    : "bg-transparent text-muted-foreground border-border hover:border-primary/50"
+                    : "bg-transparent text-muted-foreground border-border hover:border-primary/50",
                 )}
                 aria-pressed={active}
               >
@@ -457,7 +537,26 @@ export function MentorDashboard({ user }: Props) {
           })}
         </div>
 
-        {filteredUpcoming.length === 0 ? (
+        {upcomingUnavailable ? (
+          <div className="flex flex-col items-center justify-center gap-3 py-10 text-center">
+            <div className="size-10 rounded-full bg-muted grid place-items-center">
+              <CalendarPlus className="size-5 text-muted-foreground" />
+            </div>
+            <div className="max-w-xs">
+              <p className="text-sm font-medium text-foreground">Calendar figures unavailable</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Your report and interaction counts are still up to date.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => void refetch()}
+              className="text-xs px-3 py-1.5 rounded-md border border-border hover:bg-accent/40 text-primary"
+            >
+              Retry
+            </button>
+          </div>
+        ) : filteredUpcoming.length === 0 ? (
           <div className="flex flex-col items-center justify-center gap-3 py-10 text-center">
             <div className="size-10 rounded-full bg-muted grid place-items-center">
               <CalendarPlus className="size-5 text-muted-foreground" />
@@ -512,7 +611,9 @@ export function MentorDashboard({ user }: Props) {
                         <Avatar initials={e.gkInitials ?? "—"} />
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-medium text-sm truncate">{e.gkName ?? "Unassigned"}</span>
+                            <span className="font-medium text-sm truncate">
+                              {e.gkName ?? "Unassigned"}
+                            </span>
                             {e.gkStatus && <TierBadge tier={e.gkStatus as Tier} />}
                             {e.gkFreeAgent && <Pill tone="warning">Free Agent</Pill>}
                             {e.gkTierLevel && <TierLevelBadge level={e.gkTierLevel} />}

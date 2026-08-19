@@ -1,12 +1,30 @@
 import { describe, expect, it } from "vitest";
-import { isDateOnlyInPeriod, lastNDaysPeriod, toLocalDateOnly } from "./dashboard-period";
+import {
+  inclusiveDatePeriodStart,
+  isDateOnlyInPeriod,
+  lastNDaysPeriod,
+  toLocalDateOnly,
+} from "./dashboard-period";
 
 describe("dashboard period", () => {
   it("uses local calendar days, not the UTC slice of the instant", () => {
     const period = lastNDaysPeriod(14, new Date(2026, 7, 5, 0, 30));
     expect(period.toDate).toBe("2026-08-05");
-    expect(period.fromDate).toBe("2026-07-22");
+    expect(period.fromDate).toBe("2026-07-23");
     expect(toLocalDateOnly(new Date(2026, 0, 1))).toBe("2026-01-01");
+  });
+
+  it("uses exactly N inclusive calendar dates", () => {
+    expect(inclusiveDatePeriodStart("2026-08-19", 14)).toBe("2026-08-06");
+    expect(inclusiveDatePeriodStart("2026-08-19", 30)).toBe("2026-07-21");
+    expect(inclusiveDatePeriodStart("2026-01-01", 1)).toBe("2026-01-01");
+  });
+
+  it("rejects invalid periods", () => {
+    expect(() => lastNDaysPeriod(0)).toThrow();
+    expect(() => inclusiveDatePeriodStart("2026-08-19", 0)).toThrow();
+    expect(() => inclusiveDatePeriodStart("not-a-date", 14)).toThrow();
+    expect(() => inclusiveDatePeriodStart("2026-02-31", 14)).toThrow();
   });
 
   it("includes both boundary days", () => {

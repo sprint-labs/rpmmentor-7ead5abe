@@ -3,6 +3,7 @@ import type { MatchReportRow } from "@/lib/match-reports/schema";
 import {
   countCanonicalReportsForCoach,
   isMatchDateInPeriod,
+  requireCoachIdentity,
   resolveCoachIdentity,
   selectCoachProfileForDashboard,
 } from "./mentor-dashboard-report-count";
@@ -50,6 +51,13 @@ describe("resolveCoachIdentity", () => {
     expect(resolveCoachIdentity({ name: null, email: "dave@example.com" })).toBe(
       "dave@example.com",
     );
+  });
+
+  it("does not turn a missing report identity into a zero count", () => {
+    expect(() => requireCoachIdentity({ name: null, email: null })).toThrow(
+      "Match Report identity was unavailable",
+    );
+    expect(() => requireCoachIdentity(null)).toThrow("Match Report identity was unavailable");
   });
 });
 

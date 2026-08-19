@@ -6,7 +6,7 @@ import type { TierLevel } from "@/lib/mock-data";
 import {
   countCanonicalReportsForCoach,
   FALLBACK_MENTOR_ID,
-  resolveCoachIdentity,
+  requireCoachIdentity,
   selectCoachProfileForDashboard,
   type DashboardCoachProfile,
 } from "@/lib/mentor-dashboard-report-count";
@@ -17,11 +17,10 @@ import {
   type MentorUpcomingInteraction,
 } from "@/lib/mentor-upcoming-events";
 import { DASHBOARD_INTERACTION_TYPES } from "@/lib/interactions/schema";
+import { requireExactDashboardCount } from "@/lib/dashboard-count";
+import { inclusiveDatePeriodStart } from "@/lib/dashboard-period";
 
-export type {
-  MentorUpcomingInteraction,
-  UpcomingPlannedType,
-} from "@/lib/mentor-upcoming-events";
+export type { MentorUpcomingInteraction, UpcomingPlannedType } from "@/lib/mentor-upcoming-events";
 
 export type OutstandingActionKind = "missing_report" | "missing_clip";
 
@@ -48,10 +47,11 @@ export interface MentorDashboardStats {
   coachIdentity: string;
   reportsLast14: number;
   interactionsLast14: number;
-  clipsLast14: number;
   outstandingActions: number;
   outstandingItems: OutstandingActionItem[];
+  outstandingAvailable: boolean;
   upcomingList: MentorUpcomingInteraction[];
+  upcomingAvailable: boolean;
   lastUpdatedAt: string;
 }
 
@@ -72,13 +72,18 @@ const dashboardInputSchema = z
     to: z.string().datetime({ offset: true }),
     // Local calendar days for the same window. Used for `date` columns so the
     // window never shifts by a day for non-UTC users.
-    fromDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-    toDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+    fromDate: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/)
+      .optional(),
+    toDate: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/)
+      .optional(),
   })
   .refine((period) => new Date(period.from).getTime() <= new Date(period.to).getTime(), {
     message: "The reporting period must end after it starts.",
   });
-
 
 export const getMentorDashboardStats = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
@@ -86,14 +91,21 @@ export const getMentorDashboardStats = createServerFn({ method: "GET" })
   .handler(async ({ context, data }): Promise<MentorDashboardStats> => {
     const { supabase, userId } = context;
 
-    const [{ data: profile }, { data: roles }] = await Promise.all([
-      supabase
-        .from("profiles")
-        .select("mentor_id,name,email")
-        .eq("id", userId)
-        .maybeSingle<DashboardCoachProfile & { mentor_id: string | null }>(),
-      supabase.from("user_roles").select("role").eq("user_id", userId),
-    ]);
+    const [{ data: profile, error: profileError }, { data: roles, error: rolesError }] =
+      await Promise.all([
+        supabase
+          .from("profiles")
+          .select("mentor_id,name,email")
+          .eq("id", userId)
+          .maybeSingle<DashboardCoachProfile & { mentor_id: string | null }>(),
+        supabase.from("user_roles").select("role").eq("user_id", userId),
+      ]);
+    if (profileError || rolesError) {
+      throw new Error("Could not load your dashboard identity.");
+    }
+    if (!profile) {
+      throw new Error("Your dashboard identity was unavailable.");
+    }
 
     let mentorId = profile?.mentor_id ?? null;
     const usingSuperAdminFallbackMentor =
@@ -110,7 +122,7 @@ export const getMentorDashboardStats = createServerFn({ method: "GET" })
     // caller's local calendar days, not the UTC slice of the instant.
     const periodFrom = data.fromDate ?? data.from.slice(0, 10);
     const periodTo = data.toDate ?? data.to.slice(0, 10);
-    const thirtyDaysAgo = new Date(now - 30 * 86400000).toISOString().slice(0, 10);
+    const thirtyDaysAgo = inclusiveDatePeriodStart(periodTo, 30);
     // The caller's local today is the upper bound of the backward window, and
     // the lower bound of the forward one the upcoming list needs.
     const upcoming = upcomingWindow(periodTo, days);
@@ -118,15 +130,10 @@ export const getMentorDashboardStats = createServerFn({ method: "GET" })
     // Real, durable activity for the signed-in user. These are the numbers the
     // dashboard cards claim to show, so they are read from the database rather
     // than from any sample data.
-    const [
-      { data: periodInteractions },
-      { data: observationRows },
-      { data: clipRows },
-      { data: upcomingEventRows },
-    ] = await Promise.all([
+    const [periodInteractions, observations, upcomingEvents] = await Promise.all([
       supabase
         .from("interactions")
-        .select("id")
+        .select("id", { count: "exact", head: true })
         .eq("mentor_id", userId)
         .in("interaction_type", [...DASHBOARD_INTERACTION_TYPES])
         .gte("occurred_at", periodFrom)
@@ -137,13 +144,6 @@ export const getMentorDashboardStats = createServerFn({ method: "GET" })
         .eq("mentor_id", userId)
         .eq("interaction_type", "Live Match Observation")
         .gte("occurred_at", thirtyDaysAgo),
-      supabase
-        .from("media_assets")
-        .select("id, gk_id, media_type, created_at")
-        .eq("uploaded_by_id", userId)
-        .eq("media_type", "video")
-        .gte("created_at", data.from)
-        .lte("created_at", data.to),
       // Events a manager has booked this mentor in to attend, bounded to the
       // forward window so this never reads the whole table. Scoped by the
       // assigned profile, so a mentor sees their own diary rather than the
@@ -161,25 +161,23 @@ export const getMentorDashboardStats = createServerFn({ method: "GET" })
         .limit(UPCOMING_EVENTS_LIMIT),
     ]);
 
-    const interactionsLast14 = periodInteractions?.length ?? 0;
-    const clipsLast14 = clipRows?.length ?? 0;
+    const interactionsLast14 = requireExactDashboardCount(
+      periodInteractions,
+      "personal interaction count",
+    );
 
-    // Every clip this user has uploaded, used to decide whether an observation
-    // still needs follow-up media.
-    const { data: allClipRows } = await supabase
-      .from("media_assets")
-      .select("gk_id, created_at")
-      .eq("uploaded_by_id", userId)
-      .eq("media_type", "video");
-
-    const { data: fallbackMentorProfile } = usingSuperAdminFallbackMentor
-      ? await supabase
-          .from("profiles")
-          .select("name,email")
-          .eq("mentor_id", FALLBACK_MENTOR_ID)
-          .maybeSingle<DashboardCoachProfile>()
-      : { data: null };
-    const coachIdentity = resolveCoachIdentity(
+    const { data: fallbackMentorProfile, error: fallbackMentorProfileError } =
+      usingSuperAdminFallbackMentor
+        ? await supabase
+            .from("profiles")
+            .select("name,email")
+            .eq("mentor_id", FALLBACK_MENTOR_ID)
+            .maybeSingle<DashboardCoachProfile>()
+        : { data: null, error: null };
+    if (fallbackMentorProfileError) {
+      throw new Error("Could not load the preview mentor identity.");
+    }
+    const coachIdentity = requireCoachIdentity(
       selectCoachProfileForDashboard(
         profile ?? null,
         fallbackMentorProfile ?? null,
@@ -189,50 +187,48 @@ export const getMentorDashboardStats = createServerFn({ method: "GET" })
 
     // Match Reports are read from the same canonical Supabase store as the
     // report centre, then scoped to the authenticated coach identity.
-    let reportsLast14 = 0;
-    let coachReports: { goalkeeper: string; match_date: string | null }[] = [];
-    if (coachIdentity) {
-      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-      const { listCanonicalReports } = await import("@/lib/match-reports/store.server");
-      const parsed = await listCanonicalReports(supabaseAdmin);
-      // Same calendar-day window as the Interactions card.
-      reportsLast14 = countCanonicalReportsForCoach(parsed, coachIdentity, periodFrom, periodTo);
-      const needle = coachIdentity.trim().toLowerCase();
-      coachReports = parsed
-        .filter((r) => (r.coach ?? "").trim().toLowerCase() === needle)
-        .map((r) => ({ goalkeeper: r.goalkeeper, match_date: r.match_date }));
-    }
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { listCanonicalReports } = await import("@/lib/match-reports/store.server");
+    // Every clip this user has uploaded is optional panel data used only to
+    // decide whether an observed match still needs follow-up media.
+    const [parsed, allClips] = await Promise.all([
+      listCanonicalReports(supabaseAdmin),
+      supabase
+        .from("media_assets")
+        .select("gk_id, created_at")
+        .eq("uploaded_by_id", userId)
+        .eq("media_type", "video"),
+    ]);
+    // Same calendar-day window as the Interactions card.
+    const reportsLast14 = countCanonicalReportsForCoach(
+      parsed,
+      coachIdentity,
+      periodFrom,
+      periodTo,
+    );
+    const needle = coachIdentity.trim().toLowerCase();
+    const coachReports = parsed
+      .filter((r) => (r.coach ?? "").trim().toLowerCase() === needle)
+      .map((r) => ({ goalkeeper: r.goalkeeper, match_date: r.match_date }));
 
-    // Built before the no-mentor-profile early return below: the list is scoped
-    // by the signed-in profile in the query above, so it does not depend on the
-    // separate `profiles.mentor_id` link that the counts below need.
-    const upcomingList = mapUpcomingCalendarEvents(upcomingEventRows ?? [], goalkeepers);
-
-    if (!mentorId) {
-      return {
-        mentorProfileId: null,
-        coachIdentity,
-        reportsLast14,
-        interactionsLast14,
-        clipsLast14,
-        outstandingActions: 0,
-        outstandingItems: [],
-        upcomingList,
-        lastUpdatedAt: new Date().toISOString(),
-      };
-    }
+    // Optional panels fail independently, so a calendar/media outage cannot
+    // blank otherwise valid report and interaction KPI cards.
+    const upcomingAvailable = !upcomingEvents.error;
+    const upcomingList = upcomingAvailable
+      ? mapUpcomingCalendarEvents(upcomingEvents.data ?? [], goalkeepers)
+      : [];
+    const outstandingAvailable = Boolean(mentorId) && !observations.error && !allClips.error;
 
     const gkById = new Map(goalkeepers.map((g) => [g.id, g]));
 
     // Outstanding actions: live match observations logged by this user in the
     // last 30 days that lack either a follow-up match report or a matching
     // video clip within ±3 days of the observation date.
-    const mentorObservations = (observationRows ?? []).filter(
+    const mentorObservations = (outstandingAvailable ? (observations.data ?? []) : []).filter(
       (i) => +new Date(i.occurred_at) <= now - 3 * 86400000,
     );
     const within3d = (a: string, b: string) =>
       Math.abs(+new Date(a) - +new Date(b)) <= 3 * 86400000;
-
 
     const outstandingItems: OutstandingActionItem[] = [];
     const mentorDisplay = mentors.find((m) => m.id === mentorId)?.name ?? "You";
@@ -244,10 +240,10 @@ export const getMentorDashboardStats = createServerFn({ method: "GET" })
           r.match_date != null &&
           within3d(r.match_date, obs.occurred_at),
       );
-      const hasClip = (allClipRows ?? []).some(
+      const hasClip = (allClips.data ?? []).some(
         (m) => m.gk_id === obs.gk_slug && within3d(m.created_at, obs.occurred_at),
       );
-      const gk = obs.gk_slug ? gkById.get(obs.gk_slug) ?? null : null;
+      const gk = obs.gk_slug ? (gkById.get(obs.gk_slug) ?? null) : null;
       const due = +new Date(obs.occurred_at) + 3 * 86400000;
       const daysOverdue = Math.max(0, Math.floor((now - due) / 86400000));
       const base = {
@@ -290,10 +286,11 @@ export const getMentorDashboardStats = createServerFn({ method: "GET" })
       coachIdentity,
       reportsLast14,
       interactionsLast14,
-      clipsLast14,
       outstandingActions,
       outstandingItems,
+      outstandingAvailable,
       upcomingList,
+      upcomingAvailable,
       lastUpdatedAt: new Date().toISOString(),
     };
   });

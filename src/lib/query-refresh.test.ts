@@ -35,5 +35,7 @@ describe("refreshInteractionViews", () => {
     expect(keys).toContainEqual(["interactions", "page"]);
     expect(keys).toContainEqual(["interactions", "audio"]);
     expect(keys).toContainEqual(["mentor-dashboard-stats"]);
+    expect(keys).toContainEqual(["overview-dashboard-stats"]);
+    expect(keys).toContainEqual(["executive-dashboard-stats"]);
   });
 });

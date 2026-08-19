@@ -9,7 +9,7 @@ import { useLoggedInteractions } from "@/lib/interactions/use-interactions";
 import { listPlayers } from "@/lib/players.functions";
 import { listUsersAndRoles } from "@/lib/users-and-roles.functions";
 import { listMatchReports } from "@/lib/match-reports/reports.functions";
-import { listCalendarEvents } from "@/lib/calendar.functions";
+import { listAssignableMentors, listCalendarEvents } from "@/lib/calendar.functions";
 import {
   alerts as systemAlerts,
   goalkeepers,
@@ -18,6 +18,8 @@ import {
   type DutyLevel,
 } from "@/lib/mock-data";
 import { isDateOnlyInPeriod, lastNDaysPeriod } from "@/lib/dashboard-period";
+import { isDashboardInteractionType } from "@/lib/interactions/schema";
+import { buildActiveMentorInsightRows } from "@/lib/active-mentor-insights";
 
 const METRICS = [
   "goalkeepers",
@@ -46,13 +48,13 @@ const META: Record<Metric, { title: string; description: string; to: string; lin
     },
     duty: {
       title: "Duty of Care",
-      description: "Goalkeepers grouped by cadence status for their tier.",
+      description: "Reference-only cadence bands; not a canonical operational count.",
       to: "/goalkeepers",
       linkLabel: "Goalkeepers",
     },
     reports: {
-      title: "Match Reports Submitted",
-      description: "Match reports with a match date inside the selected window.",
+      title: "Match Reports",
+      description: "Match reports with match dates in the selected period.",
       to: "/reports",
       linkLabel: "All reports",
     },
@@ -70,7 +72,7 @@ const META: Record<Metric, { title: string; description: string; to: string; lin
     },
     alerts: {
       title: "System Alerts",
-      description: "Outstanding operational alerts raised across the roster.",
+      description: "Reference alert feed; live operational alerts are not connected.",
       to: "/alerts",
       linkLabel: "Alerts",
     },
@@ -97,7 +99,8 @@ export const Route = createFileRoute("/insights/$metric")({
     level: typeof search.level === "string" ? search.level : "",
   }),
   head: ({ params }) => {
-    const meta = META[(params.metric as Metric) in META ? (params.metric as Metric) : "goalkeepers"];
+    const meta =
+      META[(params.metric as Metric) in META ? (params.metric as Metric) : "goalkeepers"];
     const title = `${meta.title} breakdown — Mentor Hub`;
     return {
       meta: [
@@ -131,6 +134,10 @@ function Empty({ label }: { label: string }) {
   );
 }
 
+function availableCount(isLoading: boolean, isError: boolean, count: number): string | number {
+  return isLoading ? "…" : isError ? "—" : count;
+}
+
 function InsightDrilldown() {
   const { metric } = Route.useParams();
   const search = Route.useSearch();
@@ -161,6 +168,7 @@ function InsightDrilldown() {
 
   const fetchPlayers = useServerFn(listPlayers);
   const fetchUsers = useServerFn(listUsersAndRoles);
+  const fetchMentorDirectory = useServerFn(listAssignableMentors);
   const fetchReports = useServerFn(listMatchReports);
   const fetchEvents = useServerFn(listCalendarEvents);
 
@@ -173,6 +181,12 @@ function InsightDrilldown() {
   const users = useQuery({
     queryKey: ["users-and-roles"],
     queryFn: () => fetchUsers(),
+    enabled: enabled && active === "mentors",
+    staleTime: 30_000,
+  });
+  const mentorDirectory = useQuery({
+    queryKey: ["users-and-roles", "active-mentor-directory"],
+    queryFn: () => fetchMentorDirectory(),
     enabled: enabled && active === "mentors",
     staleTime: 30_000,
   });
@@ -251,7 +265,7 @@ function InsightDrilldown() {
       <div className="command-panel p-5">
         {active === "goalkeepers" && (
           <>
-            <SectionTitle>{`Player records (${players.data?.length ?? 0})`}</SectionTitle>
+            <SectionTitle>{`Player records (${availableCount(players.isLoading, players.isError, players.data?.length ?? 0)})`}</SectionTitle>
             <div className="divide-y divide-border">
               {players.isLoading ? (
                 <Empty label="Loading…" />
@@ -290,7 +304,11 @@ function InsightDrilldown() {
         {active === "interactions" &&
           (() => {
             const rows = (interactions.data ?? [])
-              .filter((i) => isDateOnlyInPeriod(i.occurredAt, period.fromDate, period.toDate))
+              .filter(
+                (i) =>
+                  isDashboardInteractionType(i.interactionType) &&
+                  isDateOnlyInPeriod(i.occurredAt, period.fromDate, period.toDate),
+              )
               .sort((a, b) => b.occurredAt.localeCompare(a.occurredAt));
             return (
               <>
@@ -300,7 +318,7 @@ function InsightDrilldown() {
                       {periodLabel}
                     </span>
                   }
-                >{`Interactions (${rows.length})`}</SectionTitle>
+                >{`Interactions (${availableCount(interactions.isLoading, interactions.isError, rows.length)})`}</SectionTitle>
                 <div className="divide-y divide-border">
                   {interactions.isLoading ? (
                     <Empty label="Loading…" />
@@ -340,13 +358,16 @@ function InsightDrilldown() {
 
         {active === "duty" &&
           (() => {
-            const graded = goalkeepers.map((g) => ({ gk: g, duty: dutyStatusForGk(g, dutySource) }));
+            const graded = goalkeepers.map((g) => ({
+              gk: g,
+              duty: dutyStatusForGk(g, dutySource),
+            }));
             const filtered = search.level
               ? graded.filter((r) => r.duty.level === search.level)
               : graded;
             return (
               <>
-                <SectionTitle>{`Duty of Care (${filtered.length})`}</SectionTitle>
+                <SectionTitle>{`Reference Duty of Care (${availableCount(interactions.isLoading, interactions.isError, filtered.length)})`}</SectionTitle>
                 <div className="flex flex-wrap gap-2 mb-4">
                   <Link
                     to="/insights/$metric"
@@ -354,7 +375,8 @@ function InsightDrilldown() {
                     search={{ from: period.fromDate, to: period.toDate, level: "" }}
                     className={`px-2.5 h-7 inline-flex items-center border text-[10px] font-mono uppercase tracking-widest ${!search.level ? "border-primary text-primary" : "border-border text-muted-foreground"}`}
                   >
-                    All ({graded.length})
+                    All (
+                    {availableCount(interactions.isLoading, interactions.isError, graded.length)})
                   </Link>
                   {DUTY_LEVELS.map((l) => {
                     const count = graded.filter((r) => r.duty.level === l.level).length;
@@ -366,7 +388,8 @@ function InsightDrilldown() {
                         search={{ from: period.fromDate, to: period.toDate, level: l.level }}
                         className={`px-2.5 h-7 inline-flex items-center border text-[10px] font-mono uppercase tracking-widest ${search.level === l.level ? "border-primary text-primary" : "border-border text-muted-foreground"}`}
                       >
-                        {l.label} ({count})
+                        {l.label} (
+                        {availableCount(interactions.isLoading, interactions.isError, count)})
                       </Link>
                     );
                   })}
@@ -374,6 +397,8 @@ function InsightDrilldown() {
                 <div className="divide-y divide-border">
                   {interactions.isLoading ? (
                     <Empty label="Loading…" />
+                  ) : interactions.isError ? (
+                    <Empty label="Duty of Care unavailable" />
                   ) : filtered.length === 0 ? (
                     <Empty label="No goalkeepers in this band" />
                   ) : (
@@ -419,7 +444,7 @@ function InsightDrilldown() {
                       {periodLabel}
                     </span>
                   }
-                >{`Match reports (${rows.length})`}</SectionTitle>
+                >{`Match reports (${availableCount(reports.isLoading, reports.isError, rows.length)})`}</SectionTitle>
                 <div className="divide-y divide-border">
                   {reports.isLoading ? (
                     <Empty label="Loading…" />
@@ -460,14 +485,16 @@ function InsightDrilldown() {
 
         {active === "mentors" &&
           (() => {
-            const rows = (users.data ?? []).filter((u) => u.role === "mentor");
+            const rows = buildActiveMentorInsightRows(mentorDirectory.data ?? [], users.data ?? []);
+            const isLoading = users.isLoading || mentorDirectory.isLoading;
+            const isError = users.isError || mentorDirectory.isError;
             return (
               <>
-                <SectionTitle>{`Mentors (${rows.length})`}</SectionTitle>
+                <SectionTitle>{`Mentors (${availableCount(isLoading, isError, rows.length)})`}</SectionTitle>
                 <div className="divide-y divide-border">
-                  {users.isLoading ? (
+                  {isLoading ? (
                     <Empty label="Loading…" />
-                  ) : users.isError ? (
+                  ) : isError ? (
                     <Empty label="Directory unavailable" />
                   ) : rows.length === 0 ? (
                     <Empty label="No mentor accounts" />
@@ -485,7 +512,7 @@ function InsightDrilldown() {
                           {u.firstName} {u.lastName}
                         </div>
                         <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
-                          Mentor
+                          {u.isManager ? "Mentor Manager" : "Mentor"}
                         </div>
                       </Row>
                     ))
@@ -503,7 +530,7 @@ function InsightDrilldown() {
               .sort((a, b) => a.event_date.localeCompare(b.event_date));
             return (
               <>
-                <SectionTitle>{`Scheduled events (${rows.length})`}</SectionTitle>
+                <SectionTitle>{`Scheduled events (${availableCount(events.isLoading, events.isError, rows.length)})`}</SectionTitle>
                 <div className="divide-y divide-border">
                   {events.isLoading ? (
                     <Empty label="Loading…" />
@@ -537,10 +564,10 @@ function InsightDrilldown() {
 
         {active === "alerts" && (
           <>
-            <SectionTitle>{`Alerts (${systemAlerts.length})`}</SectionTitle>
+            <SectionTitle>Reference alerts (—)</SectionTitle>
             <div className="space-y-2">
               {systemAlerts.length === 0 ? (
-                <Empty label="No active alerts" />
+                <Empty label="Live alert feed not connected" />
               ) : (
                 systemAlerts.map((a) => (
                   <div

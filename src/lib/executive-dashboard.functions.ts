@@ -3,6 +3,11 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
 import type { MatchReportRow } from "@/lib/match-reports/schema";
 import { DASHBOARD_INTERACTION_TYPES } from "@/lib/interactions/schema";
+import { getActiveMentorCount } from "@/lib/active-mentors";
+import { EXECUTIVE_DASHBOARD_ROLES, requireRole } from "@/lib/roles.server";
+import { inclusiveDatePeriodStart } from "@/lib/dashboard-period";
+import { readAllPages } from "@/lib/paginated-read";
+import { countCoveredPlayerRecords } from "@/lib/dashboard-coverage";
 
 export interface ExecutiveBar {
   label: string;
@@ -22,9 +27,9 @@ export interface ExecutiveDashboardStats {
   coverageDays: number;
   /** Interactions logged across the whole team in the selected period. */
   interactionsInPeriod: number;
-  /** Accounts holding the mentor role — public.user_roles. */
+  /** Accounts with mentor access (mentor or mentor_manager). */
   activeMentors: number;
-  /** Canonical Sheets match reports whose match_date falls in the period. */
+  /** Canonical Supabase match reports whose match_date falls in the period. */
   reportsInPeriod: number;
   /** Match report volume per week for the last 8 completed weeks. */
   reportWeeks: ExecutiveBar[];
@@ -35,6 +40,17 @@ export interface ExecutiveDashboardStats {
   /** Interactions in period grouped by mentor. */
   mentorLeaderboard: ExecutiveMentorRow[];
   lastUpdatedAt: string;
+}
+
+interface ExecutiveInteractionRow {
+  id: string;
+  mentor_name: string | null;
+  interaction_type: string;
+}
+
+interface CoverageInteractionRow {
+  id: string;
+  player_id: string | null;
 }
 
 const executiveInputSchema = z.object({
@@ -63,45 +79,52 @@ export const getExecutiveDashboardStats = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .validator((data) => executiveInputSchema.parse(data))
   .handler(async ({ context, data }): Promise<ExecutiveDashboardStats> => {
-    const { supabase } = context;
+    const { supabase, userId } = context;
+    await requireRole(supabase, userId, EXECUTIVE_DASHBOARD_ROLES, "view the executive dashboard");
 
-    const coverageFrom = new Date(`${data.toDate}T00:00:00`);
-    coverageFrom.setDate(coverageFrom.getDate() - data.coverageDays);
-    const coverageFromDate = coverageFrom.toISOString().slice(0, 10);
+    const coverageFromDate = inclusiveDatePeriodStart(data.toDate, data.coverageDays);
 
-    const [players, periodInteractions, coverageInteractions, mentorRoles] = await Promise.all([
+    const [players, rowsInPeriod, coverageRows, activeMentors] = await Promise.all([
       supabase.from("players").select("id", { count: "exact", head: true }),
-      supabase
-        .from("interactions")
-        .select("id, mentor_name, interaction_type")
-        .in("interaction_type", [...DASHBOARD_INTERACTION_TYPES])
-        .gte("occurred_at", data.fromDate)
-        .lte("occurred_at", data.toDate),
-      supabase
-        .from("interactions")
-        .select("player_id, gk_slug")
-        .in("interaction_type", [...DASHBOARD_INTERACTION_TYPES])
-        .gte("occurred_at", coverageFromDate)
-        .lte("occurred_at", data.toDate),
-      supabase.from("user_roles").select("user_id").eq("role", "mentor"),
+      readAllPages<ExecutiveInteractionRow>(
+        (from, to) =>
+          supabase
+            .from("interactions")
+            .select("id, mentor_name, interaction_type")
+            .in("interaction_type", [...DASHBOARD_INTERACTION_TYPES])
+            .gte("occurred_at", data.fromDate)
+            .lte("occurred_at", data.toDate)
+            .order("occurred_at", { ascending: false })
+            .order("id", { ascending: false })
+            .range(from, to),
+        "Could not load executive interactions.",
+      ),
+      readAllPages<CoverageInteractionRow>(
+        (from, to) =>
+          supabase
+            .from("interactions")
+            .select("id, player_id")
+            .gte("occurred_at", coverageFromDate)
+            .lte("occurred_at", data.toDate)
+            .order("occurred_at", { ascending: false })
+            .order("id", { ascending: false })
+            .range(from, to),
+        "Could not load goalkeeper coverage.",
+      ),
+      getActiveMentorCount(supabase),
     ]);
 
-    const rowsInPeriod = periodInteractions.data ?? [];
-    const covered = new Set(
-      (coverageInteractions.data ?? [])
-        .map((row) => row.player_id ?? row.gk_slug)
-        .filter((value): value is string => Boolean(value)),
-    );
+    if (players.error) throw new Error("Could not load the goalkeeper count.");
+    if (typeof players.count !== "number") {
+      throw new Error("The goalkeeper count was unavailable.");
+    }
+
+    const coveredGoalkeepers = countCoveredPlayerRecords(coverageRows);
 
     // Match Reports come from the same canonical Supabase store as /reports.
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { listCanonicalReports } = await import("@/lib/match-reports/store.server");
-    let reports: MatchReportRow[] = [];
-    try {
-      reports = await listCanonicalReports(supabaseAdmin);
-    } catch {
-      reports = [];
-    }
+    const reports: MatchReportRow[] = await listCanonicalReports(supabaseAdmin);
 
     const inPeriod = reports.filter(
       (r) => r.match_date != null && r.match_date >= data.fromDate && r.match_date <= data.toDate,
@@ -124,11 +147,11 @@ export const getExecutiveDashboardStats = createServerFn({ method: "GET" })
     });
 
     return {
-      totalGoalkeepers: players.count ?? 0,
-      coveredGoalkeepers: covered.size,
+      totalGoalkeepers: players.count,
+      coveredGoalkeepers,
       coverageDays: data.coverageDays,
       interactionsInPeriod: rowsInPeriod.length,
-      activeMentors: new Set((mentorRoles.data ?? []).map((r) => r.user_id)).size,
+      activeMentors,
       reportsInPeriod: inPeriod.length,
       reportWeeks,
       interactionsByType: tally(

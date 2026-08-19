@@ -2,15 +2,16 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
 import { DASHBOARD_INTERACTION_TYPES } from "@/lib/interactions/schema";
+import { getActiveMentorCount } from "@/lib/active-mentors";
+import { requireExactDashboardCount } from "@/lib/dashboard-count";
+import { OVERVIEW_DASHBOARD_ROLES, requireRole } from "@/lib/roles.server";
 
 export interface OverviewDashboardStats {
   /** Canonical player records — public.players. */
   totalGoalkeepers: number;
   /** Interactions logged across the whole team in the selected period. */
   interactionsInPeriod: number;
-  /** Interactions logged by the signed-in user in the same period. */
-  myInteractionsInPeriod: number;
-  /** Distinct accounts holding the mentor role — public.user_roles. */
+  /** Distinct accounts with mentor access (mentor or mentor_manager). */
   activeMentors: number;
   lastUpdatedAt: string;
 }
@@ -30,8 +31,9 @@ export const getOverviewDashboardStats = createServerFn({ method: "GET" })
   .validator((data) => overviewInputSchema.parse(data))
   .handler(async ({ context, data }): Promise<OverviewDashboardStats> => {
     const { supabase, userId } = context;
+    await requireRole(supabase, userId, OVERVIEW_DASHBOARD_ROLES, "view the management dashboard");
 
-    const [players, periodInteractions, myInteractions, mentorRoles] = await Promise.all([
+    const [players, periodInteractions, activeMentors] = await Promise.all([
       supabase.from("players").select("id", { count: "exact", head: true }),
       supabase
         .from("interactions")
@@ -39,21 +41,19 @@ export const getOverviewDashboardStats = createServerFn({ method: "GET" })
         .in("interaction_type", [...DASHBOARD_INTERACTION_TYPES])
         .gte("occurred_at", data.fromDate)
         .lte("occurred_at", data.toDate),
-      supabase
-        .from("interactions")
-        .select("id", { count: "exact", head: true })
-        .eq("mentor_id", userId)
-        .in("interaction_type", [...DASHBOARD_INTERACTION_TYPES])
-        .gte("occurred_at", data.fromDate)
-        .lte("occurred_at", data.toDate),
-      supabase.from("user_roles").select("user_id").eq("role", "mentor"),
+      getActiveMentorCount(supabase),
     ]);
 
+    const totalGoalkeepers = requireExactDashboardCount(players, "goalkeeper count");
+    const interactionsInPeriod = requireExactDashboardCount(
+      periodInteractions,
+      "interaction count",
+    );
+
     return {
-      totalGoalkeepers: players.count ?? 0,
-      interactionsInPeriod: periodInteractions.count ?? 0,
-      myInteractionsInPeriod: myInteractions.count ?? 0,
-      activeMentors: new Set((mentorRoles.data ?? []).map((r) => r.user_id)).size,
+      totalGoalkeepers,
+      interactionsInPeriod,
+      activeMentors,
       lastUpdatedAt: new Date().toISOString(),
     };
   });

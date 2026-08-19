@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useEffect, useMemo } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { PageHeader, Card, StatCard, SectionTitle, ProgressBar } from "@/components/primitives";
 import { withPermission } from "@/components/require-permission";
@@ -35,6 +35,7 @@ export const Route = createFileRoute("/executive")({
 
 function Executive() {
   const period = useMemo(() => lastNDaysPeriod(PERIOD_DAYS), []);
+  const queryClient = useQueryClient();
   const fetchStats = useServerFn(getExecutiveDashboardStats);
   const { data, isLoading, isError } = useQuery({
     queryKey: ["executive-dashboard-stats", period.fromDate, period.toDate],
@@ -45,6 +46,14 @@ function Executive() {
     staleTime: 30_000,
   });
 
+  useEffect(() => {
+    const refresh = () => {
+      void queryClient.invalidateQueries({ queryKey: ["executive-dashboard-stats"] });
+    };
+    window.addEventListener("rpm:report-submitted", refresh);
+    return () => window.removeEventListener("rpm:report-submitted", refresh);
+  }, [queryClient]);
+
   const placeholder = isLoading ? "…" : isError ? "—" : 0;
   const coverage =
     data && data.totalGoalkeepers > 0
@@ -53,7 +62,9 @@ function Executive() {
   const avgInteractions =
     data && data.activeMentors > 0
       ? (data.interactionsInPeriod / data.activeMentors).toFixed(1)
-      : "0.0";
+      : data
+        ? "0.0"
+        : null;
   const maxWeek = Math.max(...(data?.reportWeeks.map((w) => w.count) ?? [0]), 1);
   const maxLeader = Math.max(...(data?.mentorLeaderboard.map((m) => m.interactions) ?? [0]), 1);
   const totalTypes = data?.interactionsByType.reduce((sum, t) => sum + t.count, 0) ?? 0;
@@ -98,9 +109,11 @@ function Executive() {
             label={`GK Coverage (${COVERAGE_DAYS}d)`}
             value={coverage == null ? placeholder : `${coverage}%`}
             hint={
-              data
-                ? `${data.coveredGoalkeepers} of ${data.totalGoalkeepers} player records observed`
-                : "Player records observed"
+              isError
+                ? "Coverage unavailable"
+                : data
+                  ? `${data.coveredGoalkeepers} of ${data.totalGoalkeepers} player records observed`
+                  : "Player records observed"
             }
             accent="primary"
           />
@@ -109,7 +122,15 @@ function Executive() {
           <StatCard
             label="Active Mentors"
             value={data?.activeMentors ?? placeholder}
-            hint={`${avgInteractions} avg interactions ea. (${PERIOD_DAYS}d)`}
+            hint={
+              isError
+                ? "Average unavailable"
+                : avgInteractions === null
+                  ? isLoading
+                    ? "Loading average…"
+                    : "Average unavailable"
+                  : `${avgInteractions} avg interactions ea. (${PERIOD_DAYS}d)`
+            }
           />
         </Link>
         <Link
@@ -119,9 +140,9 @@ function Executive() {
           aria-label="View match reports"
         >
           <StatCard
-            label="Reports Submitted"
+            label="Match Reports"
             value={data?.reportsInPeriod ?? placeholder}
-            hint={`Last ${PERIOD_DAYS} days`}
+            hint={isError ? "Count unavailable" : `Match dates · last ${PERIOD_DAYS} days`}
             accent="info"
           />
         </Link>
@@ -134,7 +155,7 @@ function Executive() {
           <StatCard
             label="Interactions Logged"
             value={data?.interactionsInPeriod ?? placeholder}
-            hint={`Last ${PERIOD_DAYS} days`}
+            hint={isError ? "Count unavailable" : `Last ${PERIOD_DAYS} days`}
             accent="warning"
           />
         </Link>
@@ -146,7 +167,9 @@ function Executive() {
           <div className="flex items-end gap-2 h-48">
             {(data?.reportWeeks ?? []).map((w) => (
               <div key={w.label} className="flex-1 flex flex-col items-center gap-1.5">
-                <div className="text-[10px] tabular-nums font-mono text-muted-foreground">{w.count}</div>
+                <div className="text-[10px] tabular-nums font-mono text-muted-foreground">
+                  {w.count}
+                </div>
                 <div
                   className="w-full bg-primary/70 rounded-t hover:bg-primary transition-colors"
                   style={{ height: `${(w.count / maxWeek) * 100}%` }}
@@ -215,12 +238,16 @@ function Executive() {
             <div className="space-y-2">
               {data.mentorLeaderboard.map((m, i) => (
                 <div key={m.name} className="flex items-center gap-3">
-                  <div className="w-6 text-xs tabular-nums font-mono text-muted-foreground">{i + 1}</div>
+                  <div className="w-6 text-xs tabular-nums font-mono text-muted-foreground">
+                    {i + 1}
+                  </div>
                   <div className="flex-1 text-sm font-medium truncate">{m.name}</div>
                   <div className="w-32">
                     <ProgressBar value={(m.interactions / maxLeader) * 100} />
                   </div>
-                  <div className="text-xs tabular-nums font-mono w-8 text-right">{m.interactions}</div>
+                  <div className="text-xs tabular-nums font-mono w-8 text-right">
+                    {m.interactions}
+                  </div>
                 </div>
               ))}
             </div>

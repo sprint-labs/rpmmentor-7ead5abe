@@ -14,7 +14,7 @@ import { eventFollowUpsQueryKey } from "@/lib/events/query-keys";
 /**
  * Everything that reflects an interaction: the interactions log (shared cache
  * and paged queries), the attached voice recordings, the dashboard Recent
- * Activity card, goalkeeper profile timelines, the mentor dashboard stats that
+ * Logged Interactions panel, goalkeeper profile timelines, the mentor dashboard stats that
  * drive Duty of Care, the calendar's missing-report badges, and the follow-up
  * statuses — a saved write-up is what turns a requirement to Completed, so the
  * status has to be re-read rather than left in cache.
@@ -28,6 +28,8 @@ export async function refreshInteractionViews(queryClient: QueryClient): Promise
     queryClient.invalidateQueries({ queryKey: ["interactions", "page"] }),
     queryClient.invalidateQueries({ queryKey: ["interactions", "audio"] }),
     queryClient.invalidateQueries({ queryKey: ["mentor-dashboard-stats"] }),
+    queryClient.invalidateQueries({ queryKey: ["overview-dashboard-stats"] }),
+    queryClient.invalidateQueries({ queryKey: ["executive-dashboard-stats"] }),
     queryClient.invalidateQueries({ queryKey: reportCoverageQueryKey }),
     queryClient.invalidateQueries({ queryKey: eventFollowUpsQueryKey }),
   ]);
@@ -66,4 +68,3 @@ export async function refreshUserDirectoryViews(queryClient: QueryClient): Promi
     refreshInteractionViews(queryClient),
   ]);
 }
-

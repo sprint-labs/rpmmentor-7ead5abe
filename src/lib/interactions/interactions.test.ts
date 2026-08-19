@@ -9,6 +9,7 @@ import {
   DASHBOARD_INTERACTION_TYPES,
   MATCH_REPORT_INTERACTION_TYPE,
   interactionTypeForEdit,
+  isDashboardInteractionType,
 } from "@/lib/interactions/schema";
 
 import { mapInteractionRow, type InteractionDbRow } from "@/lib/interactions/map";
@@ -28,7 +29,9 @@ const validInput = {
 describe("interaction input validation", () => {
   it("accepts every manually loggable interaction type", () => {
     for (const t of MANUAL_INTERACTION_TYPES) {
-      expect(createInteractionInput.parse({ ...validInput, interactionType: t }).interactionType).toBe(t);
+      expect(
+        createInteractionInput.parse({ ...validInput, interactionType: t }).interactionType,
+      ).toBe(t);
     }
   });
 
@@ -37,9 +40,18 @@ describe("interaction input validation", () => {
     expect(MANUAL_INTERACTION_TYPES).not.toContain(MATCH_REPORT_INTERACTION_TYPE);
   });
 
+  it("keeps report-generated observations out of dashboard interaction totals", () => {
+    expect(isDashboardInteractionType("Coffee Catch Up")).toBe(true);
+    expect(isDashboardInteractionType(MATCH_REPORT_INTERACTION_TYPE)).toBe(false);
+    expect(isDashboardInteractionType("Unknown interaction")).toBe(false);
+  });
+
   it("rejects Live Match Observation on create", () => {
     expect(() =>
-      createInteractionInput.parse({ ...validInput, interactionType: MATCH_REPORT_INTERACTION_TYPE }),
+      createInteractionInput.parse({
+        ...validInput,
+        interactionType: MATCH_REPORT_INTERACTION_TYPE,
+      }),
     ).toThrow();
   });
 
@@ -56,12 +68,15 @@ describe("interaction input validation", () => {
   });
 
   it("rejects an unknown interaction type", () => {
-    expect(() => createInteractionInput.parse({ ...validInput, interactionType: "Face to Face" })).toThrow();
+    expect(() =>
+      createInteractionInput.parse({ ...validInput, interactionType: "Face to Face" }),
+    ).toThrow();
   });
 
-
   it("rejects a timestamp in the calendar-date field", () => {
-    expect(() => createInteractionInput.parse({ ...validInput, occurredAt: "2026-01-05T22:30:00Z" })).toThrow();
+    expect(() =>
+      createInteractionInput.parse({ ...validInput, occurredAt: "2026-01-05T22:30:00Z" }),
+    ).toThrow();
   });
 
   it("requires notes and a goalkeeper", () => {
@@ -76,7 +91,10 @@ describe("interaction input validation", () => {
   });
 
   it("never accepts mentor identity from the client", () => {
-    const parsed = createInteractionInput.parse({ ...validInput, mentorId: "attacker-uuid" }) as Record<string, unknown>;
+    const parsed = createInteractionInput.parse({
+      ...validInput,
+      mentorId: "attacker-uuid",
+    }) as Record<string, unknown>;
     expect(parsed["mentorId"]).toBeUndefined();
   });
 });
@@ -108,10 +126,19 @@ describe("calendar date preservation", () => {
 
   it("maps a date column through without timezone parsing", () => {
     const row: InteractionDbRow = {
-      id: "1", gk_slug: "gk-demo", goalkeeper_name: "Demo Keeper", player_id: null,
-      mentor_id: "m1", mentor_name: "Mentor", interaction_type: "Phone Call",
-      club: null, occurred_at: "2026-01-05", notes: null, outcome: null,
-      follow_up: null, created_at: "2026-01-05T10:00:00Z",
+      id: "1",
+      gk_slug: "gk-demo",
+      goalkeeper_name: "Demo Keeper",
+      player_id: null,
+      mentor_id: "m1",
+      mentor_name: "Mentor",
+      interaction_type: "Phone Call",
+      club: null,
+      occurred_at: "2026-01-05",
+      notes: null,
+      outcome: null,
+      follow_up: null,
+      created_at: "2026-01-05T10:00:00Z",
     };
     const mapped = mapInteractionRow(row);
     expect(mapped.occurredAt).toBe("2026-01-05");

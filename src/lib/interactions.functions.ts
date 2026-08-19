@@ -22,22 +22,31 @@ import {
   type LoggedInteraction,
 } from "@/lib/interactions/schema";
 
-import { INTERACTION_COLUMNS, mapInteractionRow } from "@/lib/interactions/map";
+import {
+  INTERACTION_COLUMNS,
+  mapInteractionRow,
+  type InteractionDbRow,
+} from "@/lib/interactions/map";
 import { linkInteractionAudio } from "@/lib/interactions/audio-link";
 import { getUserRoles, hasAnyRole, INTERACTION_MANAGE_ROLES } from "@/lib/roles.server";
 import { MEDIA_BUCKET } from "@/lib/storage/bucket";
+import { readAllPages } from "@/lib/paginated-read";
 
 export const listInteractions = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<LoggedInteraction[]> => {
-    const { data, error } = await context.supabase
-      .from("interactions")
-      .select(INTERACTION_COLUMNS)
-      .order("occurred_at", { ascending: false })
-      .order("created_at", { ascending: false })
-      .limit(500);
-    if (error) throw new Error(error.message);
-    return (data ?? []).map(mapInteractionRow);
+    const rows = await readAllPages<InteractionDbRow>(
+      (from, to) =>
+        context.supabase
+          .from("interactions")
+          .select(INTERACTION_COLUMNS)
+          .order("occurred_at", { ascending: false })
+          .order("created_at", { ascending: false })
+          .order("id", { ascending: false })
+          .range(from, to),
+      "Could not load interactions.",
+    );
+    return rows.map(mapInteractionRow);
   });
 
 export const createInteraction = createServerFn({ method: "POST" })
@@ -54,8 +63,6 @@ export const createInteraction = createServerFn({ method: "POST" })
         `"${MATCH_REPORT_INTERACTION_TYPE}" is recorded by submitting a Match Report, not by logging an interaction.`,
       );
     }
-
-
 
     // Mentor identity: derived server-side, never client-supplied.
     const { data: profile, error: profileError } = await supabase
@@ -125,9 +132,8 @@ export const createInteraction = createServerFn({ method: "POST" })
 
     // Read-back is mandatory: no inserted row means no success.
     if (error) {
-      const { isDuplicateFollowUp, DUPLICATE_FOLLOW_UP_MESSAGE } = await import(
-        "@/lib/events/link-follow-up.server"
-      );
+      const { isDuplicateFollowUp, DUPLICATE_FOLLOW_UP_MESSAGE } =
+        await import("@/lib/events/link-follow-up.server");
       if (calendarEventId && isDuplicateFollowUp(error)) {
         throw new Error(DUPLICATE_FOLLOW_UP_MESSAGE);
       }

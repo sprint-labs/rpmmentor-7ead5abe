@@ -3,7 +3,7 @@
  * Outstanding actions are presented as the breakdown list only, not a metric card.
  */
 export const mentorDashboardMetricCardLabels = {
-  matchReportsSubmitted: "Match Reports Submitted",
+  matchReportsSubmitted: "Match Reports",
   interactionsLogged: "Interactions Logged",
 } as const;
 

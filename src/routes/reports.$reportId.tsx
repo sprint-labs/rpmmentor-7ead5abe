@@ -125,6 +125,7 @@ function ReportDetail() {
       queryClient.invalidateQueries({ queryKey: ["match-reports"] }),
       queryClient.invalidateQueries({ queryKey: ["mentor-dashboard-stats"] }),
       queryClient.invalidateQueries({ queryKey: ["overview-dashboard-stats"] }),
+      queryClient.invalidateQueries({ queryKey: ["executive-dashboard-stats"] }),
       // Deleting a report withdraws it as calendar coverage, so the goalkeeper's
       // Match Report badge has to come back.
       queryClient.invalidateQueries({ queryKey: reportCoverageQueryKey }),

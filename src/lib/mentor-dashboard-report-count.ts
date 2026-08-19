@@ -14,6 +14,12 @@ export function resolveCoachIdentity(profile: DashboardCoachProfile | null | und
   return (profile?.name || profile?.email || "").trim();
 }
 
+export function requireCoachIdentity(profile: DashboardCoachProfile | null | undefined): string {
+  const identity = resolveCoachIdentity(profile);
+  if (!identity) throw new Error("Your Match Report identity was unavailable.");
+  return identity;
+}
+
 /**
  * A Super Admin previewing the Mentor view represents the effective mentor,
  * rather than the Super Admin's own profile.

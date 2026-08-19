@@ -8,7 +8,7 @@
  * `from`/`to` are absolute instants (used for `timestamptz` columns such as
  * `media_assets.created_at`). `fromDate`/`toDate` are the *local* calendar
  * days of the same window (used for `date` columns such as
- * `interactions.occurred_at` and the Sheets `match_date`). Deriving the day
+ * `interactions.occurred_at` and the canonical report `match_date`). Deriving the day
  * from the UTC ISO string instead would shift the window by one day for any
  * user east/west of UTC.
  */
@@ -27,11 +27,32 @@ export function toLocalDateOnly(date: Date): string {
   return `${year}-${month}-${day}`;
 }
 
+/**
+ * Start date for an inclusive N-calendar-day window ending on `toDate`.
+ * Date-only values are parsed in UTC so British Summer Time cannot shift the
+ * result onto the previous day when it is serialised.
+ */
+export function inclusiveDatePeriodStart(toDate: string, days: number): string {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(toDate) || !Number.isInteger(days) || days < 1) {
+    throw new Error("A valid end date and positive whole-day period are required.");
+  }
+  const [year, month, day] = toDate.split("-").map(Number) as [number, number, number];
+  const start = new Date(Date.UTC(year, month - 1, day));
+  if (start.toISOString().slice(0, 10) !== toDate) {
+    throw new Error("A valid end date and positive whole-day period are required.");
+  }
+  start.setUTCDate(start.getUTCDate() - (days - 1));
+  return start.toISOString().slice(0, 10);
+}
+
 export function lastNDaysPeriod(days: number, now = new Date()): DashboardPeriod {
+  if (!Number.isInteger(days) || days < 1) {
+    throw new Error("Dashboard periods must contain at least one whole day.");
+  }
   const to = new Date(now);
   to.setHours(23, 59, 59, 999);
   const from = new Date(now);
-  from.setDate(from.getDate() - days);
+  from.setDate(from.getDate() - (days - 1));
   from.setHours(0, 0, 0, 0);
   return {
     days,

@@ -1,21 +1,18 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { WorkflowDialog, type WorkflowKind } from "@/components/workflows";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { PageHeader, StatCard, SectionTitle, TierBadge } from "@/components/primitives";
 import {
-  activity,
   alerts,
   goalkeepers,
-  
   stats,
   formatRelative,
-  
   computeDutyOverview,
   type Alert,
 } from "@/lib/mock-data";
-import { useDutySource, useLoggedInteractions } from "@/lib/interactions/use-interactions";
+import { useLoggedInteractions } from "@/lib/interactions/use-interactions";
 import { ErrorBoundary } from "@/components/error-boundary";
 
 function initialsOf(name: string) {
@@ -29,7 +26,15 @@ function initialsOf(name: string) {
   );
 }
 
-import { ArrowUpRight, AlertTriangle, CalendarClock, FileText, Users, UserCog, Plus } from "lucide-react";
+import {
+  ArrowUpRight,
+  AlertTriangle,
+  CalendarClock,
+  FileText,
+  Users,
+  UserCog,
+  Plus,
+} from "lucide-react";
 import { useAuth, ROLE_LABEL } from "@/lib/auth";
 import { MentorDashboard } from "@/components/mentor/mentor-dashboard";
 import { SyncStatusChip } from "@/components/sync-status-chip";
@@ -46,6 +51,7 @@ export const Route = createFileRoute("/")({ component: Dashboard });
 function Dashboard() {
   const { user, can } = useAuth();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [workflow, setWorkflow] = useState<WorkflowKind | null>(null);
 
   /**
@@ -69,7 +75,7 @@ function Dashboard() {
     isError: reportsError,
   } = useQuery({
     // Share the Reports page cache so the dashboard number and the
-    // destination list are based on the same Sheets read.
+    // destination list are based on the same canonical Supabase read.
     queryKey: ["match-reports"],
     queryFn: () => listReports(),
     enabled: Boolean(user && user.role !== "mentor"),
@@ -80,7 +86,7 @@ function Dashboard() {
   // the window used by the mentor Interactions card.
   const period = useMemo(() => lastNDaysPeriod(OVERVIEW_PERIOD_DAYS), []);
   const fetchOverview = useServerFn(getOverviewDashboardStats);
-  const { data: overview } = useQuery({
+  const { data: overview, isError: overviewError } = useQuery({
     queryKey: ["overview-dashboard-stats", period.fromDate, period.toDate],
     queryFn: () => fetchOverview({ data: { fromDate: period.fromDate, toDate: period.toDate } }),
     enabled: Boolean(user && user.role !== "mentor"),
@@ -121,11 +127,19 @@ function Dashboard() {
     if (!user) navigate({ to: "/login", search: { next: "/" }, replace: true });
   }, [user, navigate]);
 
+  useEffect(() => {
+    const refreshReports = () => {
+      void queryClient.invalidateQueries({ queryKey: ["match-reports"] });
+    };
+    window.addEventListener("rpm:report-submitted", refreshReports);
+    return () => window.removeEventListener("rpm:report-submitted", refreshReports);
+  }, [queryClient]);
+
   // Hooks must run unconditionally — this query stays above every early return
   // and is disabled unless a signed-in, non-mentor user is viewing the page.
   const {
     data: loggedInteractions,
-    isLoading: interactionsLoading,
+    isPending: interactionsPending,
     isError: interactionsError,
   } = useLoggedInteractions(Boolean(user) && user?.role !== "mentor");
   const dutySource = useMemo(
@@ -138,13 +152,12 @@ function Dashboard() {
     [loggedInteractions],
   );
 
-  // Recent Activity merges durable interactions with other real events, so a
-  // newly logged interaction appears as soon as the shared cache refreshes.
+  // Show only durable interactions here; sample activity must never be mixed
+  // into a live operational dashboard.
   const recentActivity = useMemo(
     () =>
-      [
-        ...activity,
-        ...(loggedInteractions ?? []).map((i) => ({
+      (loggedInteractions ?? [])
+        .map((i) => ({
           id: `interaction-${i.id}`,
           actor: i.mentorName || "Mentor",
           actorInitials: initialsOf(i.mentorName || "Mentor"),
@@ -152,8 +165,7 @@ function Dashboard() {
           target: i.goalkeeperName,
           gkId: i.gkSlug,
           date: i.occurredAt,
-        })),
-      ]
+        }))
         .sort((a, b) => +new Date(b.date) - +new Date(a.date))
         .slice(0, 8),
     [loggedInteractions],
@@ -191,7 +203,8 @@ function Dashboard() {
                 onClick={() => setWorkflow("report")}
                 className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md bg-primary text-primary-foreground text-xs uppercase tracking-[0.06em] font-semibold hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
-                <FileText className="size-4" />Submit a Match report
+                <FileText className="size-4" />
+                Submit a Match report
               </button>
             )}
             {can("interactions.log") && (
@@ -199,7 +212,8 @@ function Dashboard() {
                 onClick={() => setWorkflow("interaction")}
                 className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md border border-border text-xs uppercase tracking-[0.06em] font-semibold hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
-                <Plus className="size-4" />Log interaction
+                <Plus className="size-4" />
+                Log interaction
               </button>
             )}
           </div>
@@ -215,8 +229,8 @@ function Dashboard() {
         >
           <StatCard
             label="Total Goalkeepers"
-            value={overview?.totalGoalkeepers ?? "…"}
-            hint="Player records on file"
+            value={overviewError ? "—" : (overview?.totalGoalkeepers ?? "…")}
+            hint={overviewError ? "Count unavailable" : "Player records on file"}
           />
         </Link>
         <Link
@@ -228,8 +242,8 @@ function Dashboard() {
         >
           <StatCard
             label="Interactions Logged"
-            value={overview?.interactionsInPeriod ?? "…"}
-            hint={`Last ${OVERVIEW_PERIOD_DAYS} days`}
+            value={overviewError ? "—" : (overview?.interactionsInPeriod ?? "…")}
+            hint={overviewError ? "Count unavailable" : `Last ${OVERVIEW_PERIOD_DAYS} days`}
             accent="info"
             emptyMessage="None logged"
           />
@@ -243,8 +257,8 @@ function Dashboard() {
         >
           <StatCard
             label="Overdue Duty of Care"
-            value={interactionsLoading ? "…" : interactionsError ? "—" : dutyOverview.overdue}
-            hint={interactionsError ? "Count unavailable" : "Past tier cadence"}
+            value={interactionsPending ? "…" : interactionsError ? "—" : dutyOverview.overdue}
+            hint={interactionsError ? "Count unavailable" : "Reference tier roster"}
             accent="warning"
             emptyMessage="All caught up"
           />
@@ -254,16 +268,20 @@ function Dashboard() {
           params={{ metric: "reports" }}
           search={{ from: period.fromDate, to: period.toDate, level: "" }}
           className="block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-          aria-label="Break down match reports submitted"
+          aria-label="Break down match reports by match date"
         >
           <StatCard
-            label="Match Reports Submitted"
+            label="Match Reports"
             value={
               reportsLoading ? "…" : reportsError || reportsInPeriod == null ? "—" : reportsInPeriod
             }
-            hint={reportsError ? "Report count unavailable" : `Last ${OVERVIEW_PERIOD_DAYS} days`}
+            hint={
+              reportsError
+                ? "Report count unavailable"
+                : `Match dates · last ${OVERVIEW_PERIOD_DAYS} days`
+            }
             accent="primary"
-            emptyMessage="None submitted"
+            emptyMessage="None in period"
           />
         </Link>
         <Link
@@ -275,12 +293,11 @@ function Dashboard() {
         >
           <StatCard
             label="Active Mentors"
-            value={overview?.activeMentors ?? "…"}
-            hint="Accounts with mentor access"
+            value={overviewError ? "—" : (overview?.activeMentors ?? "…")}
+            hint={overviewError ? "Count unavailable" : "Mentors and mentor managers"}
           />
         </Link>
       </div>
-
 
       {/* Operational grid */}
       <div className="grid grid-cols-12 gap-4">
@@ -306,84 +323,95 @@ function Dashboard() {
               </div>
             }
           >
-            Duty of Care Monitor
+            Duty of Care Monitor · Reference
           </SectionTitle>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-5">
-            {(
-              [
-                {
-                  level: "up_to_date",
-                  label: "Up to date",
-                  count: dutyOverview.up_to_date,
-                  hint: "On cadence for tier",
-                  bar: "bg-success",
-                  value: "text-success",
-                },
-                {
-                  level: "due_soon",
-                  label: "Due soon",
-                  count: dutyOverview.due_soon,
-                  hint: "Approaching cadence",
-                  bar: "bg-warning",
-                  value: "text-warning",
-                },
-                {
-                  level: "overdue",
-                  label: "Overdue",
-                  count: dutyOverview.overdue,
-                  hint: "Past required cadence",
-                  bar: "bg-warning",
-                  value: "text-warning",
-                },
-                {
-                  level: "not_required",
-                  label: "Not required",
-                  count: dutyOverview.not_required,
-                  hint: "Tier 4 — no formal duty",
-                  bar: "bg-muted-foreground/50",
-                  value: "text-foreground",
-                },
-                {
-                  level: "not_enough_data",
-                  label: "Not enough data",
-                  count: dutyOverview.not_enough_data,
-                  hint: "Missing tier or interactions",
-                  bar: "bg-muted-foreground/50",
-                  value: "text-foreground",
-                },
-              ] as const
-            ).map((b) => {
-              const pct = Math.round((b.count / Math.max(1, dutyOverview.total)) * 100);
-              return (
-                <Link
-                  key={b.level}
-                  to="/insights/$metric"
-                  params={{ metric: "duty" }}
-                  search={{ from: period.fromDate, to: period.toDate, level: b.level }}
-                  aria-label={`View goalkeepers: ${b.label}`}
-                  className="space-y-2 block -mx-2 px-2 py-1 hover:bg-accent/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                >
-                  <div className="h-1.5 w-full bg-background overflow-hidden">
-                    <div className={`h-full bar-grow ${b.bar}`} style={{ width: `${pct}%` }} />
-                  </div>
-                  <div className="flex items-baseline justify-between font-mono text-xs">
-                    <span className="text-muted-foreground">{b.label}</span>
-                    <span className={`tabular-nums font-bold ${b.value}`}>{b.count}</span>
-                  </div>
-                  <div className="flex items-center justify-between text-[10px] text-muted-foreground/70">
-                    <span>{b.hint}</span>
-                    <span className="font-mono tabular-nums">{pct}%</span>
-                  </div>
-                </Link>
-              );
-
-            })}
-          </div>
+          <p className="mb-4 text-[10px] text-muted-foreground">
+            Reference tier roster combined with live logged interactions.
+          </p>
+          {interactionsPending ? (
+            <p className="text-sm text-muted-foreground">Loading duty-of-care figures…</p>
+          ) : interactionsError ? (
+            <p className="text-sm text-muted-foreground">Duty-of-care figures are unavailable.</p>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-5">
+              {(
+                [
+                  {
+                    level: "up_to_date",
+                    label: "Up to date",
+                    count: dutyOverview.up_to_date,
+                    hint: "On cadence for tier",
+                    bar: "bg-success",
+                    value: "text-success",
+                  },
+                  {
+                    level: "due_soon",
+                    label: "Due soon",
+                    count: dutyOverview.due_soon,
+                    hint: "Approaching cadence",
+                    bar: "bg-warning",
+                    value: "text-warning",
+                  },
+                  {
+                    level: "overdue",
+                    label: "Overdue",
+                    count: dutyOverview.overdue,
+                    hint: "Past required cadence",
+                    bar: "bg-warning",
+                    value: "text-warning",
+                  },
+                  {
+                    level: "not_required",
+                    label: "Not required",
+                    count: dutyOverview.not_required,
+                    hint: "Tier 4 — no formal duty",
+                    bar: "bg-muted-foreground/50",
+                    value: "text-foreground",
+                  },
+                  {
+                    level: "not_enough_data",
+                    label: "Not enough data",
+                    count: dutyOverview.not_enough_data,
+                    hint: "Missing tier or interactions",
+                    bar: "bg-muted-foreground/50",
+                    value: "text-foreground",
+                  },
+                ] as const
+              ).map((b) => {
+                const pct = Math.round((b.count / Math.max(1, dutyOverview.total)) * 100);
+                return (
+                  <Link
+                    key={b.level}
+                    to="/insights/$metric"
+                    params={{ metric: "duty" }}
+                    search={{ from: period.fromDate, to: period.toDate, level: b.level }}
+                    aria-label={`View goalkeepers: ${b.label}`}
+                    className="space-y-2 block -mx-2 px-2 py-1 hover:bg-accent/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                  >
+                    <div className="h-1.5 w-full bg-background overflow-hidden">
+                      <div className={`h-full bar-grow ${b.bar}`} style={{ width: `${pct}%` }} />
+                    </div>
+                    <div className="flex items-baseline justify-between font-mono text-xs">
+                      <span className="text-muted-foreground">{b.label}</span>
+                      <span className={`tabular-nums font-bold ${b.value}`}>{b.count}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-[10px] text-muted-foreground/70">
+                      <span>{b.hint}</span>
+                      <span className="font-mono tabular-nums">{pct}%</span>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         {/* Status distribution */}
         <div className="col-span-12 lg:col-span-4 command-panel p-5">
-          <SectionTitle>Distribution</SectionTitle>
+          <SectionTitle>Tier Distribution · Reference</SectionTitle>
+          <p className="mb-4 text-[10px] text-muted-foreground">
+            Reference roster; tier data is not yet stored on live player records.
+          </p>
           <div className="space-y-3">
             {stats.tierDistribution.map((t) => {
               const pct = Math.round((t.count / stats.totalGks) * 100);
@@ -547,10 +575,10 @@ function Dashboard() {
                 ) : undefined
               }
             >
-              Recent Events
+              Recent Logged Interactions
             </SectionTitle>
             <div className="space-y-3">
-              {interactionsLoading ? (
+              {interactionsPending ? (
                 <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground/70 py-6 text-center">
                   Loading…
                 </div>
@@ -595,14 +623,13 @@ function Dashboard() {
                 All <ArrowUpRight className="size-3" />
               </Link>
             }
-
           >
             System Alerts
           </SectionTitle>
           <div className="space-y-2">
             {alerts.length === 0 ? (
               <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground/70 py-6 text-center">
-                No active alerts
+                Live alert feed not connected
               </div>
             ) : (
               alerts.slice(0, 6).map((a) => {

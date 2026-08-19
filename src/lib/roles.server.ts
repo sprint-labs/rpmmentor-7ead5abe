@@ -45,6 +45,16 @@ export const USER_DIRECTORY_VIEW_ROLES: readonly AppRole[] = [
   "mentor",
 ];
 
+/** Roles served by the shared management overview on `/`. */
+export const OVERVIEW_DASHBOARD_ROLES: readonly AppRole[] = [
+  "super_admin",
+  "admin",
+  "mentor_manager",
+];
+
+/** Mirrors the `executive.view` permission enforced by the route. */
+export const EXECUTIVE_DASHBOARD_ROLES: readonly AppRole[] = ["super_admin", "admin"];
+
 export async function getUserRoles(supabase: AuthedClient, userId: string): Promise<AppRole[]> {
   const { data, error } = await supabase.from("user_roles").select("role").eq("user_id", userId);
   if (error) throw new Error(error.message);
