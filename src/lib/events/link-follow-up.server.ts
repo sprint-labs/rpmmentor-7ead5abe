@@ -14,6 +14,7 @@ import {
   type FollowUpKind,
 } from "./follow-up";
 import { hasAnyRole, getUserRoles, type AppRole } from "@/lib/roles.server";
+import type { InteractionTypeValue } from "@/lib/interactions/schema";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type LinkClient = { from: (table: string) => any };
@@ -30,7 +31,7 @@ export interface VerifiedEventLink {
   goalkeeperName: string | null;
   eventDate: string;
   /** The stored interaction type required by this event, when applicable. */
-  interactionType: string | null;
+  interactionType: InteractionTypeValue | null;
 }
 
 /**
@@ -71,13 +72,14 @@ export async function verifyFollowUpTarget(
     }
   }
 
+  const eventType = String(event.event_type);
   return {
     eventId: event.id,
     playerId: event.player_id ?? null,
     goalkeeperName: event.goalkeeper_name ?? null,
     eventDate: String(event.event_date).slice(0, 10),
-    interactionType: isEventType(event.event_type)
-      ? (INTERACTION_TYPE_BY_EVENT_TYPE[event.event_type] ?? null)
+    interactionType: isEventType(eventType)
+      ? (INTERACTION_TYPE_BY_EVENT_TYPE[eventType] ?? null)
       : null,
   };
 }
