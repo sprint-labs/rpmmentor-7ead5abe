@@ -14,6 +14,7 @@
  * the saved record that satisfied it.
  */
 import { addHours, londonWallClockMs } from "@/lib/time/london";
+import type { InteractionTypeValue } from "@/lib/interactions/schema";
 
 /**
  * The three event types a manager may schedule.
@@ -60,7 +61,7 @@ export const FOLLOW_UP_KIND_BY_EVENT_TYPE: Record<EventType, FollowUpKind> = {
  * constraint on `public.interactions`, so the mapping is explicit here rather
  * than derived from the label.
  */
-export const INTERACTION_TYPE_BY_EVENT_TYPE: Partial<Record<EventType, string>> = {
+export const INTERACTION_TYPE_BY_EVENT_TYPE: Partial<Record<EventType, InteractionTypeValue>> = {
   "Training Ground Visit": "Training Ground Visit",
   "Coffee Catch-up": "Coffee Catch Up",
 };

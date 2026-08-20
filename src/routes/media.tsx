@@ -1,4 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
+import { useQuery } from "@tanstack/react-query";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
 import { PageHeader, Card, Pill, EmptyState } from "@/components/primitives";
@@ -15,6 +17,7 @@ import {
 } from "@/lib/media-store";
 import { withPermission } from "@/components/require-permission";
 import { getNavSource } from "@/lib/nav-source";
+import { listPlayers } from "@/lib/players.functions";
 
 const mediaSearchSchema = z.object({
   from: fallback(z.string(), "").default(""),
@@ -39,6 +42,16 @@ function isKind(v: string): v is MediaKind | "all" {
 
 function MediaPage() {
   const { can, user } = useAuth();
+  const listPlayersFn = useServerFn(listPlayers);
+  const { data: rosterPlayers = [] } = useQuery({
+    queryKey: ["players", "roster"],
+    queryFn: () => listPlayersFn(),
+    staleTime: 5 * 60_000,
+  });
+  const playerNamesById = useMemo(
+    () => new Map(rosterPlayers.map((player) => [player.id, player.full_name])),
+    [rosterPlayers],
+  );
   const { from, to, uploaderName, kind: kindParam, source } = Route.useSearch();
   const navSource = getNavSource(source);
   const [assets, setAssets] = useState<MediaAsset[]>([]);
@@ -252,7 +265,9 @@ function MediaPage() {
         <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
           {assets.map((m) => {
             const Icon = KIND_ICON[m.media_type] ?? FileText;
-            const gk = getGk(m.gk_id);
+            const goalkeeperName = m.gk_id
+              ? playerNamesById.get(m.gk_id) ?? getGk(m.gk_id)?.name ?? "Unknown goalkeeper"
+              : "Unlinked";
             const thumb = thumbUrls[m.id];
             return (
               <Card key={m.id} className="overflow-hidden group">
@@ -275,7 +290,7 @@ function MediaPage() {
                 </button>
                 <div className="p-3">
                   <div className="text-sm font-medium leading-tight line-clamp-2">{m.title}</div>
-                  <div className="text-[11px] text-muted-foreground mt-1">{gk?.name ?? "Unknown goalkeeper"}</div>
+                  <div className="text-[11px] text-muted-foreground mt-1">{goalkeeperName}</div>
                   {m.rating_tags.length > 0 && (
                     <div className="flex flex-wrap gap-1 mt-1.5">
                       {m.rating_tags.slice(0, 3).map((t) => <Pill key={t} tone="info">{t}</Pill>)}

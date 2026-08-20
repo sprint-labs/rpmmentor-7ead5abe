@@ -8,9 +8,12 @@ const createInteractionMock = vi.fn();
 const updateInteractionMock = vi.fn();
 const attachInteractionAudioMock = vi.fn();
 const uploadMediaMock = vi.fn();
-const listPlayersMock = vi.fn(async () => [
-  { id: "p1", full_name: "Demo Keeper", current_club: "Roster FC" },
-]);
+const TEST_PLAYER = {
+  id: "11111111-1111-4111-8111-111111111111",
+  full_name: "Demo Keeper",
+  current_club: "Roster FC",
+};
+const listPlayersMock = vi.fn(async () => [TEST_PLAYER]);
 
 vi.mock("@tanstack/react-start", () => ({
   useServerFn: (fn: unknown) => fn,
@@ -105,7 +108,6 @@ vi.mock("sonner", () => ({
 const { InteractionForm } = await import("./workflows");
 // Success closes the dialog and returns the user to the page they came from.
 const onDoneMock = vi.fn();
-const { goalkeepers } = await import("@/lib/mock-data");
 type LoggedInteraction = import("@/lib/interactions/schema").LoggedInteraction;
 
 function renderForm(props: Partial<React.ComponentProps<typeof InteractionForm>> = {}) {
@@ -138,8 +140,7 @@ const EXISTING: LoggedInteraction = {
 };
 
 async function fillValidForm() {
-  const gk = goalkeepers[0]!;
-  fireEvent.change(screen.getByLabelText("Goalkeeper"), { target: { value: gk.id } });
+  const player = await selectGoalkeeper();
   fireEvent.change(screen.getByLabelText("Interaction Type"), {
     target: { value: "Coffee Catch Up" },
   });
@@ -151,8 +152,36 @@ async function fillValidForm() {
   fireEvent.change(screen.getByLabelText("Notes"), {
     target: { value: "Reviewed the recovery plan." },
   });
-  return gk;
+  return player;
 }
+
+async function selectGoalkeeper(player = TEST_PLAYER) {
+  const trigger = await screen.findByRole("combobox", { name: "Goalkeeper" });
+  await waitFor(() => expect((trigger as HTMLButtonElement).disabled).toBe(false));
+  fireEvent.click(trigger);
+  const search = await screen.findByRole("combobox", { name: "Search Goalkeeper" });
+  fireEvent.change(search, { target: { value: player.full_name } });
+  fireEvent.click(await screen.findByText(player.full_name));
+  await waitFor(() => expect(trigger.textContent).toContain(player.full_name));
+  return player;
+}
+
+beforeEach(() => {
+  vi.stubGlobal(
+    "ResizeObserver",
+    class ResizeObserver {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    },
+  );
+  Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
+    configurable: true,
+    value: vi.fn(),
+  });
+});
+
+afterEach(() => vi.unstubAllGlobals());
 
 describe("InteractionForm (durable)", () => {
   beforeEach(() => {
@@ -160,7 +189,8 @@ describe("InteractionForm (durable)", () => {
     updateInteractionMock.mockReset();
     attachInteractionAudioMock.mockReset();
     uploadMediaMock.mockReset();
-    listPlayersMock.mockClear();
+    listPlayersMock.mockReset();
+    listPlayersMock.mockResolvedValue([TEST_PLAYER]);
     onDoneMock.mockClear();
   });
 
@@ -226,8 +256,7 @@ describe("InteractionForm (durable)", () => {
   it("saves a voice-entered note — the case that was silently losing data", async () => {
     createInteractionMock.mockResolvedValue({ id: "i1", occurredAt: "2026-01-05" });
     renderForm();
-    const gk = goalkeepers[0]!;
-    fireEvent.change(screen.getByLabelText("Goalkeeper"), { target: { value: gk.id } });
+    await selectGoalkeeper();
     fireEvent.change(screen.getByLabelText("Interaction Type"), {
       target: { value: "Coffee Catch Up" },
     });
@@ -345,7 +374,8 @@ describe("InteractionForm (durable)", () => {
 
     await waitFor(() => expect(createInteractionMock).toHaveBeenCalledTimes(1));
     const payload = createInteractionMock.mock.calls[0]![0] as { data: Record<string, unknown> };
-    expect(payload.data["goalkeeperName"]).toBe(gk.name);
+    expect(payload.data["goalkeeperName"]).toBe(gk.full_name);
+    expect(payload.data["playerId"]).toBe(gk.id);
     expect(payload.data["occurredAt"]).toBe("2026-01-05");
     expect(payload.data["interactionType"]).toBe("Coffee Catch Up");
     // Mentor identity is never sent from the client.
@@ -380,12 +410,9 @@ describe("InteractionForm (durable)", () => {
 
   it("auto-fills the club from the roster but keeps it editable and resettable", async () => {
     createInteractionMock.mockResolvedValue({ id: "i1" });
-    const gk = goalkeepers[0]!;
-    listPlayersMock.mockResolvedValue([
-      { id: "p1", full_name: gk.name, current_club: "Roster FC" },
-    ]);
+    listPlayersMock.mockResolvedValue([TEST_PLAYER]);
     renderForm();
-    fireEvent.change(screen.getByLabelText("Goalkeeper"), { target: { value: gk.id } });
+    await selectGoalkeeper();
 
     const club = () => screen.getByLabelText("Club") as HTMLInputElement;
     await waitFor(() => expect(club().value).toBe("Roster FC"));
@@ -413,8 +440,7 @@ describe("InteractionForm (durable)", () => {
     fireEvent.submit(screen.getByRole("form", { name: /log interaction/i }));
     await waitFor(() => expect(screen.getByText(/Select a goalkeeper/i)).toBeTruthy());
 
-    const gk = goalkeepers[0]!;
-    fireEvent.change(screen.getByLabelText("Goalkeeper"), { target: { value: gk.id } });
+    await selectGoalkeeper();
     fireEvent.change(screen.getByLabelText("Date"), { target: { value: "2026-01-05" } });
     fireEvent.change(screen.getByLabelText("Outcome"), { target: { value: "On track" } });
     fireEvent.change(screen.getByLabelText("Follow-up Action"), {
@@ -483,7 +509,8 @@ describe("InteractionForm voice recording persistence", () => {
     updateInteractionMock.mockReset();
     attachInteractionAudioMock.mockReset();
     uploadMediaMock.mockReset();
-    listPlayersMock.mockClear();
+    listPlayersMock.mockReset();
+    listPlayersMock.mockResolvedValue([TEST_PLAYER]);
     onDoneMock.mockClear();
   });
 
@@ -633,8 +660,7 @@ describe("InteractionForm voice recording persistence", () => {
     uploadMediaMock.mockRejectedValue(new Error("storage unavailable"));
 
     renderForm();
-    const gk = goalkeepers[0]!;
-    fireEvent.change(screen.getByLabelText("Goalkeeper"), { target: { value: gk.id } });
+    await selectGoalkeeper();
     fireEvent.change(screen.getByLabelText("Interaction Type"), {
       target: { value: "Coffee Catch Up" },
     });

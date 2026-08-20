@@ -44,6 +44,13 @@ import {
 } from "@/lib/media-store";
 import { HandwrittenNotesField } from "@/components/handwritten-notes-field";
 import { VoiceNoteField } from "@/components/voice-note-field";
+import { GoalkeeperPicker } from "@/components/goalkeeper-picker";
+import {
+  createMediaUploadItems,
+  retryFailedMediaUploads,
+  runMediaUploadBatch,
+  type MediaUploadItem,
+} from "@/lib/media-upload-batch";
 import { submitMatchReport } from "@/lib/match-reports/reports.functions";
 import {
   PILLAR_IDS, PILLAR_LABELS, averageOfScores, type PillarId,
@@ -163,7 +170,7 @@ export function WorkflowDialog({ kind, onClose, prefillGoalkeeper, prefillMatchD
                   ? "Live Match Observation · the interaction is created when this report is submitted"
                   : "Draft autosaves locally · Submission writes to the RPM Match Reports Google Sheet"
                 : activeKind === "media"
-                  ? "Stored in Lovable Cloud"
+                  ? "Stored in the central media repository"
                   : activeKind === "interaction"
                     ? isEditing
                       ? "Corrects the original record · visible everywhere it appears"
@@ -659,6 +666,21 @@ export function InteractionForm({
     }
     return null;
   }, [selectedPlayer, gk, players]);
+
+  // Entry points created before canonical player ids were available still pass
+  // a legacy gk-* slug. Resolve it to public.players without re-offering the
+  // legacy roster as selectable options.
+  useEffect(() => {
+    if (!players.length || selectedPlayer) return;
+    const legacyName =
+      goalkeepers.find((candidate) => candidate.id === gkId)?.name ??
+      editing?.goalkeeperName ??
+      "";
+    if (!legacyName) return;
+    const canonical = findPlayerByName(players, legacyName);
+    if (canonical) setGkId(canonical.id);
+    else if (!editing) setGkId("");
+  }, [editing?.goalkeeperName, gkId, players, selectedPlayer]);
 
   useEffect(() => {
     if (selectedPlayer) {
@@ -1200,25 +1222,24 @@ export function InteractionForm({
       <fieldset disabled={saving} className="space-y-4 border-0 p-0 m-0 min-w-0">
         <div className="grid grid-cols-2 gap-3">
           <Field label="Goalkeeper" required error={showErrors ? errors.gkId : undefined}>
-            <select
-              aria-label="Goalkeeper"
-              aria-invalid={showErrors && !!errors.gkId}
-              aria-required="true"
-              className={`${selectCls} ${showErrors && errors.gkId ? "border-destructive focus:ring-destructive/40" : ""}`}
-              value={gkId}
-              onChange={(e) => { setGkId(e.target.value); clearFieldError("gkId"); }}
-              onBlur={() => { if (!gkId) setErrors((prev) => ({ ...prev, gkId: "Select a goalkeeper" })); }}
-            >
-              <option value="" disabled>Select…</option>
-              {players.length > 0 && (
-                <optgroup label="Player records">
-                  {players.map((p) => <option key={p.id} value={p.id}>{p.full_name}</option>)}
-                </optgroup>
-              )}
-              <optgroup label="Legacy profiles (no player record)">
-                {goalkeepers.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
-              </optgroup>
-            </select>
+            <GoalkeeperPicker
+              players={players}
+              value={selectedPlayer?.id ?? null}
+              onValueChange={(playerId) => {
+                setGkId(playerId ?? "");
+                clearFieldError("gkId");
+              }}
+              required
+              loading={playersQuery.isLoading}
+              error={
+                playersQuery.isError
+                  ? playersQuery.error instanceof Error
+                    ? playersQuery.error.message
+                    : "Could not load goalkeepers."
+                  : null
+              }
+              placeholder={selection?.name ?? "Select a goalkeeper…"}
+            />
           </Field>
           <Field label="Interaction Type" required>
             {isMatchReportObservation || isCalendarFollowUp ? (
@@ -2470,20 +2491,95 @@ const KIND_LABELS: { value: MediaKind; label: string }[] = [
   { value: "audio", label: "Voice note" },
 ];
 
-function MediaForm({ onDone, prefillGkId }: { onDone: () => void; prefillGkId?: string }) {
+const ALL_MEDIA_ACCEPT = Array.from(
+  new Set(Object.values(ACCEPT_BY_KIND).flatMap((value) => value.split(","))),
+).join(",");
+
+function MediaUploadRow({ item }: { item: MediaUploadItem<MediaAsset> }) {
+  const percentage = Math.round(Math.min(1, Math.max(0, item.progress)) * 100);
+  const status =
+    item.status === "queued"
+      ? "Ready"
+      : item.status === "uploading"
+        ? percentage >= 100
+          ? "Finalising…"
+          : `${percentage}%`
+        : item.status === "succeeded"
+          ? "Uploaded"
+          : item.error || "Upload failed.";
+
+  return (
+    <li className="rounded-md border border-border bg-input/20 px-3 py-2.5">
+      <div className="flex items-start gap-2">
+        {item.status === "succeeded" ? (
+          <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" />
+        ) : item.status === "failed" ? (
+          <AlertCircle className="mt-0.5 size-4 shrink-0 text-destructive" aria-hidden="true" />
+        ) : item.status === "uploading" ? (
+          <Loader2 className="mt-0.5 size-4 shrink-0 animate-spin text-primary" aria-hidden="true" />
+        ) : (
+          <Upload className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+        )}
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start justify-between gap-3 text-xs">
+            <span className="min-w-0 truncate font-medium" title={item.title}>{item.title}</span>
+            <span className="shrink-0 text-muted-foreground">{formatBytes(item.file.size)}</span>
+          </div>
+          <p
+            className={`mt-0.5 text-[11px] ${item.status === "failed" ? "text-destructive" : "text-muted-foreground"}`}
+            role={item.status === "failed" ? "alert" : "status"}
+          >
+            {status}
+          </p>
+          {item.status === "uploading" && (
+            <div
+              role="progressbar"
+              aria-label={`${item.title} upload progress`}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={percentage}
+              className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-muted"
+            >
+              <div
+                className="h-full rounded-full bg-primary transition-[width] duration-200 ease-out"
+                style={{ width: `${percentage}%` }}
+              />
+            </div>
+          )}
+        </div>
+      </div>
+    </li>
+  );
+}
+
+export function MediaForm({ onDone, prefillGkId }: { onDone: () => void; prefillGkId?: string }) {
   const { user, can } = useAuth();
-  const [done, setDone] = useState(false);
-  const [kind, setKind] = useState<MediaKind>("video");
-  const [file, setFile] = useState<File | null>(null);
-  const [title, setTitle] = useState("");
-  const [notes, setNotes] = useState("");
-  const [gkId, setGkId] = useState(prefillGkId ?? "");
-  const [tags, setTags] = useState<string[]>([]);
+  const listPlayersFn = useServerFn(listPlayers);
+  const playersQuery = useQuery({
+    queryKey: ["players", "roster"],
+    queryFn: () => listPlayersFn(),
+    staleTime: 5 * 60_000,
+  });
+  const players: PlayerRosterRow[] = playersQuery.data ?? [];
+  const [gkId, setGkId] = useState<string | null>(prefillGkId ?? null);
+  const selectedPlayer = useMemo(
+    () => players.find((player) => player.id === gkId) ?? null,
+    [gkId, players],
+  );
+  const [items, setItems] = useState<MediaUploadItem<MediaAsset>[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Mentors work collaboratively — any mentor can link media to any goalkeeper.
-  const allowedGks = useMemo(() => goalkeepers, []);
+  useEffect(() => {
+    if (!prefillGkId || selectedPlayer || !players.length) return;
+    const legacyName = goalkeepers.find((candidate) => candidate.id === prefillGkId)?.name;
+    if (!legacyName) {
+      setGkId(null);
+      return;
+    }
+    const canonical = findPlayerByName(players, legacyName);
+    setGkId(canonical?.id ?? null);
+  }, [players, prefillGkId, selectedPlayer]);
 
   if (!user || !can("media.upload")) {
     return (
@@ -2494,82 +2590,161 @@ function MediaForm({ onDone, prefillGkId }: { onDone: () => void; prefillGkId?: 
     );
   }
 
-  if (done) return <Submitted message="Media uploaded and linked to the goalkeeper." onDone={onDone} />;
+  const uploadedCount = items.filter((item) => item.status === "succeeded").length;
+  const failedCount = items.filter((item) => item.status === "failed").length;
+  const queuedCount = items.filter((item) => item.status === "queued").length;
+  const retryableCount = items.filter(
+    (item) => item.status === "failed" && !item.validationError,
+  ).length;
+  const allUploaded = items.length > 0 && uploadedCount === items.length;
 
-  const handleFile = (f: File | null) => {
+  if (allUploaded) {
+    return (
+      <Submitted
+        message={`${uploadedCount} ${uploadedCount === 1 ? "clip" : "clips"} uploaded to the central media repository.`}
+        onDone={onDone}
+      />
+    );
+  }
+
+  const handleFiles = (files: FileList | null) => {
     setError(null);
-    if (!f) { setFile(null); return; }
-    if (f.size > MAX_FILE_BYTES) { setError(`File is ${formatBytes(f.size)} — limit is ${formatBytes(MAX_FILE_BYTES)}.`); return; }
-    const detected = detectKind(f);
-    if (detected) setKind(detected);
-    setFile(f);
-    if (!title) setTitle(f.name.replace(/\.[^.]+$/, ""));
+    if (!files?.length) return;
+    setItems(createMediaUploadItems<MediaAsset>(Array.from(files)));
+  };
+
+  const runBatch = async (retryFailed: boolean) => {
+    if (!user) return;
+    setError(null);
+    setBusy(true);
+    try {
+      const options = {
+        upload: (
+          item: { file: File; title: string; kind: MediaKind },
+          onProgress: (fraction: number) => void,
+        ) => uploadMedia({
+          file: item.file,
+          gkId: selectedPlayer?.id ?? null,
+          title: item.title,
+          kind: item.kind,
+          user,
+          onProgress,
+        }),
+        onItemUpdate: (
+          _item: MediaUploadItem<MediaAsset>,
+          nextItems: readonly MediaUploadItem<MediaAsset>[],
+        ) => setItems([...nextItems]),
+      };
+      const result = retryFailed
+        ? await retryFailedMediaUploads(items, options)
+        : await runMediaUploadBatch(items, options);
+      setItems(result);
+      if (result.some((item) => item.status === "succeeded")) {
+        window.dispatchEvent(new CustomEvent("rpm:media-uploaded"));
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "The upload batch could not be started.");
+    } finally { setBusy(false); }
   };
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null);
-    if (!file) { setError("Please choose a file to upload."); return; }
-    if (!gkId) { setError("Please select a goalkeeper."); return; }
-    setBusy(true);
-    try {
-      await uploadMedia({ file, gkId, title: title.trim() || file.name, notes, kind, ratingTags: tags, user });
-      window.dispatchEvent(new CustomEvent("rpm:media-uploaded"));
-      setDone(true);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Upload failed.");
-    } finally { setBusy(false); }
+    if (!items.length) {
+      setError("Choose one or more clips to upload.");
+      return;
+    }
+    await runBatch(false);
   };
 
   return (
-    <form onSubmit={onSubmit} className="space-y-4">
+    <form onSubmit={onSubmit} className="space-y-4" aria-label="Bulk media upload form">
       <div className="grid grid-cols-2 gap-3">
-        <Field label="Media Type">
-          <select className={selectCls} value={kind} onChange={(e) => setKind(e.target.value as MediaKind)}>
-            {KIND_LABELS.map((k) => <option key={k.value} value={k.value}>{k.label}</option>)}
-          </select>
+        <Field label="Goalkeeper">
+          <GoalkeeperPicker
+            players={players}
+            value={selectedPlayer?.id ?? null}
+            onValueChange={(playerId) => setGkId(playerId)}
+            loading={playersQuery.isLoading}
+            disabled={busy}
+            error={
+              playersQuery.isError
+                ? playersQuery.error instanceof Error
+                  ? playersQuery.error.message
+                  : "Could not load goalkeepers."
+                : null
+            }
+            placeholder="No goalkeeper linked"
+          />
+          <p className="mt-1 text-[11px] text-muted-foreground">
+            Optional. Every selected clip uses this link.
+          </p>
         </Field>
-        <Field label="Linked Goalkeeper">
-          <select className={selectCls} required value={gkId} onChange={(e) => setGkId(e.target.value)}>
-            <option value="" disabled>Select…</option>
-            {allowedGks.map((g) => <option key={g.id} value={g.id}>{g.name} — {g.club}</option>)}
-          </select>
+        <Field label="Club">
+          <input
+            aria-label="Club"
+            value={selectedPlayer?.current_club ?? ""}
+            placeholder="No goalkeeper linked"
+            readOnly
+            aria-readonly="true"
+            className={`${inputCls} cursor-not-allowed bg-muted/40 text-muted-foreground`}
+          />
+          <p className="mt-1 text-[11px] text-muted-foreground">
+            Auto-filled from the player record and locked.
+          </p>
         </Field>
       </div>
-      <Field label="Title">
-        <input className={inputCls} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Match clip vs derby — 2nd half" required />
-      </Field>
-      <Field label="File">
-        <label className="flex flex-col items-center justify-center gap-1.5 h-32 rounded-md border-2 border-dashed border-border hover:border-primary/40 cursor-pointer bg-input/30 px-4 text-center">
-          {file ? (
-            <>
-              <Upload className="size-5 text-primary" />
-              <span className="text-sm font-medium truncate max-w-full">{file.name}</span>
-              <span className="text-[11px] text-muted-foreground">{formatBytes(file.size)} · {file.type || "unknown type"}</span>
-            </>
-          ) : (
-            <>
-              <Upload className="size-5 text-muted-foreground" />
-              <span className="text-sm font-medium">Click to select a file</span>
-              <span className="text-[11px] text-muted-foreground">Up to 200MB · video, audio, image or PDF</span>
-            </>
-          )}
-          <input type="file" className="hidden" accept={ACCEPT_BY_KIND[kind]} onChange={(e) => handleFile(e.target.files?.[0] ?? null)} />
+      <Field label="Clips">
+        <label className="flex min-h-28 cursor-pointer flex-col items-center justify-center gap-1.5 rounded-md border-2 border-dashed border-border bg-input/30 px-4 text-center hover:border-primary/40">
+          <Upload className="size-5 text-muted-foreground" />
+          <span className="text-sm font-medium">Select all clips at once</span>
+          <span className="text-[11px] text-muted-foreground">
+            Up to 200MB per file · filenames are kept as clip titles
+          </span>
+          <input
+            aria-label="Clips"
+            type="file"
+            className="hidden"
+            accept={ALL_MEDIA_ACCEPT}
+            multiple
+            disabled={busy}
+            onChange={(e) => {
+              handleFiles(e.currentTarget.files);
+              e.currentTarget.value = "";
+            }}
+          />
         </label>
       </Field>
-      <Field label="Rating Tags"><TagPicker value={tags} onChange={setTags} /></Field>
-      <Field label="Notes"><textarea rows={3} className={taCls} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Context for reviewers…" /></Field>
+      {items.length > 0 && (
+        <div className="space-y-2">
+          <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
+            <span>{items.length} {items.length === 1 ? "file" : "files"} selected</span>
+            {(uploadedCount > 0 || failedCount > 0) && (
+              <span>{uploadedCount} uploaded · {failedCount} failed</span>
+            )}
+          </div>
+          <ul className="max-h-64 space-y-2 overflow-y-auto pr-1" aria-label="Upload queue">
+            {items.map((item) => <MediaUploadRow key={item.id} item={item} />)}
+          </ul>
+        </div>
+      )}
       {error && (
-        <div className="flex items-start gap-2 text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded-md p-2">
+        <div role="alert" className="flex items-start gap-2 text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded-md p-2">
           <AlertCircle className="size-4 mt-0.5 shrink-0" />
           <span>{error}</span>
         </div>
       )}
       <div className="flex justify-end gap-2 pt-2">
-        <button type="button" onClick={onDone} className="h-9 px-3 rounded-md border border-border text-sm" disabled={busy}>Cancel</button>
-        <button type="submit" disabled={busy} className="h-9 px-4 rounded-md bg-primary text-primary-foreground text-sm font-medium disabled:opacity-60">
-          {busy ? "Uploading…" : "Upload"}
-        </button>
+        <button type="button" onClick={onDone} className="h-9 px-3 rounded-md border border-border text-sm" disabled={busy}>{uploadedCount ? "Close" : "Cancel"}</button>
+        {retryableCount > 0 && (
+          <button type="button" onClick={() => void runBatch(true)} disabled={busy} className="h-9 px-4 rounded-md border border-border text-sm font-medium disabled:opacity-60">
+            {busy ? "Uploading…" : `Retry ${retryableCount} failed`}
+          </button>
+        )}
+        {queuedCount > 0 && (
+          <button type="submit" disabled={busy} className="h-9 px-4 rounded-md bg-primary text-primary-foreground text-sm font-medium disabled:opacity-60">
+            {busy ? "Uploading…" : `Upload ${queuedCount} ${queuedCount === 1 ? "clip" : "clips"}`}
+          </button>
+        )}
       </div>
     </form>
   );
@@ -2577,17 +2752,34 @@ function MediaForm({ onDone, prefillGkId }: { onDone: () => void; prefillGkId?: 
 
 function EditMediaForm({ asset, onDone }: { asset: MediaAsset; onDone: () => void }) {
   const { user } = useAuth();
+  const listPlayersFn = useServerFn(listPlayers);
+  const playersQuery = useQuery({
+    queryKey: ["players", "roster"],
+    queryFn: () => listPlayersFn(),
+    staleTime: 5 * 60_000,
+  });
+  const players: PlayerRosterRow[] = playersQuery.data ?? [];
   const [title, setTitle] = useState(asset.title);
   const [notes, setNotes] = useState(asset.notes ?? "");
   const [kind, setKind] = useState<MediaKind>(asset.media_type);
-  const [gkId, setGkId] = useState(asset.gk_id);
+  const [gkId, setGkId] = useState<string | null>(asset.gk_id);
   const [tags, setTags] = useState<string[]>(asset.rating_tags);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
 
-  // Mentors work collaboratively — any mentor can link media to any goalkeeper.
-  const allowedGks = useMemo(() => goalkeepers, []);
+  const selectedPlayer = useMemo(
+    () => players.find((player) => player.id === gkId) ?? null,
+    [gkId, players],
+  );
+
+  useEffect(() => {
+    if (!gkId || selectedPlayer || !players.length) return;
+    const legacyName = goalkeepers.find((candidate) => candidate.id === gkId)?.name;
+    if (!legacyName) return;
+    const canonical = findPlayerByName(players, legacyName);
+    if (canonical) setGkId(canonical.id);
+  }, [gkId, players, selectedPlayer]);
 
   if (done) return <Submitted message="Media updated." onDone={onDone} />;
 
@@ -2613,12 +2805,34 @@ function EditMediaForm({ asset, onDone }: { asset: MediaAsset; onDone: () => voi
             {KIND_LABELS.map((k) => <option key={k.value} value={k.value}>{k.label}</option>)}
           </select>
         </Field>
-        <Field label="Linked Goalkeeper">
-          <select className={selectCls} value={gkId} onChange={(e) => setGkId(e.target.value)}>
-            {allowedGks.map((g) => <option key={g.id} value={g.id}>{g.name} — {g.club}</option>)}
-          </select>
+        <Field label="Goalkeeper">
+          <GoalkeeperPicker
+            players={players}
+            value={selectedPlayer?.id ?? null}
+            onValueChange={(playerId) => setGkId(playerId)}
+            loading={playersQuery.isLoading}
+            disabled={busy}
+            error={
+              playersQuery.isError
+                ? playersQuery.error instanceof Error
+                  ? playersQuery.error.message
+                  : "Could not load goalkeepers."
+                : null
+            }
+            placeholder="No goalkeeper linked"
+          />
         </Field>
       </div>
+      <Field label="Club">
+        <input
+          aria-label="Club"
+          value={selectedPlayer?.current_club ?? ""}
+          placeholder="No goalkeeper linked"
+          readOnly
+          aria-readonly="true"
+          className={`${inputCls} cursor-not-allowed bg-muted/40 text-muted-foreground`}
+        />
+      </Field>
       <Field label="Rating Tags"><TagPicker value={tags} onChange={setTags} /></Field>
       <Field label="Notes"><textarea rows={3} className={taCls} value={notes} onChange={(e) => setNotes(e.target.value)} /></Field>
       {error && <div className="text-xs text-red-400">{error}</div>}

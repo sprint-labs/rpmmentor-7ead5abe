@@ -9,7 +9,7 @@ export type MediaKind = "video" | "pdf" | "image" | "audio";
 
 export interface MediaAsset {
   id: string;
-  gk_id: string;
+  gk_id: string | null;
   title: string;
   notes: string | null;
   media_type: MediaKind;
@@ -274,7 +274,7 @@ async function uploadObject(
 
 export async function uploadMedia(opts: {
   file: File;
-  gkId: string;
+  gkId: string | null;
   title: string;
   notes?: string;
   kind: MediaKind;
@@ -289,7 +289,8 @@ export async function uploadMedia(opts: {
     throw new Error("File exceeds the 200MB upload limit.");
   }
 
-  const path = `${gkId}/${Date.now()}-${crypto.randomUUID().slice(0, 8)}-${sanitizeName(file.name)}`;
+  const folder = gkId ?? "unlinked";
+  const path = `${folder}/${Date.now()}-${crypto.randomUUID().slice(0, 8)}-${sanitizeName(file.name)}`;
 
   await uploadObject(path, file, onProgress);
 
@@ -299,7 +300,7 @@ export async function uploadMedia(opts: {
   try {
     const thumb = await generateThumbnail(file, kind);
     if (thumb) {
-      thumbPath = `${gkId}/thumbs/${crypto.randomUUID()}.jpg`;
+      thumbPath = `${folder}/thumbs/${crypto.randomUUID()}.jpg`;
       const { error: tErr } = await supabase.storage.from(BUCKET).upload(thumbPath, thumb, {
         contentType: "image/jpeg", upsert: false,
       });
@@ -338,6 +339,8 @@ export async function uploadMedia(opts: {
 export interface MediaFilters {
   kind?: MediaKind | "all";
   gkId?: string;
+  gkIds?: string[];
+  unlinked?: boolean;
   uploaderId?: string;
   uploaderName?: string;
   from?: string; // ISO date
@@ -349,7 +352,9 @@ export interface MediaFilters {
 export async function listMedia(filters: MediaFilters = {}): Promise<MediaAsset[]> {
   let q = supabase.from("media_assets").select("*").order("created_at", { ascending: false });
   if (filters.kind && filters.kind !== "all") q = q.eq("media_type", filters.kind);
-  if (filters.gkId) q = q.eq("gk_id", filters.gkId);
+  if (filters.gkIds?.length) q = q.in("gk_id", filters.gkIds);
+  else if (filters.gkId) q = q.eq("gk_id", filters.gkId);
+  else if (filters.unlinked) q = q.is("gk_id", null);
   if (filters.uploaderId) q = q.eq("uploaded_by_id", filters.uploaderId);
   if (filters.uploaderName) q = q.ilike("uploaded_by_name", `%${filters.uploaderName}%`);
   if (filters.from) q = q.gte("created_at", filters.from);
