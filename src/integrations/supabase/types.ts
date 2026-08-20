@@ -634,7 +634,7 @@ export type Database = {
           created_at: string
           file_path: string
           file_size: number | null
-          gk_id: string
+          gk_id: string | null
           id: string
           media_type: string
           mime_type: string | null
@@ -651,7 +651,7 @@ export type Database = {
           created_at?: string
           file_path: string
           file_size?: number | null
-          gk_id: string
+          gk_id?: string | null
           id?: string
           media_type: string
           mime_type?: string | null
@@ -668,7 +668,7 @@ export type Database = {
           created_at?: string
           file_path?: string
           file_size?: number | null
-          gk_id?: string
+          gk_id?: string | null
           id?: string
           media_type?: string
           mime_type?: string | null

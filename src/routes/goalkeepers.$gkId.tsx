@@ -72,6 +72,10 @@ function GkDetail() {
     [players, gk.name],
   );
   const linkedPlayerId = linkedPlayer?.id ?? (gk as { playerId?: string | null }).playerId ?? null;
+  const mediaGoalkeeperIds = useMemo(
+    () => Array.from(new Set([gk.id, linkedPlayerId].filter((id): id is string => !!id))),
+    [gk.id, linkedPlayerId],
+  );
   const displayClub = linkedPlayer?.current_club || gk.club;
   const displayLeague = linkedPlayer?.league || gk.league;
   const gkInteractions = useMemo(
@@ -89,13 +93,13 @@ function GkDetail() {
     setMediaLoading(true);
     setMediaError(null);
     try {
-      setGkMedia(await listMedia({ gkId: gk.id }));
+      setGkMedia(await listMedia({ gkIds: mediaGoalkeeperIds }));
     } catch (e) {
       setMediaError(e instanceof Error ? e.message : "Could not load media");
     } finally {
       setMediaLoading(false);
     }
-  }, [gk.id]);
+  }, [mediaGoalkeeperIds]);
   useEffect(() => { void loadMedia(); }, [loadMedia]);
   useEffect(() => {
     const h = () => { void loadMedia(); };
@@ -595,7 +599,7 @@ function GkDetail() {
         kind={workflow}
         onClose={() => setWorkflow(null)}
         prefillGoalkeeper={gk.name}
-        prefillGkId={gk.id}
+        prefillGkId={linkedPlayerId ?? undefined}
       />
       <ReportPreviewModal
         reportId={previewId}
