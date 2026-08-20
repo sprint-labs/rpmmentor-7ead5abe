@@ -10,6 +10,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import {
   attachInteractionAudioInput,
   createInteractionInput,
+  deleteInteractionInput,
   interactionTypeForEdit,
   isLoggableInteractionType,
   listInteractionAudioQuery,
@@ -28,7 +29,13 @@ import {
   type InteractionDbRow,
 } from "@/lib/interactions/map";
 import { linkInteractionAudio } from "@/lib/interactions/audio-link";
-import { getUserRoles, hasAnyRole, INTERACTION_MANAGE_ROLES } from "@/lib/roles.server";
+import {
+  getUserRoles,
+  hasAnyRole,
+  INTERACTION_MANAGE_ROLES,
+  requireRole,
+  SUPER_ADMIN_ROLES,
+} from "@/lib/roles.server";
 import { MEDIA_BUCKET } from "@/lib/storage/bucket";
 import { readAllPages } from "@/lib/paginated-read";
 
@@ -40,6 +47,7 @@ export const listInteractions = createServerFn({ method: "GET" })
         context.supabase
           .from("interactions")
           .select(INTERACTION_COLUMNS)
+          .is("deleted_at", null)
           .order("occurred_at", { ascending: false })
           .order("created_at", { ascending: false })
           .order("id", { ascending: false })
@@ -84,6 +92,7 @@ export const createInteraction = createServerFn({ method: "POST" })
         .from("players")
         .select("id")
         .eq("id", data.playerId)
+        .is("deleted_at", null)
         .maybeSingle();
       playerId = player?.id ?? null;
     }
@@ -164,6 +173,7 @@ export const updateInteraction = createServerFn({ method: "POST" })
       .from("interactions")
       .select("id, mentor_id, interaction_type, calendar_event_id")
       .eq("id", data.id)
+      .is("deleted_at", null)
       .maybeSingle();
     if (loadError) throw new Error(loadError.message);
     if (!existing) throw new Error("That interaction no longer exists.");
@@ -200,6 +210,7 @@ export const updateInteraction = createServerFn({ method: "POST" })
         .from("players")
         .select("id")
         .eq("id", data.playerId)
+        .is("deleted_at", null)
         .maybeSingle();
       playerId = player?.id ?? null;
     }
@@ -219,6 +230,7 @@ export const updateInteraction = createServerFn({ method: "POST" })
         updated_by: userId,
       })
       .eq("id", data.id)
+      .is("deleted_at", null)
       .select(INTERACTION_COLUMNS)
       .single();
 
@@ -232,6 +244,7 @@ export const updateInteraction = createServerFn({ method: "POST" })
       .from("interactions")
       .select(INTERACTION_COLUMNS)
       .eq("id", data.id)
+      .is("deleted_at", null)
       .single();
     if (readbackError) throw new Error(readbackError.message);
     if (!readback) throw new Error("The change could not be confirmed as saved.");
@@ -245,6 +258,67 @@ export const updateInteraction = createServerFn({ method: "POST" })
       throw new Error("The saved interaction did not match what was submitted.");
     }
     return confirmed;
+  });
+
+/**
+ * Recoverably remove an interaction from every active product view.
+ *
+ * The source row, interaction_audit history and interaction_media links remain
+ * intact. Match-Report-generated observations must be removed through their
+ * source report so the two canonical records cannot disagree.
+ */
+export const deleteInteraction = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((data) => deleteInteractionInput.parse(data))
+  .handler(async ({ data, context }) => {
+    await requireRole(context.supabase, context.userId, SUPER_ADMIN_ROLES, "delete an interaction");
+
+    const { data: existing, error: loadError } = await context.supabase
+      .from("interactions")
+      .select("id, match_report_id, calendar_event_id")
+      .eq("id", data.id)
+      .is("deleted_at", null)
+      .maybeSingle();
+    if (loadError) throw new Error(loadError.message);
+    if (!existing) return { deleted: false as const, reason: "not_found" as const };
+    if (existing.match_report_id) {
+      const { data: sourceReport, error: reportError } = await context.supabase
+        .from("match_reports_cache")
+        .select("deleted_at")
+        .eq("report_id", existing.match_report_id)
+        .maybeSingle();
+      if (reportError) throw new Error("Could not verify the source Match Report.");
+      if (sourceReport?.deleted_at == null) {
+        throw new Error(
+          "This interaction was created by an active Match Report. Delete the Match Report instead so both records stay consistent.",
+        );
+      }
+    }
+
+    const deletedAt = new Date().toISOString();
+    const { data: deleted, error } = await context.supabase
+      .from("interactions")
+      .update({
+        deleted_at: deletedAt,
+        deleted_by: context.userId,
+        updated_by: context.userId,
+      })
+      .eq("id", data.id)
+      .is("deleted_at", null)
+      .select("id, deleted_at, deleted_by, calendar_event_id")
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!deleted) return { deleted: false as const, reason: "not_found" as const };
+    if (deleted.deleted_at !== deletedAt || deleted.deleted_by !== context.userId) {
+      throw new Error("The interaction deletion could not be confirmed.");
+    }
+
+    return {
+      deleted: true as const,
+      id: deleted.id,
+      deletedAt,
+      reopenedCalendarFollowUp: Boolean(deleted.calendar_event_id),
+    };
   });
 
 /**
@@ -264,7 +338,8 @@ export const listInteractionsPage = createServerFn({ method: "GET" })
 
     let query = context.supabase
       .from("interactions")
-      .select(INTERACTION_COLUMNS, { count: "exact" });
+      .select(INTERACTION_COLUMNS, { count: "exact" })
+      .is("deleted_at", null);
 
     if (data.from) query = query.gte("occurred_at", data.from);
     if (data.to) query = query.lte("occurred_at", data.to);
@@ -331,12 +406,23 @@ export const listInteractionAudio = createServerFn({ method: "GET" })
   .handler(async ({ data, context }): Promise<InteractionAudioClip[]> => {
     if (data.interactionIds.length === 0) return [];
 
+    // A tombstoned interaction retains its media links for recovery, but those
+    // recordings must not remain playable from a stale or hand-crafted id.
+    const { data: activeRows, error: activeError } = await context.supabase
+      .from("interactions")
+      .select("id")
+      .in("id", data.interactionIds)
+      .is("deleted_at", null);
+    if (activeError) throw new Error(activeError.message);
+    const activeIds = (activeRows ?? []).map((row) => row.id);
+    if (activeIds.length === 0) return [];
+
     const { data: rows, error } = await context.supabase
       .from("interaction_media")
       .select(
         "interaction_id, media_id, created_at, media_assets:media_id(title, file_path, mime_type, file_size)",
       )
-      .in("interaction_id", data.interactionIds)
+      .in("interaction_id", activeIds)
       .order("created_at", { ascending: false });
     if (error) throw new Error(error.message);
 

@@ -26,6 +26,9 @@ export const INTERACTION_MANAGE_ROLES: readonly AppRole[] = [
   "super_admin",
 ];
 
+/** Destructive entity controls are deliberately reserved for Super Admins. */
+export const SUPER_ADMIN_ROLES: readonly AppRole[] = ["super_admin"];
+
 /** Every operational role may submit a Match Report. */
 export const REPORT_SUBMIT_ROLES: readonly AppRole[] = [
   "super_admin",

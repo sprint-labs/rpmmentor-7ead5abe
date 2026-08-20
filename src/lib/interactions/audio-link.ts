@@ -63,6 +63,7 @@ export async function linkInteractionAudio(
     .from("interactions")
     .select("id, mentor_id")
     .eq("id", input.interactionId)
+    .is("deleted_at", null)
     .maybeSingle();
   if (loadError) throw new Error(loadError.message);
   if (!interaction) throw new Error("That interaction no longer exists.");

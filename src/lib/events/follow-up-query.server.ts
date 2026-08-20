@@ -92,7 +92,11 @@ export async function loadCompletions(
 
   for (const chunk of batches(eventIds, ID_BATCH)) {
     const [interactions, reports] = await Promise.all([
-      supabase.from("interactions").select("id, calendar_event_id").in("calendar_event_id", chunk),
+      supabase
+        .from("interactions")
+        .select("id, calendar_event_id")
+        .is("deleted_at", null)
+        .in("calendar_event_id", chunk),
       supabase
         .from("match_reports_cache")
         .select("report_id, calendar_event_id")

@@ -1,17 +1,41 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import {
-  averageOfScores,
-  matchReportEditSchema,
-  type MatchReportRow,
-} from "./schema";
+import { averageOfScores, matchReportEditSchema, type MatchReportRow } from "./schema";
 import { matchReportInteractionNotes } from "@/lib/interactions/match-report-link";
 import {
   getUserRoles,
   hasAnyRole,
   REPORT_MANAGE_ROLES,
+  REPORT_SUBMIT_ROLES,
+  type AppRole,
 } from "@/lib/roles.server";
+
+export interface MatchReportEditAccess {
+  canManage: boolean;
+  isAuthor: boolean;
+  canEdit: boolean;
+}
+
+/**
+ * Decide edit access from authenticated database facts only.
+ *
+ * Management roles may correct any report. Authorship is a fallback for a
+ * current operational user, so removing someone's RPM role also revokes their
+ * author-edit access without rewriting report history.
+ */
+export function decideMatchReportEditAccess(input: {
+  roles: readonly AppRole[];
+  userId: string;
+  submittedBy: string | null | undefined;
+}): MatchReportEditAccess {
+  const canManage = hasAnyRole(input.roles, REPORT_MANAGE_ROLES);
+  const hasActiveOperationalRole = hasAnyRole(input.roles, REPORT_SUBMIT_ROLES);
+  const isAuthor =
+    hasActiveOperationalRole && !!input.submittedBy && input.submittedBy === input.userId;
+
+  return { canManage, isAuthor, canEdit: canManage || isAuthor };
+}
 
 /**
  * Row-aware Match Report editing.
@@ -35,10 +59,12 @@ export const getMatchReportEditAccess = createServerFn({ method: "GET" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { CANONICAL_TABLE, getCanonicalReport } = await import("./store.server");
     const report = await getCanonicalReport(supabaseAdmin, data.reportId);
-    if (!report) return { canEdit: false };
-
-    if (hasAnyRole(roles, REPORT_MANAGE_ROLES)) {
-      return { canEdit: true };
+    if (!report) {
+      return {
+        canManage: hasAnyRole(roles, REPORT_MANAGE_ROLES),
+        isAuthor: false,
+        canEdit: false,
+      } satisfies MatchReportEditAccess;
     }
 
     const { data: ownerRow, error } = await supabaseAdmin
@@ -48,9 +74,11 @@ export const getMatchReportEditAccess = createServerFn({ method: "GET" })
       .maybeSingle();
     if (error) throw new Error("Could not verify report ownership.");
 
-    return {
-      canEdit: (ownerRow as { submitted_by: string | null } | null)?.submitted_by === userId,
-    };
+    return decideMatchReportEditAccess({
+      roles,
+      userId,
+      submittedBy: (ownerRow as { submitted_by: string | null } | null)?.submitted_by,
+    });
   });
 
 export type UpdateOwnedMatchReportResult =
@@ -65,11 +93,8 @@ export const updateOwnedMatchReport = createServerFn({ method: "POST" })
     const roles = await getUserRoles(supabase, userId);
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const {
-      CANONICAL_TABLE,
-      getCanonicalReport,
-      updateCanonicalReport,
-    } = await import("./store.server");
+    const { CANONICAL_TABLE, getCanonicalReport, updateCanonicalReport } =
+      await import("./store.server");
 
     // Resolve legacy/base ids first, then authorise against the exact canonical
     // row that will be updated.
@@ -78,7 +103,8 @@ export const updateOwnedMatchReport = createServerFn({ method: "POST" })
       return { updated: false, report: null, reason: "not_found" };
     }
 
-    if (!hasAnyRole(roles, REPORT_MANAGE_ROLES)) {
+    let access = decideMatchReportEditAccess({ roles, userId, submittedBy: null });
+    if (!access.canManage) {
       const { data: ownerRow, error: ownerError } = await supabaseAdmin
         .from(CANONICAL_TABLE)
         .select("submitted_by")
@@ -86,11 +112,16 @@ export const updateOwnedMatchReport = createServerFn({ method: "POST" })
         .maybeSingle();
       if (ownerError) throw new Error("Could not verify report ownership.");
 
-      const isAuthor =
-        (ownerRow as { submitted_by: string | null } | null)?.submitted_by === userId;
-      if (!isAuthor) {
-        throw new Error("You can only edit Match Reports that you submitted yourself.");
-      }
+      access = decideMatchReportEditAccess({
+        roles,
+        userId,
+        submittedBy: (ownerRow as { submitted_by: string | null } | null)?.submitted_by,
+      });
+    }
+    if (!access.canEdit) {
+      throw new Error(
+        "You can only edit your own Match Reports while you have active mentor access.",
+      );
     }
 
     const average = averageOfScores(data.scores);
@@ -119,7 +150,8 @@ export const updateOwnedMatchReport = createServerFn({ method: "POST" })
         }),
         updated_by: userId,
       })
-      .eq("match_report_id", saved.report.report_id);
+      .eq("match_report_id", saved.report.report_id)
+      .is("deleted_at", null);
 
     if (interactionError) {
       console.error(

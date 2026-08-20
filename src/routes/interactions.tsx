@@ -1,4 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
+import { useQueryClient } from "@tanstack/react-query";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
 import { PageHeader, Card, Pill, Avatar, EmptyState } from "@/components/primitives";
@@ -21,11 +23,26 @@ import {
   ChevronRight,
   Search,
   Pencil,
+  Trash2,
+  Loader2,
 } from "lucide-react";
+import { toast } from "sonner";
 import { withPermission } from "@/components/require-permission";
 import { getNavSource } from "@/lib/nav-source";
 import { WorkflowDialog, type WorkflowKind } from "@/components/workflows";
 import { useAuth } from "@/lib/auth";
+import { deleteInteraction } from "@/lib/interactions.functions";
+import { refreshInteractionViews } from "@/lib/query-refresh";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const interactionsSearchSchema = z.object({
   from: fallback(z.string(), "").default(""),
@@ -71,6 +88,8 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 function InteractionsPage() {
   const { can, user } = useAuth();
   const navigate = useNavigate({ from: "/interactions" });
+  const queryClient = useQueryClient();
+  const deleteInteractionFn = useServerFn(deleteInteraction);
   const {
     from,
     to,
@@ -87,6 +106,8 @@ function InteractionsPage() {
   const navSource = getNavSource(source);
   const [workflow, setWorkflow] = useState<WorkflowKind | null>(null);
   const [editing, setEditing] = useState<LoggedInteraction | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<LoggedInteraction | null>(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
   const [logContext, setLogContext] = useState<{
     gkId?: string;
     date?: string;
@@ -181,6 +202,30 @@ function InteractionsPage() {
   const firstOnPage = total === 0 ? 0 : (safePage - 1) * INTERACTIONS_PAGE_SIZE + 1;
   const lastOnPage = Math.min(total, (safePage - 1) * INTERACTIONS_PAGE_SIZE + rows.length);
 
+  const confirmDelete = async () => {
+    if (!pendingDelete || deleteBusy) return;
+    setDeleteBusy(true);
+    try {
+      const result = await deleteInteractionFn({ data: { id: pendingDelete.id } });
+      if (!result.deleted) {
+        toast.error("This interaction is no longer available to delete.");
+        setPendingDelete(null);
+        return;
+      }
+      await refreshInteractionViews(queryClient);
+      setPendingDelete(null);
+      toast.success("Interaction deleted");
+      if (result.reopenedCalendarFollowUp) {
+        toast.info("Its calendar follow-up is outstanding again.");
+      }
+      if (rows.length === 1 && safePage > 1) goToPage(safePage - 1);
+    } catch (failure) {
+      toast.error(failure instanceof Error ? failure.message : "Could not delete the interaction.");
+    } finally {
+      setDeleteBusy(false);
+    }
+  };
+
   return (
     <div className="space-y-5">
       <PageHeader
@@ -263,7 +308,7 @@ function InteractionsPage() {
           <tbody>
             {(isLoading || isError) && (
               <tr>
-                <td colSpan={7} className="px-4 py-6 text-sm text-muted-foreground">
+                <td colSpan={8} className="px-4 py-6 text-sm text-muted-foreground">
                   {isLoading
                     ? "Loading logged interactions…"
                     : "Interactions could not be loaded. Please retry."}
@@ -272,7 +317,7 @@ function InteractionsPage() {
             )}
             {!isLoading && !isError && rows.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-4 py-2">
+                <td colSpan={8} className="px-4 py-2">
                   <EmptyState
                     icon={hasFilters ? Filter : MessageSquarePlus}
                     title={
@@ -365,21 +410,45 @@ function InteractionsPage() {
                     <span className="line-clamp-1">{i.followUp || "—"}</span>
                   </td>
                   <td className="px-4 text-right whitespace-nowrap">
-                    {/*
-                      Offered to the mentor who logged it and to managers/admins.
-                      Hiding it is presentation only — updateInteraction and the
-                      RLS policy both re-check before anything is written.
-                    */}
-                    {(i.mentorId === user?.id || can("interactions.manage")) && (
-                      <button
-                        type="button"
-                        onClick={() => setEditing(i)}
-                        aria-label={`Edit interaction with ${name} on ${formatDateOnly(i.occurredAt)}`}
-                        className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-[11px] hover:bg-accent/40"
-                      >
-                        <Pencil className="size-3" /> Edit
-                      </button>
-                    )}
+                    <div className="inline-flex items-center justify-end gap-1.5">
+                      {/*
+                        Offered to the mentor who logged it and to managers/admins.
+                        Hiding it is presentation only — updateInteraction and the
+                        RLS policy both re-check before anything is written.
+                      */}
+                      {(i.mentorId === user?.id || can("interactions.manage")) && (
+                        <button
+                          type="button"
+                          onClick={() => setEditing(i)}
+                          aria-label={`Edit interaction with ${name} on ${formatDateOnly(i.occurredAt)}`}
+                          className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-[11px] hover:bg-accent/40"
+                        >
+                          <Pencil className="size-3" /> Edit
+                        </button>
+                      )}
+                      {can("interactions.delete") && (
+                        <>
+                          {i.matchReportId && (
+                            <Link
+                              to="/reports/$reportId"
+                              params={{ reportId: i.matchReportId }}
+                              aria-label={`Open the source Match Report for ${name}`}
+                              className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-[11px] hover:bg-accent/40"
+                            >
+                              Open report
+                            </Link>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => setPendingDelete(i)}
+                            aria-label={`Delete interaction with ${name} on ${formatDateOnly(i.occurredAt)}`}
+                            className="inline-flex items-center gap-1 rounded-md border border-destructive/40 px-2 py-1 text-[11px] text-destructive hover:bg-destructive/10"
+                          >
+                            <Trash2 className="size-3" /> Delete
+                          </button>
+                        </>
+                      )}
+                    </div>
                   </td>
                 </tr>
               );
@@ -432,6 +501,42 @@ function InteractionsPage() {
         editingInteraction={editing}
         onClose={() => setEditing(null)}
       />
+      <AlertDialog
+        open={Boolean(pendingDelete)}
+        onOpenChange={(open) => {
+          if (!open && !deleteBusy) setPendingDelete(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this interaction?</AlertDialogTitle>
+            <AlertDialogDescription>
+              It will disappear from active views, but the original row, edit history and voice-note
+              links will be retained for recovery.
+              {pendingDelete?.matchReportId
+                ? " If its source Match Report is still active, deletion will be blocked and the report must be deleted first."
+                : ""}
+              {pendingDelete?.calendarEventId
+                ? " Because it completes a scheduled event, that calendar follow-up will become outstanding again."
+                : ""}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteBusy}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={deleteBusy}
+              onClick={(event) => {
+                event.preventDefault();
+                void confirmDelete();
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteBusy ? <Loader2 className="animate-spin" /> : <Trash2 />}
+              Delete interaction
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

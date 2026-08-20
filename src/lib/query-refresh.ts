@@ -30,24 +30,30 @@ export async function refreshInteractionViews(queryClient: QueryClient): Promise
     queryClient.invalidateQueries({ queryKey: ["mentor-dashboard-stats"] }),
     queryClient.invalidateQueries({ queryKey: ["overview-dashboard-stats"] }),
     queryClient.invalidateQueries({ queryKey: ["executive-dashboard-stats"] }),
+    queryClient.invalidateQueries({ queryKey: ["users-and-roles"] }),
+    queryClient.invalidateQueries({ queryKey: ["player"] }),
     queryClient.invalidateQueries({ queryKey: reportCoverageQueryKey }),
     queryClient.invalidateQueries({ queryKey: eventFollowUpsQueryKey }),
   ]);
 }
 
 /**
- * Everything that displays a player's club: the roster list, the individual
- * player record, and the interaction/report forms that auto-fill club from the
- * roster.
+ * Everything that reflects the active player roster or a player record. Club
+ * corrections refresh the same consumers as a recoverable player deletion;
+ * the latter also changes dashboard totals and must evict every detail route,
+ * including one already open in another tab.
  */
 export async function refreshClubDependentViews(
   queryClient: QueryClient,
   playerId?: string,
 ): Promise<void> {
   await Promise.all([
-    queryClient.invalidateQueries({ queryKey: ["players", "roster"] }),
+    // Prefix invalidation covers both ["players"] and ["players", "roster"].
+    queryClient.invalidateQueries({ queryKey: ["players"] }),
+    queryClient.invalidateQueries({ queryKey: ["overview-dashboard-stats"] }),
+    queryClient.invalidateQueries({ queryKey: ["executive-dashboard-stats"] }),
     queryClient.invalidateQueries({ queryKey: ["mentor-dashboard-stats"] }),
-    ...(playerId ? [queryClient.invalidateQueries({ queryKey: ["player", playerId] })] : []),
+    queryClient.invalidateQueries({ queryKey: playerId ? ["player", playerId] : ["player"] }),
   ]);
 }
 

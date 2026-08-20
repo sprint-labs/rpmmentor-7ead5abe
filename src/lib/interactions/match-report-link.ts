@@ -55,6 +55,7 @@ export async function ensureMatchReportInteraction(
       .from("interactions")
       .select(INTERACTION_COLUMNS)
       .eq("match_report_id", input.reportId)
+      .is("deleted_at", null)
       .maybeSingle();
 
   try {
@@ -71,6 +72,7 @@ export async function ensureMatchReportInteraction(
       .from("players")
       .select("id")
       .ilike("full_name", input.goalkeeperName.trim())
+      .is("deleted_at", null)
       .maybeSingle();
     playerId = player?.id ?? null;
 

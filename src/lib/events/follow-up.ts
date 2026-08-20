@@ -67,12 +67,7 @@ export const INTERACTION_TYPE_BY_EVENT_TYPE: Partial<Record<EventType, Interacti
 };
 
 export type FollowUpStatus =
-  | "scheduled"
-  | "pending"
-  | "completed"
-  | "overdue"
-  | "cancelled"
-  | "not_required";
+  "scheduled" | "pending" | "completed" | "overdue" | "cancelled" | "not_required";
 
 export const FOLLOW_UP_WINDOW_HOURS = 48;
 
@@ -86,7 +81,11 @@ export const FOLLOW_UP_STATUS_LABEL: Record<FollowUpStatus, string> = {
 };
 
 /** Statuses that still need someone to act. */
-export const OPEN_FOLLOW_UP_STATUSES: readonly FollowUpStatus[] = ["scheduled", "pending", "overdue"];
+export const OPEN_FOLLOW_UP_STATUSES: readonly FollowUpStatus[] = [
+  "scheduled",
+  "pending",
+  "overdue",
+];
 
 /** The stored facts a status is computed from. */
 export interface FollowUpSource {
@@ -136,9 +135,7 @@ export function resolveFollowUp(source: FollowUpSource, now: number = Date.now()
     : null;
 
   const endsAtMs = londonWallClockMs(source.eventDate, source.endTime || source.startTime);
-  const deadlineMs = Number.isFinite(endsAtMs)
-    ? addHours(endsAtMs, FOLLOW_UP_WINDOW_HOURS)
-    : NaN;
+  const deadlineMs = Number.isFinite(endsAtMs) ? addHours(endsAtMs, FOLLOW_UP_WINDOW_HOURS) : NaN;
 
   const status = ((): FollowUpStatus => {
     if (source.completedRecordId) return "completed";

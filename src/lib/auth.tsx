@@ -54,11 +54,15 @@ export type Permission =
    * only decides what the UI offers; the database decides what is allowed.
    */
   | "players.edit_club"
+  /** Edit or safely delete any canonical player record. */
+  | "players.manage"
   | "mentors.view"
   | "interactions.view"
   | "interactions.log"
   /** Correct an interaction someone else logged. */
   | "interactions.manage"
+  /** Safely delete an interaction. */
+  | "interactions.delete"
   | "reports.view"
   | "reports.submit"
   | "reports.manage"
@@ -107,6 +111,7 @@ const ADMIN: Permission[] = [
 const SUPER_ADMIN: Permission[] = [
   "system.manage",
   ...ADMIN,
+  "players.manage", "interactions.delete",
   "interactions.log", "reports.submit", "media.upload",
 ];
 

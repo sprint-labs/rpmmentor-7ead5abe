@@ -75,9 +75,7 @@ export const listMatchReports = createServerFn({ method: "GET" })
 
 export const getMatchReport = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .validator((data: { reportId: string }) =>
-    z.object({ reportId: z.string().min(1) }).parse(data),
-  )
+  .validator((data: { reportId: string }) => z.object({ reportId: z.string().min(1) }).parse(data))
   .handler(async ({ data }) => {
     // Resolution order is unchanged: exact identity first, then the base id of
     // an occurrence, then the legacy (pre-Team) identity — so historic detail
@@ -624,7 +622,8 @@ export const updateMatchReport = createServerFn({ method: "POST" })
         }),
         updated_by: userId,
       })
-      .eq("match_report_id", saved.report.report_id);
+      .eq("match_report_id", saved.report.report_id)
+      .is("deleted_at", null);
 
     if (interactionError) {
       console.error(
@@ -672,16 +671,42 @@ export const deleteMatchReport = createServerFn({ method: "POST" })
       return { deleted: false, reason: "not_found" as const };
     }
 
-    // Release this report's ledger records so the fixture can be submitted
-    // again. Only this exact occurrence is affected — ids never reindex.
-    try {
-      await supabaseAdmin
-        .from("match_report_submissions")
-        .delete()
-        .eq("report_id", removed.report_id as string);
-    } catch (e) {
-      console.error("[match-reports] ledger cleanup after delete failed:", e);
+    // The report's Live Match Observation is a derived record, not a separate
+    // user action. Withdraw it from active interaction views while retaining
+    // the source row, audit history and media links under the same tombstone
+    // semantics as a direct Super Admin interaction deletion.
+    const interactionDeletedAt = new Date().toISOString();
+    const { error: interactionError } = await supabaseAdmin
+      .from("interactions")
+      .update({
+        deleted_at: interactionDeletedAt,
+        deleted_by: userId,
+        updated_by: userId,
+      })
+      .eq("match_report_id", removed.report_id as string)
+      .is("deleted_at", null);
+    if (interactionError) {
+      console.error(
+        "[match-reports] linked interaction cleanup after delete failed:",
+        interactionError,
+      );
     }
 
-    return { deleted: true, row_index: removed.row_index ?? -1, verified: true };
+    // Release this report's ledger records so the fixture can be submitted
+    // again. Only this exact occurrence is affected — ids never reindex.
+    const { error: ledgerError } = await supabaseAdmin
+      .from("match_report_submissions")
+      .delete()
+      .eq("report_id", removed.report_id as string);
+    if (ledgerError) {
+      console.error("[match-reports] ledger cleanup after delete failed:", ledgerError);
+    }
+
+    return {
+      deleted: true,
+      row_index: removed.row_index ?? -1,
+      verified: true,
+      ...(interactionError ? { interaction_error: interactionError.message } : {}),
+      ...(ledgerError ? { ledger_error: ledgerError.message } : {}),
+    };
   });

@@ -12,4 +12,13 @@ describe("goalkeeper coverage", () => {
       ]),
     ).toBe(2);
   });
+
+  it("excludes archived players from the coverage numerator", () => {
+    expect(
+      countCoveredPlayerRecords(
+        [{ player_id: "active" }, { player_id: "archived" }],
+        new Set(["active"]),
+      ),
+    ).toBe(1);
+  });
 });

@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   createInteractionInput,
+  deleteInteractionInput,
   updateInteractionInput,
   formatDateOnly,
   dateOnlyToLocalMs,
@@ -96,6 +97,14 @@ describe("interaction input validation", () => {
       mentorId: "attacker-uuid",
     }) as Record<string, unknown>;
     expect(parsed["mentorId"]).toBeUndefined();
+  });
+
+  it("accepts only a canonical interaction UUID for deletion", () => {
+    const id = "11111111-1111-4111-8111-111111111111";
+    expect(deleteInteractionInput.parse({ id })).toEqual({ id });
+    expect(() => deleteInteractionInput.parse({ id: "interaction-1" })).toThrow(
+      /interactions\.id/i,
+    );
   });
 });
 

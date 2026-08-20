@@ -12,7 +12,13 @@ function fakeClient(options: {
     from: () => ({
       select: () => ({
         eq: () => ({
-          maybeSingle: async () => ({ data: { full_name: "Demo Keeper" }, error: null }),
+          is: (column: string, value: unknown) => {
+            expect(column).toBe("deleted_at");
+            expect(value).toBeNull();
+            return {
+              maybeSingle: async () => ({ data: { full_name: "Demo Keeper" }, error: null }),
+            };
+          },
         }),
       }),
     }),
