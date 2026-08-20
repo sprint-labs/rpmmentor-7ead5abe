@@ -34,8 +34,11 @@ import { useAuth } from "@/lib/auth";
 import {
   deleteMatchReport,
   getMatchReport,
-  updateMatchReport,
 } from "@/lib/match-reports/reports.functions";
+import {
+  getMatchReportEditAccess,
+  updateOwnedMatchReport,
+} from "@/lib/match-reports/report-edit-access.functions";
 import {
   PILLAR_IDS,
   PILLAR_LABELS,
@@ -78,12 +81,17 @@ function ReportDetail() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const getFn = useServerFn(getMatchReport);
-  const updateFn = useServerFn(updateMatchReport);
+  const getEditAccessFn = useServerFn(getMatchReportEditAccess);
+  const updateFn = useServerFn(updateOwnedMatchReport);
   const deleteFn = useServerFn(deleteMatchReport);
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["match-report", reportId],
     queryFn: () => getFn({ data: { reportId } }),
+  });
+  const { data: editAccess } = useQuery({
+    queryKey: ["match-report-edit-access", reportId],
+    queryFn: () => getEditAccessFn({ data: { reportId } }),
   });
 
   const r = data?.report ?? null;
@@ -122,6 +130,7 @@ function ReportDetail() {
   const refreshReportViews = async () => {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ["match-report", reportId] }),
+      queryClient.invalidateQueries({ queryKey: ["match-report-edit-access", reportId] }),
       queryClient.invalidateQueries({ queryKey: ["match-reports"] }),
       queryClient.invalidateQueries({ queryKey: ["mentor-dashboard-stats"] }),
       queryClient.invalidateQueries({ queryKey: ["overview-dashboard-stats"] }),
@@ -193,7 +202,8 @@ function ReportDetail() {
     }
   };
 
-  const canManage = can("reports.manage");
+  const canEdit = editAccess?.canEdit ?? false;
+  const canDelete = can("reports.manage");
 
   if (isLoading) {
     return <Card className="p-10 text-center text-sm text-muted-foreground">Loading report…</Card>;
@@ -224,23 +234,23 @@ function ReportDetail() {
         description={`${formatDate(r.match_date)} · ${r.team ?? "—"} vs ${r.opponent ?? "—"} · Coach: ${r.coach}`}
         action={
           <div className="flex flex-wrap items-end justify-end gap-2">
-            {canManage && (
-              <>
-                <Button type="button" size="sm" variant="outline" onClick={openEditor}>
-                  <Pencil />
-                  Edit report
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  className="border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive"
-                  onClick={() => setDeleteOpen(true)}
-                >
-                  <Trash2 />
-                  Delete report
-                </Button>
-              </>
+            {canEdit && (
+              <Button type="button" size="sm" variant="outline" onClick={openEditor}>
+                <Pencil />
+                Edit report
+              </Button>
+            )}
+            {canDelete && (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                onClick={() => setDeleteOpen(true)}
+              >
+                <Trash2 />
+                Delete report
+              </Button>
             )}
             <div className="text-right min-w-16">
               <div className="text-[11px] text-muted-foreground uppercase tracking-wider">
