@@ -2,11 +2,14 @@ import { describe, expect, it } from "vitest";
 import { Constants } from "@/integrations/supabase/types";
 import {
   hasAnyRole,
+  SUPER_ADMIN_ROLES,
   USER_DIRECTORY_VIEW_ROLES,
   type AppRole,
 } from "@/lib/roles.server";
+import { roleHasPermission, type Role } from "@/lib/auth";
 
 const GENERATED_ROLES = Constants.public.Enums.app_role;
+const ROLES: Role[] = ["super_admin", "admin", "mentor_manager", "mentor"];
 
 describe("roles.server", () => {
   it("treats every generated app_role as an AppRole", () => {
@@ -18,5 +21,16 @@ describe("roles.server", () => {
     expect(hasAnyRole(["mentor"], ["mentor_manager", "admin"])).toBe(false);
     expect(hasAnyRole(["mentor", "admin"], ["mentor_manager", "admin"])).toBe(true);
     expect(hasAnyRole([], ["super_admin"])).toBe(false);
+  });
+
+  it("keeps destructive entity controls exclusive to Super Admin", () => {
+    expect(SUPER_ADMIN_ROLES).toEqual(["super_admin"]);
+
+    for (const role of ROLES) {
+      const expected = role === "super_admin";
+      expect(hasAnyRole([role], SUPER_ADMIN_ROLES)).toBe(expected);
+      expect(roleHasPermission(role, "interactions.delete")).toBe(expected);
+      expect(roleHasPermission(role, "players.manage")).toBe(expected);
+    }
   });
 });

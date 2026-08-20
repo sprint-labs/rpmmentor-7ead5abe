@@ -146,6 +146,10 @@ export const updateInteractionInput = z.object({
 });
 export type UpdateInteractionInput = z.input<typeof updateInteractionInput>;
 
+export const deleteInteractionInput = z.object({
+  id: z.string().regex(UUID, "id must be an interactions.id"),
+});
+
 /** A durable interaction row as returned to the client. */
 export interface LoggedInteraction {
   id: string;

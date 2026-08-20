@@ -135,6 +135,7 @@ export const getMentorDashboardStats = createServerFn({ method: "GET" })
         .from("interactions")
         .select("id", { count: "exact", head: true })
         .eq("mentor_id", userId)
+        .is("deleted_at", null)
         .in("interaction_type", [...DASHBOARD_INTERACTION_TYPES])
         .gte("occurred_at", periodFrom)
         .lte("occurred_at", periodTo),
@@ -142,6 +143,7 @@ export const getMentorDashboardStats = createServerFn({ method: "GET" })
         .from("interactions")
         .select("id, goalkeeper_name, gk_slug, player_id, occurred_at, interaction_type")
         .eq("mentor_id", userId)
+        .is("deleted_at", null)
         .eq("interaction_type", "Live Match Observation")
         .gte("occurred_at", thirtyDaysAgo),
       // Events a manager has booked this mentor in to attend, bounded to the

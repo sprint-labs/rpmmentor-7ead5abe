@@ -41,13 +41,19 @@ function makeDb(opts: {
       return {
         select: () => ({
           eq: () => ({
-            maybeSingle: async () => ({
-              data:
-                opts.interaction === undefined
-                  ? { id: INTERACTION_ID, mentor_id: AUTHOR }
-                  : opts.interaction,
-              error: null,
-            }),
+            is: (column: string, value: unknown) => {
+              expect(column).toBe("deleted_at");
+              expect(value).toBeNull();
+              return {
+                maybeSingle: async () => ({
+                  data:
+                    opts.interaction === undefined
+                      ? { id: INTERACTION_ID, mentor_id: AUTHOR }
+                      : opts.interaction,
+                  error: null,
+                }),
+              };
+            },
           }),
         }),
       };

@@ -6,6 +6,7 @@ import { Search } from "lucide-react";
 import { RequirePermission } from "@/components/require-permission";
 import { Card } from "@/components/primitives";
 import { listPlayers } from "@/lib/players.functions";
+import { useAuth } from "@/lib/auth";
 
 export const Route = createFileRoute("/system/players/")({
   component: PlayerRecordsPage,
@@ -37,6 +38,7 @@ function PlayerRecordsPage() {
 }
 
 function PlayerRecordsInner() {
+  const { can } = useAuth();
   const fetchPlayers = useServerFn(listPlayers);
   const { data, isLoading, error } = useQuery({
     queryKey: ["players", "roster"],
@@ -60,8 +62,8 @@ function PlayerRecordsInner() {
       <div>
         <h1 className="text-lg font-semibold">Player Records</h1>
         <p className="text-xs text-muted-foreground">
-          Canonical database records. Current club can be corrected by managers, admins and super
-          admins.
+          Canonical database records. Managers can correct clubs; Super Admins can correct or
+          recoverably delete the full operational record.
         </p>
       </div>
 
@@ -100,7 +102,7 @@ function PlayerRecordsInner() {
                   params={{ playerId: p.id }}
                   className="text-xs text-primary hover:text-primary/80 shrink-0"
                 >
-                  Edit club
+                  {can("players.manage") ? "Edit record" : "Edit club"}
                 </Link>
               </li>
             ))}

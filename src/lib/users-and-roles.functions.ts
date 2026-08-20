@@ -39,6 +39,7 @@ export const listUsersAndRoles = createServerFn({ method: "GET" })
             .from("interactions")
             .select("id", { count: "exact", head: true })
             .eq("mentor_id", profile.id)
+            .is("deleted_at", null)
             .in("interaction_type", [...MANUAL_INTERACTION_TYPES]),
           supabaseAdmin
             .from("match_report_submissions")

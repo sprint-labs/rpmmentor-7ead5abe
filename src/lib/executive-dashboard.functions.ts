@@ -53,6 +53,10 @@ interface CoverageInteractionRow {
   player_id: string | null;
 }
 
+interface ActivePlayerRow {
+  id: string;
+}
+
 const executiveInputSchema = z.object({
   fromDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   toDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
@@ -85,12 +89,22 @@ export const getExecutiveDashboardStats = createServerFn({ method: "GET" })
     const coverageFromDate = inclusiveDatePeriodStart(data.toDate, data.coverageDays);
 
     const [players, rowsInPeriod, coverageRows, activeMentors] = await Promise.all([
-      supabase.from("players").select("id", { count: "exact", head: true }),
+      readAllPages<ActivePlayerRow>(
+        (from, to) =>
+          supabase
+            .from("players")
+            .select("id")
+            .is("deleted_at", null)
+            .order("id", { ascending: true })
+            .range(from, to),
+        "Could not load the goalkeeper count.",
+      ),
       readAllPages<ExecutiveInteractionRow>(
         (from, to) =>
           supabase
             .from("interactions")
             .select("id, mentor_name, interaction_type")
+            .is("deleted_at", null)
             .in("interaction_type", [...DASHBOARD_INTERACTION_TYPES])
             .gte("occurred_at", data.fromDate)
             .lte("occurred_at", data.toDate)
@@ -104,6 +118,7 @@ export const getExecutiveDashboardStats = createServerFn({ method: "GET" })
           supabase
             .from("interactions")
             .select("id, player_id")
+            .is("deleted_at", null)
             .gte("occurred_at", coverageFromDate)
             .lte("occurred_at", data.toDate)
             .order("occurred_at", { ascending: false })
@@ -114,12 +129,8 @@ export const getExecutiveDashboardStats = createServerFn({ method: "GET" })
       getActiveMentorCount(supabase),
     ]);
 
-    if (players.error) throw new Error("Could not load the goalkeeper count.");
-    if (typeof players.count !== "number") {
-      throw new Error("The goalkeeper count was unavailable.");
-    }
-
-    const coveredGoalkeepers = countCoveredPlayerRecords(coverageRows);
+    const activePlayerIds = new Set(players.map((player) => player.id));
+    const coveredGoalkeepers = countCoveredPlayerRecords(coverageRows, activePlayerIds);
 
     // Match Reports come from the same canonical Supabase store as /reports.
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -147,7 +158,7 @@ export const getExecutiveDashboardStats = createServerFn({ method: "GET" })
     });
 
     return {
-      totalGoalkeepers: players.count,
+      totalGoalkeepers: players.length,
       coveredGoalkeepers,
       coverageDays: data.coverageDays,
       interactionsInPeriod: rowsInPeriod.length,

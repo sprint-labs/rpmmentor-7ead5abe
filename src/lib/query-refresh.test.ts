@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import type { QueryClient } from "@tanstack/react-query";
-import { refreshInteractionViews } from "./query-refresh";
+import { refreshClubDependentViews, refreshInteractionViews } from "./query-refresh";
 
 /** Captures the query keys a refresh helper invalidates. */
 function recordingClient() {
@@ -37,5 +37,27 @@ describe("refreshInteractionViews", () => {
     expect(keys).toContainEqual(["mentor-dashboard-stats"]);
     expect(keys).toContainEqual(["overview-dashboard-stats"]);
     expect(keys).toContainEqual(["executive-dashboard-stats"]);
+    expect(keys).toContainEqual(["users-and-roles"]);
+    expect(keys).toContainEqual(["player"]);
+  });
+});
+
+describe("refreshClubDependentViews", () => {
+  it("refreshes every active-roster dashboard and player detail", async () => {
+    const { client, keys } = recordingClient();
+    await refreshClubDependentViews(client);
+
+    expect(keys).toContainEqual(["players"]);
+    expect(keys).toContainEqual(["player"]);
+    expect(keys).toContainEqual(["overview-dashboard-stats"]);
+    expect(keys).toContainEqual(["executive-dashboard-stats"]);
+    expect(keys).toContainEqual(["mentor-dashboard-stats"]);
+  });
+
+  it("can target one open canonical player record", async () => {
+    const { client, keys } = recordingClient();
+    await refreshClubDependentViews(client, "player-1");
+
+    expect(keys).toContainEqual(["player", "player-1"]);
   });
 });

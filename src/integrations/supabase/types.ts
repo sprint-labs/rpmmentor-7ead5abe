@@ -342,6 +342,8 @@ export type Database = {
           calendar_event_id: string | null
           club: string
           created_at: string
+          deleted_at: string | null
+          deleted_by: string | null
           follow_up: string
           gk_slug: string
           goalkeeper_name: string
@@ -361,6 +363,8 @@ export type Database = {
           calendar_event_id?: string | null
           club?: string
           created_at?: string
+          deleted_at?: string | null
+          deleted_by?: string | null
           follow_up?: string
           gk_slug?: string
           goalkeeper_name: string
@@ -380,6 +384,8 @@ export type Database = {
           calendar_event_id?: string | null
           club?: string
           created_at?: string
+          deleted_at?: string | null
+          deleted_by?: string | null
           follow_up?: string
           gk_slug?: string
           goalkeeper_name?: string
@@ -821,6 +827,8 @@ export type Database = {
           contract_until: string | null
           created_at: string
           current_club: string
+          deleted_at: string | null
+          deleted_by: string | null
           full_name: string
           id: string
           instagram_url: string | null
@@ -834,6 +842,8 @@ export type Database = {
           contract_until?: string | null
           created_at?: string
           current_club?: string
+          deleted_at?: string | null
+          deleted_by?: string | null
           full_name: string
           id?: string
           instagram_url?: string | null
@@ -847,6 +857,8 @@ export type Database = {
           contract_until?: string | null
           created_at?: string
           current_club?: string
+          deleted_at?: string | null
+          deleted_by?: string | null
           full_name?: string
           id?: string
           instagram_url?: string | null

@@ -41,13 +41,27 @@ function makeDb(opts: {
   const from = vi.fn((table: string) => {
     if (table === "players") {
       return {
-        select: () => ({ ilike: () => ({ maybeSingle: async () => ({ data: { id: "p1" } }) }) }),
+        select: () => ({
+          ilike: () => ({
+            is: (column: string, value: unknown) => {
+              expect(column).toBe("deleted_at");
+              expect(value).toBeNull();
+              return { maybeSingle: async () => ({ data: { id: "p1" } }) };
+            },
+          }),
+        }),
       };
     }
     return {
       select: () => ({
         eq: () => ({
-          maybeSingle: async () => ({ data: selectQueue.shift() ?? null, error: null }),
+          is: (column: string, value: unknown) => {
+            expect(column).toBe("deleted_at");
+            expect(value).toBeNull();
+            return {
+              maybeSingle: async () => ({ data: selectQueue.shift() ?? null, error: null }),
+            };
+          },
         }),
       }),
       insert: (payload: Record<string, unknown>) => {
@@ -111,9 +125,21 @@ describe("ensureMatchReportInteraction", () => {
       from: () => ({
         select: () => ({
           eq: () => ({
-            maybeSingle: async () => ({ data: selectResults.shift() ?? null, error: null }),
+            is: (column: string, value: unknown) => {
+              expect(column).toBe("deleted_at");
+              expect(value).toBeNull();
+              return {
+                maybeSingle: async () => ({ data: selectResults.shift() ?? null, error: null }),
+              };
+            },
           }),
-          ilike: () => ({ maybeSingle: async () => ({ data: { id: "p1" } }) }),
+          ilike: () => ({
+            is: (column: string, value: unknown) => {
+              expect(column).toBe("deleted_at");
+              expect(value).toBeNull();
+              return { maybeSingle: async () => ({ data: { id: "p1" } }) };
+            },
+          }),
         }),
         insert: () => ({
           select: () => ({

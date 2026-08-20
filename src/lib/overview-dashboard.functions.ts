@@ -34,10 +34,11 @@ export const getOverviewDashboardStats = createServerFn({ method: "GET" })
     await requireRole(supabase, userId, OVERVIEW_DASHBOARD_ROLES, "view the management dashboard");
 
     const [players, periodInteractions, activeMentors] = await Promise.all([
-      supabase.from("players").select("id", { count: "exact", head: true }),
+      supabase.from("players").select("id", { count: "exact", head: true }).is("deleted_at", null),
       supabase
         .from("interactions")
         .select("id", { count: "exact", head: true })
+        .is("deleted_at", null)
         .in("interaction_type", [...DASHBOARD_INTERACTION_TYPES])
         .gte("occurred_at", data.fromDate)
         .lte("occurred_at", data.toDate),

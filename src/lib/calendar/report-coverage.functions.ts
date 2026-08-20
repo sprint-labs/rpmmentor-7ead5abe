@@ -46,6 +46,7 @@ export const listReportCoverage = createServerFn({ method: "GET" })
       context.supabase
         .from("interactions")
         .select("player_id, gk_slug, goalkeeper_name, interaction_type, occurred_at")
+        .is("deleted_at", null)
         .gte("occurred_at", since)
         .order("occurred_at", { ascending: false })
         .limit(ROW_LIMIT),

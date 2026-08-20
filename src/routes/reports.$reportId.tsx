@@ -30,11 +30,9 @@ import {
 } from "@/components/ui/alert-dialog";
 import { listReportAttachmentsForIds, openAsset, type MediaAsset } from "@/lib/media-store";
 import { reportCoverageQueryKey } from "@/lib/calendar/report-coverage";
+import { refreshInteractionViews } from "@/lib/query-refresh";
 import { useAuth } from "@/lib/auth";
-import {
-  deleteMatchReport,
-  getMatchReport,
-} from "@/lib/match-reports/reports.functions";
+import { deleteMatchReport, getMatchReport } from "@/lib/match-reports/reports.functions";
 import {
   getMatchReportEditAccess,
   updateOwnedMatchReport,
@@ -89,7 +87,7 @@ function ReportDetail() {
     queryKey: ["match-report", reportId],
     queryFn: () => getFn({ data: { reportId } }),
   });
-  const { data: editAccess } = useQuery({
+  const { data: editAccess, error: editAccessError } = useQuery({
     queryKey: ["match-report-edit-access", reportId],
     queryFn: () => getEditAccessFn({ data: { reportId } }),
   });
@@ -138,6 +136,7 @@ function ReportDetail() {
       // Deleting a report withdraws it as calendar coverage, so the goalkeeper's
       // Match Report badge has to come back.
       queryClient.invalidateQueries({ queryKey: reportCoverageQueryKey }),
+      refreshInteractionViews(queryClient),
     ]);
   };
 
@@ -192,6 +191,14 @@ function ReportDetail() {
       await refreshReportViews();
       setDeleteOpen(false);
       toast.success("Match report deleted");
+      if (result.interaction_error) {
+        toast.warning(
+          "The report was deleted, but its linked observation could not be withdrawn. Delete that interaction separately.",
+        );
+      }
+      if (result.ledger_error) {
+        toast.warning("The report was deleted, but its submission ledger needs an admin check.");
+      }
       await router.navigate({ to: "/reports" });
     } catch (deleteFailure) {
       toast.error(
@@ -202,7 +209,9 @@ function ReportDetail() {
     }
   };
 
-  const canEdit = editAccess?.canEdit ?? false;
+  // View As changes presentation only. Show management controls from the
+  // effective UI role, while still showing an active author's own Edit action.
+  const canEdit = can("reports.manage") || (editAccess?.isAuthor ?? false);
   const canDelete = can("reports.manage");
 
   if (isLoading) {
@@ -263,6 +272,12 @@ function ReportDetail() {
           </div>
         }
       />
+
+      {editAccessError && (
+        <p className="text-xs text-destructive" role="alert">
+          Could not verify edit access. Refresh and try again.
+        </p>
+      )}
 
       <div className="flex flex-wrap items-center gap-2 text-xs">
         <span className="text-muted-foreground uppercase tracking-wider">Competition</span>
@@ -455,8 +470,8 @@ function ReportDetail() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete this Match Report?</AlertDialogTitle>
             <AlertDialogDescription>
-              It will be removed from live views. The original report record remains retained for
-              audit and can be recovered by an administrator.
+              It and its linked Live Match Observation will be removed from active views. The
+              original rows remain retained for audit and recovery.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
