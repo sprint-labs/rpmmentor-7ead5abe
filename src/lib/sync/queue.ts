@@ -19,14 +19,17 @@ export type SyncJob = {
   payload: unknown;
   createdAt: number;
   attempts: number;
+  /** Timestamp of the most recent failed handler call, used as the retry anchor. */
+  lastAttemptAt?: number;
   lastError?: string;
   userId?: string;
   /** Free-form label shown in the UI (e.g. "Match report — Beadle vs Blackburn"). */
   label?: string;
   /**
    * The server refused the job pending an explicit user decision (e.g. a
-   * duplicate confirmation). The job is kept, never auto-retried, and never
-   * silently submitted — the UI must surface it.
+   * duplicate confirmation), or automatic retries were unsafe/exhausted.
+   * The job is kept, never auto-retried, and never silently submitted — the
+   * UI must surface it.
    */
   needsAction?: boolean;
 };
@@ -52,7 +55,9 @@ export function getLastSyncedAt(): number | null {
   try {
     const raw = window.localStorage.getItem(LAST_SYNC_KEY);
     return raw ? Number(raw) || null : null;
-  } catch { return null; }
+  } catch {
+    return null;
+  }
 }
 
 function setLastSyncedAt(ts: number) {
@@ -60,7 +65,9 @@ function setLastSyncedAt(ts: number) {
   try {
     window.localStorage.setItem(LAST_SYNC_KEY, String(ts));
     window.dispatchEvent(new CustomEvent("rpm:sync-queue-changed"));
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
 }
 
 function read(): SyncJob[] {
@@ -110,19 +117,19 @@ function updateJob(id: string, patch: Partial<SyncJob>) {
   write(read().map((j) => (j.id === id ? { ...j, ...patch } : j)));
 }
 
-/** Exponential backoff based on `attempts`. */
+/** Exponential backoff based on `attempts`, anchored to the latest failure. */
 function nextRetryAt(job: SyncJob): number {
   const delay = Math.min(BASE_BACKOFF_MS * 2 ** Math.max(0, job.attempts - 1), 5 * 60_000);
-  return job.createdAt + delay;
+  return (job.lastAttemptAt ?? job.createdAt) + delay;
 }
 
 export type SyncHandler = (payload: unknown, job: SyncJob) => Promise<void>;
 
 /**
  * Distinguish "network is down / server unreachable" from real logical
- * failures (bad payload, permission denied). Only the former should be
- * retried — logical failures are dropped so we don't spin forever on a
- * broken job. This heuristic mirrors what fetch throws when offline.
+ * failures (bad payload, permission denied). Only network failures should be
+ * retried automatically. Logical failures are kept and flagged for review so
+ * the queue never silently discards a mentor's work.
  */
 function isTransient(err: unknown): boolean {
   if (typeof navigator !== "undefined" && !navigator.onLine) return true;
@@ -139,7 +146,7 @@ export async function drainQueue(handlers: Record<string, SyncHandler>): Promise
   const jobs = read();
   let processed = 0;
   let failed = 0;
-  let dropped = 0;
+  const dropped = 0;
   let needsAction = 0;
   const now = Date.now();
 
@@ -158,16 +165,24 @@ export async function drainQueue(handlers: Record<string, SyncHandler>): Promise
       processed += 1;
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
+      const lastAttemptAt = Date.now();
       if (err instanceof NeedsUserActionError) {
-        updateJob(job.id, { needsAction: true, lastError: message });
+        updateJob(job.id, { needsAction: true, lastError: message, lastAttemptAt });
         needsAction += 1;
         continue;
       }
-      if (!isTransient(err) || job.attempts + 1 >= MAX_ATTEMPTS) {
-        removeJob(job.id);
-        dropped += 1;
+
+      const attempts = job.attempts + 1;
+      if (!isTransient(err) || attempts >= MAX_ATTEMPTS) {
+        updateJob(job.id, {
+          attempts,
+          lastAttemptAt,
+          lastError: message,
+          needsAction: true,
+        });
+        needsAction += 1;
       } else {
-        updateJob(job.id, { attempts: job.attempts + 1, lastError: message });
+        updateJob(job.id, { attempts, lastAttemptAt, lastError: message });
         failed += 1;
       }
     }
@@ -180,11 +195,13 @@ export async function drainQueue(handlers: Record<string, SyncHandler>): Promise
 export function subscribe(cb: () => void): () => void {
   if (typeof window === "undefined") return () => {};
   const handler = () => cb();
+  const storageHandler = (event: StorageEvent) => {
+    if (event.key === KEY) cb();
+  };
   window.addEventListener("rpm:sync-queue-changed", handler);
-  window.addEventListener("storage", (e) => {
-    if (e.key === KEY) cb();
-  });
+  window.addEventListener("storage", storageHandler);
   return () => {
     window.removeEventListener("rpm:sync-queue-changed", handler);
+    window.removeEventListener("storage", storageHandler);
   };
 }
