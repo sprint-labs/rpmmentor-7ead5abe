@@ -36,3 +36,6 @@ supabase/.temp/
 
 # Local editor settings
 .cursor/settings.json
+
+# Test coverage output
+coverage
