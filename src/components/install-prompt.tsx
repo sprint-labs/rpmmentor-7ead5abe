@@ -317,20 +317,20 @@ export function InstallPrompt() {
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-[13px] font-semibold text-foreground">Install didn’t start</p>
-            <p className="mt-0.5 text-[11px] text-muted-foreground">
+            <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
               Your browser blocked the install prompt. Try again, or follow the manual steps.
             </p>
-            <div className="mt-2 flex items-center gap-2">
+            <div className="mt-2 flex flex-wrap items-center gap-2">
               <button
                 type="button"
                 onClick={retryFromFailure}
-                className="inline-flex items-center gap-1 h-7 rounded-md border border-border px-2 text-[11px] font-semibold uppercase tracking-[0.06em] text-foreground hover:bg-accent"
+                className="inline-flex min-h-11 items-center gap-1 rounded-md border border-border px-3 text-[11px] font-semibold uppercase tracking-[0.06em] text-foreground hover:bg-accent"
               >
                 <RefreshCw className="size-3" /> Try again
               </button>
               <Link
                 to="/install"
-                className="inline-flex items-center h-7 rounded-md bg-primary px-2 text-[11px] font-semibold uppercase tracking-[0.06em] text-primary-foreground hover:opacity-90"
+                className="inline-flex min-h-11 items-center rounded-md bg-primary px-3 text-[11px] font-semibold uppercase tracking-[0.06em] text-primary-foreground hover:opacity-90"
               >
                 Manual steps
               </Link>
@@ -344,7 +344,7 @@ export function InstallPrompt() {
   if (deferred) {
     return (
       <Card onClose={() => snooze("manual-close")}>
-        <div className="flex items-center gap-3">
+        <div className="grid grid-cols-[auto_minmax(0,1fr)] items-start gap-x-3 gap-y-3 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:items-center">
           <div className="flex size-9 shrink-0 items-center justify-center rounded-md bg-primary/15 text-primary">
             <Download className="size-4" />
           </div>
@@ -358,7 +358,7 @@ export function InstallPrompt() {
           <button
             type="button"
             onClick={install}
-            className="h-8 shrink-0 rounded-md bg-primary px-3 text-[11px] font-semibold uppercase tracking-[0.06em] text-primary-foreground hover:opacity-90"
+            className="col-span-2 min-h-11 w-full rounded-md bg-primary px-3 text-[11px] font-semibold uppercase tracking-[0.06em] text-primary-foreground hover:opacity-90 sm:col-span-1 sm:w-auto"
           >
             Install
           </button>
@@ -376,7 +376,7 @@ export function InstallPrompt() {
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-[13px] font-semibold text-foreground">Add Mentor Hub to Home Screen</p>
-            <p className="mt-1 flex flex-wrap items-center gap-1 text-[11px] text-muted-foreground">
+            <p className="mt-1 flex flex-wrap items-center gap-1 text-xs leading-relaxed text-muted-foreground">
               Tap
               <Share className="inline size-3.5" aria-label="Share" />
               then
@@ -384,7 +384,7 @@ export function InstallPrompt() {
                 <Plus className="size-3" /> Add to Home Screen
               </span>
             </p>
-            <Link to="/install" className="mt-1 inline-block text-[11px] text-primary hover:underline">
+            <Link to="/install" className="mt-1 inline-block text-xs text-primary hover:underline">
               Step-by-step guide
             </Link>
           </div>
@@ -398,16 +398,19 @@ export function InstallPrompt() {
 
 function Card({ children, onClose }: { children: React.ReactNode; onClose: () => void }) {
   return (
-    <div className="fixed inset-x-3 bottom-3 z-40 mx-auto max-w-md rounded-lg border border-border bg-card/95 p-3 shadow-2xl backdrop-blur md:left-auto md:right-4 md:mx-0">
+    <div
+      data-install-prompt
+      className="fixed inset-x-3 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-40 mx-auto max-w-md overflow-hidden rounded-lg border border-border bg-card/95 p-3 shadow-2xl backdrop-blur md:left-auto md:right-4 md:mx-0"
+    >
       <button
         type="button"
         onClick={onClose}
         aria-label="Dismiss install prompt"
-        className="absolute right-1.5 top-1.5 inline-flex size-6 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground"
+        className="absolute right-0.5 top-0.5 inline-flex size-11 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground"
       >
         <X className="size-3.5" />
       </button>
-      {children}
+      <div className="install-prompt-body pr-9">{children}</div>
     </div>
   );
 }

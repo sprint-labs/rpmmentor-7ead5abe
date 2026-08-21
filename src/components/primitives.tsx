@@ -54,11 +54,13 @@ export function PageHeader({
   description,
   action,
   breadcrumbs,
+  titleClassName,
 }: {
   title: string;
   description?: string;
   action?: ReactNode;
   breadcrumbs?: BreadcrumbItem[];
+  titleClassName?: string;
 }) {
   return (
     <div className="mb-6">
@@ -66,8 +68,15 @@ export function PageHeader({
         <Breadcrumbs items={breadcrumbs} className="mb-2" />
       )}
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-3xl font-display font-bold uppercase tracking-[0.02em]">{title}</h1>
+        <div className="min-w-0">
+          <h1
+            className={cn(
+              "text-3xl font-display font-bold uppercase tracking-[0.02em]",
+              titleClassName,
+            )}
+          >
+            {title}
+          </h1>
           {description && <p className="text-sm text-muted-foreground mt-1">{description}</p>}
         </div>
         {action}
@@ -316,9 +325,17 @@ export function Avatar({
   );
 }
 
-export function SectionTitle({ children, action }: { children: ReactNode; action?: ReactNode }) {
+export function SectionTitle({
+  children,
+  action,
+  className,
+}: {
+  children: ReactNode;
+  action?: ReactNode;
+  className?: string;
+}) {
   return (
-    <div className="flex items-center justify-between gap-3 mb-4">
+    <div className={cn("flex items-center justify-between gap-3 mb-4", className)}>
       <h2 className="text-xs font-bold uppercase tracking-[0.2em] font-mono text-foreground">
         {children}
       </h2>

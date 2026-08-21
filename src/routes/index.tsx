@@ -194,25 +194,26 @@ function Dashboard() {
     <div className="space-y-4">
       <PageHeader
         title={greeting}
+        titleClassName="break-words text-2xl leading-tight min-[390px]:text-[1.625rem] sm:text-3xl"
         description={`${ROLE_LABEL[user.role]} view · overview of goalkeeper coverage and outstanding actions.`}
         action={
-          <div className="flex items-center gap-2">
-            <SyncStatusChip />
+          <div className="grid w-full grid-cols-1 gap-2 min-[390px]:grid-cols-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center">
+            <SyncStatusChip className="w-fit justify-self-start whitespace-nowrap min-[390px]:col-span-2 sm:col-auto" />
             {can("reports.submit") && (
               <button
                 onClick={() => setWorkflow("report")}
-                className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md bg-primary text-primary-foreground text-xs uppercase tracking-[0.06em] font-semibold hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="inline-flex min-h-11 min-w-0 w-full items-center justify-center gap-1.5 rounded-md bg-primary px-2 py-2 text-center text-[11px] font-semibold uppercase leading-tight tracking-[0.06em] text-primary-foreground hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:w-auto sm:px-3 sm:text-xs"
               >
-                <FileText className="size-4" />
-                Submit a Match report
+                <FileText className="size-4 shrink-0" />
+                Submit report
               </button>
             )}
             {can("interactions.log") && (
               <button
                 onClick={() => setWorkflow("interaction")}
-                className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md border border-border text-xs uppercase tracking-[0.06em] font-semibold hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="inline-flex min-h-11 min-w-0 w-full items-center justify-center gap-1.5 rounded-md border border-border px-2 py-2 text-center text-[11px] font-semibold uppercase leading-tight tracking-[0.06em] hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:w-auto sm:px-3 sm:text-xs"
               >
-                <Plus className="size-4" />
+                <Plus className="size-4 shrink-0" />
                 Log interaction
               </button>
             )}
@@ -221,7 +222,7 @@ function Dashboard() {
       />
 
       {/* KPI strip */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 gap-3 min-[390px]:grid-cols-2 sm:gap-4 md:grid-cols-3 lg:grid-cols-5 [&>a]:h-full [&>a]:min-w-0 [&>a>div]:h-full">
         <Link
           to="/goalkeepers"
           className="block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
@@ -288,7 +289,7 @@ function Dashboard() {
           to="/insights/$metric"
           params={{ metric: "mentors" }}
           search={{ from: period.fromDate, to: period.toDate, level: "" }}
-          className="block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          className="block min-[390px]:col-span-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary md:col-span-1"
           aria-label="Break down active mentors"
         >
           <StatCard
@@ -302,10 +303,11 @@ function Dashboard() {
       {/* Operational grid */}
       <div className="grid grid-cols-12 gap-4">
         {/* Duty of Care monitor */}
-        <div className="col-span-12 lg:col-span-8 command-panel p-5 self-start">
+        <div className="col-span-12 self-start command-panel p-4 sm:p-5 lg:col-span-8">
           <SectionTitle
+            className="flex-col items-start gap-2 sm:flex-row sm:items-center sm:gap-3"
             action={
-              <div className="flex items-center gap-3 text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] font-mono uppercase tracking-[0.12em] text-muted-foreground">
                 <span className="inline-flex items-center gap-1.5">
                   <span className="size-1.5 rounded-full bg-success shadow-[0_0_6px_var(--success)]" />
                   Nominal
@@ -325,7 +327,7 @@ function Dashboard() {
           >
             Duty of Care Monitor · Reference
           </SectionTitle>
-          <p className="mb-4 text-[10px] text-muted-foreground">
+          <p className="mb-4 text-xs leading-relaxed text-muted-foreground">
             Reference tier roster combined with live logged interactions.
           </p>
           {interactionsPending ? (

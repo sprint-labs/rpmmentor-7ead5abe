@@ -161,7 +161,7 @@ export function AppShell() {
     : null;
 
   return (
-    <div className="flex min-h-screen bg-background text-foreground">
+    <div className="flex min-h-screen overflow-x-clip bg-background text-foreground supports-[height:100dvh]:min-h-dvh">
       <div className="flex flex-1 flex-col min-w-0">
         <header className="h-16 md:h-14 flex items-center gap-2 md:gap-3 px-3 sm:px-4 md:px-6 border-b border-border bg-sidebar/95 backdrop-blur sticky top-0 z-10">
           <Link to="/" aria-label="Mentor Hub" className="size-11 md:w-auto md:h-auto flex items-center justify-center md:justify-start gap-2.5 shrink-0 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
