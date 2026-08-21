@@ -58,7 +58,6 @@ export function SyncManager() {
           (res as { message?: string }).message ?? "This queued report needs your confirmation.",
         );
       }
-
     },
   };
 
@@ -89,16 +88,18 @@ export function SyncManager() {
         );
         try {
           window.dispatchEvent(new CustomEvent("rpm:report-submitted"));
-        } catch { /* ignore */ }
+        } catch {
+          /* ignore */
+        }
       }
       if (res.needsAction > 0) {
         toast.warning(
-          `${res.needsAction} queued report${res.needsAction === 1 ? "" : "s"} look like duplicates and need your confirmation.`,
+          `${res.needsAction} queued change${res.needsAction === 1 ? "" : "s"} ${res.needsAction === 1 ? "needs" : "need"} your attention and ${res.needsAction === 1 ? "was" : "were"} kept for review.`,
         );
       }
       if (res.dropped > 0) {
         toast.error(
-          `${res.dropped} queued change${res.dropped === 1 ? "" : "s"} could not be applied and were removed. Check the details and try again.`,
+          `${res.dropped} queued change${res.dropped === 1 ? "" : "s"} could not be applied and ${res.dropped === 1 ? "was" : "were"} removed. Check the details and try again.`,
         );
       }
     } finally {
@@ -117,16 +118,23 @@ export function SyncManager() {
   // Connectivity + visibility triggers.
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const on = () => { setOnline(true); void drain(); };
+    const on = () => {
+      setOnline(true);
+      void drain();
+    };
     const off = () => setOnline(false);
-    const vis = () => { if (document.visibilityState === "visible") void drain(); };
+    const vis = () => {
+      if (document.visibilityState === "visible") void drain();
+    };
     window.addEventListener("online", on);
     window.addEventListener("offline", off);
     document.addEventListener("visibilitychange", vis);
     // Attempt one drain on mount (e.g. reload after being offline).
     void drain();
     // Periodic retry while there are pending jobs.
-    const timer = window.setInterval(() => { void drain(); }, 30_000);
+    const timer = window.setInterval(() => {
+      void drain();
+    }, 30_000);
     return () => {
       window.removeEventListener("online", on);
       window.removeEventListener("offline", off);
@@ -137,12 +145,20 @@ export function SyncManager() {
 
   if (jobs.length === 0) return null;
 
-  const needsActionJobs = jobs.filter((j) => j.needsAction);
-  const anyFailed = jobs.some((j) => j.attempts > 0);
-  const Icon = syncing ? RefreshCw : anyFailed && !online ? AlertTriangle : online ? Check : CloudUpload;
+  const needsActionJobs = jobs.filter((job) => job.needsAction);
+  const retryableJobCount = jobs.length - needsActionJobs.length;
+  const anyFailed = jobs.some((job) => job.attempts > 0);
+  const hasNeedsAction = needsActionJobs.length > 0;
+  const Icon = syncing
+    ? RefreshCw
+    : hasNeedsAction || (anyFailed && !online)
+      ? AlertTriangle
+      : online
+        ? Check
+        : CloudUpload;
   const color = syncing
     ? "border-sky-500/40 bg-sky-500/10 text-sky-200"
-    : anyFailed && !online
+    : hasNeedsAction || (anyFailed && !online)
       ? "border-amber-500/40 bg-amber-500/10 text-amber-200"
       : online
         ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-200"
@@ -159,17 +175,19 @@ export function SyncManager() {
         <span className="truncate">
           {syncing
             ? `Syncing ${jobs.length} queued change${jobs.length === 1 ? "" : "s"}…`
-            : online
-              ? `${jobs.length} queued change${jobs.length === 1 ? "" : "s"} — retrying automatically`
-              : `${jobs.length} change${jobs.length === 1 ? "" : "s"} queued — will upload when online`}
+            : hasNeedsAction
+              ? `${needsActionJobs.length} queued change${needsActionJobs.length === 1 ? "" : "s"} ${needsActionJobs.length === 1 ? "needs" : "need"} review${retryableJobCount > 0 ? ` · ${retryableJobCount} retrying automatically` : ""}`
+              : online
+                ? `${jobs.length} queued change${jobs.length === 1 ? "" : "s"} — retrying automatically`
+                : `${jobs.length} change${jobs.length === 1 ? "" : "s"} queued — will upload when online`}
         </span>
       </div>
       {needsActionJobs.length > 0 && (
         <button
           type="button"
           onClick={() => {
-            for (const j of needsActionJobs) removeJob(j.id);
-            toast.message("Removed queued duplicates. Re-submit the report if it is genuinely new.");
+            for (const job of needsActionJobs) removeJob(job.id);
+            toast.message("Removed flagged queued changes. Re-submit after checking the details.");
             refresh();
           }}
           className="shrink-0 h-6 px-2 rounded border border-current/40 hover:bg-current/10"
