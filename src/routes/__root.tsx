@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Outlet, createRootRouteWithContext, useRouter, HeadContent, Scripts, ScriptOnce } from "@tanstack/react-router";
+import { Outlet, createRootRouteWithContext, useRouter, useRouterState, HeadContent, Scripts, ScriptOnce } from "@tanstack/react-router";
 import { useEffect, type ReactNode } from "react";
 import { SpeedInsights } from "@vercel/speed-insights/react";
 import appCss from "../styles.css?url";
@@ -136,6 +136,13 @@ function RootShell({ children }: { children: ReactNode }) {
 }
 
 
+function VercelSpeedInsights() {
+  const route = useRouterState({
+    select: (s) => s.matches[s.matches.length - 1]?.routeId ?? null,
+  });
+  return <SpeedInsights route={route} />;
+}
+
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   useEffect(() => {
@@ -154,7 +161,7 @@ function RootComponent() {
           <NotificationsProvider>
             <AppShell />
             <Toaster richColors closeButton position="top-right" />
-            <SpeedInsights />
+            <VercelSpeedInsights />
           </NotificationsProvider>
         </AuthProvider>
       </ThemeProvider>
