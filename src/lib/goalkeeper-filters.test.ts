@@ -45,6 +45,15 @@ describe("goalkeeper filter behaviour", () => {
     expect(results.every((goalkeeper) => goalkeeper.tier === tier)).toBe(true);
   });
 
+  it.each([
+    ["Academy", "Academy"],
+    ["Free Agents", "Free Agent"],
+  ] as const)("selects the %s player status tag independently", (category, tag) => {
+    const results = filterGoalkeepers(goalkeepers, { ...defaultFilters, cat: category }, noRatings);
+    expect(results.length).toBeGreaterThan(0);
+    expect(results.every((goalkeeper) => goalkeeper.tags.includes(tag))).toBe(true);
+  });
+
   it("combines Tier 1 and Tier 2 without changing the canonical tier values", () => {
     const results = filterGoalkeepers(
       goalkeepers,
