@@ -177,7 +177,8 @@ Use this short release gate:
 3. Reconcile the repository's migration history with the live database into a reviewed forward-only baseline before the next schema project.
 4. Verify/copy the underlying media objects and any desired historical interaction/calendar records separately. Their metadata/history is not proof that every original storage object or auth-linked record migrated.
 5. Remove the legacy tracked `.env` safely and rotate any affected credentials in a dedicated security change.
-6. **Leaked-password protection (HaveIBeenPwned)** — Supabase Security Advisor flag remains until the RPM project is on **Pro plan or above**. The Management API rejects `password_hibp_enabled` on the current plan. Enable manually at [Auth → Email provider settings](https://supabase.com/dashboard/project/zdxxezquhvpjmoxlecjp/auth/providers?provider=Email) after upgrade.
+6. **Leaked-password protection (HaveIBeenPwned)** — Supabase Security Advisor flag remains until the RPM project is on **Pro plan or above**. The Management API rejects `password_hibp_enabled` on the current plan with: *"Configuring leaked password protection via HaveIBeenPwned.org is available on Pro Plans and up."* After upgrade: [Auth → Email provider settings](https://supabase.com/dashboard/project/zdxxezquhvpjmoxlecjp/auth/providers?provider=Email) → enable **Prevent use of leaked passwords** → Save. Billing: [Supabase org dashboard](https://supabase.com/dashboard/org/atsofgtvhfjmcevxkmer).
+7. **`list_mentor_directory()` security lint** — The function now rejects callers who are not `mentor`, `mentor_manager`, `admin`, or `super_admin`. Supabase may still surface `authenticated_security_definer_function_executable` because `authenticated` retains `EXECUTE` on a `SECURITY DEFINER` RPC; that is required for calendar/insights reads from the browser client.
 
 ### 22 Aug 2026 — Matt Beadle feedback (completed)
 
