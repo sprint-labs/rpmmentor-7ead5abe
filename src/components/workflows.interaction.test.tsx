@@ -484,7 +484,7 @@ describe("InteractionForm (durable)", () => {
   it("stores a training visit for a goalkeeper outside the RPM roster without a player link", async () => {
     createInteractionMock.mockResolvedValue({ id: "i-ext", occurredAt: "2026-01-05" });
     renderForm();
-    fireEvent.click(screen.getByRole("button", { name: /goalkeeper not on rpm/i }));
+    fireEvent.click(screen.getByRole("button", { name: /non-rpm goalkeeper/i }));
     fireEvent.change(screen.getByLabelText("Goalkeeper"), {
       target: { value: "Kjell Scherpen" },
     });
@@ -535,7 +535,7 @@ describe("InteractionForm (durable)", () => {
       },
     });
 
-    fireEvent.click(screen.getByRole("button", { name: /goalkeeper not on rpm/i }));
+    fireEvent.click(screen.getByRole("button", { name: /non-rpm goalkeeper/i }));
     fireEvent.change(screen.getByLabelText("Goalkeeper"), {
       target: { value: "Kjell Scherpen" },
     });

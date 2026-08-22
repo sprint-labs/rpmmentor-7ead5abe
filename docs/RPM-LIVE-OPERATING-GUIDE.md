@@ -185,7 +185,7 @@ Use this short release gate:
 | Item | Status |
 | --- | --- |
 | Voice note text doubling on interactions | Shipped in PR #50 (`autoApply` hides duplicate append controls) |
-| External goalkeepers on training visits | Shipped in PR #50 (`Goalkeeper not on RPM?` form path) |
+| External goalkeepers on training visits | Shipped in PR #50 (`Non-RPM Goalkeeper` form path; label updated in PR #53) |
 | Media page goalkeeper filter (mock roster) | Shipped in PR #46 |
 | `/robots.txt` SPA 404 | Shipped in PR #49 — live returns `200` with `Disallow: /` |
 | **Kjell Scherpen / Christian Walton mis-attribution** | **Corrected in live `public.interactions`** — interaction `8ccbb8b5-3e03-4a7f-9348-0936775e4a97` now reads **Kjell Scherpen**, `player_id` null, club **Brighton & Hove Albion**. The separate Walton training visit (`36f14cdc-…`) was left unchanged. |

@@ -1331,7 +1331,7 @@ export function InteractionForm({
                   }}
                   className="text-[11px] text-primary hover:text-primary/80"
                 >
-                  Goalkeeper not on RPM?
+                  Non-RPM Goalkeeper
                 </button>
               </div>
             )}
