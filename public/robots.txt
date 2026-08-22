@@ -1,0 +1,4 @@
+# Mentor Hub is an authenticated internal operations platform.
+# Public login/marketing pages should not be indexed.
+User-agent: *
+Disallow: /
