@@ -20,6 +20,7 @@ import {
 import { isDateOnlyInPeriod, lastNDaysPeriod } from "@/lib/dashboard-period";
 import { isDashboardInteractionType } from "@/lib/interactions/schema";
 import { buildActiveMentorInsightRows } from "@/lib/active-mentor-insights";
+import { RequirePermission } from "@/components/require-permission";
 
 const METRICS = [
   "goalkeepers",
@@ -141,7 +142,7 @@ function availableCount(isLoading: boolean, isError: boolean, count: number): st
 function InsightDrilldown() {
   const { metric } = Route.useParams();
   const search = Route.useSearch();
-  const { user } = useAuth();
+  const { user, can } = useAuth();
   const navigate = useNavigate();
 
   const active: Metric = (METRICS as readonly string[]).includes(metric)
@@ -160,6 +161,10 @@ function InsightDrilldown() {
   }, [search.from, search.to]);
 
   const enabled = Boolean(user) && user?.role !== "mentor";
+  const canViewSystemAlerts = can("alerts.view");
+  const visibleMetrics = canViewSystemAlerts
+    ? METRICS
+    : METRICS.filter((candidate) => candidate !== "alerts");
 
   useEffect(() => {
     if (!user) navigate({ to: "/login", search: { next: "/" }, replace: true });
@@ -218,6 +223,13 @@ function InsightDrilldown() {
   );
 
   if (!user || user.role === "mentor") return null;
+  if (active === "alerts" && !canViewSystemAlerts) {
+    return (
+      <RequirePermission permission="alerts.view">
+        <></>
+      </RequirePermission>
+    );
+  }
 
   const periodLabel = `${period.fromDate} → ${period.toDate}`;
 
@@ -245,7 +257,7 @@ function InsightDrilldown() {
       />
 
       <nav className="flex flex-wrap gap-2">
-        {METRICS.map((m) => (
+        {visibleMetrics.map((m) => (
           <Link
             key={m}
             to="/insights/$metric"

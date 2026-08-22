@@ -170,6 +170,7 @@ function Dashboard() {
     return <MentorDashboard user={user} mentorProfileId={user.mentorId ?? ""} />;
   }
 
+  const canViewSystemAlerts = can("alerts.view");
   const dutyOverview = computeDutyOverview(dutySource);
 
   // Upcoming interactions come from the shared team calendar only. There is
@@ -541,7 +542,9 @@ function Dashboard() {
         {/* Recent activity */}
         <ErrorBoundary
           fallback={(reset) => (
-            <div className="col-span-12 lg:col-span-4 command-panel p-5">
+            <div
+              className={`col-span-12 ${canViewSystemAlerts ? "lg:col-span-4" : "lg:col-span-8"} command-panel p-5`}
+            >
               <SectionTitle>Recent Events</SectionTitle>
               <div className="border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive flex items-start gap-2">
                 <AlertTriangle className="size-4 shrink-0" />
@@ -562,7 +565,9 @@ function Dashboard() {
             </div>
           )}
         >
-          <div className="col-span-12 lg:col-span-4 command-panel p-5">
+          <div
+            className={`col-span-12 ${canViewSystemAlerts ? "lg:col-span-4" : "lg:col-span-8"} command-panel p-5`}
+          >
             <SectionTitle
               action={
                 can("interactions.log") ? (
@@ -612,59 +617,61 @@ function Dashboard() {
         </ErrorBoundary>
 
         {/* Alerts */}
-        <div className="col-span-12 lg:col-span-4 command-panel p-5">
-          <SectionTitle
-            action={
-              <Link
-                to="/insights/$metric"
-                params={{ metric: "alerts" }}
-                search={{ from: period.fromDate, to: period.toDate, level: "" }}
-                className="text-[10px] font-mono uppercase tracking-widest text-primary inline-flex items-center gap-1"
-              >
-                All <ArrowUpRight className="size-3" />
-              </Link>
-            }
-          >
-            System Alerts
-          </SectionTitle>
-          <div className="space-y-2">
-            {alerts.length === 0 ? (
-              <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground/70 py-6 text-center">
-                Live alert feed not connected
-              </div>
-            ) : (
-              alerts.slice(0, 6).map((a) => {
-                const tone =
-                  a.severity === "high"
-                    ? "border-destructive/30 bg-destructive/5 text-destructive"
-                    : a.severity === "medium"
-                      ? "border-warning/30 bg-warning/5 text-warning"
-                      : "border-info/30 bg-info/5 text-info";
-                return (
-                  <div key={a.id} className={`border p-3 ${tone}`}>
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-[10px] font-mono font-bold uppercase tracking-widest">
-                        {a.kind}
-                      </span>
-                      <AlertTriangle className="size-3" />
+        {canViewSystemAlerts && (
+          <div className="col-span-12 lg:col-span-4 command-panel p-5">
+            <SectionTitle
+              action={
+                <Link
+                  to="/insights/$metric"
+                  params={{ metric: "alerts" }}
+                  search={{ from: period.fromDate, to: period.toDate, level: "" }}
+                  className="text-[10px] font-mono uppercase tracking-widest text-primary inline-flex items-center gap-1"
+                >
+                  All <ArrowUpRight className="size-3" />
+                </Link>
+              }
+            >
+              System Alerts
+            </SectionTitle>
+            <div className="space-y-2">
+              {alerts.length === 0 ? (
+                <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground/70 py-6 text-center">
+                  Live alert feed not connected
+                </div>
+              ) : (
+                alerts.slice(0, 6).map((a) => {
+                  const tone =
+                    a.severity === "high"
+                      ? "border-destructive/30 bg-destructive/5 text-destructive"
+                      : a.severity === "medium"
+                        ? "border-warning/30 bg-warning/5 text-warning"
+                        : "border-info/30 bg-info/5 text-info";
+                  return (
+                    <div key={a.id} className={`border p-3 ${tone}`}>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-[10px] font-mono font-bold uppercase tracking-widest">
+                          {a.kind}
+                        </span>
+                        <AlertTriangle className="size-3" />
+                      </div>
+                      <p className="text-[11px] text-muted-foreground leading-snug">{a.message}</p>
+                      {can("calendar.manage") && (
+                        <button
+                          type="button"
+                          onClick={() => escalateAlert(a)}
+                          className="mt-2 inline-flex items-center gap-1 border border-current/40 px-2 py-1 text-[10px] font-mono uppercase tracking-widest hover:bg-current/10"
+                        >
+                          <ArrowUpRight className="size-3" />
+                          Escalate
+                        </button>
+                      )}
                     </div>
-                    <p className="text-[11px] text-muted-foreground leading-snug">{a.message}</p>
-                    {can("calendar.manage") && (
-                      <button
-                        type="button"
-                        onClick={() => escalateAlert(a)}
-                        className="mt-2 inline-flex items-center gap-1 border border-current/40 px-2 py-1 text-[10px] font-mono uppercase tracking-widest hover:bg-current/10"
-                      >
-                        <ArrowUpRight className="size-3" />
-                        Escalate
-                      </button>
-                    )}
-                  </div>
-                );
-              })
-            )}
+                  );
+                })
+              )}
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       <WorkflowDialog kind={workflow} onClose={() => setWorkflow(null)} />

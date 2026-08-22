@@ -30,6 +30,7 @@ import {
   followUpDetail,
 } from "@/components/events/follow-up-status";
 import { formatDateOnly } from "@/lib/interactions/schema";
+import { useAuth } from "@/lib/auth";
 
 export const Route = createFileRoute("/follow-ups")({
   component: withPermission(FollowUpsPage, "calendar.view"),
@@ -55,6 +56,7 @@ function matchesFilter(row: EventFollowUpRow, filter: Filter): boolean {
 }
 
 function FollowUpsPage() {
+  const { user } = useAuth();
   const queryClient = useQueryClient();
   const fetchFollowUps = useServerFn(listEventFollowUps);
   const syncOverdue = useServerFn(syncOverdueFollowUpNotifications);
@@ -79,14 +81,16 @@ function FollowUpsPage() {
     void syncOverdue({ data: undefined })
       .then((res) => {
         if (res.created > 0) {
-          void queryClient.invalidateQueries({ queryKey: notificationsQueryKey });
+          void queryClient.invalidateQueries({
+            queryKey: notificationsQueryKey(user?.id ?? "anonymous"),
+          });
         }
       })
       .catch(() => {
         // A failed alert must not break the page: the list below is the
         // authoritative view of outstanding work either way.
       });
-  }, [data, syncOverdue, queryClient]);
+  }, [data, syncOverdue, queryClient, user?.id]);
 
   const visible = useMemo(() => {
     const filtered = rows

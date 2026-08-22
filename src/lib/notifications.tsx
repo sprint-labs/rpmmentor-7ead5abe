@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { goalkeepers, dutyStatusForGk, type DutyLevel } from "./mock-data";
+import { useAuth } from "./auth";
 
 export type DutyNotif = {
   id: string;
@@ -68,12 +69,16 @@ function seedFromCurrent(): DutyNotif[] {
 }
 
 export function NotificationsProvider({ children }: { children: ReactNode }) {
+  const { user, can } = useAuth();
+  const canViewDutyNotifications = Boolean(user) && can("alerts.view");
   const [items, setItems] = useState<DutyNotif[]>(() => load(STORAGE_KEY, [] as DutyNotif[]));
   const [prefs, setPrefsState] = useState<EmailPrefs>(() =>
     load(PREFS_KEY, { frequency: "weekly", recipients: ["operations@refuelpm.com"] } as EmailPrefs),
   );
 
   useEffect(() => {
+    if (!canViewDutyNotifications) return;
+
     const snap = load<Record<string, DutyLevel>>(SNAPSHOT_KEY, {});
     const current: Record<string, DutyLevel> = {};
     const fresh: DutyNotif[] = [];
@@ -114,7 +119,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [canViewDutyNotifications]);
 
   const setPrefs = (p: EmailPrefs) => { setPrefsState(p); persist(PREFS_KEY, p); };
   const markAllRead = () => setItems((p) => { const n = p.map((x) => ({ ...x, read: true })); persist(STORAGE_KEY, n); return n; });
@@ -132,10 +137,24 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
     });
   };
 
-  const unread = useMemo(() => items.filter((i) => !i.read).length, [items]);
+  const unread = useMemo(
+    () => (canViewDutyNotifications ? items.filter((i) => !i.read).length : 0),
+    [items, canViewDutyNotifications],
+  );
 
   return (
-    <C.Provider value={{ items, unread, markAllRead, markRead, clearAll, prefs, setPrefs, sendSummaryNow }}>
+    <C.Provider
+      value={{
+        items: canViewDutyNotifications ? items : [],
+        unread,
+        markAllRead,
+        markRead,
+        clearAll,
+        prefs,
+        setPrefs,
+        sendSummaryNow,
+      }}
+    >
       {children}
     </C.Provider>
   );

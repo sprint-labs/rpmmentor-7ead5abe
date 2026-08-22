@@ -104,13 +104,14 @@ const ADMIN: Permission[] = [
   "interactions.view", "interactions.log", "interactions.manage",
   "reports.view", "reports.submit", "reports.manage",
   "media.view", "media.edit",
-  "alerts.view", "calendar.view", "calendar.manage",
+  "calendar.view", "calendar.manage",
   "executive.view", "audit.view",
 ];
 
 const SUPER_ADMIN: Permission[] = [
   "system.manage",
   ...ADMIN,
+  "alerts.view",
   "players.manage", "interactions.delete",
   "interactions.log", "reports.submit", "media.upload",
 ];

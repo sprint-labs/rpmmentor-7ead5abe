@@ -7,4 +7,5 @@
  * "Completed" write-up carries on reading as overdue.
  */
 export const eventFollowUpsQueryKey = ["events", "follow-ups"] as const;
-export const notificationsQueryKey = ["notifications", "inbox"] as const;
+export const notificationsQueryKey = (userId: string) =>
+  ["notifications", "inbox", userId] as const;

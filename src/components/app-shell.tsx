@@ -14,6 +14,7 @@ import {
 } from "@/lib/events/notifications.functions";
 import { notificationsQueryKey } from "@/lib/events/query-keys";
 import { formatRelative } from "@/lib/mock-data";
+import { visibleNotificationUnreadCount } from "@/lib/notification-visibility";
 import { BrandMark } from "@/components/brand-mark";
 import { OfflineBanner } from "@/components/offline-banner";
 import { SyncManager } from "@/components/sync-manager";
@@ -64,22 +65,33 @@ export function AppShell() {
    * told about a new event or a write-up that has gone past its deadline.
    */
   const canSeeEventInbox = can("calendar.view");
+  const canSeeDutyNotifications = can("alerts.view");
   const queryClient = useQueryClient();
   const fetchInbox = useServerFn(listNotifications);
   const markInboxRead = useServerFn(markNotificationsRead);
-  const { data: inbox } = useQuery({
-    queryKey: notificationsQueryKey,
+  const notificationQueryKey = notificationsQueryKey(user?.id ?? "anonymous");
+  const {
+    data: inbox,
+    isPending: inboxPending,
+    isError: inboxError,
+  } = useQuery({
+    queryKey: notificationQueryKey,
     queryFn: () => fetchInbox(),
     staleTime: 60_000,
     enabled: canSeeEventInbox,
   });
   const inboxItems = inbox?.items ?? [];
-  const inboxUnread = inbox?.unread ?? 0;
+  const inboxUnread = inboxItems.filter((item) => !item.readAt).length;
+  const bellUnread = visibleNotificationUnreadCount(
+    inboxUnread,
+    notif.unread,
+    canSeeDutyNotifications,
+  );
 
   async function markInboxAllRead() {
     try {
       await markInboxRead({ data: { ids: [] } });
-      await queryClient.invalidateQueries({ queryKey: notificationsQueryKey });
+      await queryClient.invalidateQueries({ queryKey: notificationQueryKey });
     } catch {
       // Nothing to recover: the inbox simply stays unread until the next attempt.
     }
@@ -220,13 +232,13 @@ export function AppShell() {
             <div className="hidden md:inline-flex items-center gap-1.5 h-7 px-2 rounded-md bg-primary/10 border border-primary/30 text-primary text-[10px] font-medium uppercase tracking-wider"><ShieldCheck className="size-3" />{ROLE_LABEL[user.role]}</div>
           )}
           <ThemeToggle />
-          {(can("alerts.view") || canSeeEventInbox) && (
+          {(canSeeDutyNotifications || canSeeEventInbox) && (
             <div ref={bellRef} className="relative">
               <button
                 onClick={() => setBellOpen((v) => !v)}
                 aria-label={
-                  notif.unread + inboxUnread > 0
-                    ? `${bellOpen ? "Close" : "Open"} notifications, ${notif.unread + inboxUnread > 9 ? "9+" : notif.unread + inboxUnread} unread`
+                  bellUnread > 0
+                    ? `${bellOpen ? "Close" : "Open"} notifications, ${bellUnread > 9 ? "9+" : bellUnread} unread`
                     : bellOpen
                       ? "Close notifications"
                       : "Open notifications"
@@ -236,9 +248,9 @@ export function AppShell() {
                 className="relative size-11 md:size-9 grid place-items-center rounded-md border border-border hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               >
                 <BellRing className="size-4" aria-hidden="true" />
-                {notif.unread + inboxUnread > 0 && (
+                {bellUnread > 0 && (
                   <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-destructive text-destructive-foreground text-[10px] font-mono font-semibold grid place-items-center" aria-hidden="true">
-                    {notif.unread + inboxUnread > 9 ? "9+" : notif.unread + inboxUnread}
+                    {bellUnread > 9 ? "9+" : bellUnread}
                   </span>
                 )}
               </button>
@@ -265,12 +277,20 @@ export function AppShell() {
                           )}
                         </div>
                         <div className="max-h-[260px] overflow-y-auto">
-                          {inboxItems.length === 0 ? (
+                          {inboxPending && inboxItems.length === 0 ? (
+                            <div className="px-4 py-6 text-center text-xs text-muted-foreground">
+                              Loading notifications…
+                            </div>
+                          ) : inboxError && inboxItems.length === 0 ? (
+                            <div className="px-4 py-6 text-center text-xs text-muted-foreground">
+                              Notifications unavailable.
+                            </div>
+                          ) : inboxItems.length === 0 ? (
                             <div className="px-4 py-6 text-center text-xs text-muted-foreground">
                               Nothing about your scheduled events yet.
                             </div>
                           ) : (
-                            inboxItems.slice(0, 20).map((n) => (
+                            inboxItems.map((n) => (
                               <Link
                                 key={n.id}
                                 to={n.linkPath.split("?")[0] || "/calendar"}
@@ -279,7 +299,7 @@ export function AppShell() {
                                 )}
                                 onClick={() => {
                                   void markInboxRead({ data: { ids: [n.id] } }).then(() =>
-                                    queryClient.invalidateQueries({ queryKey: notificationsQueryKey }),
+                                    queryClient.invalidateQueries({ queryKey: notificationQueryKey }),
                                   );
                                   setBellOpen(false);
                                 }}
@@ -312,7 +332,7 @@ export function AppShell() {
                         </div>
                       </div>
                     )}
-                    {can("alerts.view") && (
+                    {canSeeDutyNotifications && (
                     <>
                     <div className="flex items-center justify-between px-3 py-2 border-b border-border">
                       <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Duty Notifications</div>
@@ -325,7 +345,7 @@ export function AppShell() {
                       {notif.items.length === 0 ? (
                         <div className="px-4 py-8 text-center text-xs text-muted-foreground">No duty status changes.</div>
                       ) : (
-                        notif.items.slice(0, 30).map((n) => {
+                        notif.items.map((n) => {
                           const tone = n.to === "overdue" ? "bg-destructive" : n.to === "due_soon" ? "bg-warning" : n.to === "up_to_date" ? "bg-success" : "bg-muted-foreground/50";
                           return (
                             <Link

@@ -33,4 +33,10 @@ describe("roles.server", () => {
       expect(roleHasPermission(role, "players.manage")).toBe(expected);
     }
   });
+
+  it("keeps System Alerts exclusive to Super Admin", () => {
+    for (const role of ROLES) {
+      expect(roleHasPermission(role, "alerts.view")).toBe(role === "super_admin");
+    }
+  });
 });
