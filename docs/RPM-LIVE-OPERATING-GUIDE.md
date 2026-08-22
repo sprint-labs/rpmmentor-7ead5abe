@@ -177,3 +177,14 @@ Use this short release gate:
 3. Reconcile the repository's migration history with the live database into a reviewed forward-only baseline before the next schema project.
 4. Verify/copy the underlying media objects and any desired historical interaction/calendar records separately. Their metadata/history is not proof that every original storage object or auth-linked record migrated.
 5. Remove the legacy tracked `.env` safely and rotate any affected credentials in a dedicated security change.
+6. **Leaked-password protection (HaveIBeenPwned)** — Supabase Security Advisor flag remains until the RPM project is on **Pro plan or above**. The Management API rejects `password_hibp_enabled` on the current plan. Enable manually at [Auth → Email provider settings](https://supabase.com/dashboard/project/zdxxezquhvpjmoxlecjp/auth/providers?provider=Email) after upgrade.
+
+### 22 Aug 2026 — Matt Beadle feedback (completed)
+
+| Item | Status |
+| --- | --- |
+| Voice note text doubling on interactions | Shipped in PR #50 (`autoApply` hides duplicate append controls) |
+| External goalkeepers on training visits | Shipped in PR #50 (`Goalkeeper not on RPM?` form path) |
+| Media page goalkeeper filter (mock roster) | Shipped in PR #46 |
+| `/robots.txt` SPA 404 | Shipped in PR #49 — live returns `200` with `Disallow: /` |
+| **Kjell Scherpen / Christian Walton mis-attribution** | **Corrected in live `public.interactions`** — interaction `8ccbb8b5-3e03-4a7f-9348-0936775e4a97` now reads **Kjell Scherpen**, `player_id` null, club **Brighton & Hove Albion**. The separate Walton training visit (`36f14cdc-…`) was left unchanged. |
