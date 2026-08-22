@@ -490,6 +490,11 @@ export function InteractionForm({
     const target = editing.goalkeeperName.trim().toLowerCase();
     return goalkeepers.find((g) => g.name.trim().toLowerCase() === target)?.id ?? "";
   });
+  /** When true, the mentor is logging someone outside the RPM roster. */
+  const [goalkeeperNotOnRpm, setGoalkeeperNotOnRpm] = useState(() => !editing?.playerId && Boolean(editing));
+  const [externalGoalkeeperName, setExternalGoalkeeperName] = useState(() =>
+    editing && !editing.playerId ? editing.goalkeeperName : "",
+  );
   // Defaults to a type that can actually be logged here. Live Match Observation
   // is still selectable, but it hands over to the Match Report rather than
   // creating an observation with no report behind it.
@@ -538,6 +543,11 @@ export function InteractionForm({
     if (draft) {
       // Explicit context (a goalkeeper profile, a calendar day) wins over the draft.
       if (!prefillGkId && draft.gkId) setGkId(draft.gkId);
+      if (draft.goalkeeperNotOnRpm) {
+        setGoalkeeperNotOnRpm(true);
+        setGkId("");
+      }
+      if (draft.externalGoalkeeperName) setExternalGoalkeeperName(draft.externalGoalkeeperName);
       if (!prefillDate && draft.date) setDate(draft.date);
       if (draft.type && (MANUAL_INTERACTION_TYPES as readonly string[]).includes(draft.type)) {
         setType(draft.type as InteractionTypeValue);
@@ -559,15 +569,27 @@ export function InteractionForm({
   useEffect(() => {
     if (isEditing || !draftReadyRef.current) return;
     const handle = window.setTimeout(() => {
-      saveInteractionDraft({ gkId, type, club, date, notes, outcome, followUp });
+      saveInteractionDraft({
+        gkId,
+        goalkeeperNotOnRpm,
+        externalGoalkeeperName,
+        type,
+        club,
+        date,
+        notes,
+        outcome,
+        followUp,
+      });
     }, 600);
     return () => window.clearTimeout(handle);
-  }, [isEditing, gkId, type, club, date, notes, outcome, followUp]);
+  }, [isEditing, gkId, goalkeeperNotOnRpm, externalGoalkeeperName, type, club, date, notes, outcome, followUp]);
 
   function discardDraft() {
     clearInteractionDraft();
     setDraftRestoredAt(null);
     setGkId(prefillGkId ?? "");
+    setGoalkeeperNotOnRpm(false);
+    setExternalGoalkeeperName("");
     setType(MANUAL_INTERACTION_TYPES[0]!);
     setClub("");
     setDate(prefillDate ?? todayDateOnly());
@@ -618,8 +640,8 @@ export function InteractionForm({
   const isCalendarFollowUp = isEditing && !!editing?.calendarEventId;
 
   const validationErrors = useMemo(
-    () => validate({ gkId, date, notes, outcome, followUp }),
-    [gkId, date, notes, outcome, followUp],
+    () => validate({ goalkeeperNotOnRpm, gkId, externalGoalkeeperName, date, notes, outcome, followUp }),
+    [goalkeeperNotOnRpm, gkId, externalGoalkeeperName, date, notes, outcome, followUp],
   );
   const canSubmit = Object.keys(validationErrors).length === 0 && !saving;
 
@@ -645,6 +667,15 @@ export function InteractionForm({
    */
   const selectedPlayer = useMemo(() => players.find((p) => p.id === gkId) ?? null, [players, gkId]);
   const selection = useMemo(() => {
+    if (goalkeeperNotOnRpm) {
+      const name = externalGoalkeeperName.trim();
+      if (!name) return null;
+      return {
+        name,
+        slug: "",
+        playerId: null as string | null,
+      };
+    }
     if (selectedPlayer) {
       const legacy =
         goalkeepers.find(
@@ -665,13 +696,13 @@ export function InteractionForm({
       };
     }
     return null;
-  }, [selectedPlayer, gk, players]);
+  }, [goalkeeperNotOnRpm, externalGoalkeeperName, selectedPlayer, gk, players]);
 
   // Entry points created before canonical player ids were available still pass
   // a legacy gk-* slug. Resolve it to public.players without re-offering the
   // legacy roster as selectable options.
   useEffect(() => {
-    if (!players.length || selectedPlayer) return;
+    if (goalkeeperNotOnRpm || !players.length || selectedPlayer) return;
     const legacyName =
       goalkeepers.find((candidate) => candidate.id === gkId)?.name ??
       editing?.goalkeeperName ??
@@ -680,9 +711,10 @@ export function InteractionForm({
     const canonical = findPlayerByName(players, legacyName);
     if (canonical) setGkId(canonical.id);
     else if (!editing) setGkId("");
-  }, [editing?.goalkeeperName, gkId, players, selectedPlayer]);
+  }, [editing?.goalkeeperName, gkId, players, selectedPlayer, goalkeeperNotOnRpm]);
 
   useEffect(() => {
+    if (goalkeeperNotOnRpm) return;
     if (selectedPlayer) {
       const canOverwritePlayerClub = !club.trim() || club === autoFilledClubRef.current;
       if (!canOverwritePlayerClub || club === selectedPlayer.current_club) return;
@@ -715,9 +747,21 @@ export function InteractionForm({
     }
   }
 
-  function validate(values: { gkId: string; date: string; notes: string; outcome: string; followUp: string }): Record<string, string> {
+  function validate(values: {
+    goalkeeperNotOnRpm: boolean;
+    gkId: string;
+    externalGoalkeeperName: string;
+    date: string;
+    notes: string;
+    outcome: string;
+    followUp: string;
+  }): Record<string, string> {
     const next: Record<string, string> = {};
-    if (!values.gkId.trim()) next.gkId = "Select a goalkeeper";
+    if (values.goalkeeperNotOnRpm) {
+      if (!values.externalGoalkeeperName.trim()) next.gkId = "Enter the goalkeeper's name";
+    } else if (!values.gkId.trim()) {
+      next.gkId = "Select a goalkeeper";
+    }
     if (!values.date.trim()) next.date = "Date is required";
     else if (!/^\d{4}-\d{2}-\d{2}$/.test(values.date)) next.date = "Enter a valid date";
     if (!values.notes.trim()) next.notes = "Notes are required";
@@ -942,7 +986,15 @@ export function InteractionForm({
     // Read the latest notes, not the value captured when this render began, so
     // a transcript applied immediately before Save is never lost.
     const currentNotes = notesRef.current;
-    const validation = validate({ gkId, date, notes: currentNotes, outcome, followUp });
+    const validation = validate({
+      goalkeeperNotOnRpm,
+      gkId,
+      externalGoalkeeperName,
+      date,
+      notes: currentNotes,
+      outcome,
+      followUp,
+    });
 
     if (Object.keys(validation).length > 0) {
       setErrors(validation);
@@ -1222,24 +1274,67 @@ export function InteractionForm({
       <fieldset disabled={saving} className="space-y-4 border-0 p-0 m-0 min-w-0">
         <div className="grid grid-cols-2 gap-3">
           <Field label="Goalkeeper" required error={showErrors ? errors.gkId : undefined}>
-            <GoalkeeperPicker
-              players={players}
-              value={selectedPlayer?.id ?? null}
-              onValueChange={(playerId) => {
-                setGkId(playerId ?? "");
-                clearFieldError("gkId");
-              }}
-              required
-              loading={playersQuery.isLoading}
-              error={
-                playersQuery.isError
-                  ? playersQuery.error instanceof Error
-                    ? playersQuery.error.message
-                    : "Could not load goalkeepers."
-                  : null
-              }
-              placeholder={selection?.name ?? "Select a goalkeeper…"}
-            />
+            {goalkeeperNotOnRpm ? (
+              <div className="space-y-2">
+                <input
+                  aria-label="Goalkeeper"
+                  aria-invalid={showErrors && !!errors.gkId}
+                  aria-required="true"
+                  className={`${inputCls} ${showErrors && errors.gkId ? "border-destructive focus:ring-destructive/40" : ""}`}
+                  value={externalGoalkeeperName}
+                  onChange={(e) => {
+                    setExternalGoalkeeperName(e.target.value);
+                    clearFieldError("gkId");
+                  }}
+                  placeholder="e.g. Kjell Scherpen"
+                  maxLength={120}
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    setGoalkeeperNotOnRpm(false);
+                    setExternalGoalkeeperName("");
+                    clearFieldError("gkId");
+                  }}
+                  className="text-[11px] text-primary hover:text-primary/80"
+                >
+                  Choose from RPM roster
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <GoalkeeperPicker
+                  players={players}
+                  value={selectedPlayer?.id ?? null}
+                  onValueChange={(playerId) => {
+                    setGkId(playerId ?? "");
+                    clearFieldError("gkId");
+                  }}
+                  required
+                  loading={playersQuery.isLoading}
+                  error={
+                    playersQuery.isError
+                      ? playersQuery.error instanceof Error
+                        ? playersQuery.error.message
+                        : "Could not load goalkeepers."
+                      : null
+                  }
+                  placeholder={selection?.name ?? "Select a goalkeeper…"}
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    setGoalkeeperNotOnRpm(true);
+                    setGkId("");
+                    setExternalGoalkeeperName("");
+                    clearFieldError("gkId");
+                  }}
+                  className="text-[11px] text-primary hover:text-primary/80"
+                >
+                  Goalkeeper not on RPM?
+                </button>
+              </div>
+            )}
           </Field>
           <Field label="Interaction Type" required>
             {isMatchReportObservation || isCalendarFollowUp ? (

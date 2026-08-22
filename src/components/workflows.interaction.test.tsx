@@ -13,6 +13,11 @@ const TEST_PLAYER = {
   full_name: "Demo Keeper",
   current_club: "Roster FC",
 };
+const CHRISTIAN_WALTON = {
+  id: "22222222-2222-4222-8222-222222222222",
+  full_name: "Christian Walton",
+  current_club: "Brighton & Hove Albion",
+};
 const listPlayersMock = vi.fn(async () => [TEST_PLAYER]);
 
 vi.mock("@tanstack/react-start", () => ({
@@ -474,6 +479,73 @@ describe("InteractionForm (durable)", () => {
     expect((screen.getByRole("button", { name: /cancel/i }) as HTMLButtonElement).disabled).toBe(
       true,
     );
+  });
+
+  it("stores a training visit for a goalkeeper outside the RPM roster without a player link", async () => {
+    createInteractionMock.mockResolvedValue({ id: "i-ext", occurredAt: "2026-01-05" });
+    renderForm();
+    fireEvent.click(screen.getByRole("button", { name: /goalkeeper not on rpm/i }));
+    fireEvent.change(screen.getByLabelText("Goalkeeper"), {
+      target: { value: "Kjell Scherpen" },
+    });
+    fireEvent.change(screen.getByLabelText("Interaction Type"), {
+      target: { value: "Training Ground Visit" },
+    });
+    fireEvent.change(screen.getByLabelText("Date"), { target: { value: "2026-01-05" } });
+    fireEvent.change(screen.getByLabelText("Outcome"), { target: { value: "On track" } });
+    fireEvent.change(screen.getByLabelText("Follow-up Action"), {
+      target: { value: "Share clip with parent club" },
+    });
+    fireEvent.change(screen.getByLabelText("Notes"), {
+      target: { value: "Observed distribution and communication." },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /save interaction/i }));
+
+    await waitFor(() => expect(createInteractionMock).toHaveBeenCalledTimes(1));
+    const payload = createInteractionMock.mock.calls[0]![0] as { data: Record<string, unknown> };
+    expect(payload.data["goalkeeperName"]).toBe("Kjell Scherpen");
+    expect(payload.data["playerId"]).toBeNull();
+    expect(payload.data["gkSlug"]).toBe("");
+    expect(payload.data["interactionType"]).toBe("Training Ground Visit");
+  });
+
+  it("opens external goalkeeper mode when correcting a name-only interaction", () => {
+    renderForm({ editing: EXISTING });
+    expect((screen.getByLabelText("Goalkeeper") as HTMLInputElement).value).toBe("Tom Watson");
+    expect(screen.queryByRole("combobox", { name: "Goalkeeper" })).toBeNull();
+  });
+
+  it("lets a mentor re-attribute a mis-linked RPM goalkeeper to the correct external name", async () => {
+    listPlayersMock.mockResolvedValue([TEST_PLAYER, CHRISTIAN_WALTON]);
+    updateInteractionMock.mockResolvedValue({
+      ...EXISTING,
+      playerId: null,
+      gkSlug: "",
+      goalkeeperName: "Kjell Scherpen",
+      interactionType: "Training Ground Visit",
+    });
+    renderForm({
+      editing: {
+        ...EXISTING,
+        playerId: CHRISTIAN_WALTON.id,
+        gkSlug: "gk-christian-walton",
+        goalkeeperName: "Christian Walton",
+        interactionType: "Training Ground Visit",
+        club: "Brighton & Hove Albion",
+      },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /goalkeeper not on rpm/i }));
+    fireEvent.change(screen.getByLabelText("Goalkeeper"), {
+      target: { value: "Kjell Scherpen" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /save changes/i }));
+
+    await waitFor(() => expect(updateInteractionMock).toHaveBeenCalledTimes(1));
+    const payload = updateInteractionMock.mock.calls[0]![0] as { data: Record<string, unknown> };
+    expect(payload.data["goalkeeperName"]).toBe("Kjell Scherpen");
+    expect(payload.data["playerId"]).toBeNull();
+    expect(payload.data["gkSlug"]).toBe("");
   });
 });
 
