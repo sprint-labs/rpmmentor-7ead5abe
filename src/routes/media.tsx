@@ -5,7 +5,7 @@ import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
 import { PageHeader, Card, Pill, EmptyState } from "@/components/primitives";
 import { DataSourceBanner } from "@/lib/data-classification";
-import { goalkeepers, getGk, formatDate } from "@/lib/mock-data";
+import { getGk, formatDate } from "@/lib/mock-data";
 import { Video, FileText, Image as ImageIcon, Mic, Upload, Trash2, ExternalLink, Pencil, Filter, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { WorkflowDialog, type WorkflowKind, EditMediaDialog } from "@/components/workflows";
@@ -50,6 +50,13 @@ function MediaPage() {
   });
   const playerNamesById = useMemo(
     () => new Map(rosterPlayers.map((player) => [player.id, player.full_name])),
+    [rosterPlayers],
+  );
+  const goalkeeperFilterOptions = useMemo(
+    () =>
+      [...rosterPlayers]
+        .sort((a, b) => a.full_name.localeCompare(b.full_name))
+        .map((player) => ({ id: player.id, name: player.full_name })),
     [rosterPlayers],
   );
   const { from, to, uploaderName, kind: kindParam, source } = Route.useSearch();
@@ -197,7 +204,11 @@ function MediaPage() {
           </select>
           <select value={filters.gkId ?? ""} onChange={(e) => setFilters((f) => ({ ...f, gkId: e.target.value || undefined }))} className="h-9 px-2 rounded-md bg-input/60 border border-border text-sm">
             <option value="">All goalkeepers</option>
-            {goalkeepers.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+            {goalkeeperFilterOptions.map((goalkeeper) => (
+              <option key={goalkeeper.id} value={goalkeeper.id}>
+                {goalkeeper.name}
+              </option>
+            ))}
           </select>
           <select value={filters.uploaderId ?? ""} onChange={(e) => setFilters((f) => ({ ...f, uploaderId: e.target.value || undefined }))} className="h-9 px-2 rounded-md bg-input/60 border border-border text-sm">
             <option value="">All uploaders</option>
