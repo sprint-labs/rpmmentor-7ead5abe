@@ -12,6 +12,7 @@ import {
   computeDutyOverview,
   type Alert,
 } from "@/lib/mock-data";
+import { compareAlertSeverity } from "@/lib/interaction-alert-rank";
 import { useLoggedInteractions } from "@/lib/interactions/use-interactions";
 import { ErrorBoundary } from "@/components/error-boundary";
 
@@ -86,7 +87,7 @@ function Dashboard() {
   });
   // Upcoming Logs reads the shared team calendar (same cache as /calendar).
   const fetchCalendarEvents = useServerFn(listCalendarEvents);
-  const { data: teamEvents } = useQuery({
+  const { data: teamEvents, isPending: calendarPending, isError: calendarError } = useQuery({
     queryKey: ["calendar-events"],
     queryFn: () => fetchCalendarEvents(),
     enabled: Boolean(user && user.role !== "mentor"),
@@ -177,7 +178,7 @@ function Dashboard() {
   // no sample/placeholder fallback — an empty schedule shows an empty state.
   const todayIso = new Date().toISOString().slice(0, 10);
   const upcoming = (teamEvents ?? [])
-    .filter((e) => e.event_date >= todayIso)
+    .filter((e) => e.event_date >= todayIso && e.status !== "cancelled")
     .sort((a, b) => a.event_date.localeCompare(b.event_date))
     .slice(0, 6);
 
@@ -247,14 +248,20 @@ function Dashboard() {
           params={{ metric: "duty" }}
           search={{ from: period.fromDate, to: period.toDate, level: "overdue" }}
           className="block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-warning"
-          aria-label="Break down overdue duty of care"
+          aria-label="Break down duty of care cadence"
         >
           <StatCard
-            label="Overdue Duty of Care"
+            label="Duty of Care"
             value={interactionsPending ? "…" : interactionsError ? "—" : dutyOverview.overdue}
-            hint={interactionsError ? "Count unavailable" : "Reference tier roster"}
+            hint={
+              interactionsError
+                ? "Count unavailable"
+                : dutyOverview.overdue > 0
+                  ? "Players past required cadence"
+                  : "Nothing overdue on the reference roster"
+            }
             accent="warning"
-            emptyMessage="All caught up"
+            emptyMessage="Nothing overdue"
           />
         </Link>
         <Link
@@ -403,14 +410,14 @@ function Dashboard() {
 
         {/* Roster categories */}
         <div className="col-span-12 self-start command-panel p-4 lg:col-span-4">
-          <SectionTitle>Goalkeeper Categories</SectionTitle>
+          <SectionTitle>Roster Snapshot</SectionTitle>
 
           <section className="mt-3" aria-labelledby="duty-tier-categories">
             <h3
               id="duty-tier-categories"
               className="mb-2 text-[10px] font-mono uppercase tracking-[0.14em] text-muted-foreground"
             >
-              Duty of care tiers
+              Care cadence tiers
             </h3>
             <div className="grid grid-cols-2 gap-2">
               {rosterCategoryCounts.tiers.map(({ label, count }) => (
@@ -439,7 +446,7 @@ function Dashboard() {
               id="player-status-categories"
               className="mb-2 text-[10px] font-mono uppercase tracking-[0.14em] text-muted-foreground"
             >
-              Player status
+              Status groups
             </h3>
             <div className="grid grid-cols-2 gap-2">
               {rosterCategoryCounts.statuses.map(({ label, count }) => (
@@ -489,9 +496,48 @@ function Dashboard() {
             Upcoming Logs
           </SectionTitle>
           <div className="divide-y divide-border">
-            {upcoming.length === 0 ? (
+            {calendarPending ? (
               <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground/70 py-6 text-center">
-                No scheduled interactions
+                Loading calendar…
+              </div>
+            ) : calendarError ? (
+              <div className="space-y-2 py-6 text-center">
+                <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground/70">
+                  Calendar unavailable
+                </div>
+                <Link
+                  to="/calendar"
+                  search={{ gkId: "", new: false }}
+                  className="text-[10px] font-mono uppercase tracking-widest text-primary hover:underline"
+                >
+                  Open calendar
+                </Link>
+              </div>
+            ) : upcoming.length === 0 ? (
+              <div className="space-y-2 py-6 text-center">
+                <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground/70">
+                  No upcoming calendar events
+                </div>
+                <p className="text-[11px] text-muted-foreground px-2">
+                  This panel reads the shared team calendar. Schedule a visit or catch-up to populate it.
+                </p>
+                {can("calendar.manage") ? (
+                  <Link
+                    to="/calendar"
+                    search={{ gkId: "", new: true }}
+                    className="text-[10px] font-mono uppercase tracking-widest text-primary hover:underline"
+                  >
+                    Schedule an event
+                  </Link>
+                ) : (
+                  <Link
+                    to="/calendar"
+                    search={{ gkId: "", new: false }}
+                    className="text-[10px] font-mono uppercase tracking-widest text-primary hover:underline"
+                  >
+                    View calendar
+                  </Link>
+                )}
               </div>
             ) : (
               upcoming.map((e) => {
@@ -639,7 +685,7 @@ function Dashboard() {
                   Live alert feed not connected
                 </div>
               ) : (
-                alerts.slice(0, 6).map((a) => {
+                [...alerts].sort(compareAlertSeverity).slice(0, 6).map((a) => {
                   const tone =
                     a.severity === "high"
                       ? "border-destructive/30 bg-destructive/5 text-destructive"

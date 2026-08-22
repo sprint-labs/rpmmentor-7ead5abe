@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
+import { createContext, startTransition, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 
 export type Theme = "dark" | "light";
 const STORAGE_KEY = "rpm.theme";
@@ -32,11 +32,12 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const setTheme = useCallback((next: Theme) => {
-    setThemeState(next);
+    // Defer React state so the html class swap stays responsive (INP).
     const d = document.documentElement;
     if (next === "dark") d.classList.add("dark");
     else d.classList.remove("dark");
     try { localStorage.setItem(STORAGE_KEY, next); } catch {}
+    startTransition(() => setThemeState(next));
   }, []);
 
   const toggle = useCallback(() => {
