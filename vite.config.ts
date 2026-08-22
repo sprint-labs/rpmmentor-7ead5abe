@@ -48,6 +48,7 @@ export default defineConfig({
             /^\/\.well-known/,
             /^\/\.lovable/,
             /^\/~oauth/,
+            /^\/robots\.txt$/,
             /^\/sw\.js$/,
           ],
           globPatterns: ["**/*.{js,css,html,ico,png,svg,webmanifest,woff,woff2}"],
