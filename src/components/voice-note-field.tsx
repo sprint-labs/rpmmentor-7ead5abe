@@ -1053,7 +1053,9 @@ export function VoiceNoteField({
 
             <>
               <div className="flex items-center justify-between gap-2 flex-wrap">
-                <div className="text-[11px] uppercase tracking-wider text-muted-foreground">Transcript preview — edit before applying</div>
+                <div className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                  {autoApply ? "Transcript preview — already in Notes" : "Transcript preview — edit before applying"}
+                </div>
                 <div className="flex items-center gap-1.5">
                   {overallLabel && (
                     <span className={`inline-flex items-center gap-1 h-5 px-1.5 rounded-md border text-[10px] font-mono uppercase tracking-wider ${overallClass}`}>
@@ -1216,16 +1218,18 @@ export function VoiceNoteField({
                   <span className="opacity-70">Editing the text clears highlights.</span>
                 </div>
               )}
-              <label className="inline-flex items-center gap-1.5 text-[11px] text-foreground select-none">
-                <input
-                  type="checkbox"
-                  checked={reviewed}
-                  disabled={isEditingText}
-                  onChange={(e) => setReviewed(e.target.checked)}
-                  className="size-3.5 accent-primary"
-                />
-                I've reviewed the transcript
-              </label>
+              {!autoApply && (
+                <label className="inline-flex items-center gap-1.5 text-[11px] text-foreground select-none">
+                  <input
+                    type="checkbox"
+                    checked={reviewed}
+                    disabled={isEditingText}
+                    onChange={(e) => setReviewed(e.target.checked)}
+                    className="size-3.5 accent-primary"
+                  />
+                  I've reviewed the transcript
+                </label>
+              )}
               {isEditingText && (
                 <div className="text-[11px] text-amber-500" role="status">
                   You're editing the transcript — click outside the editor to enable saving.
@@ -1250,6 +1254,18 @@ export function VoiceNoteField({
                       Keep editing
                     </button>
                   </div>
+                </div>
+              ) : autoApply ? (
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <p className="text-[11px] text-muted-foreground" role="status">
+                    Added to Notes — edit there if needed. Use Retry to transcribe again.
+                  </p>
+                  <button type="button" onClick={() => { navigator.clipboard?.writeText(transcript); toast.success("Copied"); }} className="inline-flex items-center gap-1 h-7 px-2 rounded-md border border-border text-[11px] font-medium hover:bg-accent">
+                    Copy
+                  </button>
+                  <button type="button" onClick={retry} className="inline-flex items-center gap-1 h-7 px-2 rounded-md border border-border text-[11px] font-medium hover:bg-accent">
+                    <RotateCcw className="size-3" />Retry
+                  </button>
                 </div>
               ) : (
                 <div className="flex flex-wrap gap-1.5">
@@ -1293,7 +1309,7 @@ export function VoiceNoteField({
                 </div>
               )}
 
-              {aiMode === "report-rewrite" && rewriting && !rewrite && (
+              {!autoApply && aiMode === "report-rewrite" && rewriting && !rewrite && (
                 <div className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground" role="status">
                   <Loader2 className="size-3 animate-spin" />
                   Preparing an editable AI rewrite…

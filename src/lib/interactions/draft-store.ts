@@ -11,6 +11,10 @@
 
 export interface InteractionDraft {
   gkId: string;
+  /** True when the mentor is logging someone outside the RPM roster. */
+  goalkeeperNotOnRpm?: boolean;
+  /** Free-text goalkeeper name when `goalkeeperNotOnRpm` is true. */
+  externalGoalkeeperName?: string;
   type: string;
   club: string;
   date: string;
@@ -36,7 +40,14 @@ function storage(): Storage | null {
 
 /** True when the draft holds anything a user would be annoyed to lose. */
 export function isDraftMeaningful(d: Omit<InteractionDraft, "savedAt">): boolean {
-  return Boolean(d.gkId.trim() || d.notes.trim() || d.club.trim() || d.outcome.trim() || d.followUp.trim());
+  return Boolean(
+    d.gkId.trim() ||
+      d.externalGoalkeeperName?.trim() ||
+      d.notes.trim() ||
+      d.club.trim() ||
+      d.outcome.trim() ||
+      d.followUp.trim(),
+  );
 }
 
 export function saveInteractionDraft(draft: Omit<InteractionDraft, "savedAt">): void {
@@ -74,6 +85,8 @@ export function loadInteractionDraft(): InteractionDraft | null {
     }
     const draft: InteractionDraft = {
       gkId: String(parsed.gkId ?? ""),
+      goalkeeperNotOnRpm: Boolean(parsed.goalkeeperNotOnRpm),
+      externalGoalkeeperName: String(parsed.externalGoalkeeperName ?? ""),
       type: String(parsed.type ?? ""),
       club: String(parsed.club ?? ""),
       date: String(parsed.date ?? ""),
