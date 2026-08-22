@@ -631,7 +631,22 @@ export function computeDutyOverview(
 
 export const dutyOverview = computeDutyOverview();
 
-const STATUSES: Status[] = ["Tier 1", "Tier 2", "Tier 3", "Tier 4", "Academy", "Free Agent"];
+const ROSTER_TIERS: TierLevelLabel[] = ["Tier 1", "Tier 2", "Tier 3", "Tier 4"];
+const ROSTER_STATUS_TAGS: GoalkeeperTag[] = ["Academy", "Free Agent"];
+
+// Tiers and status tags are deliberately counted separately. Every goalkeeper
+// belongs to one duty-of-care tier, while Academy and Free Agent describe the
+// player's current situation and can coexist with any numbered tier.
+export const rosterCategoryCounts = {
+  tiers: ROSTER_TIERS.map((label) => ({
+    label,
+    count: goalkeepers.filter((goalkeeper) => goalkeeper.tier === label).length,
+  })),
+  statuses: ROSTER_STATUS_TAGS.map((label) => ({
+    label,
+    count: goalkeepers.filter((goalkeeper) => goalkeeper.tags.includes(label)).length,
+  })),
+};
 
 export const stats = {
   totalGks: goalkeepers.length,
@@ -647,8 +662,5 @@ export const stats = {
   overdueInteractions: alerts.filter((a) => a.kind === "Overdue observation" || a.kind === "Overdue contact").length,
   reportsThisWeek: reports.filter((r) => (Date.now() - new Date(r.date).getTime()) / 86400000 < 7).length,
   activeMentors: activeMentors.length,
-  // Back-compat: tierDistribution now reports the Status distribution
-  tierDistribution: STATUSES.map((t) => ({ tier: t, count: goalkeepers.filter((g) => g.status === t).length })),
-  statusDistribution: STATUSES.map((t) => ({ status: t, count: goalkeepers.filter((g) => g.status === t).length })),
   regionDistribution: (["UK Based", "Overseas", "Free Agent"] as Region[]).map((r) => ({ region: r, count: goalkeepers.filter((g) => g.region === r).length })),
 };

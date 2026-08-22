@@ -7,7 +7,7 @@ import { PageHeader, StatCard, SectionTitle, TierBadge } from "@/components/prim
 import {
   alerts,
   goalkeepers,
-  stats,
+  rosterCategoryCounts,
   formatRelative,
   computeDutyOverview,
   type Alert,
@@ -26,15 +26,7 @@ function initialsOf(name: string) {
   );
 }
 
-import {
-  ArrowUpRight,
-  AlertTriangle,
-  CalendarClock,
-  FileText,
-  Users,
-  UserCog,
-  Plus,
-} from "lucide-react";
+import { ArrowUpRight, AlertTriangle, CalendarClock, FileText, Plus } from "lucide-react";
 import { useAuth, ROLE_LABEL } from "@/lib/auth";
 import { MentorDashboard } from "@/components/mentor/mentor-dashboard";
 import { SyncStatusChip } from "@/components/sync-status-chip";
@@ -408,57 +400,64 @@ function Dashboard() {
           )}
         </div>
 
-        {/* Status distribution */}
-        <div className="col-span-12 lg:col-span-4 command-panel p-5">
-          <SectionTitle>Tier Distribution · Reference</SectionTitle>
-          <p className="mb-4 text-[10px] text-muted-foreground">
-            Reference roster; tier data is not yet stored on live player records.
-          </p>
-          <div className="space-y-3">
-            {stats.tierDistribution.map((t) => {
-              const pct = Math.round((t.count / stats.totalGks) * 100);
-              const color =
-                t.tier === "Tier 1"
-                  ? "bg-warning"
-                  : t.tier === "Tier 2"
-                    ? "bg-info"
-                    : t.tier === "Tier 3"
-                      ? "bg-primary"
-                      : t.tier === "Academy"
-                        ? "bg-tier-3"
-                        : "bg-muted-foreground/40";
-              return (
-                <div key={t.tier} className="flex items-center gap-3">
-                  <span className="w-20 shrink-0">
-                    <TierBadge tier={t.tier as never} />
-                  </span>
-                  <div className="flex-1 h-1 bg-background overflow-hidden">
-                    <div className={`h-full bar-grow ${color}`} style={{ width: `${pct}%` }} />
-                  </div>
-                  <span className="w-8 text-right text-[11px] font-mono tabular-nums text-muted-foreground">
-                    {pct}%
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-          <div className="grid grid-cols-3 gap-2 mt-6 pt-4 border-t border-border">
-            <Link
-              to="/goalkeepers"
-              className="flex flex-col items-center gap-1 p-2 hover:bg-accent/40"
+        {/* Roster categories */}
+        <div className="col-span-12 self-start command-panel p-4 lg:col-span-4">
+          <SectionTitle>Goalkeeper Categories</SectionTitle>
+
+          <section className="mt-3" aria-labelledby="duty-tier-categories">
+            <h3
+              id="duty-tier-categories"
+              className="mb-2 text-[10px] font-mono uppercase tracking-[0.14em] text-muted-foreground"
             >
-              <Users className="size-4 text-primary" />
-              <span className="text-[10px] font-mono uppercase tracking-wider">Keepers</span>
-            </Link>
-            <Link to="/mentors" className="flex flex-col items-center gap-1 p-2 hover:bg-accent/40">
-              <UserCog className="size-4 text-info" />
-              <span className="text-[10px] font-mono uppercase tracking-wider">Roles</span>
-            </Link>
-            <Link to="/reports" className="flex flex-col items-center gap-1 p-2 hover:bg-accent/40">
-              <FileText className="size-4 text-warning" />
-              <span className="text-[10px] font-mono uppercase tracking-wider">Reports</span>
-            </Link>
-          </div>
+              Duty of care tiers
+            </h3>
+            <div className="grid grid-cols-2 gap-2">
+              {rosterCategoryCounts.tiers.map(({ label, count }) => (
+                <Link
+                  key={label}
+                  to="/goalkeepers"
+                  search={{ tiers: label }}
+                  aria-label={`View ${count} ${label} goalkeepers`}
+                  className="group flex min-h-12 items-center gap-2 rounded-md border border-border bg-background/40 px-2.5 py-2 hover:border-primary/50 hover:bg-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                >
+                  <TierBadge tier={label} />
+                  <span className="ml-auto font-mono text-lg font-bold tabular-nums text-foreground">
+                    {count}
+                  </span>
+                  <ArrowUpRight className="size-3 shrink-0 text-muted-foreground transition-colors group-hover:text-primary" />
+                </Link>
+              ))}
+            </div>
+          </section>
+
+          <section
+            className="mt-4 border-t border-border pt-3"
+            aria-labelledby="player-status-categories"
+          >
+            <h3
+              id="player-status-categories"
+              className="mb-2 text-[10px] font-mono uppercase tracking-[0.14em] text-muted-foreground"
+            >
+              Player status
+            </h3>
+            <div className="grid grid-cols-2 gap-2">
+              {rosterCategoryCounts.statuses.map(({ label, count }) => (
+                <Link
+                  key={label}
+                  to="/goalkeepers"
+                  search={{ cat: label === "Free Agent" ? "Free Agents" : label }}
+                  aria-label={`View ${count} ${label} goalkeepers`}
+                  className="group flex min-h-12 items-center gap-2 rounded-md border border-border bg-background/40 px-2.5 py-2 hover:border-primary/50 hover:bg-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                >
+                  <TierBadge tier={label} />
+                  <span className="ml-auto font-mono text-lg font-bold tabular-nums text-foreground">
+                    {count}
+                  </span>
+                  <ArrowUpRight className="size-3 shrink-0 text-muted-foreground transition-colors group-hover:text-primary" />
+                </Link>
+              ))}
+            </div>
+          </section>
         </div>
 
         {/* Upcoming interactions */}
