@@ -130,4 +130,40 @@ describe("FixtureImportDialog", () => {
     expect(payload.rows[0].assigned_mentor_id).toBe(mentors[0].id);
     expect(payload.rows[0].event_date).toBe("2026-08-15");
   });
+
+  it("shows a per-row kick-off control when the Time cell is empty", async () => {
+    render(
+      <FixtureImportDialog
+        open
+        onClose={() => undefined}
+        roster={roster}
+        mentors={mentors}
+        existingEvents={[]}
+        onImported={vi.fn().mockResolvedValue(undefined)}
+      />,
+    );
+
+    const csv = new File(
+      ["Date,Goalkeeper,Club,Opponent\n15/08/2026,James Beadle,Charlton Athletic,Leyton Orient\n"],
+      "no-times.csv",
+      { type: "text/csv" },
+    );
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    fireEvent.change(input, { target: { files: [csv] } });
+
+    await waitFor(() => {
+      expect(screen.getByText(/Set kick-off for this row/i)).toBeTruthy();
+      expect(screen.getByText(/2026-08-15/)).toBeTruthy();
+    });
+
+    const timeInputs = Array.from(document.querySelectorAll('input[type="time"]'));
+    expect(timeInputs.length).toBeGreaterThan(1);
+    const rowTime = timeInputs[1] as HTMLInputElement;
+    expect(rowTime.value).toBe("15:00");
+    fireEvent.change(rowTime, { target: { value: "19:45" } });
+
+    await waitFor(() => {
+      expect(screen.getByText(/19:45/)).toBeTruthy();
+    });
+  });
 });

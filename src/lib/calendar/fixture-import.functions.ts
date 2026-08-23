@@ -86,6 +86,7 @@ export const commitFixtureImport = createServerFn({ method: "POST" })
     const { data: existingRows, error: existingError } = await context.supabase
       .from("calendar_events")
       .select("id, player_id, event_date, start_time, title, event_type, notes, location, status")
+      .order("event_date", { ascending: false })
       .limit(5000);
     if (existingError) throw new Error(friendlyWriteError(existingError.message));
 

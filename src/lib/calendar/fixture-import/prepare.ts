@@ -41,13 +41,22 @@ export function prepareFixtureImport(options: PrepareFixtureImportOptions): {
   const resolutions = options.goalkeeperResolutions ?? {};
   const timeOverrides = options.timeOverrides ?? {};
 
-  const rows = options.rows.map((parsed) => prepareOne(parsed, {
-    roster: options.roster,
-    existingIndex,
-    defaultStartTime,
-    resolvedPlayerId: resolutions[parsed.rowNumber],
-    timeOverride: timeOverrides[parsed.rowNumber],
-  }));
+  const rows: PreparedFixtureRow[] = [];
+  for (const parsed of options.rows) {
+    const row = prepareOne(parsed, {
+      roster: options.roster,
+      existingIndex,
+      defaultStartTime,
+      resolvedPlayerId: resolutions[parsed.rowNumber],
+      timeOverride: timeOverrides[parsed.rowNumber],
+    });
+    // Later copies of the same fixture in this file are duplicates, not extra
+    // ready rows. Commit already skips repeats via seenKeys; preview must too.
+    if (row.status === "ready" && !row.duplicateKey.startsWith("incomplete:")) {
+      existingIndex.set(row.duplicateKey, `import:${row.rowNumber}`);
+    }
+    rows.push(row);
+  }
 
   return { rows, summary: summariseFixtureImport(rows) };
 }
@@ -70,7 +79,8 @@ function prepareOne(
     parseFixtureTime(ctx.timeOverride ?? "") ??
     parseFixtureTime(parsed.timeRaw, parsed.dateRaw) ??
     parseFixtureTime(ctx.defaultStartTime ?? "");
-  if (!startTime) errors.push("A start time is required (set a default kick-off or fill the Time column).");
+  if (!startTime)
+    errors.push("A start time is required (set a default kick-off or fill the Time column).");
 
   let goalkeeper = matchGoalkeeperName(parsed.goalkeeperRaw, ctx.roster);
   if (ctx.resolvedPlayerId) {

@@ -66,11 +66,14 @@ function cellToString(value: unknown): string {
     return String(value);
   }
   if (value instanceof Date && !Number.isNaN(value.getTime())) {
-    const y = value.getFullYear();
-    const m = String(value.getMonth() + 1).padStart(2, "0");
-    const d = String(value.getDate()).padStart(2, "0");
-    const hh = String(value.getHours()).padStart(2, "0");
-    const mm = String(value.getMinutes()).padStart(2, "0");
+    // Excel serials are timezone-naive day numbers. SheetJS materialises them as
+    // absolute instants (typically UTC midnight); local getters would shift the
+    // calendar day for viewers west of UTC.
+    const y = value.getUTCFullYear();
+    const m = String(value.getUTCMonth() + 1).padStart(2, "0");
+    const d = String(value.getUTCDate()).padStart(2, "0");
+    const hh = String(value.getUTCHours()).padStart(2, "0");
+    const mm = String(value.getUTCMinutes()).padStart(2, "0");
     if (hh === "00" && mm === "00") return `${y}-${m}-${d}`;
     return `${y}-${m}-${d} ${hh}:${mm}`;
   }
@@ -149,7 +152,7 @@ export function parseFixtureWorkbook(data: ArrayBuffer | Uint8Array): ParsedFixt
   const matrix = XLSX.utils.sheet_to_json(sheet, {
     header: 1,
     defval: "",
-    raw: false,
+    raw: true,
     blankrows: false,
   }) as unknown[][];
   return parseFixtureMatrix(matrix);

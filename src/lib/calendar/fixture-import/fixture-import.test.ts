@@ -68,6 +68,27 @@ describe("fixture spreadsheet parsing", () => {
     expect(rows[0].timeRaw).toBe("19:45");
   });
 
+  it("formats Excel Date cells with UTC calendar parts, not the local timezone", () => {
+    // UTC midnight 15 Aug 2026 — local getters west of UTC would report 14 Aug.
+    const excelDate = new Date(Date.UTC(2026, 7, 15));
+    const rows = parseFixtureMatrix([
+      ["Date", "Goalkeeper", "Opponent"],
+      [excelDate, "James Beadle", "Portsmouth"],
+    ]);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].dateRaw).toBe("2026-08-15");
+  });
+
+  it("keeps an Excel date-time cell on the UTC calendar day and clock", () => {
+    const excelDateTime = new Date(Date.UTC(2026, 7, 15, 19, 45));
+    const rows = parseFixtureMatrix([
+      ["Date", "Time", "Goalkeeper"],
+      [excelDateTime, excelDateTime, "James Beadle"],
+    ]);
+    expect(rows[0].dateRaw).toBe("2026-08-15 19:45");
+    expect(rows[0].timeRaw).toBe("2026-08-15 19:45");
+  });
+
   it("rejects workbooks with unrecognised headers", () => {
     expect(() => parseFixtureMatrix([["Foo", "Bar"], ["1", "2"]])).toThrow(/recognise any fixture columns/i);
   });
@@ -246,6 +267,24 @@ describe("prepareFixtureImport validation and summary", () => {
     expect(second.rows[0].status).toBe("duplicate");
     expect(second.summary.duplicates).toBe(1);
     expect(second.summary.ready).toBe(0);
+  });
+
+  it("marks later copies of the same fixture in one file as duplicates", () => {
+    const { rows, summary } = prepareFixtureImport({
+      rows: parseFixtureCsv(
+        [
+          "Date,Time,Goalkeeper,Club,Opponent",
+          "15/08/2026,15:00,James Beadle,Charlton Athletic,Leyton Orient",
+          "15/08/2026,15:00,James Beadle,Charlton Athletic,Leyton Orient",
+        ].join("\n"),
+      ),
+      roster: ROSTER,
+      existingEvents: [],
+    });
+    expect(rows[0].status).toBe("ready");
+    expect(rows[1].status).toBe("duplicate");
+    expect(summary.ready).toBe(1);
+    expect(summary.duplicates).toBe(1);
   });
 
   it("accepts a manual goalkeeper resolution before import", () => {

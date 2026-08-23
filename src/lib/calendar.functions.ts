@@ -243,7 +243,9 @@ export const listCalendarEvents = createServerFn({ method: "GET" })
     const { data, error } = await context.supabase
       .from("calendar_events")
       .select(COLUMNS)
-      .order("event_date", { ascending: true })
+      // Newest dates first so the 1000-row window keeps recent/upcoming fixtures.
+      // Fixture-import duplicate preview depends on those rows remaining visible.
+      .order("event_date", { ascending: false })
       .order("start_time", { ascending: true, nullsFirst: true })
       .limit(1000);
     if (error) throw new Error(error.message);

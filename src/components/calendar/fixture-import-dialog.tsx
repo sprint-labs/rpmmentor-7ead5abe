@@ -477,12 +477,12 @@ function PreviewRow({
         </label>
       )}
 
-      {!row.startTime && (
+      {!row.parsed.timeRaw.trim() && (
         <label className="mt-2 block">
           <span className="mb-1 block text-[11px] text-muted-foreground">Set kick-off for this row</span>
           <input
             type="time"
-            value={timeOverride}
+            value={timeOverride || row.startTime || ""}
             onChange={(event) => onTimeOverride(event.target.value)}
             className="rounded-md border border-border bg-background px-2 py-1"
           />
