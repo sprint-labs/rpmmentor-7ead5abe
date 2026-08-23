@@ -107,12 +107,18 @@ export interface Goalkeeper {
   nationality: string;
   contractUntil: string;
   height: string;
+  /** Squad shirt number when known; null keeps the profile slot reserved/empty. */
+  shirtNumber: number | null;
   foot: "Right" | "Left";
   lastInteraction: string;
   nextInteraction: string;
   rating: number;
   potential: number;
   recommendation: "Sign" | "Monitor" | "Pass" | "Loan" | "Develop" | "Retain";
+  /**
+   * Highlight reel URLs. Empty still reserves a Highlight Reel slot on the
+   * profile so every goalkeeper has a place for one.
+   */
   videoLinks: string[];
   developmentPlan?: string[];
   bio?: string;
@@ -405,13 +411,15 @@ export const goalkeepers: Goalkeeper[] = SEED.map((s, i) => {
     nationality: s.nationality,
     contractUntil: contractISO(s.contract),
     height: `${between(186, 200)}cm`,
+    shirtNumber: null,
     foot: rand() > 0.25 ? "Right" : "Left",
     lastInteraction: daysFromNow(-between(1, status === "Tier 1" ? 14 : 40)),
     nextInteraction: daysFromNow(between(-2, 28)),
     rating: o?.rating ?? baseRating,
     potential: o?.potential ?? Math.min(99, baseRating + between(4, 14)),
     recommendation: o?.recommendation ?? pick(["Sign", "Monitor", "Develop", "Retain", "Loan"] as const),
-    videoLinks: [`https://video.rpmgk.com/${s.name.split(" ")[0].toLowerCase()}/highlights`],
+    // Reserved empty slot — populate per-player when a real reel exists.
+    videoLinks: [],
     profileImage: s.profileImage || undefined,
     instagram: s.instagram || undefined,
     parentClub: s.parentClub || undefined,
@@ -427,15 +435,28 @@ goalkeepers.forEach((gk) => {
 });
 
 // ---------- Hero profile enrichment ----------
+const austin = goalkeepers.find((g) => g.name === "Brandon Austin");
+if (austin) {
+  austin.height = "188cm";
+  austin.shirtNumber = 40;
+  austin.videoLinks = ["https://video.rpmgk.com/austin/highlights"];
+}
+
 const beadle = goalkeepers.find((g) => g.name === "James Beadle")!;
 beadle.bio = "Brighton & Hove Albion academy graduate, England U21 international. Loan spells have accelerated first-team readiness; RPM tracking pathway toward sustained Premier League minutes.";
+beadle.height = "196cm";
+beadle.shirtNumber = 45;
 beadle.developmentPlan = [
   "Increase distribution accuracy under high press (target 86%+).",
   "Quarterly tactical session on back-line organisation with Mark Halsey.",
   "Continue strength block (lower-limb power) through international break.",
   "Review opposition striker tendencies pre-match in dedicated video clinic.",
 ];
-beadle.videoLinks.push("https://video.rpmgk.com/beadle/saves-2025-26", "https://video.rpmgk.com/beadle/distribution-block");
+beadle.videoLinks = [
+  "https://video.rpmgk.com/beadle/highlights",
+  "https://video.rpmgk.com/beadle/saves-2025-26",
+  "https://video.rpmgk.com/beadle/distribution-block",
+];
 
 const corey = goalkeepers.find((g) => g.name === "Corey Addai");
 if (corey) {

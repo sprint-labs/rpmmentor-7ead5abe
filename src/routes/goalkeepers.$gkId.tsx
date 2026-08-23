@@ -15,6 +15,7 @@ import { listMedia, openAsset, formatBytes, type MediaAsset } from "@/lib/media-
 import { UpdateClubButton } from "@/components/update-club-dialog";
 import { listPlayers } from "@/lib/players.functions";
 import { findPlayerByName, interactionBelongsToGoalkeeper } from "@/lib/goalkeeper-player-link";
+import { compareInteractionsByAlertThenDate, interactionOutcomeAlertRank } from "@/lib/interaction-alert-rank";
 
 /** Inclusive 1–5 finite numeric guard for report scores/averages. */
 function isValidScore(v: unknown): v is number {
@@ -39,6 +40,25 @@ const TYPE_ICON: Record<string, typeof Video> = {
 
 function normaliseName(s: string): string {
   return s.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+
+function formatDob(iso: string): string {
+  if (!iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return "Not recorded";
+  const [year, month, day] = iso.split("-").map(Number);
+  return new Intl.DateTimeFormat("en-GB", { day: "2-digit", month: "short", year: "numeric", timeZone: "UTC" })
+    .format(new Date(Date.UTC(year, month - 1, day)));
+}
+
+function reelLabel(url: string, index: number): string {
+  try {
+    const path = new URL(url).pathname.replace(/\/+$/, "");
+    const slug = path.split("/").filter(Boolean).pop() ?? "";
+    if (!slug || slug === "highlights") return index === 0 ? "Main highlight reel" : `Clip ${index + 1}`;
+    return slug.replace(/[-_]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+  } catch {
+    return index === 0 ? "Main highlight reel" : `Clip ${index + 1}`;
+  }
 }
 
 function formatContractExpiry(value: string): string {
@@ -214,9 +234,18 @@ function GkDetail() {
       })),
     ];
     return items.sort((a, b) => {
-      const da = a.date ? +new Date(a.date) : 0;
-      const db = b.date ? +new Date(b.date) : 0;
-      return db - da;
+      // Interactions with red / concerning outcomes float first; reports keep date order within band.
+      const aOutcome = a.kind === "interaction" ? a.outcome : "";
+      const bOutcome = b.kind === "interaction" ? b.outcome : "";
+      const aDate = a.date ?? "";
+      const bDate = b.date ?? "";
+      if (a.kind === "interaction" || b.kind === "interaction") {
+        return compareInteractionsByAlertThenDate(
+          { outcome: aOutcome || "On track", date: aDate },
+          { outcome: bOutcome || "On track", date: bDate },
+        );
+      }
+      return +new Date(bDate) - +new Date(aDate);
     });
   }, [gkInteractions, gkReports]);
 
@@ -309,27 +338,73 @@ function GkDetail() {
         </Card>
       )}
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <Card className="p-4">
-          <div className="text-[10px] uppercase text-muted-foreground">Rating (avg of Match Reports)</div>
-          <div className="text-xl font-semibold tabular-nums font-mono mt-1">
-            {isLoading ? <span className="text-muted-foreground text-sm font-sans font-normal">Loading…</span>
-              : isError ? <span className="text-destructive text-sm font-sans font-normal">Unavailable</span>
-              : averageRating != null ? `${averageRating.toFixed(1)}/5`
-              : <span className="text-muted-foreground">-</span>}
-          </div>
-          {!isLoading && !isError && averageRating != null && (
-            <div className="mt-1 text-[11px] text-muted-foreground">
-              Based on {ratingContributors.length} scored Match Report{ratingContributors.length === 1 ? "" : "s"}
-            </div>
-          )}
-        </Card>
-
-        <Card className="p-4">
-          <div className="text-[10px] uppercase text-muted-foreground">Contract expiry</div>
-          <div className="mt-1 text-sm font-medium">{formatContractExpiry(gk.contractUntil)}</div>
-        </Card>
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+        {([
+          {
+            label: "Rating",
+            value: isLoading
+              ? "…"
+              : isError
+                ? "—"
+                : averageRating != null
+                  ? `${averageRating.toFixed(1)}/5`
+                  : "—",
+            hint: !isLoading && !isError && averageRating != null
+              ? `${ratingContributors.length} report${ratingContributors.length === 1 ? "" : "s"}`
+              : undefined,
+          },
+          { label: "Contract expiry", value: formatContractExpiry(gk.contractUntil) },
+          { label: "Date of birth", value: `${formatDob(gk.dob)} (${gk.age})` },
+          { label: "Height", value: gk.height || "—" },
+          { label: "Shirt no.", value: gk.shirtNumber != null ? String(gk.shirtNumber) : "—" },
+          { label: "Preferred foot", value: gk.foot || "—" },
+        ] as const).map((metric) => (
+          <Card key={metric.label} className="px-3 py-2.5">
+            <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{metric.label}</div>
+            <div className="mt-0.5 text-sm font-semibold tabular-nums leading-tight">{metric.value}</div>
+            {"hint" in metric && metric.hint ? (
+              <div className="mt-0.5 text-[10px] text-muted-foreground">{metric.hint}</div>
+            ) : null}
+          </Card>
+        ))}
       </div>
+
+      <Card className="p-4">
+        <div className="flex items-center justify-between gap-2 mb-2">
+          <SectionTitle>Highlight Reel</SectionTitle>
+          {gk.videoLinks.length > 0 ? (
+            <span className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
+              {gk.videoLinks.length} clip{gk.videoLinks.length === 1 ? "" : "s"}
+            </span>
+          ) : null}
+        </div>
+        {gk.videoLinks.length === 0 ? (
+          <div className="rounded-md border border-dashed border-border/80 bg-muted/20 px-3 py-4 text-center">
+            <p className="text-xs text-muted-foreground">No highlight reel uploaded yet.</p>
+            <p className="mt-1 text-[11px] text-muted-foreground/80">
+              Slot reserved for {gk.name} — add a reel when footage is ready.
+            </p>
+          </div>
+        ) : (
+          <ul className="space-y-1.5">
+            {gk.videoLinks.map((url, index) => (
+              <li key={url}>
+                <a
+                  href={url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 rounded-md border border-border/60 bg-accent/10 px-2.5 py-2 text-xs hover:border-primary/40 hover:bg-accent/30"
+                >
+                  <Video className="size-3.5 shrink-0 text-muted-foreground" />
+                  <span className="min-w-0 flex-1 truncate font-medium">{reelLabel(url, index)}</span>
+                  <ExternalLink className="size-3 shrink-0 text-muted-foreground" />
+                </a>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
+
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <Card className="lg:col-span-2 p-4">
@@ -368,7 +443,7 @@ function GkDetail() {
                       <div className="text-[11px] text-muted-foreground tabular-nums font-mono">{formatDate(item.date)} · {formatRelative(item.date)}</div>
                     </div>
                     <div className="text-sm text-muted-foreground mt-0.5">{item.notes}</div>
-                    <div className="mt-1.5 flex flex-wrap gap-1.5"><Pill>{item.outcome}</Pill><Pill tone="info">↳ {item.followUp}</Pill></div>
+                    <div className="mt-1.5 flex flex-wrap gap-1.5"><Pill tone={interactionOutcomeAlertRank(item.outcome) === 0 ? "destructive" : interactionOutcomeAlertRank(item.outcome) === 1 ? "warning" : "muted"}>{item.outcome}</Pill><Pill tone="info">↳ {item.followUp}</Pill></div>
                   </div>
                 );
               })
