@@ -106,10 +106,12 @@ export interface Goalkeeper {
   dob: string;
   nationality: string;
   contractUntil: string;
-  height: string;
+  /** Height when recorded from an authoritative source. */
+  height: string | null;
   /** Squad shirt number when known; null keeps the profile slot reserved/empty. */
   shirtNumber: number | null;
-  foot: "Right" | "Left";
+  /** Preferred foot when recorded from an authoritative source. */
+  foot: "Right" | "Left" | null;
   lastInteraction: string;
   nextInteraction: string;
   rating: number;
@@ -410,9 +412,9 @@ export const goalkeepers: Goalkeeper[] = SEED.map((s, i) => {
     age: s.age, dob: dobToISO(s.dob),
     nationality: s.nationality,
     contractUntil: contractISO(s.contract),
-    height: `${between(186, 200)}cm`,
+    height: null,
     shirtNumber: null,
-    foot: rand() > 0.25 ? "Right" : "Left",
+    foot: null,
     lastInteraction: daysFromNow(-between(1, status === "Tier 1" ? 14 : 40)),
     nextInteraction: daysFromNow(between(-2, 28)),
     rating: o?.rating ?? baseRating,
@@ -435,27 +437,13 @@ goalkeepers.forEach((gk) => {
 });
 
 // ---------- Hero profile enrichment ----------
-const austin = goalkeepers.find((g) => g.name === "Brandon Austin");
-if (austin) {
-  austin.height = "188cm";
-  austin.shirtNumber = 40;
-  austin.videoLinks = ["https://video.rpmgk.com/austin/highlights"];
-}
-
 const beadle = goalkeepers.find((g) => g.name === "James Beadle")!;
 beadle.bio = "Brighton & Hove Albion academy graduate, England U21 international. Loan spells have accelerated first-team readiness; RPM tracking pathway toward sustained Premier League minutes.";
-beadle.height = "196cm";
-beadle.shirtNumber = 45;
 beadle.developmentPlan = [
   "Increase distribution accuracy under high press (target 86%+).",
   "Quarterly tactical session on back-line organisation with Mark Halsey.",
   "Continue strength block (lower-limb power) through international break.",
   "Review opposition striker tendencies pre-match in dedicated video clinic.",
-];
-beadle.videoLinks = [
-  "https://video.rpmgk.com/beadle/highlights",
-  "https://video.rpmgk.com/beadle/saves-2025-26",
-  "https://video.rpmgk.com/beadle/distribution-block",
 ];
 
 const corey = goalkeepers.find((g) => g.name === "Corey Addai");

@@ -98,6 +98,14 @@ function GkDetail() {
   );
   const displayClub = linkedPlayer?.current_club || gk.club;
   const displayLeague = linkedPlayer?.league || gk.league;
+  const profileSummary = [
+    gk.tags.includes("Free Agent") ? "Free Agent" : (displayClub || "Club not recorded"),
+    !gk.tags.includes("Free Agent") ? displayLeague : null,
+    gk.nationality || "Nationality not recorded",
+    `${gk.age} yrs`,
+    gk.height,
+    gk.foot ? `${gk.foot} foot` : null,
+  ].filter((value): value is string => Boolean(value));
   const gkInteractions = useMemo(
     () =>
       (loggedInteractions ?? [])
@@ -272,10 +280,7 @@ function GkDetail() {
               {gk.onLoan && <Pill tone="info">On loan{gk.parentClub ? ` from ${gk.parentClub}` : ""}</Pill>}
             </div>
             <div className="mt-1 text-sm leading-snug text-muted-foreground">
-              {gk.tags.includes("Free Agent") ? "Free Agent" : (displayClub || "Club not recorded")}
-              {!gk.tags.includes("Free Agent") && displayLeague ? ` · ${displayLeague}` : ""}
-              {" · "}{gk.nationality || "Nationality not recorded"}
-              {" · "}{gk.age} yrs · {gk.height} · {gk.foot} foot
+              {profileSummary.join(" · ")}
             </div>
             {/* Prefer a name-matched players row so club corrections work even
                 when the legacy profile has no stored playerId. */}
