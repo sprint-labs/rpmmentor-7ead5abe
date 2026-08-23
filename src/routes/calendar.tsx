@@ -8,9 +8,10 @@ import { PageHeader, Card, Pill } from "@/components/primitives";
 import { formatDate, goalkeepers } from "@/lib/mock-data";
 import { useEffect, useMemo, useState } from "react";
 import { withPermission } from "@/components/require-permission";
-import { X, Plus, Pencil, Trash2, NotebookPen } from "lucide-react";
+import { X, Plus, Pencil, Trash2, NotebookPen, Upload } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { WorkflowDialog, type WorkflowKind } from "@/components/workflows";
+import { FixtureImportDialog } from "@/components/calendar/fixture-import-dialog";
 import {
   listCalendarEvents,
   createCalendarEvent,
@@ -279,6 +280,7 @@ function CalendarPage() {
 
   const [draft, setDraft] = useState<Draft | null>(null);
   const [saving, setSaving] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
 
   async function refreshEvents() {
     await Promise.all([
@@ -509,12 +511,20 @@ function CalendarPage() {
               </button>
             )}
             {canManage && (
-              <button
-                onClick={() => openNew()}
-                className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:brightness-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                <Plus className="size-3.5" /> Add event
-              </button>
+              <>
+                <button
+                  onClick={() => setImportOpen(true)}
+                  className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-xs font-medium hover:bg-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <Upload className="size-3.5" /> Import fixtures
+                </button>
+                <button
+                  onClick={() => openNew()}
+                  className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:brightness-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <Plus className="size-3.5" /> Add event
+                </button>
+              </>
             )}
           </div>
         }
@@ -939,6 +949,17 @@ function CalendarPage() {
         prefillGkId={logPrefill.gkId}
         prefillMatchDate={logPrefill.date}
       />
+
+      {canManage && (
+        <FixtureImportDialog
+          open={importOpen}
+          onClose={() => setImportOpen(false)}
+          roster={roster}
+          mentors={assignableMentors}
+          existingEvents={events}
+          onImported={refreshEvents}
+        />
+      )}
     </div>
   );
 }
