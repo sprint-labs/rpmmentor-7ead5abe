@@ -100,4 +100,12 @@ function ensureUsableLocalStorage() {
 
 beforeEach(() => {
   ensureUsableLocalStorage();
+  if (typeof window === "undefined") return;
+  try {
+    // Node 25's origin-scoped localStorage is process-global. Without a reset,
+    // drafts and TUS fingerprints leak across files and fail unrelated suites.
+    window.localStorage.clear();
+  } catch {
+    // Opaque origins can throw; the shim above already replaced unusable storage.
+  }
 });

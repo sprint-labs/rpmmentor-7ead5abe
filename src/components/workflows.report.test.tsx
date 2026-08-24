@@ -140,6 +140,8 @@ vi.mock("@/lib/media-store", () => ({
   MAX_FILE_BYTES: 50 * 1024 * 1024,
   detectKind: vi.fn(() => "image"),
   formatBytes: vi.fn((bytes: number) => `${bytes} bytes`),
+  formatFileLimit: vi.fn((bytes: number) => `${bytes} bytes`),
+  buildObjectPath: vi.fn(() => "unlinked/test"),
   uploadMedia: (...args: unknown[]) => mocks.uploadMedia(...args),
   updateMedia: (...args: unknown[]) => mocks.updateMedia(...args),
   listMedia: (...args: unknown[]) => mocks.listMedia(...args),

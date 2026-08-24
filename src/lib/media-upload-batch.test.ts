@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
-import { MAX_FILE_BYTES } from "@/lib/media-store";
+import { MAX_FILE_BYTES, fileExceedsLimitMessage } from "@/lib/media-store";
 import {
+  DEFAULT_MEDIA_UPLOAD_CONCURRENCY,
   createMediaUploadItems,
   retryFailedMediaUploads,
   runMediaUploadBatch,
@@ -40,10 +41,20 @@ describe("media upload batches", () => {
     expect(upload).toHaveBeenCalledTimes(1);
     expect(result.map((item) => item.status)).toEqual(["succeeded", "failed", "failed"]);
     expect(result[1]?.validationError).toBe("Unsupported file type.");
-    expect(result[2]?.validationError).toBe("File exceeds the 200MB upload limit.");
+    expect(result[2]?.validationError).toBe(fileExceedsLimitMessage(MAX_FILE_BYTES));
   });
 
-  it("uses a default maximum concurrency of three", async () => {
+  it("accepts a file of exactly 1 GB and rejects anything larger", () => {
+    const items = createMediaUploadItems([
+      file("exact-limit.mp4", "video/mp4", MAX_FILE_BYTES),
+      file("over-limit.mp4", "video/mp4", MAX_FILE_BYTES + 1),
+    ]);
+    expect(items[0]?.status).toBe("queued");
+    expect(items[1]?.status).toBe("failed");
+    expect(items[1]?.validationError).toBe("File exceeds the 1 GB upload limit.");
+  });
+
+  it("uses a default maximum concurrency of two", async () => {
     let active = 0;
     let maximumActive = 0;
     const items = createMediaUploadItems(
@@ -60,7 +71,9 @@ describe("media upload batches", () => {
       },
     });
 
-    expect(maximumActive).toBe(3);
+    expect(DEFAULT_MEDIA_UPLOAD_CONCURRENCY).toBe(2);
+    expect(maximumActive).toBe(2);
+    expect(maximumActive).toBeLessThanOrEqual(2);
     expect(result.every((item) => item.status === "succeeded")).toBe(true);
   });
 
@@ -116,5 +129,32 @@ describe("media upload batches", () => {
     expect(retried[0]?.result).toBe("first:already-saved.mp4");
     expect(retried[1]?.result).toBe("retry:retry-me.mp4");
     expect(retried[2]?.validationError).toBe("Unsupported file type.");
+  });
+
+  it("assigns a stable object path on first upload and reuses it on retry", async () => {
+    const paths: string[] = [];
+    const items = createMediaUploadItems([file("clip.mp4")]);
+    const first = await runMediaUploadBatch(items, {
+      resolveObjectPath: (item) => `unlinked/${item.id}-clip.mp4`,
+      upload: async (item) => {
+        paths.push(item.objectPath ?? "");
+        throw new Error("Temporary failure");
+      },
+    });
+
+    expect(first[0]?.objectPath).toBe(`unlinked/${items[0]!.id}-clip.mp4`);
+
+    await retryFailedMediaUploads(first, {
+      resolveObjectPath: () => "unlinked/should-not-change.mp4",
+      upload: async (item) => {
+        paths.push(item.objectPath ?? "");
+        return "ok";
+      },
+    });
+
+    expect(paths).toEqual([
+      `unlinked/${items[0]!.id}-clip.mp4`,
+      `unlinked/${items[0]!.id}-clip.mp4`,
+    ]);
   });
 });
