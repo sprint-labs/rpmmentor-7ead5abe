@@ -63,8 +63,10 @@ import {
 import {
   ACCEPT_BY_KIND,
   MAX_FILE_BYTES,
+  buildObjectPath,
   detectKind,
   formatBytes,
+  formatFileLimit,
   uploadMedia,
   updateMedia,
   listMedia,
@@ -83,6 +85,7 @@ import {
   retryFailedMediaUploads,
   runMediaUploadBatch,
   type MediaUploadItem,
+  type ValidMediaUploadTask,
 } from "@/lib/media-upload-batch";
 import { submitMatchReport } from "@/lib/match-reports/reports.functions";
 import {
@@ -1074,7 +1077,7 @@ export function InteractionForm({
       return;
     }
     if (file.size > MAX_FILE_BYTES) {
-      setAudioError(`That file is too large (max ${formatBytes(MAX_FILE_BYTES)}).`);
+      setAudioError(`That file is too large (max ${formatFileLimit(MAX_FILE_BYTES)}).`);
       return;
     }
     const durationSec = await readAudioDuration(file);
@@ -3044,7 +3047,7 @@ function InlineUploader({
       return;
     }
     if (file.size > MAX_FILE_BYTES) {
-      setErr(`File exceeds ${formatBytes(MAX_FILE_BYTES)}.`);
+      setErr(`File exceeds ${formatFileLimit(MAX_FILE_BYTES)}.`);
       return;
     }
     setBusy(true);
@@ -3077,7 +3080,7 @@ function InlineUploader({
         />
       </label>
       <span className="text-muted-foreground">
-        Up to {formatBytes(MAX_FILE_BYTES)} · video/image/PDF/audio
+        Up to {formatFileLimit(MAX_FILE_BYTES)} · video/image/PDF/audio
       </span>
       {err && <span className="text-red-400 ml-auto">{err}</span>}
     </div>
@@ -3224,10 +3227,7 @@ export function MediaForm({ onDone, prefillGkId }: { onDone: () => void; prefill
     setBusy(true);
     try {
       const options = {
-        upload: (
-          item: { file: File; title: string; kind: MediaKind },
-          onProgress: (fraction: number) => void,
-        ) =>
+        upload: (item: ValidMediaUploadTask, onProgress: (fraction: number) => void) =>
           uploadMedia({
             file: item.file,
             gkId: selectedPlayer?.id ?? null,
@@ -3235,7 +3235,11 @@ export function MediaForm({ onDone, prefillGkId }: { onDone: () => void; prefill
             kind: item.kind,
             user,
             onProgress,
+            objectPath: item.objectPath,
           }),
+        resolveObjectPath: (item: ValidMediaUploadTask) =>
+          item.objectPath ??
+          buildObjectPath(selectedPlayer?.id ?? null, item.file.name, item.id),
         onItemUpdate: (
           _item: MediaUploadItem<MediaAsset>,
           nextItems: readonly MediaUploadItem<MediaAsset>[],
@@ -3306,7 +3310,7 @@ export function MediaForm({ onDone, prefillGkId }: { onDone: () => void; prefill
           <Upload className="size-5 text-muted-foreground" />
           <span className="text-sm font-medium">Select all clips at once</span>
           <span className="text-[11px] text-muted-foreground">
-            Up to 200MB per file · filenames are kept as clip titles
+            Up to {formatFileLimit(MAX_FILE_BYTES)} per file · filenames are kept as clip titles
           </span>
           <input
             aria-label="Clips"

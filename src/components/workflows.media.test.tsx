@@ -228,7 +228,7 @@ describe("MediaForm bulk clip upload", () => {
     renderForm();
     chooseClips([clip("too-large.mp4", "video/mp4", MAX_FILE_BYTES + 1), clip("valid.mp4")]);
 
-    expect(screen.getByText("File exceeds the 200MB upload limit.")).toBeTruthy();
+    expect(screen.getByText("File exceeds the 1 GB upload limit.")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Upload 1 clip" }));
 
     await waitFor(() => expect(uploadMediaMock).toHaveBeenCalledTimes(1));
@@ -272,5 +272,42 @@ describe("MediaForm bulk clip upload", () => {
     };
     expect(options.gkId).toBe(PLAYERS[1]!.id);
     expect(options.title).toBe("Alex Goalkeeper 20-08-2026.mp4");
+  });
+
+  it("shows the shared 1 GB limit and accepts a file of exactly that size", async () => {
+    uploadMediaMock.mockResolvedValue({ id: "asset:max" });
+    renderForm();
+
+    expect(screen.getByText(/Up to 1 GB per file/)).toBeTruthy();
+
+    chooseClips([clip("exact-limit.mp4", "video/mp4", MAX_FILE_BYTES)]);
+    expect(screen.queryByText("File exceeds the 1 GB upload limit.")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Upload 1 clip" }));
+
+    await waitFor(() => expect(uploadMediaMock).toHaveBeenCalledTimes(1));
+    expect((uploadMediaMock.mock.calls[0]![0] as { file: File }).file.name).toBe("exact-limit.mp4");
+  });
+
+  it("retries only failed clips and leaves successful ones untouched", async () => {
+    uploadMediaMock.mockImplementation(async ({ file }: { file: File }) => {
+      if (file.name === "fails.mp4") throw new Error("Network dropped");
+      return { id: `asset:${file.name}` };
+    });
+    renderForm();
+    chooseClips([clip("fails.mp4"), clip("ok.mp4")]);
+    fireEvent.click(screen.getByRole("button", { name: "Upload 2 clips" }));
+
+    await waitFor(() => expect(screen.getByText("1 uploaded · 1 failed")).toBeTruthy());
+    expect(uploadMediaMock).toHaveBeenCalledTimes(2);
+
+    uploadMediaMock.mockClear();
+    uploadMediaMock.mockResolvedValue({ id: "asset:retry" });
+    fireEvent.click(screen.getByRole("button", { name: "Retry 1 failed" }));
+
+    await waitFor(() => expect(uploadMediaMock).toHaveBeenCalledTimes(1));
+    expect((uploadMediaMock.mock.calls[0]![0] as { file: File }).file.name).toBe("fails.mp4");
+    await waitFor(() => {
+      expect(screen.getByText("2 clips uploaded to the central media repository.")).toBeTruthy();
+    });
   });
 });

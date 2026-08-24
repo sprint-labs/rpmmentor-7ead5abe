@@ -1,9 +1,28 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { SessionUser } from "@/lib/auth";
 import { attachmentLookupIds, mergeAttachments } from "@/lib/report-attachments";
+import {
+  buildObjectPath,
+  describeUploadError,
+  fileExceedsLimitMessage,
+  formatFileLimit,
+  uploadObjectBytes,
+  RESUMABLE_UPLOAD_THRESHOLD_BYTES,
+  TUS_CHUNK_SIZE_BYTES,
+  TUS_RETRY_DELAYS,
+} from "@/lib/media-upload-transport";
 import { MEDIA_BUCKET } from "@/lib/storage/bucket";
 
-export { attachmentLookupIds, mergeAttachments };
+export {
+  attachmentLookupIds,
+  mergeAttachments,
+  buildObjectPath,
+  fileExceedsLimitMessage,
+  formatFileLimit,
+  RESUMABLE_UPLOAD_THRESHOLD_BYTES,
+  TUS_CHUNK_SIZE_BYTES,
+  TUS_RETRY_DELAYS,
+};
 
 export type MediaKind = "video" | "pdf" | "image" | "audio";
 
@@ -47,7 +66,7 @@ export interface ReportAttachment {
   attached_by_name: string | null;
 }
 
-export const MAX_FILE_BYTES = 200 * 1024 * 1024;
+export const MAX_FILE_BYTES = 1024 * 1024 * 1024;
 export const BUCKET = MEDIA_BUCKET;
 
 export const ACCEPT_BY_KIND: Record<MediaKind, string> = {
@@ -87,9 +106,6 @@ export function formatBytes(n: number | null | undefined): string {
   return `${(n / (1024 * 1024 * 1024)).toFixed(2)} GB`;
 }
 
-function sanitizeName(name: string) {
-  return name.replace(/[^a-zA-Z0-9._-]+/g, "_").slice(0, 80);
-}
 
 // ---------- Thumbnail generation ----------
 
@@ -192,8 +208,15 @@ export async function listAuditLog(limit = 200): Promise<MediaAuditEntry[]> {
  *
  * `getSession()` returns the stored session even when it has just expired; the
  * storage request would then be evaluated as `anon` and rejected by RLS.
+ * Large TUS uploads also force a refresh at the start so a long transfer is
+ * less likely to begin with a token that is already about to expire.
  */
-async function currentAccessToken(): Promise<string | null> {
+export async function getUploadAccessToken(forceRefresh = false): Promise<string | null> {
+  if (forceRefresh) {
+    const { data: refreshed } = await supabase.auth.refreshSession();
+    if (refreshed.session?.access_token) return refreshed.session.access_token;
+  }
+
   const { data } = await supabase.auth.getSession();
   const session = data.session;
   if (!session) return null;
@@ -220,55 +243,40 @@ async function uploadObject(
   file: File,
   onProgress?: (fraction: number) => void,
 ): Promise<void> {
-  const url = import.meta.env['VITE_SUPABASE_URL'];
-  const anonKey = import.meta.env['VITE_SUPABASE_PUBLISHABLE_KEY'];
+  const url = import.meta.env["VITE_SUPABASE_URL"] as string | undefined;
+  const anonKey = import.meta.env["VITE_SUPABASE_PUBLISHABLE_KEY"] as string | undefined;
+  const limitLabel = formatFileLimit(MAX_FILE_BYTES);
 
-  // Storage RLS only admits requests that arrive as `authenticated`. An expired
-  // or missing session reaches Postgres as `anon` and fails with an opaque
-  // "violates row-level security policy" error, so refresh first and, if there
-  // is genuinely no session, say so in words the user can act on.
-  const token = await currentAccessToken();
+  if (!url || !anonKey) {
+    throw new Error("Upload failed: storage is not configured.");
+  }
+
+  const token = await getUploadAccessToken(file.size > RESUMABLE_UPLOAD_THRESHOLD_BYTES);
   if (!token) {
-    throw new Error("Upload failed: your session has expired. Sign in again and retry.");
+    throw new Error("Your session has expired. Sign in again and retry this clip.");
   }
 
-  if (!onProgress || typeof XMLHttpRequest === "undefined" || !url || !anonKey) {
-    const { error } = await supabase.storage
-      .from(BUCKET)
-      .upload(path, file, { contentType: file.type || undefined, upsert: false });
-    if (error) throw new Error(`Upload failed: ${error.message}`);
-    return;
-  }
-
-
-  await new Promise<void>((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-    xhr.open("POST", `${url}/storage/v1/object/${BUCKET}/${encodeURI(path)}`);
-    xhr.setRequestHeader("Authorization", `Bearer ${token}`);
-    xhr.setRequestHeader("apikey", anonKey);
-    xhr.setRequestHeader("x-upsert", "false");
-    if (file.type) xhr.setRequestHeader("Content-Type", file.type);
-    xhr.upload.onprogress = (e) => {
-      if (e.lengthComputable && e.total > 0) onProgress(Math.min(1, e.loaded / e.total));
-    };
-    xhr.onload = () => {
-      if (xhr.status >= 200 && xhr.status < 300) {
-        onProgress(1);
-        resolve();
-        return;
-      }
-      let message = `HTTP ${xhr.status}`;
-      try {
-        const parsed = JSON.parse(xhr.responseText) as { message?: string; error?: string };
-        message = parsed.message || parsed.error || message;
-      } catch {
-        /* keep the status-code message */
-      }
-      reject(new Error(`Upload failed: ${message}`));
-    };
-    xhr.onerror = () => reject(new Error("Upload failed: the network connection dropped."));
-    xhr.onabort = () => reject(new Error("Upload cancelled."));
-    xhr.send(file);
+  await uploadObjectBytes({
+    path,
+    file,
+    onProgress,
+    accessToken: token,
+    getAccessToken: async () => {
+      const next = await getUploadAccessToken(false);
+      if (!next) throw new Error("Your session has expired. Sign in again and retry this clip.");
+      return next;
+    },
+    supabaseUrl: url,
+    anonKey,
+    bucket: BUCKET,
+    limitLabel,
+    standardUpload: async (objectPath, objectFile) => {
+      const { error } = await supabase.storage.from(BUCKET).upload(objectPath, objectFile, {
+        contentType: objectFile.type || undefined,
+        upsert: false,
+      });
+      if (error) throw new Error(describeUploadError(error, limitLabel));
+    },
   });
 }
 
@@ -282,15 +290,19 @@ export async function uploadMedia(opts: {
   user: SessionUser;
   /** Receives 0–1 as the bytes go up. Enables the XHR progress path. */
   onProgress?: (fraction: number) => void;
+  /** Stable Storage object path. Retries must reuse the same value. */
+  objectPath?: string | null;
 }): Promise<MediaAsset> {
   const { file, gkId, title, notes, kind, ratingTags, user, onProgress } = opts;
 
   if (file.size > MAX_FILE_BYTES) {
-    throw new Error("File exceeds the 200MB upload limit.");
+    throw new Error(fileExceedsLimitMessage(MAX_FILE_BYTES));
   }
 
   const folder = gkId ?? "unlinked";
-  const path = `${folder}/${Date.now()}-${crypto.randomUUID().slice(0, 8)}-${sanitizeName(file.name)}`;
+  const path =
+    opts.objectPath ||
+    buildObjectPath(gkId, file.name, `${Date.now()}-${crypto.randomUUID().slice(0, 8)}`);
 
   await uploadObject(path, file, onProgress);
 

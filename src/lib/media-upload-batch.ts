@@ -1,6 +1,11 @@
-import { detectKind, MAX_FILE_BYTES, type MediaKind } from "@/lib/media-store";
+import {
+  detectKind,
+  fileExceedsLimitMessage,
+  MAX_FILE_BYTES,
+  type MediaKind,
+} from "@/lib/media-store";
 
-export const DEFAULT_MEDIA_UPLOAD_CONCURRENCY = 3;
+export const DEFAULT_MEDIA_UPLOAD_CONCURRENCY = 2;
 
 export type MediaUploadStatus = "queued" | "uploading" | "succeeded" | "failed";
 
@@ -16,6 +21,8 @@ export interface MediaUploadItem<TResult = unknown> {
   error: string | null;
   /** Present only when the file itself cannot be uploaded. */
   validationError: string | null;
+  /** Stable Storage object path, assigned on first upload and reused on retry. */
+  objectPath: string | null;
   result?: TResult;
 }
 
@@ -24,10 +31,12 @@ export interface ValidMediaUploadTask {
   file: File;
   title: string;
   kind: MediaKind;
+  objectPath: string | null;
 }
 
 export interface MediaUploadBatchOptions<TResult> {
   upload: (item: ValidMediaUploadTask, onProgress: (fraction: number) => void) => Promise<TResult>;
+  resolveObjectPath?: (item: ValidMediaUploadTask) => string;
   concurrency?: number;
   onItemUpdate?: (
     item: MediaUploadItem<TResult>,
@@ -52,7 +61,7 @@ function createItemId(): string {
 
 export function validateMediaUploadFile(file: File): MediaUploadValidation {
   if (file.size > MAX_FILE_BYTES) {
-    return { kind: null, error: "File exceeds the 200MB upload limit." };
+    return { kind: null, error: fileExceedsLimitMessage(MAX_FILE_BYTES) };
   }
 
   const kind = detectKind(file);
@@ -77,6 +86,7 @@ export function createMediaUploadItems<TResult = unknown>(
       progress: 0,
       error: validation.error,
       validationError: validation.error,
+      objectPath: null,
     };
   });
 }
@@ -185,7 +195,12 @@ export async function runMediaUploadBatch<TResult>(
         file: queuedItem.file,
         title: queuedItem.title,
         kind: queuedItem.kind,
+        objectPath: queuedItem.objectPath,
       };
+      if (!task.objectPath && options.resolveObjectPath) {
+        task.objectPath = options.resolveObjectPath(task);
+        update(itemIndex, { objectPath: task.objectPath });
+      }
 
       try {
         const result = await options.upload(task, (fraction) => {
