@@ -60,7 +60,9 @@ function workbookFile(): File {
   const book = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(book, sheet, "Fixtures");
   const buffer = XLSX.write(book, { type: "array", bookType: "xlsx" }) as Uint8Array;
-  return new File([buffer], "august-fixtures.xlsx", {
+  // Copy into a fresh ArrayBuffer so File's BlobPart typing accepts the bytes.
+  const bytes = new Uint8Array(buffer);
+  return new File([bytes], "august-fixtures.xlsx", {
     type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   });
 }

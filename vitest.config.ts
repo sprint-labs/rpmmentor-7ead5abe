@@ -9,6 +9,12 @@ export default defineConfig({
   },
   test: {
     environment: "node",
+    // jsdom defaults to an opaque origin; Node 25+ then denies localStorage.
+    environmentOptions: {
+      jsdom: {
+        url: "http://localhost/",
+      },
+    },
     testTimeout: 30_000,
     hookTimeout: 30_000,
     include: ["src/**/*.test.ts", "src/**/*.test.tsx"],

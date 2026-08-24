@@ -75,7 +75,11 @@ export type Permission =
   /** Add, edit or remove shared team calendar events. */
   | "calendar.manage"
   | "executive.view"
-  | "audit.view";
+  | "audit.view"
+  /** Open a bug report or question and reply on own threads. */
+  | "support.send"
+  /** Super Admin support inbox and broadcast controls. */
+  | "support.inbox";
 
 const MENTOR: Permission[] = [
   "goalkeepers.view",
@@ -84,6 +88,7 @@ const MENTOR: Permission[] = [
   "reports.view", "reports.submit",
   "media.view", "media.upload", "media.edit",
   "calendar.view",
+  "support.send",
 ];
 
 const MENTOR_MANAGER: Permission[] = [
@@ -106,6 +111,7 @@ const ADMIN: Permission[] = [
   "media.view", "media.edit",
   "calendar.view", "calendar.manage",
   "executive.view", "audit.view",
+  "support.send",
 ];
 
 const SUPER_ADMIN: Permission[] = [
@@ -114,6 +120,7 @@ const SUPER_ADMIN: Permission[] = [
   "alerts.view",
   "players.manage", "interactions.delete",
   "interactions.log", "reports.submit", "media.upload",
+  "support.inbox",
 ];
 
 const MATRIX: Record<Role, Permission[]> = {
