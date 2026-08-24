@@ -10,10 +10,125 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.5"
+    PostgrestVersion: "14.15"
   }
   public: {
     Tables: {
+      announcement_reads: {
+        Row: {
+          announcement_id: string
+          read_at: string
+          user_id: string
+        }
+        Insert: {
+          announcement_id: string
+          read_at?: string
+          user_id: string
+        }
+        Update: {
+          announcement_id?: string
+          read_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "announcement_reads_announcement_id_fkey"
+            columns: ["announcement_id"]
+            isOneToOne: false
+            referencedRelation: "announcements"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "announcement_reads_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      announcements: {
+        Row: {
+          active: boolean
+          body: string
+          created_at: string
+          created_by: string
+          ends_at: string | null
+          id: string
+          kind: string
+          starts_at: string
+          title: string
+        }
+        Insert: {
+          active?: boolean
+          body?: string
+          created_at?: string
+          created_by: string
+          ends_at?: string | null
+          id?: string
+          kind: string
+          starts_at?: string
+          title: string
+        }
+        Update: {
+          active?: boolean
+          body?: string
+          created_at?: string
+          created_by?: string
+          ends_at?: string | null
+          id?: string
+          kind?: string
+          starts_at?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "announcements_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      calendar_event_audit: {
+        Row: {
+          action: string
+          after_values: Json | null
+          before_values: Json | null
+          calendar_event_id: string
+          changed_at: string
+          changed_by: string | null
+          id: string
+        }
+        Insert: {
+          action: string
+          after_values?: Json | null
+          before_values?: Json | null
+          calendar_event_id: string
+          changed_at?: string
+          changed_by?: string | null
+          id?: string
+        }
+        Update: {
+          action?: string
+          after_values?: Json | null
+          before_values?: Json | null
+          calendar_event_id?: string
+          changed_at?: string
+          changed_by?: string | null
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "calendar_event_audit_calendar_event_id_fkey"
+            columns: ["calendar_event_id"]
+            isOneToOne: false
+            referencedRelation: "calendar_events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       calendar_events: {
         Row: {
           assigned_mentor_id: string | null
@@ -106,15 +221,15 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "calendar_events_follow_up_waived_by_fkey"
-            columns: ["follow_up_waived_by"]
+            foreignKeyName: "calendar_events_created_by_fkey"
+            columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "calendar_events_created_by_fkey"
-            columns: ["created_by"]
+            foreignKeyName: "calendar_events_follow_up_waived_by_fkey"
+            columns: ["follow_up_waived_by"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -124,44 +239,6 @@ export type Database = {
             columns: ["player_id"]
             isOneToOne: false
             referencedRelation: "players"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      calendar_event_audit: {
-        Row: {
-          action: string
-          after_values: Json | null
-          before_values: Json | null
-          calendar_event_id: string
-          changed_at: string
-          changed_by: string | null
-          id: string
-        }
-        Insert: {
-          action: string
-          after_values?: Json | null
-          before_values?: Json | null
-          calendar_event_id: string
-          changed_at?: string
-          changed_by?: string | null
-          id?: string
-        }
-        Update: {
-          action?: string
-          after_values?: Json | null
-          before_values?: Json | null
-          calendar_event_id?: string
-          changed_at?: string
-          changed_by?: string | null
-          id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "calendar_event_audit_calendar_event_id_fkey"
-            columns: ["calendar_event_id"]
-            isOneToOne: false
-            referencedRelation: "calendar_events"
             referencedColumns: ["id"]
           },
         ]
@@ -336,6 +413,33 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      interaction_types: {
+        Row: {
+          active: boolean
+          counts_as_live: boolean
+          created_at: string
+          name: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          counts_as_live?: boolean
+          created_at?: string
+          name: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          counts_as_live?: boolean
+          created_at?: string
+          name?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
       }
       interactions: {
         Row: {
@@ -836,6 +940,8 @@ export type Database = {
           nationality: string
           on_loan: boolean
           parent_club: string | null
+          tier: string | null
+          tier_effective_from: string | null
           updated_at: string
         }
         Insert: {
@@ -851,6 +957,8 @@ export type Database = {
           nationality?: string
           on_loan?: boolean
           parent_club?: string | null
+          tier?: string | null
+          tier_effective_from?: string | null
           updated_at?: string
         }
         Update: {
@@ -866,6 +974,8 @@ export type Database = {
           nationality?: string
           on_loan?: boolean
           parent_club?: string | null
+          tier?: string | null
+          tier_effective_from?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -962,6 +1072,92 @@ export type Database = {
           },
         ]
       }
+      support_messages: {
+        Row: {
+          author_id: string
+          body: string
+          created_at: string
+          id: string
+          thread_id: string
+        }
+        Insert: {
+          author_id: string
+          body: string
+          created_at?: string
+          id?: string
+          thread_id: string
+        }
+        Update: {
+          author_id?: string
+          body?: string
+          created_at?: string
+          id?: string
+          thread_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "support_messages_author_id_fkey"
+            columns: ["author_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "support_messages_thread_id_fkey"
+            columns: ["thread_id"]
+            isOneToOne: false
+            referencedRelation: "support_threads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      support_threads: {
+        Row: {
+          author_id: string
+          created_at: string
+          id: string
+          kind: string
+          last_message_at: string
+          page_path: string
+          severity: string
+          status: string
+          subject: string
+          updated_at: string
+        }
+        Insert: {
+          author_id: string
+          created_at?: string
+          id?: string
+          kind: string
+          last_message_at?: string
+          page_path?: string
+          severity?: string
+          status?: string
+          subject: string
+          updated_at?: string
+        }
+        Update: {
+          author_id?: string
+          created_at?: string
+          id?: string
+          kind?: string
+          last_message_at?: string
+          page_path?: string
+          severity?: string
+          status?: string
+          subject?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "support_threads_author_id_fkey"
+            columns: ["author_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_deletion_audit: {
         Row: {
           actor_email: string
@@ -1025,182 +1221,60 @@ export type Database = {
         }
         Relationships: []
       }
-      // Hand-added ahead of the migration being applied. Regenerating types from the
-      // live database after the migration is applied will replace this verbatim.
-      announcement_reads: {
-        Row: {
-          announcement_id: string
-          read_at: string
-          user_id: string
-        }
-        Insert: {
-          announcement_id: string
-          read_at?: string
-          user_id: string
-        }
-        Update: {
-          announcement_id?: string
-          read_at?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "announcement_reads_announcement_id_fkey"
-            columns: ["announcement_id"]
-            isOneToOne: false
-            referencedRelation: "announcements"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "announcement_reads_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      // Hand-added ahead of the migration being applied. Regenerating types from the
-      // live database after the migration is applied will replace this verbatim.
-      announcements: {
-        Row: {
-          active: boolean
-          body: string
-          created_at: string
-          created_by: string
-          ends_at: string | null
-          id: string
-          kind: string
-          starts_at: string
-          title: string
-        }
-        Insert: {
-          active?: boolean
-          body?: string
-          created_at?: string
-          created_by: string
-          ends_at?: string | null
-          id?: string
-          kind: string
-          starts_at?: string
-          title: string
-        }
-        Update: {
-          active?: boolean
-          body?: string
-          created_at?: string
-          created_by?: string
-          ends_at?: string | null
-          id?: string
-          kind?: string
-          starts_at?: string
-          title?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "announcements_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      // Hand-added ahead of the migration being applied. Regenerating types from the
-      // live database after the migration is applied will replace this verbatim.
-      support_messages: {
-        Row: {
-          author_id: string
-          body: string
-          created_at: string
-          id: string
-          thread_id: string
-        }
-        Insert: {
-          author_id: string
-          body: string
-          created_at?: string
-          id?: string
-          thread_id: string
-        }
-        Update: {
-          author_id?: string
-          body?: string
-          created_at?: string
-          id?: string
-          thread_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "support_messages_author_id_fkey"
-            columns: ["author_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "support_messages_thread_id_fkey"
-            columns: ["thread_id"]
-            isOneToOne: false
-            referencedRelation: "support_threads"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      // Hand-added ahead of the migration being applied. Regenerating types from the
-      // live database after the migration is applied will replace this verbatim.
-      support_threads: {
-        Row: {
-          author_id: string
-          created_at: string
-          id: string
-          kind: string
-          last_message_at: string
-          page_path: string
-          severity: string
-          status: string
-          subject: string
-          updated_at: string
-        }
-        Insert: {
-          author_id: string
-          created_at?: string
-          id?: string
-          kind: string
-          last_message_at?: string
-          page_path?: string
-          severity?: string
-          status?: string
-          subject: string
-          updated_at?: string
-        }
-        Update: {
-          author_id?: string
-          created_at?: string
-          id?: string
-          kind?: string
-          last_message_at?: string
-          page_path?: string
-          severity?: string
-          status?: string
-          subject?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "support_threads_author_id_fkey"
-            columns: ["author_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
     }
     Views: {
-      [_ in never]: never
+      player_duty_of_care: {
+        Row: {
+          checkpoints_due: number | null
+          current_club: string | null
+          days_until_due: number | null
+          full_name: string | null
+          interval_days: number | null
+          is_off_season: boolean | null
+          last_interaction_at: string | null
+          next_checkpoint_no: number | null
+          next_due_at: string | null
+          period_target: number | null
+          player_id: string | null
+          rag_status: string | null
+          season_count: number | null
+          season_end: string | null
+          season_outcome: string | null
+          season_start: string | null
+          state: string | null
+          status_label: string | null
+          tier: string | null
+          tier_effective_from: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
+      duty_of_care_at: {
+        Args: { as_of: string }
+        Returns: {
+          checkpoints_due: number
+          current_club: string
+          days_until_due: number
+          full_name: string
+          interval_days: number
+          is_off_season: boolean
+          last_interaction_at: string
+          next_checkpoint_no: number
+          next_due_at: string
+          period_target: number
+          player_id: string
+          rag_status: string
+          season_count: number
+          season_end: string
+          season_outcome: string
+          season_start: string
+          state: string
+          status_label: string
+          tier: string
+          tier_effective_from: string
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -1208,32 +1282,47 @@ export type Database = {
         }
         Returns: boolean
       }
-      import_match_report_sheet_batch: {
-        Args: { _rows: Json; _run_id: string }
-        Returns: {
-          imported_report_id: string
-        }[]
-      }
       interaction_demo_fingerprint: {
         Args: { _goalkeeper_name: string; _notes: string; _occurred_at: string }
         Returns: string
       }
       list_mentor_directory: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           id: string
           is_manager: boolean
           name: string
         }[]
       }
-      soft_delete_match_report_journey_exact: {
-        Args: { _report_id: string }
+      rpm_recency_status: {
+        Args: {
+          p_amber_lead: number
+          p_as_of: string
+          p_interval_days: number
+          p_last_at: string
+        }
+        Returns: string
+      }
+      rpm_season_checkpoints: {
+        Args: { as_of: string; target?: number }
         Returns: {
-          deleted_interaction_id: string
-          deleted_ledger_count: number
-          deleted_report_id: string
-          deleted_row_index: number
+          checkpoint_no: number
+          due_on: string
         }[]
+      }
+      rpm_season_end: { Args: { d: string }; Returns: string }
+      rpm_season_start: { Args: { d: string }; Returns: string }
+      rpm_tier3_status: {
+        Args: {
+          p_amber_lead?: number
+          p_as_of: string
+          p_binding_due: number
+          p_binding_total: number
+          p_is_off_season: boolean
+          p_next_due_at: string
+          p_season_count: number
+        }
+        Returns: string
       }
     }
     Enums: {
