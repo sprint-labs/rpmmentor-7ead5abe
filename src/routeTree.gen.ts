@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as SupportRouteImport } from './routes/support'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as MentorsRouteImport } from './routes/mentors'
 import { Route as MediaRouteImport } from './routes/media'
@@ -41,6 +42,11 @@ import { Route as SystemPlayersPlayerIdRouteImport } from './routes/system.playe
 import { Route as Char91DotmcpChar93InvokeToolToolRouteImport } from './routes/[.mcp]/invoke-tool/$tool'
 import { Route as DotlovableOauthConsentRouteImport } from './routes/[.]lovable.oauth.consent'
 
+const SupportRoute = SupportRouteImport.update({
+  id: '/support',
+  path: '/support',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ResetPasswordRoute = ResetPasswordRouteImport.update({
   id: '/reset-password',
   path: '/reset-password',
@@ -216,6 +222,7 @@ export interface FileRoutesByFullPath {
   '/media': typeof MediaRoute
   '/mentors': typeof MentorsRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/support': typeof SupportRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/goalkeepers/$gkId': typeof GoalkeepersGkIdRoute
@@ -249,6 +256,7 @@ export interface FileRoutesByTo {
   '/media': typeof MediaRoute
   '/mentors': typeof MentorsRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/support': typeof SupportRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/goalkeepers/$gkId': typeof GoalkeepersGkIdRoute
@@ -283,6 +291,7 @@ export interface FileRoutesById {
   '/media': typeof MediaRoute
   '/mentors': typeof MentorsRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/support': typeof SupportRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/goalkeepers/$gkId': typeof GoalkeepersGkIdRoute
@@ -318,6 +327,7 @@ export interface FileRouteTypes {
     | '/media'
     | '/mentors'
     | '/reset-password'
+    | '/support'
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
     | '/goalkeepers/$gkId'
@@ -351,6 +361,7 @@ export interface FileRouteTypes {
     | '/media'
     | '/mentors'
     | '/reset-password'
+    | '/support'
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
     | '/goalkeepers/$gkId'
@@ -384,6 +395,7 @@ export interface FileRouteTypes {
     | '/media'
     | '/mentors'
     | '/reset-password'
+    | '/support'
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
     | '/goalkeepers/$gkId'
@@ -418,6 +430,7 @@ export interface RootRouteChildren {
   MediaRoute: typeof MediaRoute
   MentorsRoute: typeof MentorsRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
+  SupportRoute: typeof SupportRoute
   Char91DotmcpChar93ListToolsRoute: typeof Char91DotmcpChar93ListToolsRoute
   Char91DotwellKnownChar93OauthProtectedResourceRoute: typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   InsightsMetricRoute: typeof InsightsMetricRoute
@@ -437,6 +450,13 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/support': {
+      id: '/support'
+      path: '/support'
+      fullPath: '/support'
+      preLoaderRoute: typeof SupportRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/reset-password': {
       id: '/reset-password'
       path: '/reset-password'
@@ -685,6 +705,7 @@ const rootRouteChildren: RootRouteChildren = {
   MediaRoute: MediaRoute,
   MentorsRoute: MentorsRoute,
   ResetPasswordRoute: ResetPasswordRoute,
+  SupportRoute: SupportRoute,
   Char91DotmcpChar93ListToolsRoute: Char91DotmcpChar93ListToolsRoute,
   Char91DotwellKnownChar93OauthProtectedResourceRoute:
     Char91DotwellKnownChar93OauthProtectedResourceRoute,

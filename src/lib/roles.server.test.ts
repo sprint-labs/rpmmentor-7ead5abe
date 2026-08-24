@@ -3,6 +3,7 @@ import { Constants } from "@/integrations/supabase/types";
 import {
   hasAnyRole,
   SUPER_ADMIN_ROLES,
+  SUPPORT_INBOX_ROLES,
   USER_DIRECTORY_VIEW_ROLES,
   type AppRole,
 } from "@/lib/roles.server";
@@ -37,6 +38,14 @@ describe("roles.server", () => {
   it("keeps System Alerts exclusive to Super Admin", () => {
     for (const role of ROLES) {
       expect(roleHasPermission(role, "alerts.view")).toBe(role === "super_admin");
+    }
+  });
+
+  it("keeps the support inbox exclusive to Super Admin and support.send on every role", () => {
+    expect(SUPPORT_INBOX_ROLES).toEqual(["super_admin"]);
+    for (const role of ROLES) {
+      expect(roleHasPermission(role, "support.inbox")).toBe(role === "super_admin");
+      expect(roleHasPermission(role, "support.send")).toBe(true);
     }
   });
 });

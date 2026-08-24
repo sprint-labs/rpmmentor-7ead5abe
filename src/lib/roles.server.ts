@@ -29,6 +29,17 @@ export const INTERACTION_MANAGE_ROLES: readonly AppRole[] = [
 /** Destructive entity controls are deliberately reserved for Super Admins. */
 export const SUPER_ADMIN_ROLES: readonly AppRole[] = ["super_admin"];
 
+/** The support inbox and broadcast controls are deliberately Super Admin only. */
+export const SUPPORT_INBOX_ROLES: readonly AppRole[] = ["super_admin"];
+
+/** Every signed-in operational role may open a support thread. */
+export const SUPPORT_SEND_ROLES: readonly AppRole[] = [
+  "super_admin",
+  "admin",
+  "mentor_manager",
+  "mentor",
+];
+
 /** Every operational role may submit a Match Report. */
 export const REPORT_SUBMIT_ROLES: readonly AppRole[] = [
   "super_admin",
