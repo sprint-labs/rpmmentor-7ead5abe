@@ -1,0 +1,379 @@
+{
+  "manifest_version": 1,
+  "captured_on": "2026-08-25",
+  "source": {
+    "repository": "sprint-labs/rpmmentor-7ead5abe",
+    "origin_main_sha": "a04e29a73949161d2bf4ede7eceecfb3e88ac046",
+    "active_migration_files_on_origin_main": 41
+  },
+  "production": {
+    "project_ref": "zdxxezquhvpjmoxlecjp",
+    "project_name": "RPM Mentor Hub",
+    "region": "eu-west-2",
+    "ledger_rows": 39,
+    "migrations": [
+      {
+        "version": "20260811095729",
+        "name": "rpm_safe_media_base",
+        "statement_count": 1,
+        "sql_length": 2437,
+        "sql_md5": "cda6323f7cc2d28699fe5591a9a79949"
+      },
+      {
+        "version": "20260811095752",
+        "name": "rpm_20260713173329_5406a94c-536b-4890-9491-6d51e58ecdee",
+        "statement_count": 1,
+        "sql_length": 1256,
+        "sql_md5": "6ce5916a155c98e56ab10eeec4516c5c"
+      },
+      {
+        "version": "20260811095845",
+        "name": "rpm_safe_identity_and_roles",
+        "statement_count": 1,
+        "sql_length": 3613,
+        "sql_md5": "eecdda7e5f3b45200ba700ef87c288e9"
+      },
+      {
+        "version": "20260811095901",
+        "name": "rpm_20260715055834_f940b569-5dd6-425c-bf85-5806a506a0da",
+        "statement_count": 1,
+        "sql_length": 1391,
+        "sql_md5": "dff986becd4fa237bf96f45ff3087dc1"
+      },
+      {
+        "version": "20260811095909",
+        "name": "rpm_20260715074111_565b5e71-2ce0-4d72-b03b-f2c4bafb821c",
+        "statement_count": 1,
+        "sql_length": 4643,
+        "sql_md5": "83b9d771c7d9fd6e960e07986be346e6"
+      },
+      {
+        "version": "20260811095925",
+        "name": "rpm_20260718151710_d042d2c7-3ed6-475f-9c63-4900466695b6",
+        "statement_count": 1,
+        "sql_length": 1220,
+        "sql_md5": "4bad6ca6be3550fe76509adb0afa9c3f"
+      },
+      {
+        "version": "20260811095929",
+        "name": "rpm_20260721210424_97c6944b-3c1f-4a0e-b3eb-a43047fffb8e",
+        "statement_count": 1,
+        "sql_length": 934,
+        "sql_md5": "657b80392a439c94290e5e49ecffb612"
+      },
+      {
+        "version": "20260811095934",
+        "name": "rpm_20260721214419_aaf5de1b-e0bd-4091-b656-887e08713304",
+        "statement_count": 1,
+        "sql_length": 1641,
+        "sql_md5": "31104044253f4a5e1acca447aa53f467"
+      },
+      {
+        "version": "20260811095940",
+        "name": "rpm_20260724025212_1426812c-774f-49bb-a93e-db890b9b6ace",
+        "statement_count": 1,
+        "sql_length": 1371,
+        "sql_md5": "4b2ca6afb1678e65d542ce6e0e03b52f"
+      },
+      {
+        "version": "20260811095947",
+        "name": "rpm_20260725001022_0684a65f-de14-4cc2-8c54-1d3ffda5e992",
+        "statement_count": 1,
+        "sql_length": 1108,
+        "sql_md5": "ee681a304519e799f8976717c17b940e"
+      },
+      {
+        "version": "20260811095951",
+        "name": "rpm_20260729062150_5aecccfd-05b3-419e-be5d-01cbe7ab2e25",
+        "statement_count": 1,
+        "sql_length": 1488,
+        "sql_md5": "d3aa09e87bcf9c2a250fb110ae22f65c"
+      },
+      {
+        "version": "20260811100008",
+        "name": "rpm_20260729091801_2975a8e3-8a6d-4f8c-a4c6-ff23715bb868",
+        "statement_count": 1,
+        "sql_length": 1654,
+        "sql_md5": "0d570aadfab88557e88fa9539457e629"
+      },
+      {
+        "version": "20260811100013",
+        "name": "rpm_20260729115639_0f046ddd-c4a0-49b9-8e66-389451bdf1b1",
+        "statement_count": 1,
+        "sql_length": 1320,
+        "sql_md5": "35afb029da6ffd849acbed2a1561785f"
+      },
+      {
+        "version": "20260811100017",
+        "name": "rpm_20260729120059_d1dbecee-2fc9-4f2e-843c-425776cb9aab",
+        "statement_count": 1,
+        "sql_length": 1318,
+        "sql_md5": "a185ba50b66d5f7337df783b704a5d66"
+      },
+      {
+        "version": "20260811100024",
+        "name": "rpm_20260729131710_8b1950a8-a1ba-48dd-a2c0-ddea3b0e8572",
+        "statement_count": 1,
+        "sql_length": 391,
+        "sql_md5": "f84e397a5370543e7fd2cd7e0d8000cc"
+      },
+      {
+        "version": "20260811100028",
+        "name": "rpm_20260803152635_c9c2f592-4533-479c-8935-30fe5e168f80",
+        "statement_count": 1,
+        "sql_length": 2136,
+        "sql_md5": "d1111dd25c089f3e10387c8ea8abb28e"
+      },
+      {
+        "version": "20260811100046",
+        "name": "rpm_20260805140649_8a6045dd-ccfc-4196-a05f-9cdef192b77e",
+        "statement_count": 1,
+        "sql_length": 3102,
+        "sql_md5": "e58f86c22ca03c1305cb5cf66e553342"
+      },
+      {
+        "version": "20260811100049",
+        "name": "rpm_20260805140854_919c0272-fd2f-4e4a-b551-1f215b0d218e",
+        "statement_count": 1,
+        "sql_length": 600,
+        "sql_md5": "9a69a8010150da9a2bbb3a9224a9fb92"
+      },
+      {
+        "version": "20260811100056",
+        "name": "rpm_20260805150000_interaction_edits_club_editing_match_report_link",
+        "statement_count": 1,
+        "sql_length": 11199,
+        "sql_md5": "38d35acc823dc8543bdca0a2632867c7"
+      },
+      {
+        "version": "20260811100115",
+        "name": "rpm_20260805200000_interaction_audio_media_link",
+        "statement_count": 1,
+        "sql_length": 4080,
+        "sql_md5": "96b73869010597a6965daac91519cd93"
+      },
+      {
+        "version": "20260811100119",
+        "name": "rpm_20260806200006_afd38272-0c67-4e61-bdfd-3372c6a8966f",
+        "statement_count": 1,
+        "sql_length": 2241,
+        "sql_md5": "8e7292915e7ae4ee5a6f6a16b8474ee9"
+      },
+      {
+        "version": "20260811100123",
+        "name": "rpm_20260807005216_cc162c1a-e051-4024-a027-451989dc7231",
+        "statement_count": 1,
+        "sql_length": 954,
+        "sql_md5": "d968ca98a685ac577bb88313b026febd"
+      },
+      {
+        "version": "20260811100128",
+        "name": "rpm_20260807162147_e1791e8c-b195-44c3-8834-7f1322ddc895",
+        "statement_count": 1,
+        "sql_length": 935,
+        "sql_md5": "dbda00ab8e0dd2f95fe7f8a44bf72e33"
+      },
+      {
+        "version": "20260811100200",
+        "name": "rpm_match_reports_competition_and_source",
+        "statement_count": 1,
+        "sql_length": 125,
+        "sql_md5": "2ce0ebe59258857c5d69f2ab32431086"
+      },
+      {
+        "version": "20260811100223",
+        "name": "rpm_match_reports_canonical_store_retry",
+        "statement_count": 1,
+        "sql_length": 4282,
+        "sql_md5": "30d18a1e9734fbb473a6ce45efcb8614"
+      },
+      {
+        "version": "20260811100253",
+        "name": "rpm_match_report_cutover_state",
+        "statement_count": 1,
+        "sql_length": 1359,
+        "sql_md5": "313e57ef448b6bee67708397da6a74e8"
+      },
+      {
+        "version": "20260811121326",
+        "name": "restore_authenticated_has_role_execute",
+        "statement_count": 1,
+        "sql_length": 82,
+        "sql_md5": "33b1cf696c22cd5da603d6c0ae25cba8"
+      },
+      {
+        "version": "20260812145053",
+        "name": "add_tier_column_to_players",
+        "statement_count": 1,
+        "sql_length": 125,
+        "sql_md5": "c9baa7a35ff68ca49c03f876e0f7a234"
+      },
+      {
+        "version": "20260813184456",
+        "name": "calendar_events_assigned_mentor",
+        "statement_count": 1,
+        "sql_length": 1693,
+        "sql_md5": "ee5925e55a2826c98acd5813030d9501"
+      },
+      {
+        "version": "20260814112124",
+        "name": "event_follow_ups",
+        "statement_count": 1,
+        "sql_length": 13100,
+        "sql_md5": "cf76ccd2ed0cc74d5d147c7aa377c9e7"
+      },
+      {
+        "version": "20260820122905",
+        "name": "allow_unlinked_media_assets",
+        "statement_count": 1,
+        "sql_length": 296,
+        "sql_md5": "42a88f5fa4697eec78d758aa4708fd39"
+      },
+      {
+        "version": "20260820194809",
+        "name": "super_admin_safe_entity_deletion",
+        "statement_count": 1,
+        "sql_length": 13486,
+        "sql_md5": "cae2c01e16441b12be45d4c182ac387d"
+      },
+      {
+        "version": "20260824150611",
+        "name": "support_inbox_and_broadcasts",
+        "statement_count": 1,
+        "sql_length": 13295,
+        "sql_md5": "51d6c881a2c41e4e84d88019ab9d55dc"
+      },
+      {
+        "version": "20260824161128",
+        "name": "parity_repair_players_tier",
+        "statement_count": 1,
+        "sql_length": 1249,
+        "sql_md5": "76c894ca375f6892c1715cf4db748778"
+      },
+      {
+        "version": "20260824161140",
+        "name": "players_tier_effective_from",
+        "statement_count": 1,
+        "sql_length": 1914,
+        "sql_md5": "6e388374a8f2acb848a5253f0518e840"
+      },
+      {
+        "version": "20260824161232",
+        "name": "duty_of_care_engine",
+        "statement_count": 1,
+        "sql_length": 14758,
+        "sql_md5": "3a31f538dea9892b656ac6c66c9d9240"
+      },
+      {
+        "version": "20260825181827",
+        "name": "fail_closed_auth_and_api_grants",
+        "statement_count": 1,
+        "sql_length": 23602,
+        "sql_md5": "639af8c4c6cc2a66bf477120d33aaf54"
+      },
+      {
+        "version": "20260825181841",
+        "name": "cover_foreign_keys_and_remove_duplicate_index",
+        "statement_count": 1,
+        "sql_length": 1650,
+        "sql_md5": "146dddb36594d7d22e10eb2be45eae8e"
+      },
+      {
+        "version": "20260825181851",
+        "name": "complete_fail_closed_policy_cleanup",
+        "statement_count": 1,
+        "sql_length": 2559,
+        "sql_md5": "596adf78fabbf01a762417c53294d839"
+      }
+    ]
+  },
+  "reviewed_forward_migrations": [],
+  "repository_comparison": {
+    "live_rows_with_byte_exact_local_statement": 24,
+    "live_rows_contained_inside_a_larger_local_file": 2,
+    "live_rows_without_an_exact_local_statement": 10,
+    "origin_main_files_not_selected_by_those_matches": 15,
+    "warning": "Version equality alone is insufficient. Reconcile from the production ledger statements, not from similarly named historical files."
+  },
+  "out_of_band_schema_state": [
+    {
+      "source_file": "supabase/migrations/20260822154500_security_rls_initplan_and_mentor_directory.sql",
+      "production_ledger_row": false,
+      "live_evidence": "The guarded list_mentor_directory() definition and SELECT-wrapped auth helper expressions are present in production.",
+      "reconciliation": "Reconciled into production migration 20260825181827 after disposable replay verification; the historical source file remains archived."
+    }
+  ],
+  "staging": {
+    "project_ref": "emyxyqqftwnjpcmctkpe",
+    "project_name": "RPM Mentor Hub — Staging",
+    "ledger_rows": 13,
+    "ledger_strategy": "current-schema snapshot",
+    "schema_parity_with_production": true
+  },
+  "schema_fingerprints": {
+    "normalisation": "PostgreSQL catalogue definitions with repeated whitespace collapsed; sorted within each section; MD5 over the resulting newline-delimited section.",
+    "production_and_staging": [
+      {
+        "section": "tables",
+        "item_count": 25,
+        "fingerprint": "a84f97421826e56cc390fe4266c2a71c"
+      },
+      {
+        "section": "columns",
+        "item_count": 265,
+        "fingerprint": "6f7de5b95fde13d97a20a265141d6023"
+      },
+      {
+        "section": "constraints",
+        "item_count": 81,
+        "fingerprint": "293136e10e7f7faf83461df15806f3a0"
+      },
+      {
+        "section": "indexes",
+        "item_count": 89,
+        "fingerprint": "a7ad20c236f2d7cc4fc936c3cb803b48"
+      },
+      {
+        "section": "functions",
+        "item_count": 22,
+        "fingerprint": "dfd88ec6dd25d906e0e5f3d30a580df1"
+      },
+      {
+        "section": "views",
+        "item_count": 1,
+        "fingerprint": "8a6ec75acb23d3cd1c192ebaf8047e3e"
+      },
+      {
+        "section": "public_and_storage_policies",
+        "item_count": 81,
+        "fingerprint": "2c94cf2d9e14b244c41707e1cec7dc8d"
+      },
+      {
+        "section": "triggers",
+        "item_count": 19,
+        "fingerprint": "fbd601ccbf6ab3b305b17cf08cdd2caa"
+      },
+      {
+        "section": "comments",
+        "item_count": 26,
+        "fingerprint": "85ca1464975ffd904a1f33993da1a162"
+      },
+      {
+        "section": "table_acl",
+        "item_count": 579,
+        "fingerprint": "fe72c21d2078e268d17036bd8bfc488d"
+      },
+      {
+        "section": "routine_acl",
+        "item_count": 71,
+        "fingerprint": "85c60f5e9a8f4e0d32a2213770b82945"
+      }
+    ]
+  },
+  "safety": {
+    "production_writes_performed_for_this_manifest": true,
+    "staging_writes_performed_for_this_manifest": true,
+    "migration_repair_performed": false,
+    "db_push_performed": false
+  }
+}

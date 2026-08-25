@@ -156,30 +156,45 @@ interface ProfileRow {
   mentor_id: string | null;
 }
 
+/**
+ * Resolve the effective stored role without ever inventing access.
+ *
+ * A signed-in Auth account may legitimately have no `user_roles` row while it
+ * is awaiting provisioning (or after access is revoked). That state must stay
+ * roleless rather than silently inheriting Mentor permissions in the UI.
+ */
+export function resolveActualRole(roleValues: readonly string[]): Role | null {
+  if (roleValues.includes("super_admin")) return "super_admin";
+  if (roleValues.includes("admin")) return "admin";
+  if (roleValues.includes("mentor_manager")) return "mentor_manager";
+  if (roleValues.includes("mentor")) return "mentor";
+  return null;
+}
+
 async function loadSessionUser(session: Session | null): Promise<SessionUser | null> {
   if (!session?.user) return null;
   const uid = session.user.id;
 
   // Role is fetched from the database, not client state. The user_roles RLS
   // policy restricts each row to its owner (auth.uid() = user_id).
-  const [{ data: roles }, { data: profile }] = await Promise.all([
+  const [rolesResult, profileResult] = await Promise.all([
     supabase.from("user_roles").select("role").eq("user_id", uid),
     supabase.from("profiles").select("id,email,name,initials,title,mentor_id").eq("id", uid).maybeSingle<ProfileRow>(),
   ]);
+  if (rolesResult.error || profileResult.error) {
+    throw new Error("Unable to verify account access.");
+  }
 
-  const roleValues = (roles ?? []).map((r) => r.role as Role);
-  const role: Role =
-    roleValues.includes("super_admin") ? "super_admin" :
-    roleValues.includes("admin") ? "admin" :
-    roleValues.includes("mentor_manager") ? "mentor_manager" :
-    "mentor";
+  const roleValues = (rolesResult.data ?? []).map((r) => r.role as string);
+  const actualRole = resolveActualRole(roleValues);
+  if (!actualRole) return null;
 
+  const profile = profileResult.data;
   const email = profile?.email ?? session.user.email ?? "";
   const fallbackName = email.split("@")[0] ?? "User";
   const name = profile?.name || fallbackName;
   const initials = profile?.initials || name.slice(0, 2).toUpperCase();
 
-  const actualRole = role;
   const override = readViewAs();
   // Super admins may preview any role. Mentor managers may preview the mentor
   // interface so they can walk mentors through "what the lads see".
@@ -208,23 +223,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let cancelled = false;
 
+    const applySession = async (session: Session | null, finishLoading = false) => {
+      try {
+        const nextUser = await loadSessionUser(session);
+        if (session?.user && !nextUser) {
+          // An Auth identity without an operational role is not an application
+          // user. Clear its session so OAuth and restored sessions fail closed.
+          await supabase.auth.signOut();
+        }
+        if (!cancelled) setUser(nextUser);
+      } catch {
+        // A failed role lookup must never become a default Mentor session.
+        if (!cancelled) setUser(null);
+      } finally {
+        if (finishLoading && !cancelled) setLoading(false);
+      }
+    };
+
     // Subscribe first, then hydrate — avoids missed events.
     const { data: sub } = supabase.auth.onAuthStateChange((_evt, session) => {
       // Defer async work to avoid deadlocking the auth callback.
       setTimeout(() => {
         if (cancelled) return;
-        loadSessionUser(session).then((u) => { if (!cancelled) setUser(u); });
+        void applySession(session);
       }, 0);
     });
 
     supabase.auth.getSession().then(({ data }) => {
-      loadSessionUser(data.session).then((u) => {
-        if (cancelled) return;
-        setUser(u);
-        setLoading(false);
-      });
+      void applySession(data.session, true);
     }).catch(() => {
       if (cancelled) return;
+      setUser(null);
       setLoading(false);
     });
 
@@ -232,9 +261,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signIn: AuthState["signIn"] = async (email, password) => {
-    const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+    const { data, error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
     if (error) return { ok: false, error: error.message };
-    return { ok: true };
+    try {
+      const nextUser = await loadSessionUser(data.session);
+      if (!nextUser) {
+        await supabase.auth.signOut();
+        setUser(null);
+        return {
+          ok: false,
+          error: "Your account has not been granted access to Mentor Hub.",
+        };
+      }
+      setUser(nextUser);
+      return { ok: true };
+    } catch {
+      await supabase.auth.signOut();
+      setUser(null);
+      return { ok: false, error: "Unable to verify your access. Please try again." };
+    }
   };
 
   // Public sign-up is disabled during the pilot (Phase 1.1). Accounts are
