@@ -337,7 +337,7 @@ function GkDetail() {
         </Card>
       )}
 
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7">
         {([
           {
             label: "Rating",
@@ -353,9 +353,10 @@ function GkDetail() {
               : undefined,
           },
           { label: "Contract expiry", value: formatContractExpiry(gk.contractUntil) },
-          { label: "Date of birth", value: `${formatDob(gk.dob)} (${gk.age})` },
+          { label: "DOB", value: formatDob(gk.dob) },
+          { label: "Age", value: String(gk.age) },
           { label: "Height", value: gk.height || "—" },
-          { label: "Shirt no.", value: gk.shirtNumber != null ? String(gk.shirtNumber) : "—" },
+          { label: "Shirt number", value: gk.shirtNumber != null ? String(gk.shirtNumber) : "—" },
           { label: "Preferred foot", value: gk.foot || "—" },
         ] as const).map((metric) => (
           <Card key={metric.label} className="px-3 py-2.5">

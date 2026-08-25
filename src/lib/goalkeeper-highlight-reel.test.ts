@@ -66,7 +66,7 @@ describe("goalkeeper highlight reels and core metrics", () => {
     expect(beadle!.height).toBe("201 cm");
     expect(beadle!.shirtNumber).toBe(1);
     expect(beadle!.foot).toBe("Right");
-    expect(beadle!.profileImage).toContain("premierleague.com");
+    expect(beadle!.profileImage).toBe("/players/james-beadle.jpg");
   });
 
   it("includes Calum Ward on the QPR Championship roster", () => {
