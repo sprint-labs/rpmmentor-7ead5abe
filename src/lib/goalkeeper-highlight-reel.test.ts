@@ -31,14 +31,33 @@ describe("goalkeeper highlight reels and core metrics", () => {
     }
   });
 
-  it("does not invent height, shirt number, or preferred foot", () => {
+  it("only carries height and foot in a recorded shape, never a generated one", () => {
     for (const gk of goalkeepers) {
       expect(gk.videoLinks.some((url) => url.includes("video.rpmgk.com"))).toBe(false);
-      if (gk.name === "James Beadle") continue;
-      expect(gk.height).toBeNull();
-      expect(gk.shirtNumber).toBeNull();
-      expect(gk.foot).toBeNull();
+      // Blank stays blank; a present value must look like a real master-sheet fact.
+      if (gk.height !== null) expect(gk.height).toMatch(/^1[89]\d cm$|^20[01] cm$/);
+      if (gk.foot !== null) expect(["Right", "Left"]).toContain(gk.foot);
+      if (gk.shirtNumber !== null) {
+        expect(Number.isInteger(gk.shirtNumber)).toBe(true);
+        expect(gk.shirtNumber).toBeGreaterThan(0);
+      }
     }
+  });
+
+  it("leaves height and foot blank when the master sheet has no value", () => {
+    // Sheet has no height/foot for these academy keepers; the profile must not invent one.
+    for (const name of ["Owen Grainger", "Xander Grieves", "Blake Irow", "Jack Talbot"]) {
+      const gk = goalkeepers.find((g) => g.name === name);
+      expect(gk, name).toBeTruthy();
+      expect(gk!.height, name).toBeNull();
+      expect(gk!.foot, name).toBeNull();
+    }
+  });
+
+  it("shirt number stays blank until an authoritative source provides it", () => {
+    // The master sheet has no shirt-number column; Beadle's is owner-supplied.
+    const withShirt = goalkeepers.filter((gk) => gk.shirtNumber !== null).map((gk) => gk.name);
+    expect(withShirt).toEqual(["James Beadle"]);
   });
 
   it("keeps James Beadle master-sheet profile facts", () => {
