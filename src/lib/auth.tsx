@@ -215,6 +215,16 @@ async function loadSessionUser(session: Session | null): Promise<SessionUser | n
   };
 }
 
+async function clearLocalAuthSession() {
+  try {
+    // Local scope clears the browser-held token without depending on a network
+    // round trip. Database RLS remains the independent server-side boundary.
+    await supabase.auth.signOut({ scope: "local" });
+  } catch {
+    // The UI still fails closed below if storage itself is unavailable.
+  }
+}
+
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<SessionUser | null>(null);
@@ -229,11 +239,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (session?.user && !nextUser) {
           // An Auth identity without an operational role is not an application
           // user. Clear its session so OAuth and restored sessions fail closed.
-          await supabase.auth.signOut();
+          await clearLocalAuthSession();
         }
         if (!cancelled) setUser(nextUser);
       } catch {
-        // A failed role lookup must never become a default Mentor session.
+        // A failed role lookup must never leave either a default Mentor UI or a
+        // browser-held JWT behind.
+        if (session?.user) await clearLocalAuthSession();
         if (!cancelled) setUser(null);
       } finally {
         if (finishLoading && !cancelled) setLoading(false);
@@ -266,7 +278,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const nextUser = await loadSessionUser(data.session);
       if (!nextUser) {
-        await supabase.auth.signOut();
+        await clearLocalAuthSession();
         setUser(null);
         return {
           ok: false,
@@ -276,7 +288,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(nextUser);
       return { ok: true };
     } catch {
-      await supabase.auth.signOut();
+      await clearLocalAuthSession();
       setUser(null);
       return { ok: false, error: "Unable to verify your access. Please try again." };
     }
