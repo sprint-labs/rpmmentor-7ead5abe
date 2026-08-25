@@ -143,8 +143,8 @@ export const createManagedUser = createServerFn({ method: "POST" })
 
     const userId = created.user.id;
 
-    // handle_new_user trigger seeds profile + default mentor role.
-    // Upsert to ensure fields are correct, then set the requested role.
+    // handle_new_user seeds the profile only. Upsert canonical fields, then
+    // assign the requested role explicitly (or deliberately leave it empty).
     const { error: profErr } = await supabaseAdmin
       .from("profiles")
       .upsert({
@@ -208,7 +208,8 @@ export const inviteManagedUser = createServerFn({ method: "POST" })
 
     const userId = link.user.id;
 
-    // Trigger seeded a profile with mentor role; upsert canonical fields and set requested role.
+    // The trigger seeded a profile only; upsert canonical fields and assign the
+    // requested role explicitly (or deliberately leave it empty).
     const { error: profErr } = await supabaseAdmin
       .from("profiles")
       .upsert({
@@ -397,4 +398,3 @@ export const resetManagedUserPassword = createServerFn({ method: "POST" })
 
     return { ok: true as const, email: updated.user.email ?? "", tempPassword };
   });
-

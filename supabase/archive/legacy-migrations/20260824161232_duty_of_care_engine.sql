@@ -1,13 +1,37 @@
 -- =============================================================================
--- Duty of Care engine
+-- 02 — Duty of Care engine
+-- RPM Mentor Hub · Supabase project zdxxezquhvpjmoxlecjp
+-- Author: Sprint Labs · 2026-08-24
 --
--- TIER 3 RULE
+-- REQUIRES 01_players_tier_effective_from.sql to have run first.
+--
+-- WHAT THIS ADDS
+--   public.interaction_types          lookup: which types are qualifying live contact
+--   public.rpm_season_start(date)     season anchor  (14 August)
+--   public.rpm_season_end(date)       season close   (31 May)
+--   public.rpm_season_checkpoints()   the six fixed cumulative milestones
+--   public.rpm_tier3_status()         pure decision function — unit testable
+--   public.rpm_recency_status()       pure decision function — unit testable
+--   public.duty_of_care_at(date)      the read model, parameterised by date
+--   public.player_duty_of_care        thin view: duty_of_care_at(current_date)
+--   one composite index on interactions
+--
+-- WHAT THIS DOES NOT DO
+--   Alters no existing table, column, policy or row. Writes to nothing.
+--
+-- HOW TO RUN
+--   Single batch. Do NOT add BEGIN/COMMIT — the Supabase CLI already wraps
+--   migrations in a transaction and a stray COMMIT will commit early.
+--
+--
+-- THE TIER 3 RULE
 --   Season      14 August to 31 May. RPM's own operational season, not the
---               Premier League's -- clients play across all four English tiers.
+--               Premier League's — clients play across all four English tiers,
+--               which start on different dates.
 --   Span        290 days (2026/27). 290 / 6 = 48.33, so the six checkpoints are
 --               near-equal windows of 48 or 49 days.
---   Checkpoints Derived, not hardcoded. For 2026/27: 1 Oct, 19 Nov, 6 Jan,
---               23 Feb, 13 Apr, 31 May.
+--   Checkpoints Derived, not hardcoded — no annual maintenance. For 2026/27:
+--               1 Oct, 19 Nov, 6 Jan, 23 Feb, 13 Apr, 31 May.
 --   Counting    Cumulative. Interaction N satisfies checkpoint N. Early contact
 --               is credited forward; a late contact never pushes a later
 --               obligation out, because the dates are fixed.
@@ -15,21 +39,42 @@
 --   Amber       on pace, next unmet checkpoint within 14 days
 --   Green       on or ahead of pace, outside the warning window
 --   Complete    all binding checkpoints met
---   Off season  1 June to 13 August -- Off season, not Red. The finished
+--   Off season  1 June to 13 August — shows Off season, not Red. The finished
 --               season's outcome is preserved in season_outcome.
 --
--- TIER 1 / TIER 2 -- deliberately unchanged. Existing recency model: days since
---   the LATEST qualifying interaction against a rolling interval (15 / 30 days).
+--   Superseded design note: an earlier draft used a rolling
+--   "last interaction + 48 days" rule. It was wrong. Because the clock reset on
+--   every contact, a single late interaction erased all prior misses — a player
+--   on 3 of 6 on 20 May would show amber rather than red. Fixed checkpoints do
+--   not have this failure mode: a missed checkpoint stays missed.
+--
+--
+-- TIER 1 AND TIER 2 — deliberately unchanged
+--   Preserved as the existing recency model: days since the LATEST qualifying
+--   interaction against a rolling interval (15 days for Tier 1, 30 for Tier 2).
 --   No qualifying contact returns "Not enough data", not Overdue.
+--
+--   >>> The amber lead times (3 and 7 days) are the only values here I could not
+--   >>> read from the codebase. Confirm against src/lib/mock-data.ts:538 and
+--   >>> adjust the tier_cfg block below if they differ. Nothing else about
+--   >>> Tier 1 or Tier 2 behaviour changes.
+--
 --
 -- CANONICAL LINKAGE
 --   Qualifying interactions are keyed on interactions.player_id ONLY. Never
---   gk_slug, never goalkeeper_name.
+--   gk_slug, never goalkeeper_name. As of today 17 of 41 linked interactions
+--   are report-created Live Match Observations with an empty slug — 41% of
+--   qualifying contact that the current slug-keyed engine cannot see.
 -- =============================================================================
 
 
--- 1. Interaction types lookup ------------------------------------------------
--- CONFIRMED against src/lib/interactions/schema.ts:28.
+-- -----------------------------------------------------------------------------
+-- 1. Interaction types lookup
+--
+-- CONFIRMED against src/lib/interactions/schema.ts:28 — the qualifying set is
+-- Live Match Observation, Training Ground Visit and Coffee Catch Up. Phone Call
+-- is explicitly non-qualifying. Do not change without RPM sign-off.
+-- -----------------------------------------------------------------------------
 
 create table if not exists public.interaction_types (
   name            text primary key,
@@ -41,7 +86,7 @@ create table if not exists public.interaction_types (
 );
 
 comment on table public.interaction_types is
-  'Lookup for interaction types. counts_as_live defines a qualifying live interaction for duty of care. Mirrors src/lib/interactions/schema.ts -- keep the two in step.';
+  'Lookup for interaction types. counts_as_live defines a qualifying live interaction for duty of care. Mirrors src/lib/interactions/schema.ts — keep the two in step.';
 
 insert into public.interaction_types (name, counts_as_live, sort_order) values
   ('Live Match Observation', true,  10),
@@ -50,12 +95,18 @@ insert into public.interaction_types (name, counts_as_live, sort_order) values
   ('Phone Call',             false, 40)
 on conflict (name) do nothing;
 
+-- Safety net: register any other value already in the data as non-qualifying,
+-- so a type nobody knew about can never be silently counted.
 insert into public.interaction_types (name, counts_as_live, sort_order)
 select distinct i.interaction_type, false, 900
 from public.interactions i
 where i.interaction_type is not null
   and btrim(i.interaction_type) <> ''
 on conflict (name) do nothing;
+
+-- No FK from interactions.interaction_type on purpose: it would reject any new
+-- type the app writes before it is registered. Add it once the app writes
+-- through this lookup.
 
 alter table public.interaction_types enable row level security;
 
@@ -72,36 +123,42 @@ create policy "Super admins manage interaction types"
 grant select on public.interaction_types to authenticated;
 
 
--- 2. Season boundaries -------------------------------------------------------
+-- -----------------------------------------------------------------------------
+-- 2. Season boundaries
+-- -----------------------------------------------------------------------------
 
 create or replace function public.rpm_season_start(d date)
-returns date language sql immutable set search_path = '' as $fn$
+returns date language sql immutable set search_path = '' as $$
   select case
     when d >= make_date(extract(year from d)::int, 8, 14)
       then make_date(extract(year from d)::int, 8, 14)
     else make_date(extract(year from d)::int - 1, 8, 14)
   end;
-$fn$;
+$$;
 
 comment on function public.rpm_season_start(date) is
   'Start of the RPM operational season (14 August) containing the given date.';
 
 create or replace function public.rpm_season_end(d date)
-returns date language sql immutable set search_path = '' as $fn$
+returns date language sql immutable set search_path = '' as $$
   select make_date(extract(year from public.rpm_season_start(d))::int + 1, 5, 31);
-$fn$;
+$$;
 
 comment on function public.rpm_season_end(date) is
   'End of the RPM operational season (31 May). Dates from 1 June to 13 August fall after this and are treated as off season.';
 
 
--- 3. The six fixed cumulative checkpoints ------------------------------------
--- Derived from the season span so future seasons -- including leap years, span
--- 291 rather than 290 -- need no maintenance. Checkpoint 6 always lands on 31 May.
+-- -----------------------------------------------------------------------------
+-- 3. The six fixed cumulative checkpoints
+--
+-- Derived from the season span so future seasons — including leap years, where
+-- the span is 291 rather than 290 — need no maintenance. Checkpoint 6 always
+-- lands exactly on 31 May.
+-- -----------------------------------------------------------------------------
 
 create or replace function public.rpm_season_checkpoints(as_of date, target integer default 6)
 returns table (checkpoint_no integer, due_on date)
-language sql immutable set search_path = '' as $fn$
+language sql immutable set search_path = '' as $$
   select
     n::integer,
     least(
@@ -113,15 +170,18 @@ language sql immutable set search_path = '' as $fn$
       public.rpm_season_end(as_of)
     )
   from generate_series(1, target) as n;
-$fn$;
+$$;
 
 comment on function public.rpm_season_checkpoints(date, integer) is
   'The fixed cumulative duty of care checkpoints for the season containing as_of. Six near-equal windows, the last always ending on 31 May.';
 
 
--- 4. Pure decision functions -------------------------------------------------
--- Separated from the read model so the RAG rules are unit testable with no
--- fixtures. See supabase/tests/duty_of_care_tests.sql.
+-- -----------------------------------------------------------------------------
+-- 4. Pure decision functions
+--
+-- Deliberately separated from the read model so the RAG rules can be unit
+-- tested against a table of scenarios with no fixtures. See 03_tests.sql.
+-- -----------------------------------------------------------------------------
 
 create or replace function public.rpm_tier3_status(
   p_season_count   integer,
@@ -132,7 +192,7 @@ create or replace function public.rpm_tier3_status(
   p_is_off_season  boolean,
   p_amber_lead     integer default 14
 )
-returns text language sql immutable set search_path = '' as $fn$
+returns text language sql immutable set search_path = '' as $$
   select case
     when p_is_off_season                          then 'off_season'
     when coalesce(p_binding_total, 0) = 0         then 'not_required'
@@ -142,7 +202,7 @@ returns text language sql immutable set search_path = '' as $fn$
     when p_next_due_at <= p_as_of + p_amber_lead  then 'amber'
     else 'green'
   end;
-$fn$;
+$$;
 
 comment on function public.rpm_tier3_status(integer, integer, integer, date, date, boolean, integer) is
   'Tier 3 seasonal pacing decision. Returns off_season, not_required, complete, red, amber or green.';
@@ -153,30 +213,35 @@ create or replace function public.rpm_recency_status(
   p_as_of          date,
   p_amber_lead     integer
 )
-returns text language sql immutable set search_path = '' as $fn$
+returns text language sql immutable set search_path = '' as $$
   select case
     when p_last_at is null                                     then 'no_data'
     when p_last_at + p_interval_days <  p_as_of                then 'red'
     when p_last_at + p_interval_days <= p_as_of + p_amber_lead then 'amber'
     else 'green'
   end;
-$fn$;
+$$;
 
 comment on function public.rpm_recency_status(date, integer, date, integer) is
   'Existing Tier 1 / Tier 2 recency model, unchanged: interval since the latest qualifying interaction. No contact returns no_data, not red.';
 
 
--- 5. Supporting index --------------------------------------------------------
+-- -----------------------------------------------------------------------------
+-- 5. Supporting index
+-- -----------------------------------------------------------------------------
 
 create index if not exists interactions_player_occurred_active_idx
   on public.interactions (player_id, occurred_at desc)
   where deleted_at is null;
 
 
--- 6. The read model ----------------------------------------------------------
+-- -----------------------------------------------------------------------------
+-- 6. The read model
+--
 -- Parameterised by date so season boundaries, the 31 May deadline and historic
--- states are all testable. SECURITY INVOKER by default -- RLS on players and
+-- states are all testable. SECURITY INVOKER by default — RLS on players and
 -- interactions applies to whoever calls it. Do not add SECURITY DEFINER.
+-- -----------------------------------------------------------------------------
 
 create or replace function public.duty_of_care_at(as_of date)
 returns table (
@@ -201,7 +266,7 @@ returns table (
   status_label         text,
   season_outcome       text
 )
-language sql stable set search_path = '' as $fn$
+language sql stable set search_path = '' as $$
 with cfg as (
   select
     public.rpm_season_start(as_of) as season_start,
@@ -222,9 +287,9 @@ qualifying as (
   join public.interaction_types t
     on t.name = i.interaction_type
    and t.counts_as_live
-  where i.deleted_at is null
-    and i.player_id is not null
-    and i.occurred_at <= as_of
+  where i.deleted_at is null        -- exclude deleted
+    and i.player_id is not null     -- canonical link only; never slug or name
+    and i.occurred_at <= as_of      -- exclude future-dated
 ),
 last_any as (
   select q.player_id, max(q.occurred_at) as last_interaction_at
@@ -338,13 +403,15 @@ select
     else null
   end as season_outcome
 from scored s;
-$fn$;
+$$;
 
 comment on function public.duty_of_care_at(date) is
   'Duty of care read model as at a given date. Tier 1: 15-day recency. Tier 2: 30-day recency. Tier 3: six fixed cumulative checkpoints across the RPM season (14 Aug - 31 May), pro-rated by players.tier_effective_from. Tier 4 and unassigned: not required. Qualifying types come from public.interaction_types; interactions are keyed on player_id only.';
 
 
--- 7. Thin current-date view --------------------------------------------------
+-- -----------------------------------------------------------------------------
+-- 7. Thin current-date view — what the dashboards read
+-- -----------------------------------------------------------------------------
 
 create or replace view public.player_duty_of_care
 with (security_invoker = on)
