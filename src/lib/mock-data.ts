@@ -205,7 +205,7 @@ export const activeMentors = mentors.filter((mentor) => mentor.role.includes("Me
 const ASSIGN_POOL = ["m-dave-watson", "m-andy-marshall", "m-jack-stern", "m-alec-chamberlain", "m-martyn-margetson", "m-martijn-middelbeek", "m-matt-beadle", "m-david-rouse"];
 
 // ---------- Goalkeepers ----------
-// Live RPM roster (113 goalkeepers). Sourced from the current client list;
+// Live RPM roster (114 goalkeepers). Sourced from the current client list;
 // ratings/potential/recommendation remain derived placeholders until wired to
 // the Match Reports store.
 
@@ -277,6 +277,7 @@ const SEED: Seed[] = [
   { name: "Lewis Thomas", dob: "20/09/1997", age: 28, nationality: "Wales", club: "Bristol City", league: "EFL Championship", parentClub: "Bristol City", onLoan: false, tier: 3, academy: false, contract: "June 2026", profileImage: "", instagram: "", comments: "" },
   { name: "Lawrence Vigouroux", dob: "19/11/1993", age: 32, nationality: "Chile", club: "Swansea City", league: "EFL Championship", parentClub: "Swansea City", onLoan: false, tier: 1, academy: false, contract: "June 2028", profileImage: "https://cdn.sportfeeds.io/sdl/images/person/head/large/519wvkcdietyvez20d6qiy4et.png?quality=60&auto=webp&format=pjpg", instagram: "", comments: "" },
   { name: "Joe Walsh", dob: "01/04/2002", age: 24, nationality: "England", club: "Wigan Athletic", league: "EFL League One", parentClub: "Queens Park Rangers", onLoan: true, tier: 1, academy: false, contract: "June 2027", profileImage: "", instagram: "", comments: "" },
+  { name: "Calum Ward", dob: "17/10/2000", age: 25, nationality: "England", club: "Queens Park Rangers", league: "EFL Championship", parentClub: "Queens Park Rangers", onLoan: false, tier: 1, academy: false, contract: "—", profileImage: "https://img.a.transfermarkt.technology/portrait/big/655135-1768830647.png?lm=1", instagram: "", comments: "" },
   { name: "Christian Walton", dob: "09/11/1995", age: 30, nationality: "England", club: "Ipswich Town", league: "EFL Championship", parentClub: "Ipswich Town", onLoan: false, tier: 1, academy: false, contract: "June 2028", profileImage: "", instagram: "", comments: "" },
   { name: "Joe Wildsmith", dob: "28/12/1995", age: 30, nationality: "England", club: "West Bromwich Albion", league: "EFL Championship", parentClub: "West Bromwich Albion", onLoan: false, tier: 2, academy: false, contract: "June 2026", profileImage: "", instagram: "", comments: "" },
   { name: "Woody Williamson", dob: "07/07/2006", age: 20, nationality: "Scotland", club: "Ipswich Town", league: "EFL Championship", parentClub: "Ipswich Town", onLoan: false, tier: 3, academy: false, contract: "June 2026", profileImage: "", instagram: "", comments: "" },
