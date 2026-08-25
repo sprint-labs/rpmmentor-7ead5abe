@@ -3,7 +3,7 @@ import { goalkeepers, rosterCategoryCounts } from "./mock-data";
 
 describe("management-controlled roster tiers", () => {
   it("keeps one row per current client and does not invent tier from league", () => {
-    expect(goalkeepers).toHaveLength(113);
+    expect(goalkeepers).toHaveLength(114);
     expect(
       goalkeepers.some(
         (goalkeeper) => goalkeeper.league === "EFL Championship" && goalkeeper.tier === "Tier 1",

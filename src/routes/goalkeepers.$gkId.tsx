@@ -12,6 +12,7 @@ import { ReportPreviewModal } from "@/components/report-preview-modal";
 import { WorkflowDialog, type WorkflowKind } from "@/components/workflows";
 import { useAuth } from "@/lib/auth";
 import { listMedia, openAsset, formatBytes, type MediaAsset } from "@/lib/media-store";
+import { buildHighlightReelItems } from "@/lib/goalkeeper-highlight-reel";
 import { UpdateClubButton } from "@/components/update-club-dialog";
 import { listPlayers } from "@/lib/players.functions";
 import { findPlayerByName, interactionBelongsToGoalkeeper } from "@/lib/goalkeeper-player-link";
@@ -48,17 +49,6 @@ function formatDob(iso: string): string {
   const [year, month, day] = iso.split("-").map(Number);
   return new Intl.DateTimeFormat("en-GB", { day: "2-digit", month: "short", year: "numeric", timeZone: "UTC" })
     .format(new Date(Date.UTC(year, month - 1, day)));
-}
-
-function reelLabel(url: string, index: number): string {
-  try {
-    const path = new URL(url).pathname.replace(/\/+$/, "");
-    const slug = path.split("/").filter(Boolean).pop() ?? "";
-    if (!slug || slug === "highlights") return index === 0 ? "Main highlight reel" : `Clip ${index + 1}`;
-    return slug.replace(/[-_]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
-  } catch {
-    return index === 0 ? "Main highlight reel" : `Clip ${index + 1}`;
-  }
 }
 
 function formatContractExpiry(value: string): string {
@@ -138,6 +128,10 @@ function GkDetail() {
       window.removeEventListener("rpm:media-updated", h);
     };
   }, [loadMedia]);
+  const highlightReelItems = useMemo(
+    () => buildHighlightReelItems(gk.videoLinks, gkMedia),
+    [gk.videoLinks, gkMedia],
+  );
   const [previewId, setPreviewId] = useState<string | null>(null);
   const [workflow, setWorkflow] = useState<WorkflowKind | null>(null);
 
@@ -343,7 +337,7 @@ function GkDetail() {
         </Card>
       )}
 
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7">
         {([
           {
             label: "Rating",
@@ -359,9 +353,10 @@ function GkDetail() {
               : undefined,
           },
           { label: "Contract expiry", value: formatContractExpiry(gk.contractUntil) },
-          { label: "Date of birth", value: `${formatDob(gk.dob)} (${gk.age})` },
+          { label: "DOB", value: formatDob(gk.dob) },
+          { label: "Age", value: String(gk.age) },
           { label: "Height", value: gk.height || "—" },
-          { label: "Shirt no.", value: gk.shirtNumber != null ? String(gk.shirtNumber) : "—" },
+          { label: "Shirt number", value: gk.shirtNumber != null ? String(gk.shirtNumber) : "—" },
           { label: "Preferred foot", value: gk.foot || "—" },
         ] as const).map((metric) => (
           <Card key={metric.label} className="px-3 py-2.5">
@@ -377,33 +372,45 @@ function GkDetail() {
       <Card className="p-4">
         <div className="flex items-center justify-between gap-2 mb-2">
           <SectionTitle>Highlight Reel</SectionTitle>
-          {gk.videoLinks.length > 0 ? (
+          {highlightReelItems.length > 0 ? (
             <span className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
-              {gk.videoLinks.length} clip{gk.videoLinks.length === 1 ? "" : "s"}
+              {highlightReelItems.length} clip{highlightReelItems.length === 1 ? "" : "s"}
             </span>
           ) : null}
         </div>
-        {gk.videoLinks.length === 0 ? (
+        {highlightReelItems.length === 0 ? (
           <div className="rounded-md border border-dashed border-border/80 bg-muted/20 px-3 py-4 text-center">
             <p className="text-xs text-muted-foreground">No highlight reel uploaded yet.</p>
             <p className="mt-1 text-[11px] text-muted-foreground/80">
-              Slot reserved for {gk.name} — add a reel when footage is ready.
+              Slot reserved for {gk.name} — upload a clip via Media and tag it Highlight.
             </p>
           </div>
         ) : (
           <ul className="space-y-1.5">
-            {gk.videoLinks.map((url, index) => (
-              <li key={url}>
-                <a
-                  href={url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-2 rounded-md border border-border/60 bg-accent/10 px-2.5 py-2 text-xs hover:border-primary/40 hover:bg-accent/30"
-                >
-                  <Video className="size-3.5 shrink-0 text-muted-foreground" />
-                  <span className="min-w-0 flex-1 truncate font-medium">{reelLabel(url, index)}</span>
-                  <ExternalLink className="size-3 shrink-0 text-muted-foreground" />
-                </a>
+            {highlightReelItems.map((item) => (
+              <li key={item.id}>
+                {item.kind === "link" ? (
+                  <a
+                    href={item.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 rounded-md border border-border/60 bg-accent/10 px-2.5 py-2 text-xs hover:border-primary/40 hover:bg-accent/30"
+                  >
+                    <Video className="size-3.5 shrink-0 text-muted-foreground" />
+                    <span className="min-w-0 flex-1 truncate font-medium">{item.label}</span>
+                    <ExternalLink className="size-3 shrink-0 text-muted-foreground" />
+                  </a>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => { void openAsset(item.asset, user); }}
+                    className="flex w-full items-center gap-2 rounded-md border border-border/60 bg-accent/10 px-2.5 py-2 text-left text-xs hover:border-primary/40 hover:bg-accent/30"
+                  >
+                    <Video className="size-3.5 shrink-0 text-muted-foreground" />
+                    <span className="min-w-0 flex-1 truncate font-medium">{item.label}</span>
+                    <ExternalLink className="size-3 shrink-0 text-muted-foreground" />
+                  </button>
+                )}
               </li>
             ))}
           </ul>
