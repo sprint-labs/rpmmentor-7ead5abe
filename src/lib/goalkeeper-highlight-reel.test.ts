@@ -31,13 +31,23 @@ describe("goalkeeper highlight reels and core metrics", () => {
     }
   });
 
-  it("does not present generated or invented profile data as recorded facts", () => {
+  it("does not invent height, shirt number, or preferred foot", () => {
     for (const gk of goalkeepers) {
+      expect(gk.videoLinks.some((url) => url.includes("video.rpmgk.com"))).toBe(false);
+      if (gk.name === "James Beadle") continue;
       expect(gk.height).toBeNull();
       expect(gk.shirtNumber).toBeNull();
       expect(gk.foot).toBeNull();
-      expect(gk.videoLinks.some((url) => url.includes("video.rpmgk.com"))).toBe(false);
     }
+  });
+
+  it("keeps James Beadle master-sheet profile facts", () => {
+    const beadle = goalkeepers.find((gk) => gk.name === "James Beadle");
+    expect(beadle).toBeTruthy();
+    expect(beadle!.height).toBe("201 cm");
+    expect(beadle!.shirtNumber).toBe(1);
+    expect(beadle!.foot).toBe("Right");
+    expect(beadle!.profileImage).toContain("premierleague.com");
   });
 
   it("includes Calum Ward on the QPR Championship roster", () => {

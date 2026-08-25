@@ -224,10 +224,16 @@ type Seed = {
   profileImage: string;
   instagram: string;
   comments: string;
+  /** Authoritative height when known from the master roster sheet. */
+  height?: string | null;
+  /** Authoritative shirt number when known from the master roster sheet. */
+  shirtNumber?: number | null;
+  /** Authoritative preferred foot when known from the master roster sheet. */
+  foot?: "Right" | "Left" | null;
 };
 const SEED: Seed[] = [
   { name: "Brandon Austin", dob: "08/01/1999", age: 27, nationality: "England", club: "Tottenham Hotspur", league: "Premier League", parentClub: "Tottenham Hotspur", onLoan: false, tier: 1, academy: false, contract: "June 2029", profileImage: "https://cdn.sportfeeds.io/sdl/images/person/head/large/8y8d2dd469x9q0lc7qfyxypyh.png?quality=60&auto=webp&format=pjpg", instagram: "", comments: "" },
-  { name: "James Beadle", dob: "16/07/2004", age: 22, nationality: "England", club: "Birmingham City", league: "EFL Championship", parentClub: "Brighton & Hove Albion", onLoan: true, tier: 1, academy: false, contract: "June 2028", profileImage: "https://cdn.sportfeeds.io/sdl/images/person/head/large/51lnb1c5h69iw306cfcac5t6.png?quality=60&auto=webp&format=pjpg", instagram: "https://www.instagram.com/james.beadle01/", comments: "" },
+  { name: "James Beadle", dob: "16/07/2004", age: 22, nationality: "England", club: "Birmingham City", league: "EFL Championship", parentClub: "Brighton & Hove Albion", onLoan: true, tier: 1, academy: false, contract: "June 2028", profileImage: "https://resources.premierleague.com/premierleague/photos/players/250x250/p232826.png", instagram: "https://www.instagram.com/james.beadle01/", comments: "", height: "201 cm", shirtNumber: 1, foot: "Right" },
   { name: "Toby Bell", dob: "22/02/2009", age: 17, nationality: "England", club: "Chelsea", league: "Premier League", parentClub: "Chelsea", onLoan: false, tier: 1, academy: true, contract: "June 2027", profileImage: "", instagram: "", comments: "" },
   { name: "Dan Bentley", dob: "13/07/1993", age: 33, nationality: "England", club: "Wolves", league: "Premier League", parentClub: "Wolves", onLoan: false, tier: 1, academy: false, contract: "June 2027", profileImage: "https://cdn.sportfeeds.io/sdl/images/person/head/large/5pbnl8ssfcrxf9lfg1pl3vxzp.png?quality=60&auto=webp&format=pjpg", instagram: "", comments: "" },
   { name: "Marcus Bettinelli", dob: "24/05/1992", age: 34, nationality: "England", club: "Manchester City", league: "Premier League", parentClub: "Manchester City", onLoan: false, tier: 1, academy: false, contract: "June 2027", profileImage: "https://cdn.sportfeeds.io/sdl/images/person/head/large/9l3cvbbgw484v7la0bjv43mj9.png?quality=60&auto=webp&format=pjpg", instagram: "https://www.instagram.com/marcusbettinelli/", comments: "" },
@@ -413,9 +419,11 @@ export const goalkeepers: Goalkeeper[] = SEED.map((s, i) => {
     age: s.age, dob: dobToISO(s.dob),
     nationality: s.nationality,
     contractUntil: contractISO(s.contract),
-    height: null,
-    shirtNumber: null,
-    foot: null,
+    // Keep blank unless the seed carries an authoritative master-sheet value.
+    // Do not invent height / shirt / foot — leave null when unknown.
+    height: s.height ?? null,
+    shirtNumber: s.shirtNumber ?? null,
+    foot: s.foot ?? null,
     lastInteraction: daysFromNow(-between(1, status === "Tier 1" ? 14 : 40)),
     nextInteraction: daysFromNow(between(-2, 28)),
     rating: o?.rating ?? baseRating,
