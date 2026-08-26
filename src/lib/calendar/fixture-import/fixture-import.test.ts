@@ -7,6 +7,7 @@ import {
   findDuplicateEventId,
   indexExistingFixtureKeys,
   matchGoalkeeperName,
+  matchMentorName,
   normalizeHomeAway,
   parseFixtureCsv,
   parseFixtureDate,
@@ -24,12 +25,20 @@ const ROSTER = [
   { id: "55555555-5555-4555-8555-555555555555", full_name: "David Cornell", current_club: "Preston North End" },
 ];
 
+const MENTORS = [
+  { id: "22222222-2222-4222-8222-222222222222", name: "David Rouse" },
+  { id: "66666666-6666-4666-8666-666666666666", name: "Alec Chamberlain" },
+  { id: "77777777-7777-4777-8777-777777777777", name: "Dave Watson" },
+];
+
+const DEFAULT_MENTOR_ID = "22222222-2222-4222-8222-222222222222";
+
 describe("fixture spreadsheet parsing", () => {
-  it("maps common headers including Home/Away and Competition", () => {
+  it("maps common headers including Home/Away, Competition and Mentor", () => {
     const rows = parseFixtureMatrix([
-      ["Date", "Time", "Goalkeeper", "Club", "Opponent", "Competition", "Venue", "H/A"],
-      ["15/08/2026", "15:00", "James Beadle", "Charlton Athletic", "Leyton Orient", "League One", "The Valley", "H"],
-      ["", "", "", "", "", "", "", ""],
+      ["Date", "Time", "Goalkeeper", "Club", "Opponent", "Competition", "Venue", "H/A", "Mentor"],
+      ["15/08/2026", "15:00", "James Beadle", "Charlton Athletic", "Leyton Orient", "League One", "The Valley", "H", "David Rouse"],
+      ["", "", "", "", "", "", "", "", ""],
     ]);
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({
@@ -42,6 +51,7 @@ describe("fixture spreadsheet parsing", () => {
       competitionRaw: "League One",
       venueRaw: "The Valley",
       homeAwayRaw: "H",
+      mentorRaw: "David Rouse",
     });
   });
 
@@ -97,6 +107,25 @@ describe("fixture field normalisation", () => {
     expect(normalizeHomeAway("H")).toBe("H");
     expect(normalizeHomeAway("Away")).toBe("A");
     expect(normalizeHomeAway("maybe")).toBeNull();
+  });
+});
+
+describe("mentor matching", () => {
+  it("auto-accepts exact directory names and known nicknames", () => {
+    expect(matchMentorName("David Rouse", MENTORS)).toMatchObject({
+      status: "exact",
+      mentorId: DEFAULT_MENTOR_ID,
+      mentorName: "David Rouse",
+    });
+    expect(matchMentorName("Chambo", MENTORS)).toMatchObject({
+      status: "exact",
+      mentorId: "66666666-6666-4666-8666-666666666666",
+      mentorName: "Alec Chamberlain",
+    });
+  });
+
+  it("flags unmatched mentor names", () => {
+    expect(matchMentorName("Nobody", MENTORS).status).toBe("unmatched");
   });
 });
 
@@ -193,14 +222,18 @@ describe("prepareFixtureImport validation and summary", () => {
         ].join("\n"),
       ),
       roster: ROSTER,
+      mentors: MENTORS,
       existingEvents: [],
       defaultStartTime: "15:00",
+      defaultMentorId: DEFAULT_MENTOR_ID,
     });
 
     expect(rows[0].status).toBe("ready");
     expect(rows[0].eventDate).toBe("2026-08-15");
     expect(rows[0].title).toContain("Charlton Athletic v Leyton Orient");
     expect(rows[0].notes).toContain("fixture-key:");
+    expect(rows[0].mentor.mentorId).toBe(DEFAULT_MENTOR_ID);
+    expect(rows[0].mentor.status).toBe("default");
 
     expect(rows[1].status).toBe("needs_goalkeeper");
     expect(rows[2].goalkeeper.status).toBe("ambiguous");
@@ -214,13 +247,39 @@ describe("prepareFixtureImport validation and summary", () => {
     expect(summariseFixtureImport(rows).validationErrors).toBeGreaterThan(0);
   });
 
+  it("assigns different mentors per row from the Mentor column", () => {
+    const { rows, summary } = prepareFixtureImport({
+      rows: parseFixtureCsv(
+        [
+          "Date,Time,Goalkeeper,Club,Opponent,Mentor",
+          "15/08/2026,15:00,James Beadle,Charlton Athletic,Leyton Orient,David Rouse",
+          "16/08/2026,15:00,Kjell Scherpen,Brighton,Arsenal,Chambo",
+          "17/08/2026,15:00,David Button,Ipswich Town,Leeds,Watto",
+        ].join("\n"),
+      ),
+      roster: ROSTER,
+      mentors: MENTORS,
+      existingEvents: [],
+    });
+
+    expect(summary.ready).toBe(3);
+    expect(rows.map((row) => row.mentor.mentorName)).toEqual([
+      "David Rouse",
+      "Alec Chamberlain",
+      "Dave Watson",
+    ]);
+    expect(rows.every((row) => row.mentor.status === "exact")).toBe(true);
+  });
+
   it("flags a second upload of the same fixture as duplicate", () => {
     const first = prepareFixtureImport({
       rows: parseFixtureCsv(
         "Date,Time,Goalkeeper,Club,Opponent\n15/08/2026,15:00,James Beadle,Charlton Athletic,Leyton Orient\n",
       ),
       roster: ROSTER,
+      mentors: MENTORS,
       existingEvents: [],
+      defaultMentorId: DEFAULT_MENTOR_ID,
     });
     expect(first.rows[0].status).toBe("ready");
 
@@ -229,6 +288,7 @@ describe("prepareFixtureImport validation and summary", () => {
         "Date,Time,Goalkeeper,Club,Opponent\n15/08/2026,15:00,James Beadle,Charlton Athletic,Leyton Orient\n",
       ),
       roster: ROSTER,
+      mentors: MENTORS,
       existingEvents: [
         {
           id: "existing",
@@ -242,6 +302,7 @@ describe("prepareFixtureImport validation and summary", () => {
           status: "scheduled",
         },
       ],
+      defaultMentorId: DEFAULT_MENTOR_ID,
     });
     expect(second.rows[0].status).toBe("duplicate");
     expect(second.summary.duplicates).toBe(1);
@@ -255,14 +316,18 @@ describe("prepareFixtureImport validation and summary", () => {
     const unresolved = prepareFixtureImport({
       rows: parsed,
       roster: ROSTER,
+      mentors: MENTORS,
       existingEvents: [],
+      defaultMentorId: DEFAULT_MENTOR_ID,
     });
     expect(unresolved.rows[0].status).toBe("needs_goalkeeper");
 
     const resolved = prepareFixtureImport({
       rows: parsed,
       roster: ROSTER,
+      mentors: MENTORS,
       existingEvents: [],
+      defaultMentorId: DEFAULT_MENTOR_ID,
       goalkeeperResolutions: { [parsed[0].rowNumber]: "33333333-3333-4333-8333-333333333333" },
     });
     expect(resolved.rows[0].status).toBe("ready");
@@ -274,13 +339,13 @@ describe("prepareFixtureImport validation and summary", () => {
     const { validateEvent } = await import("@/lib/calendar.functions");
     const { rows } = prepareFixtureImport({
       rows: parseFixtureCsv(
-        "Date,Time,Goalkeeper,Club,Opponent,Competition,Venue,H/A\n15/08/2026,15:00,James Beadle,Charlton Athletic,Leyton Orient,League One,The Valley,H\n",
+        "Date,Time,Goalkeeper,Club,Opponent,Competition,Venue,H/A,Mentor\n15/08/2026,15:00,James Beadle,Charlton Athletic,Leyton Orient,League One,The Valley,H,David Rouse\n",
       ),
       roster: ROSTER,
+      mentors: MENTORS,
       existingEvents: [],
     });
     expect(rows[0].status).toBe("ready");
-    const mentorId = "22222222-2222-4222-8222-222222222222";
     const payload = validateEvent({
       title: rows[0].title,
       event_type: "Match",
@@ -289,14 +354,14 @@ describe("prepareFixtureImport validation and summary", () => {
       location: rows[0].location,
       notes: rows[0].notes,
       player_id: rows[0].goalkeeper.playerId!,
-      assigned_mentor_id: mentorId,
+      assigned_mentor_id: rows[0].mentor.mentorId!,
     });
     expect(payload).toMatchObject({
       event_type: "Match",
       event_date: "2026-08-15",
       start_time: "15:00",
       player_id: "11111111-1111-4111-8111-111111111111",
-      assigned_mentor_id: mentorId,
+      assigned_mentor_id: DEFAULT_MENTOR_ID,
       location: "The Valley",
     });
     expect(payload.notes).toContain("Opponent: Leyton Orient");

@@ -13,6 +13,12 @@ export interface FixtureRosterPlayer {
   current_club?: string | null;
 }
 
+/** Assignable mentor from listAssignableMentors / list_mentor_directory. */
+export interface FixtureImportMentor {
+  id: string;
+  name: string;
+}
+
 export interface ParsedFixtureRow {
   /** 1-based spreadsheet row number (header is usually row 1). */
   rowNumber: number;
@@ -25,6 +31,8 @@ export interface ParsedFixtureRow {
   competitionRaw: string;
   venueRaw: string;
   homeAwayRaw: string;
+  /** Optional; when present, each row can carry its own attending mentor. */
+  mentorRaw: string;
 }
 
 export type GoalkeeperMatchStatus = "exact" | "ambiguous" | "unmatched" | "resolved";
@@ -37,6 +45,16 @@ export interface GoalkeeperMatchResult {
   /** Candidates when ambiguous (or the empty list when unmatched). */
   candidates: FixtureRosterPlayer[];
   /** Original spreadsheet name that was matched. */
+  sourceName: string;
+}
+
+export type MentorMatchStatus = "exact" | "ambiguous" | "unmatched" | "resolved" | "default";
+
+export interface MentorMatchResult {
+  status: MentorMatchStatus;
+  mentorId: string | null;
+  mentorName: string | null;
+  candidates: FixtureImportMentor[];
   sourceName: string;
 }
 
@@ -56,6 +74,7 @@ export type FixtureRowImportStatus =
   | "ready"
   | "duplicate"
   | "needs_goalkeeper"
+  | "needs_mentor"
   | "invalid";
 
 export interface PreparedFixtureRow {
@@ -65,6 +84,7 @@ export interface PreparedFixtureRow {
   startTime: string | null;
   homeAway: "H" | "A" | null;
   goalkeeper: GoalkeeperMatchResult;
+  mentor: MentorMatchResult;
   title: string;
   location: string | null;
   notes: string;
@@ -81,6 +101,8 @@ export interface FixtureImportSummary {
   duplicates: number;
   unmatchedGoalkeepers: number;
   ambiguousGoalkeepers: number;
+  unmatchedMentors: number;
+  ambiguousMentors: number;
   validationErrors: number;
 }
 

@@ -48,6 +48,12 @@ const HEADER_ALIASES: Record<string, keyof Omit<ParsedFixtureRow, "rowNumber" | 
   ha: "homeAwayRaw",
   "h/a": "homeAwayRaw",
   venueha: "homeAwayRaw",
+  mentor: "mentorRaw",
+  attending: "mentorRaw",
+  mentorattending: "mentorRaw",
+  attendingmentor: "mentorRaw",
+  assignedmentor: "mentorRaw",
+  mentorname: "mentorRaw",
 };
 
 function normalizeHeader(value: unknown): string {
@@ -89,6 +95,7 @@ function emptyParsed(rowNumber: number, raw: Record<string, string>): ParsedFixt
     competitionRaw: "",
     venueRaw: "",
     homeAwayRaw: "",
+    mentorRaw: "",
   };
 }
 
@@ -110,7 +117,7 @@ export function parseFixtureMatrix(matrix: unknown[][]): ParsedFixtureRow[] {
 
   if (columnMap.size === 0) {
     throw new Error(
-      "Could not recognise any fixture columns. Include headers such as Date, Time, Goalkeeper, Club, Opponent, Competition, Venue and Home/Away.",
+      "Could not recognise any fixture columns. Include headers such as Date, Time, Goalkeeper, Club, Opponent, Competition, Venue, Home/Away and Mentor.",
     );
   }
 
