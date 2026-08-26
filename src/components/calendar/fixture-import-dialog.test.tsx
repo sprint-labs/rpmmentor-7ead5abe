@@ -102,8 +102,8 @@ describe("FixtureImportDialog", () => {
     fireEvent.change(input, { target: { files: [workbookFile()] } });
 
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: /Review 1 ready fixture/i })).toBeTruthy();
       expect(screen.getByText(/Charlton Athletic v Leyton Orient/i)).toBeTruthy();
+      expect(screen.getByRole("button", { name: /Review 0 ready fixture/i })).toBeTruthy();
     });
 
     const selects = Array.from(document.querySelectorAll("select"));
@@ -112,6 +112,10 @@ describe("FixtureImportDialog", () => {
     );
     expect(mentor).toBeTruthy();
     fireEvent.change(mentor!, { target: { value: mentors[0].id } });
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /Review 1 ready fixture/i })).toBeTruthy();
+    });
 
     fireEvent.click(screen.getByRole("button", { name: /Review 1 ready fixture/i }));
     expect(screen.getByText(/About to create/i)).toBeTruthy();

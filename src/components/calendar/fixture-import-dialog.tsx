@@ -1,8 +1,11 @@
 /**
  * Manager UI for bulk Excel fixture import onto the shared team calendar.
  *
- * Flow: upload → local parse/preview → resolve goalkeepers → confirm → server
- * commit. Nothing is written until the explicit confirm step.
+ * Flow: upload → local parse/preview → resolve goalkeepers/mentors → confirm →
+ * server commit. Nothing is written until the explicit confirm step.
+ *
+ * A Mentor column on the spreadsheet assigns each row independently. Rows
+ * without that cell use the fallback “Mentor attending” dropdown.
  */
 import { useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
@@ -46,9 +49,15 @@ export function FixtureImportDialog({
   const [defaultStartTime, setDefaultStartTime] = useState("15:00");
   const [defaultMentorId, setDefaultMentorId] = useState("");
   const [goalkeeperResolutions, setGoalkeeperResolutions] = useState<Record<number, string>>({});
+  const [mentorResolutions, setMentorResolutions] = useState<Record<number, string>>({});
   const [timeOverrides, setTimeOverrides] = useState<Record<number, string>>({});
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<FixtureImportCommitResult | null>(null);
+
+  const mentorDirectory = useMemo(
+    () => mentors.map((mentor) => ({ id: mentor.id, name: mentor.name })),
+    [mentors],
+  );
 
   const existingRefs = useMemo(
     () =>
@@ -76,6 +85,8 @@ export function FixtureImportDialog({
           duplicates: 0,
           unmatchedGoalkeepers: 0,
           ambiguousGoalkeepers: 0,
+          unmatchedMentors: 0,
+          ambiguousMentors: 0,
           validationErrors: 0,
         },
       };
@@ -83,21 +94,29 @@ export function FixtureImportDialog({
     return prepareFixtureImport({
       rows: parsedRows,
       roster,
+      mentors: mentorDirectory,
       existingEvents: existingRefs,
       defaultStartTime,
+      defaultMentorId: defaultMentorId || null,
       goalkeeperResolutions,
+      mentorResolutions,
       timeOverrides,
     });
   }, [
     parsedRows,
     roster,
+    mentorDirectory,
     existingRefs,
     defaultStartTime,
+    defaultMentorId,
     goalkeeperResolutions,
+    mentorResolutions,
     timeOverrides,
   ]);
 
   const readyRows = prepared.rows.filter((row) => row.status === "ready");
+  const rowsNeedFallbackMentor = parsedRows.some((row) => !row.mentorRaw.trim());
+  const canReview = readyRows.length > 0;
 
   function reset() {
     setStep("upload");
@@ -106,6 +125,7 @@ export function FixtureImportDialog({
     setDefaultStartTime("15:00");
     setDefaultMentorId("");
     setGoalkeeperResolutions({});
+    setMentorResolutions({});
     setTimeOverrides({});
     setBusy(false);
     setResult(null);
@@ -138,6 +158,7 @@ export function FixtureImportDialog({
       setFileName(file.name);
       setParsedRows(rows);
       setGoalkeeperResolutions({});
+      setMentorResolutions({});
       setTimeOverrides({});
       setResult(null);
       setStep("preview");
@@ -149,12 +170,13 @@ export function FixtureImportDialog({
   }
 
   async function handleCommit() {
-    if (!defaultMentorId) {
-      toast.error("Choose the mentor attending these fixtures.");
-      return;
-    }
     if (!readyRows.length) {
       toast.error("There are no fixtures ready to import.");
+      return;
+    }
+    const missingMentor = readyRows.find((row) => !row.mentor.mentorId);
+    if (missingMentor) {
+      toast.error("Every ready row needs an assignable mentor.");
       return;
     }
     setBusy(true);
@@ -170,7 +192,7 @@ export function FixtureImportDialog({
             location: row.location,
             notes: row.notes,
             player_id: row.goalkeeper.playerId!,
-            assigned_mentor_id: defaultMentorId,
+            assigned_mentor_id: row.mentor.mentorId!,
             duplicateKey: row.duplicateKey,
           })),
         },
@@ -189,6 +211,10 @@ export function FixtureImportDialog({
   }
 
   if (!open) return null;
+
+  const mentorNamesOnReady = [
+    ...new Set(readyRows.map((row) => row.mentor.mentorName).filter(Boolean)),
+  ] as string[];
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-background/80 p-4 backdrop-blur-sm">
@@ -215,7 +241,8 @@ export function FixtureImportDialog({
               <Upload className="size-5 text-muted-foreground" />
               <span className="text-sm font-medium">Choose .xlsx or .csv file</span>
               <span className="text-xs text-muted-foreground">
-                Expected columns: Date, Time, Goalkeeper, Club, Opponent, Competition, Venue, Home/Away
+                Expected columns: Date, Time, Goalkeeper, Club, Opponent, Competition, Venue,
+                Home/Away, Mentor
               </span>
               <input
                 type="file"
@@ -226,9 +253,10 @@ export function FixtureImportDialog({
               />
             </label>
             <p className="text-[11px] text-muted-foreground">
-              Each imported row becomes a Match calendar event for one goalkeeper and the mentor you
-              assign. Imported Matches create the same 48-hour match-report follow-up as a manually
-              added Match.
+              Each imported row becomes a Match calendar event for one goalkeeper. Include a Mentor
+              column to assign different mentors in one upload; otherwise use the fallback mentor
+              attending for every row. Imported Matches create the same 48-hour match-report
+              follow-up as a manually added Match.
             </p>
           </div>
         )}
@@ -265,13 +293,18 @@ export function FixtureImportDialog({
                 />
               </label>
               <label className="block text-sm">
-                <span className="mb-1 block text-xs text-muted-foreground">Mentor attending</span>
+                <span className="mb-1 block text-xs text-muted-foreground">
+                  Fallback mentor attending
+                  {rowsNeedFallbackMentor ? " (required for rows without Mentor)" : " (optional)"}
+                </span>
                 <select
                   value={defaultMentorId}
                   onChange={(event) => setDefaultMentorId(event.target.value)}
                   className="w-full rounded-md border border-border bg-background px-2.5 py-1.5"
                 >
-                  <option value="">Choose a mentor…</option>
+                  <option value="">
+                    {rowsNeedFallbackMentor ? "Choose a mentor…" : "Not needed — Mentor column set"}
+                  </option>
                   {mentors.map((mentor) => (
                     <option key={mentor.id} value={mentor.id}>
                       {mentor.name}
@@ -289,10 +322,17 @@ export function FixtureImportDialog({
                   key={row.rowNumber}
                   row={row}
                   roster={roster}
-                  selectedPlayerId={goalkeeperResolutions[row.rowNumber] ?? row.goalkeeper.playerId ?? ""}
+                  mentors={mentorDirectory}
+                  selectedPlayerId={
+                    goalkeeperResolutions[row.rowNumber] ?? row.goalkeeper.playerId ?? ""
+                  }
+                  selectedMentorId={mentorResolutions[row.rowNumber] ?? row.mentor.mentorId ?? ""}
                   timeOverride={timeOverrides[row.rowNumber] ?? ""}
                   onResolveGoalkeeper={(playerId) =>
                     setGoalkeeperResolutions((prev) => ({ ...prev, [row.rowNumber]: playerId }))
+                  }
+                  onResolveMentor={(mentorId) =>
+                    setMentorResolutions((prev) => ({ ...prev, [row.rowNumber]: mentorId }))
                   }
                   onTimeOverride={(value) =>
                     setTimeOverrides((prev) => ({ ...prev, [row.rowNumber]: value }))
@@ -312,7 +352,7 @@ export function FixtureImportDialog({
                 </button>
                 <button
                   type="button"
-                  disabled={!readyRows.length || !defaultMentorId}
+                  disabled={!canReview}
                   onClick={() => setStep("confirm")}
                   className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground disabled:opacity-50"
                 >
@@ -323,9 +363,10 @@ export function FixtureImportDialog({
               <div className="space-y-3 rounded-md border border-warning/40 bg-warning/10 p-3 text-sm">
                 <p>
                   About to create <strong>{readyRows.length}</strong> Match event
-                  {readyRows.length === 1 ? "" : "s"} for{" "}
-                  {mentors.find((m) => m.id === defaultMentorId)?.name ?? "the selected mentor"}.
-                  Duplicates and unresolved rows will not be written.
+                  {readyRows.length === 1 ? "" : "s"}
+                  {mentorNamesOnReady.length
+                    ? ` for ${mentorNamesOnReady.join(", ")}`
+                    : ""}. Duplicates and unresolved rows will not be written.
                 </p>
                 <div className="flex justify-end gap-2">
                   <button
@@ -390,16 +431,20 @@ function SummaryStrip({
     duplicates: number;
     unmatchedGoalkeepers: number;
     ambiguousGoalkeepers: number;
+    unmatchedMentors: number;
+    ambiguousMentors: number;
     validationErrors: number;
   };
   readyCount: number;
 }) {
   return (
-    <div className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-5">
+    <div className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-4 lg:grid-cols-7">
       <Stat label="Ready" value={readyCount} />
       <Stat label="Duplicates" value={summary.duplicates} />
       <Stat label="Unmatched GK" value={summary.unmatchedGoalkeepers} />
       <Stat label="Ambiguous GK" value={summary.ambiguousGoalkeepers} />
+      <Stat label="Unmatched mentor" value={summary.unmatchedMentors} />
+      <Stat label="Ambiguous mentor" value={summary.ambiguousMentors} />
       <Stat label="Errors" value={summary.validationErrors} />
     </div>
   );
@@ -417,16 +462,22 @@ function Stat({ label, value }: { label: string; value: number }) {
 function PreviewRow({
   row,
   roster,
+  mentors,
   selectedPlayerId,
+  selectedMentorId,
   timeOverride,
   onResolveGoalkeeper,
+  onResolveMentor,
   onTimeOverride,
 }: {
   row: PreparedFixtureRow;
   roster: FixtureRosterPlayer[];
+  mentors: AssignableMentor[] | { id: string; name: string }[];
   selectedPlayerId: string;
+  selectedMentorId: string;
   timeOverride: string;
   onResolveGoalkeeper: (playerId: string) => void;
+  onResolveMentor: (mentorId: string) => void;
   onTimeOverride: (value: string) => void;
 }) {
   const tone =
@@ -446,6 +497,8 @@ function PreviewRow({
           <div className="mt-0.5 text-muted-foreground">
             {row.eventDate ?? "no date"} · {row.startTime ?? "no time"} ·{" "}
             {row.goalkeeper.playerName ?? (row.parsed.goalkeeperRaw || "no goalkeeper")}
+            {" · "}
+            {row.mentor.mentorName ?? (row.parsed.mentorRaw || "no mentor")}
             {row.location ? ` · ${row.location}` : ""}
           </div>
         </div>
@@ -471,6 +524,28 @@ function PreviewRow({
               <option key={player.id} value={player.id}>
                 {player.full_name}
                 {player.current_club ? ` (${player.current_club})` : ""}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+
+      {(row.mentor.status === "ambiguous" ||
+        row.mentor.status === "unmatched" ||
+        row.status === "needs_mentor") && (
+        <label className="mt-2 block">
+          <span className="mb-1 block text-[11px] text-muted-foreground">
+            Resolve mentor for “{row.parsed.mentorRaw || "blank"}”
+          </span>
+          <select
+            value={selectedMentorId}
+            onChange={(event) => onResolveMentor(event.target.value)}
+            className="w-full rounded-md border border-border bg-background px-2 py-1"
+          >
+            <option value="">Choose a mentor…</option>
+            {(row.mentor.candidates.length ? row.mentor.candidates : mentors).map((mentor) => (
+              <option key={mentor.id} value={mentor.id}>
+                {mentor.name}
               </option>
             ))}
           </select>
