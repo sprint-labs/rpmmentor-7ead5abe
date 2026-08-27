@@ -81,6 +81,13 @@ import { HandwrittenNotesField } from "@/components/handwritten-notes-field";
 import { VoiceNoteField } from "@/components/voice-note-field";
 import { GoalkeeperPicker } from "@/components/goalkeeper-picker";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   createMediaUploadItems,
   retryFailedMediaUploads,
   runMediaUploadBatch,
@@ -222,6 +229,7 @@ export function WorkflowDialog({
    * dialog gets the behaviour without changes of its own.
    */
   const [handoff, setHandoff] = useState<MatchReportHandoff | null>(null);
+  const returnFocusRef = useRef<HTMLElement | null>(null);
   useEffect(() => {
     if (!kind) setHandoff(null);
   }, [kind]);
@@ -230,45 +238,45 @@ export function WorkflowDialog({
   const activeKind: WorkflowKind = handoff ? "report" : kind;
   const isEditing = activeKind === "interaction" && !!editingInteraction;
   const title = isEditing ? "Edit Interaction" : TITLES[activeKind];
+  const description =
+    activeKind === "report"
+      ? handoff
+        ? "Live Match Observation · the interaction is created when this report is submitted"
+        : "Draft autosaves locally · Submission writes to the RPM Match Reports Google Sheet"
+      : activeKind === "media"
+        ? "Stored in the central media repository"
+        : activeKind === "interaction"
+          ? isEditing
+            ? "Corrects the original record · visible everywhere it appears"
+            : "Saved to Lovable Cloud · visible in the interactions log"
+          : activeKind === "bug" || activeKind === "question"
+            ? "Goes to the Super Admin support inbox · you will get a reply in Help & Messages"
+            : "Saved locally to this session";
 
   return (
-    <div
-      className="fixed inset-0 z-50 grid place-items-center bg-background/70 backdrop-blur-sm p-4"
-      onClick={onClose}
-    >
-      <div
-        className="w-full max-w-2xl bg-card border border-border rounded-lg shadow-2xl max-h-[90vh] overflow-hidden flex flex-col"
-        onClick={(e) => e.stopPropagation()}
+    <Dialog open onOpenChange={(next) => !next && onClose()}>
+      <DialogContent
+        onOpenAutoFocus={() => {
+          returnFocusRef.current =
+            document.activeElement instanceof HTMLElement ? document.activeElement : null;
+        }}
+        onCloseAutoFocus={(event) => {
+          event.preventDefault();
+          const returnTarget = returnFocusRef.current;
+          returnFocusRef.current = null;
+          if (returnTarget?.isConnected) {
+            returnTarget.focus();
+          } else {
+            document.getElementById("main-content")?.focus();
+          }
+        }}
+        className="flex max-h-[90vh] w-[calc(100%_-_2rem)] max-w-2xl flex-col gap-0 overflow-hidden border-border bg-card p-0 shadow-2xl"
       >
-        <div className="flex items-center justify-between px-5 py-3.5 border-b border-border">
-          <div>
-            <h3 className="text-base font-semibold">{title}</h3>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              {activeKind === "report"
-                ? handoff
-                  ? "Live Match Observation · the interaction is created when this report is submitted"
-                  : "Draft autosaves locally · Submission writes to the RPM Match Reports Google Sheet"
-                : activeKind === "media"
-                  ? "Stored in the central media repository"
-                  : activeKind === "interaction"
-                    ? isEditing
-                      ? "Corrects the original record · visible everywhere it appears"
-                      : "Saved to Lovable Cloud · visible in the interactions log"
-                    : activeKind === "bug"
-                      ? "Goes to the Super Admin support inbox · you will get a reply in Help & Messages"
-                      : activeKind === "question"
-                        ? "Goes to the Super Admin support inbox · you will get a reply in Help & Messages"
-                        : "Saved locally to this session"}
-            </p>
-          </div>
-          <button
-            onClick={onClose}
-            className="size-8 grid place-items-center rounded-md hover:bg-accent"
-          >
-            <X className="size-4" />
-          </button>
-        </div>
-        <div className="p-5 overflow-y-auto">
+        <DialogHeader className="border-b border-border px-5 py-3.5 pr-12 text-left">
+          <DialogTitle className="text-base">{title}</DialogTitle>
+          <DialogDescription className="mt-0.5 text-xs">{description}</DialogDescription>
+        </DialogHeader>
+        <div className="overflow-y-auto p-5">
           {activeKind === "interaction" && (
             <InteractionForm
               onDone={onClose}
@@ -299,8 +307,8 @@ export function WorkflowDialog({
           )}
           {activeKind === "question" && <QuestionForm onDone={onClose} />}
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -3238,8 +3246,7 @@ export function MediaForm({ onDone, prefillGkId }: { onDone: () => void; prefill
             objectPath: item.objectPath,
           }),
         resolveObjectPath: (item: ValidMediaUploadTask) =>
-          item.objectPath ??
-          buildObjectPath(selectedPlayer?.id ?? null, item.file.name, item.id),
+          item.objectPath ?? buildObjectPath(selectedPlayer?.id ?? null, item.file.name, item.id),
         onItemUpdate: (
           _item: MediaUploadItem<MediaAsset>,
           nextItems: readonly MediaUploadItem<MediaAsset>[],
