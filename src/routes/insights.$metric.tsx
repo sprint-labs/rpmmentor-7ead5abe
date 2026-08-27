@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { ArrowUpRight, CalendarClock, AlertTriangle } from "lucide-react";
 import { PageHeader, SectionTitle, TierBadge } from "@/components/primitives";
+import { InteractionWorkbench } from "@/components/interaction-workbench";
 import { useAuth } from "@/lib/auth";
 import { useLoggedInteractions } from "@/lib/interactions/use-interactions";
 import { listPlayers } from "@/lib/players.functions";
@@ -246,12 +247,28 @@ function InsightDrilldown() {
             >
               Dashboard
             </Link>
-            <Link
-              to={meta.to}
-              className="text-[10px] font-mono uppercase tracking-widest text-primary inline-flex items-center gap-1"
-            >
-              {meta.linkLabel} <ArrowUpRight className="size-3" />
-            </Link>
+            {active === "interactions" ? (
+              <Link
+                to="/interactions"
+                search={{
+                  from: period.fromDate,
+                  to: period.toDate,
+                  mentorId: "",
+                  type: "",
+                  source: "interactions-logged",
+                }}
+                className="text-[10px] font-mono uppercase tracking-widest text-primary inline-flex items-center gap-1"
+              >
+                Open full interaction log <ArrowUpRight className="size-3" />
+              </Link>
+            ) : (
+              <Link
+                to={meta.to}
+                className="text-[10px] font-mono uppercase tracking-widest text-primary inline-flex items-center gap-1"
+              >
+                {meta.linkLabel} <ArrowUpRight className="size-3" />
+              </Link>
+            )}
           </div>
         }
       />
@@ -322,50 +339,10 @@ function InsightDrilldown() {
                   isDateOnlyInPeriod(i.occurredAt, period.fromDate, period.toDate),
               )
               .sort((a, b) => b.occurredAt.localeCompare(a.occurredAt));
-            return (
-              <>
-                <SectionTitle
-                  action={
-                    <span className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
-                      {periodLabel}
-                    </span>
-                  }
-                >{`Interactions (${availableCount(interactions.isLoading, interactions.isError, rows.length)})`}</SectionTitle>
-                <div className="divide-y divide-border">
-                  {interactions.isLoading ? (
-                    <Empty label="Loading…" />
-                  ) : interactions.isError ? (
-                    <Empty label="Interactions unavailable" />
-                  ) : rows.length === 0 ? (
-                    <Empty label="No interactions in this window" />
-                  ) : (
-                    rows.map((i) => (
-                      <Row
-                        key={i.id}
-                        right={
-                          <span className="text-[10px] font-mono text-muted-foreground">
-                            {formatRelative(i.occurredAt)}
-                          </span>
-                        }
-                      >
-                        <div className="text-xs font-medium">
-                          {i.goalkeeperName}
-                          <span className="text-muted-foreground font-normal">
-                            {" "}
-                            · {i.interactionType}
-                          </span>
-                        </div>
-                        <div className="text-[10px] text-muted-foreground truncate">
-                          {i.mentorName}
-                          {i.club ? ` · ${i.club}` : ""}
-                          {i.outcome ? ` · ${i.outcome}` : ""}
-                        </div>
-                      </Row>
-                    ))
-                  )}
-                </div>
-              </>
-            );
+            if (interactions.isLoading) return <Empty label="Loading…" />;
+            if (interactions.isError) return <Empty label="Interactions unavailable" />;
+            if (rows.length === 0) return <Empty label="No interactions in this window" />;
+            return <InteractionWorkbench interactions={rows} periodLabel={periodLabel} />;
           })()}
 
         {active === "duty" &&
