@@ -125,11 +125,12 @@ describe("uploadObjectBytes TUS path", () => {
     );
     expect(options.chunkSize).toBe(TUS_CHUNK_SIZE_BYTES);
     expect(options.retryDelays).toEqual([...TUS_RETRY_DELAYS]);
-    expect(options.headers).toMatchObject({
-      Authorization: "Bearer initial-token",
-      apikey: "anon-key",
-      "x-upsert": "false",
-    });
+    // tus-js-client applies these static headers and then runs
+    // onBeforeRequest, and both go through XMLHttpRequest.setRequestHeader,
+    // which combines a repeated header into "value1, value2". Setting the
+    // token here as well made Storage reject an invalid compact JWS, so only
+    // onBeforeRequest may send credentials.
+    expect(options.headers).toEqual({ "x-upsert": "false" });
     expect(options.metadata).toMatchObject({
       bucketName: "gk-media",
       objectName: "unlinked/abc-large.mp4",
@@ -143,6 +144,8 @@ describe("uploadObjectBytes TUS path", () => {
     );
     expect(getAccessToken).toHaveBeenCalled();
     expect(req.setHeader).toHaveBeenCalledWith("Authorization", "Bearer refreshed-token");
+    expect(req.setHeader).toHaveBeenCalledWith("apikey", "anon-key");
+    expect(req.setHeader).toHaveBeenCalledTimes(2);
   });
 
   it("resumes a previous TUS upload for the same object path", async () => {

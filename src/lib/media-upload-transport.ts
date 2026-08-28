@@ -149,17 +149,7 @@ export interface UploadObjectBytesOptions {
 }
 
 async function uploadWithTus(opts: UploadObjectBytesOptions): Promise<void> {
-  const {
-    path,
-    file,
-    onProgress,
-    getAccessToken,
-    accessToken,
-    supabaseUrl,
-    anonKey,
-    bucket,
-    limitLabel,
-  } = opts;
+  const { path, file, onProgress, getAccessToken, supabaseUrl, anonKey, bucket, limitLabel } = opts;
 
   await new Promise<void>((resolve, reject) => {
     const upload = new Upload(file, {
@@ -169,9 +159,16 @@ async function uploadWithTus(opts: UploadObjectBytesOptions): Promise<void> {
       uploadDataDuringCreation: true,
       removeFingerprintOnSuccess: true,
       storeFingerprintForResuming: true,
+      /**
+       * `onBeforeRequest` below is the only place that may set `Authorization`
+       * and `apikey`. tus-js-client applies these static headers first and then
+       * runs `onBeforeRequest`, and both go through `XMLHttpRequest.
+       * setRequestHeader`, which *combines* a repeated header into
+       * `"value1, value2"` instead of replacing it. Setting the token here as
+       * well produced `Authorization: Bearer <jwt>, Bearer <jwt>`, which
+       * Storage rejects as `Invalid Compact JWS`.
+       */
       headers: {
-        Authorization: `Bearer ${accessToken}`,
-        apikey: anonKey,
         "x-upsert": "false",
       },
       metadata: {
