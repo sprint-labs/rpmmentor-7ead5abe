@@ -24,6 +24,7 @@ import {
   Plug,
   Database,
   LifeBuoy,
+  Columns3,
 } from "lucide-react";
 import { useTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
@@ -60,6 +61,7 @@ type NavItem = {
 };
 const NAV: NavItem[] = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, exact: true, perm: "goalkeepers.view" },
+  { to: "/bulletins", label: "Bulletin Board", icon: Columns3, perm: "bulletins.view" },
   { to: "/goalkeepers", label: "Goalkeepers", icon: Users, perm: "goalkeepers.view" },
   { to: "/system/players", label: "Player Records", icon: Database, perm: "players.edit_club" },
   { to: "/mentors", label: "Users & Roles", icon: UserCog, perm: "mentors.view" },
