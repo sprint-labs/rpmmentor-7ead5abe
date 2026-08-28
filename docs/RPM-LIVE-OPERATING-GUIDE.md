@@ -191,7 +191,7 @@ are environment-specific and must never be replayed by `supabase db push`.
 | Account | `monx@hotmail.co.uk` (Joe Monks), created directly in `auth.users` with a matching `auth.identities` row for the `email` provider |
 | Password | Random and unrecorded — nobody holds it. First access is the **Forgot password?** flow on `/login`, which Joe triggers himself |
 | Email confirmation | Pre-confirmed at creation, so no confirmation mail was sent and the reset flow works immediately |
-| Profile | Seeded by the `on_auth_user_created` trigger: name `Joe Monks`, initials `JM`, `title` blank, `mentor_id` null |
+| Profile | Seeded by the `on_auth_user_created` trigger, then `title` set by the owner: name `Joe Monks`, initials `JM`, title `Stakeholder`, `mentor_id` null |
 | Role | One `user_roles` row: `admin` |
 | Reversal | Delete the `auth.users` row; `profiles` and `user_roles` cascade |
 
