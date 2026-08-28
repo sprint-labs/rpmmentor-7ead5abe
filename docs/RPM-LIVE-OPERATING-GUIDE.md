@@ -91,7 +91,7 @@ All 18 public tables are RLS-enabled. The most important live counts at this sna
 | `players` | 113 |
 | `match_reports_cache` | 95 canonical Match Reports |
 | `match_report_submissions` | 11 submission-ledger records |
-| `profiles` / `user_roles` | 1 / 1 (the first Super Admin) |
+| `profiles` / `user_roles` | 13 / 13 (1 Super Admin, 2 Admin, 3 Mentor Manager, 7 Mentor) |
 | `interactions`, `calendar_events`, `interaction_media` | 0 / 0 / 0 |
 | `media_assets` / `report_attachments` | 12 metadata records / 7 links |
 
@@ -177,8 +177,28 @@ Use this short release gate:
 3. Reconcile the repository's migration history with the live database into a reviewed forward-only baseline before the next schema project.
 4. Verify/copy the underlying media objects and any desired historical interaction/calendar records separately. Their metadata/history is not proof that every original storage object or auth-linked record migrated.
 5. Remove the legacy tracked `.env` safely and rotate any affected credentials in a dedicated security change.
-6. **Leaked-password protection (HaveIBeenPwned)** — Supabase Security Advisor flag remains until the RPM project is on **Pro plan or above**. The Management API rejects `password_hibp_enabled` on the current plan with: *"Configuring leaked password protection via HaveIBeenPwned.org is available on Pro Plans and up."* After upgrade: [Auth → Email provider settings](https://supabase.com/dashboard/project/zdxxezquhvpjmoxlecjp/auth/providers?provider=Email) → enable **Prevent use of leaked passwords** → Save. Billing: [Supabase org dashboard](https://supabase.com/dashboard/org/atsofgtvhfjmcevxkmer).
-7. **`list_mentor_directory()` security lint** — The function now rejects callers who are not `mentor`, `mentor_manager`, `admin`, or `super_admin`. Supabase may still surface `authenticated_security_definer_function_executable` because `authenticated` retains `EXECUTE` on a `SECURITY DEFINER` RPC; that is required for calendar/insights reads from the browser client.
+6. ~~**Leaked-password protection (HaveIBeenPwned)**~~ — **Done 24 Aug 2026.** Org upgraded to Pro; `password_hibp_enabled` is on for project `zdxxezquhvpjmoxlecjp`. Global Storage file size limit set to **1 GB** (bucket `gk-media` inherits). Re-check [Auth → Email provider settings](https://supabase.com/dashboard/project/zdxxezquhvpjmoxlecjp/auth/providers?provider=Email) after any Auth config change.
+7. **Support inbox migration** — Applied live as `20260824150611_support_inbox_and_broadcasts`. Help & Messages (`/support`) depends on these tables; no further migration apply needed unless the repo file diverges.
+8. **`list_mentor_directory()` security lint** — The function now rejects callers who are not `mentor`, `mentor_manager`, `admin`, or `super_admin`. Supabase may still surface `authenticated_security_definer_function_executable` because `authenticated` retains `EXECUTE` on a `SECURITY DEFINER` RPC; that is required for calendar/insights reads from the browser client.
+
+### 28 Aug 2026 — Joe Monks provisioned as Admin (completed)
+
+Owner-requested account provisioning against live Supabase project
+`zdxxezquhvpjmoxlecjp`. Recorded here rather than as a migration: `auth.users` rows
+are environment-specific and must never be replayed by `supabase db push`.
+
+| Item | State |
+| --- | --- |
+| Account | `monx@hotmail.co.uk` (Joe Monks), created directly in `auth.users` with a matching `auth.identities` row for the `email` provider |
+| Password | Random and unrecorded — nobody holds it. First access is the **Forgot password?** flow on `/login`, which Joe triggers himself |
+| Email confirmation | Pre-confirmed at creation, so no confirmation mail was sent and the reset flow works immediately |
+| Profile | Seeded by the `on_auth_user_created` trigger, then `title` set by the owner: name `Joe Monks`, initials `JM`, title `Stakeholder`, `mentor_id` null |
+| Role | One `user_roles` row: `admin` |
+| Reversal | Delete the `auth.users` row; `profiles` and `user_roles` cascade |
+
+`admin` grants the executive dashboard, club corrections, Match Report management and
+interaction management. It does **not** grant user management, the support inbox,
+broadcasts or entity deletion — those stay `super_admin` only.
 
 ### 22 Aug 2026 — Matt Beadle feedback (completed)
 

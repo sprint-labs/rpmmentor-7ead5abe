@@ -40,10 +40,22 @@ export const SUPPORT_SEND_ROLES: readonly AppRole[] = [
   "mentor",
 ];
 
-/** Every operational role may submit a Match Report. */
-export const REPORT_SUBMIT_ROLES: readonly AppRole[] = [
+/**
+ * Roles that may file a Match Report.
+ *
+ * `admin` is deliberately absent. It is an oversight role: it reads everything
+ * a Mentor Manager reads and adds the Executive dashboard, but it does not
+ * record mentoring work of its own. `REPORT_MANAGE_ROLES` still lets an admin
+ * correct or tombstone somebody else's report.
+ */
+export const REPORT_SUBMIT_ROLES: readonly AppRole[] = ["super_admin", "mentor_manager", "mentor"];
+
+/**
+ * Roles that may log an interaction. Mirrors `REPORT_SUBMIT_ROLES` and the
+ * `interactions_insert_own` policy — `admin` observes rather than records.
+ */
+export const INTERACTION_LOG_ROLES: readonly AppRole[] = [
   "super_admin",
-  "admin",
   "mentor_manager",
   "mentor",
 ];

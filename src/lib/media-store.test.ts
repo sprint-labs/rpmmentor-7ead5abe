@@ -29,14 +29,31 @@ vi.mock("tus-js-client", () => {
       tusState.objectNames.push(
         (options.metadata as { objectName?: string } | undefined)?.objectName ?? "",
       );
-      tusState.tokens.push(
-        (options.headers as { Authorization?: string } | undefined)?.Authorization ?? "",
-      );
     }
     findPreviousUploads = async () => [];
     resumeFromPreviousUpload = vi.fn();
     start = () => {
-      (this.options.onSuccess as () => void)();
+      // Mirrors tus-js-client: the static `headers` are applied first, then
+      // `onBeforeRequest` runs, and both go through
+      // XMLHttpRequest.setRequestHeader, which combines a repeated header into
+      // "value1, value2" rather than replacing it.
+      const headers: Record<string, string> = {
+        ...((this.options.headers as Record<string, string> | undefined) ?? {}),
+      };
+      const req = {
+        getMethod: () => "POST",
+        getHeader: (name: string) => headers[name],
+        setHeader: (name: string, value: string) => {
+          headers[name] = headers[name] ? `${headers[name]}, ${value}` : value;
+        },
+      };
+      const onBeforeRequest = this.options.onBeforeRequest as
+        | ((request: typeof req) => Promise<void>)
+        | undefined;
+      void Promise.resolve(onBeforeRequest?.(req)).then(() => {
+        tusState.tokens.push(headers.Authorization ?? "");
+        (this.options.onSuccess as () => void)();
+      });
     };
   }
   return { Upload };

@@ -75,7 +75,8 @@ export function useLoggedInteractions(enabled = true) {
 export function useDutySource(): DutySourceInteraction[] {
   const { data } = useLoggedInteractions();
   return useMemo(
-    () => (data ?? []).map((i) => ({ gkId: i.gkSlug, type: i.interactionType, date: i.occurredAt })),
+    () =>
+      (data ?? []).map((i) => ({ gkId: i.gkSlug, type: i.interactionType, date: i.occurredAt })),
     [data],
   );
 }
@@ -99,13 +100,13 @@ export function useInteractionsPage(params: ListInteractionsQuery) {
 }
 
 /**
- * Voice recordings attached to the interactions currently on screen, keyed by
- * interaction id and ready to play.
+ * Voice recordings attached to the interactions currently on screen, together
+ * with the loading and error state needed for truthful playback copy.
  *
  * Playback URLs are signed for an hour, so this is refetched well inside that
  * window rather than being cached indefinitely.
  */
-export function useInteractionAudio(interactionIds: string[]) {
+export function useInteractionAudioState(interactionIds: string[]) {
   const fetchAudio = useServerFn(listInteractionAudio);
   const hasSession = useHasSupabaseSession();
   // Sorted so the cache key is stable regardless of row order.
@@ -119,7 +120,7 @@ export function useInteractionAudio(interactionIds: string[]) {
     retry: false,
   });
 
-  return useMemo(() => {
+  const audioByInteraction = useMemo(() => {
     const byInteraction = new Map<string, InteractionAudioClip[]>();
     for (const clip of query.data ?? []) {
       const existing = byInteraction.get(clip.interactionId);
@@ -128,4 +129,15 @@ export function useInteractionAudio(interactionIds: string[]) {
     }
     return byInteraction;
   }, [query.data]);
+
+  return {
+    audioByInteraction,
+    isLoading: ids.length > 0 && !query.isSuccess && !query.isError,
+    isError: query.isError,
+  };
+}
+
+/** Backwards-compatible map-only view used by the full interaction log. */
+export function useInteractionAudio(interactionIds: string[]) {
+  return useInteractionAudioState(interactionIds).audioByInteraction;
 }
