@@ -530,9 +530,11 @@ function GkDetail() {
                 <div className="text-[11px] text-muted-foreground leading-snug">
                   Pillar means are calculated from valid 1–5 scores across the last 5 match reports.
                 </div>
-                <Link to="/reports" search={{ from: "", to: "", coach: "", mentorProfileId: "", source: "", gk: gk.name, openSubmit: "1" }} className="text-[11px] text-primary hover:underline inline-flex items-center gap-0.5">
-                  Submit a Match Report for {gk.name}
-                </Link>
+                {can("reports.submit") && (
+                  <Link to="/reports" search={{ from: "", to: "", coach: "", mentorProfileId: "", source: "", gk: gk.name, openSubmit: "1" }} className="text-[11px] text-primary hover:underline inline-flex items-center gap-0.5">
+                    Submit a Match Report for {gk.name}
+                  </Link>
+                )}
               </div>
             ) : (
               <div className="space-y-3">
@@ -597,13 +599,15 @@ function GkDetail() {
                             </div>
                           )}
                           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                            <Link
-                              to="/reports"
-                              search={{ from: "", to: "", coach: "", mentorProfileId: "", source: "", gk: gk.name, openSubmit: "1", last5Gk: "" }}
-                              className="text-primary hover:underline inline-flex items-center gap-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
-                            >
-                              Submit a Match Report for {gk.name}
-                            </Link>
+                            {can("reports.submit") && (
+                              <Link
+                                to="/reports"
+                                search={{ from: "", to: "", coach: "", mentorProfileId: "", source: "", gk: gk.name, openSubmit: "1", last5Gk: "" }}
+                                className="text-primary hover:underline inline-flex items-center gap-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
+                              >
+                                Submit a Match Report for {gk.name}
+                              </Link>
+                            )}
                             <Link to="/calendar" search={{ gkId: gk.id }} className="text-muted-foreground hover:text-foreground hover:underline inline-flex items-center gap-0.5">
                               <CalendarIcon className="size-3.5" /> See upcoming matches
                             </Link>
@@ -633,9 +637,11 @@ function GkDetail() {
                 {gkReports.length > 0 && gkReports.length < 5 && (
                   <div className="text-[11px] text-muted-foreground leading-snug border-t border-border/40 pt-2">
                     <span className="font-medium text-foreground">{gkReports.length} of 5</span> match reports available for this goalkeeper.
-                    <Link to="/reports" search={{ from: "", to: "", coach: "", mentorProfileId: "", source: "", gk: gk.name, openSubmit: "1" }} className="ml-1 text-primary hover:underline">
-                      Submit a Match Report for {gk.name}
-                    </Link>
+                    {can("reports.submit") && (
+                      <Link to="/reports" search={{ from: "", to: "", coach: "", mentorProfileId: "", source: "", gk: gk.name, openSubmit: "1" }} className="ml-1 text-primary hover:underline">
+                        Submit a Match Report for {gk.name}
+                      </Link>
+                    )}
                     <Link to="/calendar" search={{ gkId: gk.id }} className="ml-2 text-muted-foreground hover:text-foreground hover:underline inline-flex items-center gap-0.5">
                       <CalendarIcon className="size-3.5" /> See upcoming matches
                     </Link>

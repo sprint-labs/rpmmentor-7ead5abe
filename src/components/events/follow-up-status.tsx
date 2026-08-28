@@ -6,6 +6,7 @@
  * and wording.
  */
 import { Link } from "@tanstack/react-router";
+import { useAuth } from "@/lib/auth";
 import {
   FOLLOW_UP_STATUS_LABEL,
   followUpRequirementLabel,
@@ -72,10 +73,15 @@ export function FollowUpActionLink({
   followUp: FollowUp;
   label?: string;
 }) {
+  const { can } = useAuth();
   if (!followUp.kind) return null;
   if (followUp.status === "completed" || followUp.status === "cancelled" || followUp.status === "not_required") {
     return null;
   }
+  // Admin can see follow-ups but must not be offered a form they cannot open.
+  const canRecord =
+    followUp.kind === "match_report" ? can("reports.submit") : can("interactions.log");
+  if (!canRecord) return null;
   const path = followUpLinkPath(event, followUp.kind);
   const [to, query] = path.split("?");
   const search = Object.fromEntries(new URLSearchParams(query ?? ""));
