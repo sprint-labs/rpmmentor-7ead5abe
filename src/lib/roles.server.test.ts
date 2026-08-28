@@ -24,6 +24,13 @@ describe("roles.server", () => {
     expect(hasAnyRole([], ["super_admin"])).toBe(false);
   });
 
+  it("lets every operational role view bulletins but limits team management", () => {
+    for (const role of ROLES) {
+      expect(roleHasPermission(role, "bulletins.view")).toBe(true);
+      expect(roleHasPermission(role, "bulletins.manage")).toBe(role !== "mentor");
+    }
+  });
+
   it("keeps destructive entity controls exclusive to Super Admin", () => {
     expect(SUPER_ADMIN_ROLES).toEqual(["super_admin"]);
 

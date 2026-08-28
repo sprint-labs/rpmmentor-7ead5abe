@@ -21,6 +21,7 @@ import { Route as GoalkeepersRouteImport } from './routes/goalkeepers'
 import { Route as FollowUpsRouteImport } from './routes/follow-ups'
 import { Route as ExecutiveRouteImport } from './routes/executive'
 import { Route as CalendarRouteImport } from './routes/calendar'
+import { Route as BulletinsRouteImport } from './routes/bulletins'
 import { Route as AuditRouteImport } from './routes/audit'
 import { Route as AlertsRouteImport } from './routes/alerts'
 import { Route as AccountRouteImport } from './routes/account'
@@ -100,6 +101,11 @@ const ExecutiveRoute = ExecutiveRouteImport.update({
 const CalendarRoute = CalendarRouteImport.update({
   id: '/calendar',
   path: '/calendar',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BulletinsRoute = BulletinsRouteImport.update({
+  id: '/bulletins',
+  path: '/bulletins',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuditRoute = AuditRouteImport.update({
@@ -211,6 +217,7 @@ export interface FileRoutesByFullPath {
   '/account': typeof AccountRoute
   '/alerts': typeof AlertsRoute
   '/audit': typeof AuditRoute
+  '/bulletins': typeof BulletinsRoute
   '/calendar': typeof CalendarRoute
   '/executive': typeof ExecutiveRoute
   '/follow-ups': typeof FollowUpsRoute
@@ -245,6 +252,7 @@ export interface FileRoutesByTo {
   '/account': typeof AccountRoute
   '/alerts': typeof AlertsRoute
   '/audit': typeof AuditRoute
+  '/bulletins': typeof BulletinsRoute
   '/calendar': typeof CalendarRoute
   '/executive': typeof ExecutiveRoute
   '/follow-ups': typeof FollowUpsRoute
@@ -280,6 +288,7 @@ export interface FileRoutesById {
   '/account': typeof AccountRoute
   '/alerts': typeof AlertsRoute
   '/audit': typeof AuditRoute
+  '/bulletins': typeof BulletinsRoute
   '/calendar': typeof CalendarRoute
   '/executive': typeof ExecutiveRoute
   '/follow-ups': typeof FollowUpsRoute
@@ -316,6 +325,7 @@ export interface FileRouteTypes {
     | '/account'
     | '/alerts'
     | '/audit'
+    | '/bulletins'
     | '/calendar'
     | '/executive'
     | '/follow-ups'
@@ -350,6 +360,7 @@ export interface FileRouteTypes {
     | '/account'
     | '/alerts'
     | '/audit'
+    | '/bulletins'
     | '/calendar'
     | '/executive'
     | '/follow-ups'
@@ -384,6 +395,7 @@ export interface FileRouteTypes {
     | '/account'
     | '/alerts'
     | '/audit'
+    | '/bulletins'
     | '/calendar'
     | '/executive'
     | '/follow-ups'
@@ -419,6 +431,7 @@ export interface RootRouteChildren {
   AccountRoute: typeof AccountRoute
   AlertsRoute: typeof AlertsRoute
   AuditRoute: typeof AuditRoute
+  BulletinsRoute: typeof BulletinsRoute
   CalendarRoute: typeof CalendarRoute
   ExecutiveRoute: typeof ExecutiveRoute
   FollowUpsRoute: typeof FollowUpsRoute
@@ -532,6 +545,13 @@ declare module '@tanstack/react-router' {
       path: '/calendar'
       fullPath: '/calendar'
       preLoaderRoute: typeof CalendarRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/bulletins': {
+      id: '/bulletins'
+      path: '/bulletins'
+      fullPath: '/bulletins'
+      preLoaderRoute: typeof BulletinsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/audit': {
@@ -694,6 +714,7 @@ const rootRouteChildren: RootRouteChildren = {
   AccountRoute: AccountRoute,
   AlertsRoute: AlertsRoute,
   AuditRoute: AuditRoute,
+  BulletinsRoute: BulletinsRoute,
   CalendarRoute: CalendarRoute,
   ExecutiveRoute: ExecutiveRoute,
   FollowUpsRoute: FollowUpsRoute,

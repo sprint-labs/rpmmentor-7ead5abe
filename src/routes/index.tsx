@@ -36,6 +36,7 @@ import { listMatchReports } from "@/lib/match-reports/reports.functions";
 import { isDateOnlyInPeriod, lastNDaysPeriod } from "@/lib/dashboard-period";
 import { getOverviewDashboardStats } from "@/lib/overview-dashboard.functions";
 import { listCalendarEvents } from "@/lib/calendar.functions";
+import { BulletinDashboardCard } from "@/components/bulletins/dashboard-card";
 
 const OVERVIEW_PERIOD_DAYS = 14;
 
@@ -299,6 +300,8 @@ function Dashboard() {
           />
         </Link>
       </div>
+
+      <BulletinDashboardCard scope="team" />
 
       {/* Operational grid */}
       <div className="grid grid-cols-12 gap-4">
