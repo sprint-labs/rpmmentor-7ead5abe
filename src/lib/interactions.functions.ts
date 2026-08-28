@@ -32,6 +32,7 @@ import { linkInteractionAudio } from "@/lib/interactions/audio-link";
 import {
   getUserRoles,
   hasAnyRole,
+  INTERACTION_LOG_ROLES,
   INTERACTION_MANAGE_ROLES,
   requireRole,
   SUPER_ADMIN_ROLES,
@@ -62,6 +63,11 @@ export const createInteraction = createServerFn({ method: "POST" })
   .validator((data) => createInteractionInput.parse(data))
   .handler(async ({ data, context }): Promise<LoggedInteraction> => {
     const { supabase, userId } = context;
+
+    // Only a role that actually does mentoring work may record it. Admin is an
+    // oversight role and is excluded here as it is in the UI, so a hidden
+    // button can never be the only thing standing between it and a write.
+    await requireRole(supabase, userId, INTERACTION_LOG_ROLES, "log an interaction");
 
     // Defence in depth behind the validator: a manually logged interaction can
     // never be a Match Report observation, so it can never inflate the counts.

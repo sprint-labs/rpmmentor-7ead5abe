@@ -102,12 +102,19 @@ const MENTOR_MANAGER: Permission[] = [
   "audit.view",
 ];
 
+/**
+ * Admin is the oversight role: it sees everything a Mentor Manager sees, plus
+ * the Executive dashboard, but it does not record mentoring work of its own.
+ * `interactions.log` and `reports.submit` are deliberately absent — an admin
+ * still corrects other people's entries through `interactions.manage` and
+ * `reports.manage`. Mirrors `INTERACTION_LOG_ROLES` and `REPORT_SUBMIT_ROLES`.
+ */
 const ADMIN: Permission[] = [
   "goalkeepers.view", "goalkeepers.edit", "goalkeepers.create",
   "players.edit_club",
   "mentors.view",
-  "interactions.view", "interactions.log", "interactions.manage",
-  "reports.view", "reports.submit", "reports.manage",
+  "interactions.view", "interactions.manage",
+  "reports.view", "reports.manage",
   "media.view", "media.edit",
   "calendar.view", "calendar.manage",
   "executive.view", "audit.view",
