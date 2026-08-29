@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { Session } from "@supabase/supabase-js";
+import { hasAuthCallback, isRecoveryCallback } from "@/lib/password-recovery";
 
 export type Role = "super_admin" | "admin" | "mentor_manager" | "mentor";
 
@@ -145,6 +146,9 @@ export function roleHasPermission(role: Role, permission: Permission): boolean {
 interface AuthState {
   user: SessionUser | null;
   loading: boolean;
+  /** True while the caller must finish the email recovery flow on /reset-password. */
+  passwordRecoveryPending: boolean;
+  clearPasswordRecoveryPending: () => void;
   signIn: (email: string, password: string) => Promise<{ ok: true } | { ok: false; error: string }>;
   signOut: () => Promise<void>;
   can: (p: Permission) => boolean;
@@ -236,6 +240,10 @@ async function clearLocalAuthSession() {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<SessionUser | null>(null);
   const [loading, setLoading] = useState(true);
+  const [passwordRecoveryPending, setPasswordRecoveryPending] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return isRecoveryCallback(window.location) || hasAuthCallback(window.location);
+  });
 
   useEffect(() => {
     let cancelled = false;
@@ -260,7 +268,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
 
     // Subscribe first, then hydrate — avoids missed events.
-    const { data: sub } = supabase.auth.onAuthStateChange((_evt, session) => {
+    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "PASSWORD_RECOVERY") {
+        setPasswordRecoveryPending(true);
+      } else if (event === "SIGNED_OUT") {
+        setPasswordRecoveryPending(false);
+      }
+
       // Defer async work to avoid deadlocking the auth callback.
       setTimeout(() => {
         if (cancelled) return;
@@ -278,6 +292,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     return () => { cancelled = true; sub.subscription.unsubscribe(); };
   }, []);
+
+  const clearPasswordRecoveryPending = () => setPasswordRecoveryPending(false);
 
   const signIn: AuthState["signIn"] = async (email, password) => {
     const { data, error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
@@ -308,6 +324,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = async () => {
     await supabase.auth.signOut();
+    setPasswordRecoveryPending(false);
     setUser(null);
   };
 
@@ -329,7 +346,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <Ctx.Provider value={{ user, loading, signIn, signOut, can, setViewAsRole }}>
+    <Ctx.Provider value={{ user, loading, passwordRecoveryPending, clearPasswordRecoveryPending, signIn, signOut, can, setViewAsRole }}>
       {children}
     </Ctx.Provider>
   );

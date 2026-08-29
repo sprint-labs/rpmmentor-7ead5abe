@@ -2,8 +2,14 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { ArrowLeft, CheckCircle2, Eye, EyeOff, Lock } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/lib/auth";
 import { recordPasswordRecovery } from "@/lib/account.functions";
 import { LOGIN_LOCKUP_SRC } from "@/lib/brand";
+import {
+  hasAuthCallback,
+  isRecoveryCallback,
+  parseAuthCallbackParams,
+} from "@/lib/password-recovery";
 
 export const Route = createFileRoute("/reset-password")({
   component: ResetPasswordPage,
@@ -19,6 +25,7 @@ type Status = "checking" | "ready" | "invalid" | "done";
 
 function ResetPasswordPage() {
   const navigate = useNavigate();
+  const { clearPasswordRecoveryPending } = useAuth();
   const [status, setStatus] = useState<Status>("checking");
   const [pw, setPw] = useState("");
   const [confirm, setConfirm] = useState("");
@@ -26,35 +33,56 @@ function ResetPasswordPage() {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  // Recovery links land here with a hash like `#access_token=...&type=recovery`.
-  // Supabase's client parses it automatically and fires PASSWORD_RECOVERY, giving
-  // us a short-lived session that can only be used to update the password.
   useEffect(() => {
+    let cancelled = false;
     let settled = false;
+
+    const finish = (next: Status) => {
+      if (cancelled || settled) return;
+      settled = true;
+      setStatus(next);
+    };
 
     const sub = supabase.auth.onAuthStateChange((event) => {
       if (event === "PASSWORD_RECOVERY") {
-        settled = true;
-        setStatus("ready");
+        finish("ready");
       }
     });
 
-    // Fallback: if the hash contains a recovery token or we already have a
-    // session (e.g. user opened this page while signed in to change password),
-    // allow the reset form.
     (async () => {
-      const hash = typeof window !== "undefined" ? window.location.hash : "";
-      const isRecoveryHash = hash.includes("type=recovery") || hash.includes("type=invite");
-      const { data } = await supabase.auth.getSession();
-      if (settled) return;
-      if (isRecoveryHash || data.session) {
-        setStatus("ready");
-      } else {
-        setStatus("invalid");
+      const location = window.location;
+      const recoveryLanding = isRecoveryCallback(location) || hasAuthCallback(location);
+      if (!recoveryLanding) {
+        finish("invalid");
+        return;
       }
+
+      const { queryParams } = parseAuthCallbackParams(location);
+      const code = queryParams.get("code");
+      if (code) {
+        const { error: exchangeErr } = await supabase.auth.exchangeCodeForSession(code);
+        if (cancelled) return;
+        if (exchangeErr) {
+          finish("invalid");
+          return;
+        }
+      }
+
+      // Give detectSessionInUrl / PASSWORD_RECOVERY a moment after hash or PKCE exchange.
+      await new Promise((resolve) => setTimeout(resolve, code ? 0 : 250));
+      if (cancelled || settled) return;
+
+      const { data } = await supabase.auth.getSession();
+      if (data.session) {
+        finish("ready");
+        return;
+      }
+
+      finish("invalid");
     })();
 
     return () => {
+      cancelled = true;
       sub.data.subscription.unsubscribe();
     };
   }, []);
@@ -85,6 +113,7 @@ function ResetPasswordPage() {
     }
     // Sign the temporary recovery session out so the user must sign in with
     // the new password.
+    clearPasswordRecoveryPending();
     await supabase.auth.signOut();
     setStatus("done");
     setTimeout(() => navigate({ to: "/login", search: { next: "" }, replace: true }), 1600);
@@ -109,7 +138,7 @@ function ResetPasswordPage() {
               </h1>
               <p className="text-sm text-muted-foreground mt-3 leading-relaxed">
                 This password reset link is invalid or has expired. Request a new one from the sign-in
-                screen.
+                screen using the same browser you will open the email link in.
               </p>
             </div>
             <Link
@@ -130,7 +159,7 @@ function ResetPasswordPage() {
                 Set a new password
               </h1>
               <p className="text-sm text-muted-foreground mt-3 leading-relaxed">
-                Choose a new password for your Mentor Hub account. You'll be signed in with it after this.
+                Choose a new password for your Mentor Hub account. You'll sign in with it on the next screen.
               </p>
             </div>
 

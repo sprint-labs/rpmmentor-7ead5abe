@@ -3,7 +3,7 @@ import { useState } from "react";
 import { ShieldCheck, ShieldOff, Users, Search, Loader2, AlertCircle, UserPlus, Trash2, Copy, Pencil, KeyRound, Mail, History } from "lucide-react";
 import { useAuth, ROLE_LABEL, type Role } from "@/lib/auth";
 import { cn } from "@/lib/utils";
-import { CANONICAL_ORIGIN } from "@/lib/canonical-url";
+import { passwordRecoveryRedirectUrl } from "@/lib/password-recovery";
 import { toast } from "sonner";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -156,7 +156,7 @@ function SystemUsersPage() {
 
   const inviteMutation = useMutation({
     mutationFn: (vars: { email: string; name: string; title: string; role: Role | null }) => {
-      return inviteUser({ data: { ...vars, redirectTo: `${CANONICAL_ORIGIN}/reset-password` } });
+      return inviteUser({ data: { ...vars, redirectTo: passwordRecoveryRedirectUrl() } });
     },
     onSuccess: (res, vars) => {
       qc.invalidateQueries({ queryKey: QUERY_KEY });

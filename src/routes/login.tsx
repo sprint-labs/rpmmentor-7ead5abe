@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { ArrowLeft, CheckCircle2, Eye, EyeOff, Lock, Mail } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { LOGIN_LOCKUP_SRC } from "@/lib/brand";
-import { CANONICAL_ORIGIN } from "@/lib/canonical-url";
+import { passwordRecoveryRedirectUrl } from "@/lib/password-recovery";
 import { MAINTENANCE_MODE } from "@/lib/maintenance";
 
 function safeNext(raw: unknown): string {
@@ -54,7 +54,7 @@ function LoginPage() {
   async function handleForgotSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (!resetEmail.trim()) return;
-    const redirectTo = `${CANONICAL_ORIGIN}/reset-password`;
+    const redirectTo = passwordRecoveryRedirectUrl();
     await supabase.auth.resetPasswordForEmail(resetEmail.trim(), { redirectTo });
     setSentTo(resetEmail.trim());
     setResetEmail("");
