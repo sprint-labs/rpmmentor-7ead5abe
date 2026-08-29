@@ -3,7 +3,6 @@ import { useAuth } from "@/lib/auth";
 import { useEffect, useState } from "react";
 import { ArrowLeft, CheckCircle2, Eye, EyeOff, Lock, Mail } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { lovable } from "@/integrations/lovable";
 import { LOGIN_LOCKUP_SRC } from "@/lib/brand";
 import { CANONICAL_ORIGIN } from "@/lib/canonical-url";
 import { MAINTENANCE_MODE } from "@/lib/maintenance";
@@ -126,32 +125,6 @@ function LoginPage() {
                 {submitting ? "Signing in…" : "Sign in"}
               </button>
             </form>
-
-            <div className="relative my-6">
-              <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-border" /></div>
-              <div className="relative flex justify-center"><span className="bg-background px-3 text-[11px] uppercase tracking-wider text-muted-foreground">or</span></div>
-            </div>
-
-            <button type="button" onClick={async () => {
-              setError(null);
-              const res = await lovable.auth.signInWithOAuth("google", { redirect_uri: CANONICAL_ORIGIN });
-              if (res.error) setError(res.error.message || "Google sign-in failed.");
-            }}
-              className="w-full flex items-center justify-center gap-2.5 py-2.5 rounded-xl border border-border bg-card hover:bg-accent/30 text-sm font-medium transition-colors">
-              <svg width="16" height="16" viewBox="0 0 48 48" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3c-1.6 4.7-6.1 8-11.3 8-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2c-2 1.5-4.5 2.4-7.2 2.4-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.3-2.3 4.3-4.1 5.6l6.2 5.2C41.4 35.6 44 30.2 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>
-              Continue with Google
-            </button>
-
-            <button type="button" onClick={async () => {
-              setError(null);
-              const res = await lovable.auth.signInWithOAuth("apple", { redirect_uri: CANONICAL_ORIGIN });
-              if (res.error) setError(res.error.message || "Apple sign-in failed.");
-            }}
-              className="w-full mt-2.5 flex items-center justify-center gap-2.5 py-2.5 rounded-xl border border-border bg-card hover:bg-accent/30 text-sm font-medium transition-colors">
-              <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor"><path d="M16.365 1.43c0 1.14-.42 2.24-1.18 3.04-.84.9-2.17 1.58-3.28 1.5-.13-1.11.42-2.28 1.14-3.02.83-.86 2.27-1.53 3.32-1.52zM20.5 17.09c-.55 1.27-.82 1.83-1.53 2.95-.98 1.56-2.37 3.5-4.09 3.51-1.53.01-1.93-1-4-1-2.08.01-2.51 1.02-4.04 1.01-1.72-.01-3.03-1.76-4.02-3.32C.06 16.68-.24 11.4 1.94 8.6 3.5 6.62 5.94 5.46 8.24 5.46c2.35 0 3.83 1.29 5.77 1.29 1.88 0 3.03-1.29 5.75-1.29 2.05 0 4.22 1.12 5.77 3.06-5.07 2.78-4.24 10.03-4.53 8.57z"/></svg>
-              Continue with Apple
-            </button>
-
 
             <p className="text-[11px] text-muted-foreground mt-8 leading-relaxed">
               Mentor Hub accounts are provisioned by an administrator. If you need access, contact your RPM admin.
