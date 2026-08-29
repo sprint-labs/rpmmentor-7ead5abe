@@ -51,6 +51,7 @@ import { MaintenanceScreen } from "@/components/maintenance-screen";
 import { HelpUpdatesLauncher } from "@/components/help-updates-launcher";
 import { isRestrictedDuringMaintenance } from "@/lib/maintenance";
 import { isPublicRoute } from "@/lib/public-routes";
+import { PlatformWorkspaceNavigation } from "@/components/platform-workspace-navigation";
 
 type NavItem = {
   to: string;
@@ -287,15 +288,18 @@ export function AppShell() {
         <header className="h-16 md:h-14 flex items-center gap-1.5 sm:gap-2 md:gap-3 px-3 sm:px-4 md:px-6 border-b border-border bg-sidebar/95 backdrop-blur sticky top-0 z-10">
           <Link
             to="/"
-            aria-label="Mentor Hub"
+            aria-label="GKHQ Platform — Mentor Hub"
             className="size-11 md:w-auto md:h-auto flex items-center justify-center md:justify-start gap-2.5 shrink-0 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           >
             <BrandMark className="size-9 shrink-0" alt="" />
             <span
-              className="hidden sm:inline font-semibold text-foreground tracking-tight"
+              className="hidden sm:flex flex-col leading-tight text-foreground"
               aria-hidden="true"
             >
-              Mentor Hub
+              <span className="font-semibold tracking-tight">Mentor Hub</span>
+              <span className="font-mono text-[9px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
+                GKHQ Platform · Mentor
+              </span>
             </span>
           </Link>
           <div className="flex-1" />
@@ -742,6 +746,11 @@ export function AppShell() {
                 <X className="size-4" />
               </button>
             </div>
+            <PlatformWorkspaceNavigation
+              path={path}
+              canViewBulletins={can("bulletins.view")}
+              onNavigate={closeMenu}
+            />
             <nav className="flex-1 p-3 md:p-2 space-y-1 md:space-y-0.5 overflow-y-auto">
               {visible.map((n) => {
                 const active = n.exact ? path === n.to : path.startsWith(n.to);
