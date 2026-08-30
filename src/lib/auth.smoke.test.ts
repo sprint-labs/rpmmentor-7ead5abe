@@ -1,4 +1,4 @@
-import { afterAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 /**
@@ -37,10 +37,16 @@ function makeClient(): SupabaseClient {
 }
 
 suite("auth :: phase 1 smoke", () => {
-  const client = makeClient();
+  // Built in beforeAll, not at collection time: a skipped describe still
+  // evaluates its body, and makeClient() throws without a Supabase URL.
+  let client: SupabaseClient;
+
+  beforeAll(() => {
+    client = makeClient();
+  });
 
   afterAll(async () => {
-    await client.auth.signOut().catch(() => {});
+    await client?.auth.signOut().catch(() => {});
   });
 
   it("rejects an invalid password and allows an immediate retry with the correct one", async () => {
