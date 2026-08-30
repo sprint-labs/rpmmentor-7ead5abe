@@ -27,11 +27,11 @@ const SUPABASE_KEY =
   process.env.SUPABASE_PUBLISHABLE_KEY ??
   "";
 
-if (!SUPABASE_URL || !SUPABASE_KEY) {
-  throw new Error(
-    "Missing VITE_SUPABASE_URL / VITE_SUPABASE_PUBLISHABLE_KEY in env",
-  );
-}
+// These suites talk to a live Supabase project. Without a URL and key there is
+// nothing to talk to, so skip rather than fail: the credentials live in
+// .env.local and are deliberately absent from CI.
+const hasSupabaseEnv = Boolean(SUPABASE_URL && SUPABASE_KEY);
+const anonSuite = hasSupabaseEnv ? describe : describe.skip;
 
 function makeClient(): SupabaseClient {
   return createClient(SUPABASE_URL, SUPABASE_KEY, {
@@ -62,9 +62,13 @@ function fileBlob(text: string): Blob {
 // anon
 // ---------------------------------------------------------------------------
 
-describe("gk-media :: anon (unauthenticated)", () => {
-  const client = makeClient();
+anonSuite("gk-media :: anon (unauthenticated)", () => {
+  let client: SupabaseClient;
   const path = `${PREFIX}/anon-attempt.txt`;
+
+  beforeAll(() => {
+    client = makeClient();
+  });
 
   it("cannot upload to gk-media", async () => {
     const { error } = await client.storage
@@ -106,14 +110,16 @@ describe("gk-media :: anon (unauthenticated)", () => {
 
 const mentorEmail = process.env.TEST_MENTOR_EMAIL;
 const mentorPassword = process.env.TEST_MENTOR_PASSWORD;
-const mentorSuite = mentorEmail && mentorPassword ? describe : describe.skip;
+const mentorSuite =
+  hasSupabaseEnv && mentorEmail && mentorPassword ? describe : describe.skip;
 
 mentorSuite("gk-media :: authenticated (mentor)", () => {
-  const client = makeClient();
+  let client: SupabaseClient;
   const ownPath = `${PREFIX}/mentor-own.txt`;
   const uploadedByMentor: string[] = [];
 
   beforeAll(async () => {
+    client = makeClient();
     await signIn(client, mentorEmail!, mentorPassword!);
   });
 
@@ -171,16 +177,19 @@ mentorSuite("gk-media :: authenticated (mentor)", () => {
 
 const adminEmail = process.env.TEST_SUPER_ADMIN_EMAIL;
 const adminPassword = process.env.TEST_SUPER_ADMIN_PASSWORD;
-const adminSuite = adminEmail && adminPassword ? describe : describe.skip;
+const adminSuite =
+  hasSupabaseEnv && adminEmail && adminPassword ? describe : describe.skip;
 
 adminSuite("gk-media :: super_admin", () => {
-  const admin = makeClient();
-  const mentorClient = makeClient();
+  let admin: SupabaseClient;
+  let mentorClient: SupabaseClient;
   const adminPath = `${PREFIX}/admin-own.txt`;
   const mentorSeededPath = `${PREFIX}/mentor-seed-for-admin-delete.txt`;
   const cleanup: string[] = [];
 
   beforeAll(async () => {
+    admin = makeClient();
+    mentorClient = makeClient();
     await signIn(admin, adminEmail!, adminPassword!);
     if (mentorEmail && mentorPassword) {
       await signIn(mentorClient, mentorEmail, mentorPassword);

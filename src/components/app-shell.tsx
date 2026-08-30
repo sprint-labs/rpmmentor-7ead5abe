@@ -98,7 +98,7 @@ const NAV: NavItem[] = [
 ];
 
 export function AppShell() {
-  const { user, loading, can, signOut, setViewAsRole } = useAuth();
+  const { user, loading, can, signOut, setViewAsRole, passwordRecoveryPending } = useAuth();
   const path = useRouterState({ select: (s) => s.location.pathname });
   const navigate = useNavigate();
   const [navOpen, setNavOpen] = useState(false);
@@ -189,6 +189,12 @@ export function AppShell() {
   // Public routes must remain available without auth. Password recovery must
   // also remain reachable while maintenance mode is enabled.
   const isPublic = isPublicRoute(path);
+
+  useEffect(() => {
+    if (!loading && passwordRecoveryPending && path !== "/reset-password") {
+      navigate({ to: "/reset-password", replace: true });
+    }
+  }, [loading, passwordRecoveryPending, path, navigate]);
 
   useEffect(() => {
     if (!loading && !user && !isPublic) {
