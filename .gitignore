@@ -39,3 +39,8 @@ supabase/.temp/
 
 # Test coverage output
 coverage
+
+# Local environment files (never commit real project refs or keys)
+.env
+.env.*
+!.env.example

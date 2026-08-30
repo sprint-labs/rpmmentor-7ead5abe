@@ -10,7 +10,7 @@
     "project_ref": "zdxxezquhvpjmoxlecjp",
     "project_name": "RPM Mentor Hub",
     "region": "eu-west-2",
-    "ledger_rows": 39,
+    "ledger_rows": 40,
     "migrations": [
       {
         "version": "20260811095729",
@@ -263,6 +263,13 @@
         "statement_count": 1,
         "sql_length": 14758,
         "sql_md5": "3a31f538dea9892b656ac6c66c9d9240"
+      },
+      {
+        "version": "20260825120000",
+        "name": "add_calum_ward_player",
+        "statement_count": 2,
+        "sql_length": 1165,
+        "sql_md5": "008eba48dc15a279bd15d7f778d0d866"
       },
       {
         "version": "20260825181827",
