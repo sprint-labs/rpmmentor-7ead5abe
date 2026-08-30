@@ -49,6 +49,7 @@ import {
 import { formatDateOnly } from "@/lib/interactions/schema";
 
 import { lastNDaysPeriod } from "@/lib/dashboard-period";
+import { BulletinDashboardCard } from "@/components/bulletins/dashboard-card";
 
 interface Props {
   user: SessionUser;
@@ -252,6 +253,8 @@ export function MentorDashboard({ user }: Props) {
         onLogReport={() => setWorkflow("report")}
         onLogInteraction={() => openLog()}
       />
+
+      <BulletinDashboardCard scope="mine" />
 
       <section aria-label="Your activity">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

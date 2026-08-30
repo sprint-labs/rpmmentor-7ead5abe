@@ -294,7 +294,15 @@
       }
     ]
   },
-  "reviewed_forward_migrations": [],
+  "reviewed_forward_migrations": [
+    {
+      "version": "20260828210605",
+      "name": "bulletin_board_mvp",
+      "statement_count": 1,
+      "sql_length": 15069,
+      "sql_md5": "d42eee06c2cecc5273096c806e13faa0"
+    }
+  ],
   "repository_comparison": {
     "live_rows_with_byte_exact_local_statement": 24,
     "live_rows_contained_inside_a_larger_local_file": 2,

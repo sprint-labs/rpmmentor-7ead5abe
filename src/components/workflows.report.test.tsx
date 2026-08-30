@@ -3,6 +3,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { useState } from "react";
 
 const mocks = vi.hoisted(() => ({
   submitMatchReport: vi.fn(),
@@ -110,11 +111,11 @@ vi.mock("@/lib/match-reports/draft-store", () => ({
   }) =>
     Boolean(
       draft.goalkeeper.trim() ||
-        draft.team.trim() ||
-        draft.opponent.trim() ||
-        draft.comments.trim() ||
-        draft.selectedMedia.length > 0 ||
-        Object.values(draft.scores).some((score) => score !== 3),
+      draft.team.trim() ||
+      draft.opponent.trim() ||
+      draft.comments.trim() ||
+      draft.selectedMedia.length > 0 ||
+      Object.values(draft.scores).some((score) => score !== 3),
     ),
 }));
 
@@ -300,6 +301,48 @@ afterEach(() => {
 });
 
 describe("Match Report form", () => {
+  it("opens as a labelled modal, moves focus inside and closes on Escape", async () => {
+    const opener = document.createElement("button");
+    opener.textContent = "Open report";
+    document.body.append(opener);
+    opener.focus();
+
+    const onClose = vi.fn();
+    const client = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false, gcTime: 0 },
+        mutations: { retry: false },
+      },
+    });
+
+    function ClosableReport() {
+      const [kind, setKind] = useState<"report" | null>("report");
+      return (
+        <WorkflowDialog
+          kind={kind}
+          onClose={() => {
+            onClose();
+            setKind(null);
+          }}
+        />
+      );
+    }
+
+    render(
+      <QueryClientProvider client={client}>
+        <ClosableReport />
+      </QueryClientProvider>,
+    );
+    const dialog = screen.getByRole("dialog", { name: "Submit Report" });
+
+    await waitFor(() => expect(dialog.contains(document.activeElement)).toBe(true));
+    fireEvent.keyDown(document.activeElement ?? dialog, { key: "Escape" });
+
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(document.activeElement).toBe(opener));
+    opener.remove();
+  });
+
   it("blocks short comments, explains the requirement and keeps the entered report", async () => {
     renderReport();
     await fillReport("Too short to be a meaningful report.");

@@ -24,8 +24,7 @@ import {
   Plug,
   Database,
   LifeBuoy,
-  Bug,
-  HelpCircle,
+  Columns3,
 } from "lucide-react";
 import { useTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
@@ -49,6 +48,7 @@ import { OfflineBanner } from "@/components/offline-banner";
 import { SyncManager } from "@/components/sync-manager";
 import { InstallPrompt } from "@/components/install-prompt";
 import { MaintenanceScreen } from "@/components/maintenance-screen";
+import { HelpUpdatesLauncher } from "@/components/help-updates-launcher";
 import { isRestrictedDuringMaintenance } from "@/lib/maintenance";
 import { isPublicRoute } from "@/lib/public-routes";
 
@@ -61,6 +61,7 @@ type NavItem = {
 };
 const NAV: NavItem[] = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, exact: true, perm: "goalkeepers.view" },
+  { to: "/bulletins", label: "Bulletin Board", icon: Columns3, perm: "bulletins.view" },
   { to: "/goalkeepers", label: "Goalkeepers", icon: Users, perm: "goalkeepers.view" },
   { to: "/system/players", label: "Player Records", icon: Database, perm: "players.edit_club" },
   { to: "/mentors", label: "Users & Roles", icon: UserCog, perm: "mentors.view" },
@@ -102,6 +103,7 @@ export function AppShell() {
   const navigate = useNavigate();
   const [navOpen, setNavOpen] = useState(false);
   const [bellOpen, setBellOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
   const [workflow, setWorkflow] = useState<WorkflowKind | null>(null);
   const bellRef = useRef<HTMLDivElement>(null);
   const menuTriggerRef = useRef<HTMLButtonElement>(null);
@@ -135,7 +137,11 @@ export function AppShell() {
     staleTime: 60_000,
     enabled: canSeeEventInbox,
   });
-  const { data: announcements = [] } = useQuery({
+  const {
+    data: announcements = [],
+    isPending: announcementsPending,
+    isError: announcementsError,
+  } = useQuery({
     queryKey: announcementQueryKey,
     queryFn: () => fetchAnnouncements(),
     staleTime: 60_000,
@@ -144,14 +150,22 @@ export function AppShell() {
   });
   const inboxItems = inbox?.items ?? [];
   const inboxUnread = inboxItems.filter((item) => !item.readAt).length;
-  const bellAnnouncements = announcements.filter((a) => isAnnouncementInBell(a));
+  const updateAnnouncements = announcements.filter(
+    (announcement) => announcement.kind === "feature" || announcement.kind === "info",
+  );
+  const bellAnnouncements = announcements.filter(
+    (announcement) =>
+      (announcement.kind === "incident" || announcement.kind === "downtime") &&
+      isAnnouncementInBell(announcement),
+  );
   const bannerAnnouncements = announcements.filter((a) => isAnnouncementBannerVisible(a));
-  const announcementUnread = bellAnnouncements.length;
+  const bellAnnouncementUnread = bellAnnouncements.length;
+  const helpUnread = updateAnnouncements.filter((announcement) => !announcement.readAt).length;
   const bellUnread = visibleNotificationUnreadCount(
     inboxUnread,
     notif.unread,
     canSeeDutyNotifications,
-    announcementUnread,
+    bellAnnouncementUnread,
   );
 
   async function markInboxAllRead() {
@@ -160,6 +174,15 @@ export function AppShell() {
       await queryClient.invalidateQueries({ queryKey: notificationQueryKey });
     } catch {
       // Nothing to recover: the inbox simply stays unread until the next attempt.
+    }
+  }
+
+  async function markAnnouncementAsRead(announcementId: string) {
+    try {
+      await markAnnouncementSeen({ data: { announcementId } });
+      await queryClient.invalidateQueries({ queryKey: announcementQueryKey });
+    } catch {
+      // Keep the item unread so the user can try again later.
     }
   }
 
@@ -182,6 +205,7 @@ export function AppShell() {
   // Close drawer on route change
   useEffect(() => {
     setNavOpen(false);
+    setHelpOpen(false);
   }, [path]);
 
   useEffect(() => {
@@ -266,7 +290,7 @@ export function AppShell() {
   return (
     <div className="flex min-h-screen overflow-x-clip bg-background text-foreground supports-[height:100dvh]:min-h-dvh">
       <div className="flex flex-1 flex-col min-w-0">
-        <header className="h-16 md:h-14 flex items-center gap-2 md:gap-3 px-3 sm:px-4 md:px-6 border-b border-border bg-sidebar/95 backdrop-blur sticky top-0 z-10">
+        <header className="h-16 md:h-14 flex items-center gap-1.5 sm:gap-2 md:gap-3 px-3 sm:px-4 md:px-6 border-b border-border bg-sidebar/95 backdrop-blur sticky top-0 z-10">
           <Link
             to="/"
             aria-label="Mentor Hub"
@@ -348,11 +372,14 @@ export function AppShell() {
               {ROLE_LABEL[user.role]}
             </div>
           )}
-          <ThemeToggle />
+          <ThemeToggle className="hidden sm:grid" />
           {(canSeeDutyNotifications || canSeeEventInbox || canSeeSupport) && (
-            <div ref={bellRef} className="relative">
+            <div ref={bellRef} className="relative shrink-0">
               <button
-                onClick={() => setBellOpen((v) => !v)}
+                onClick={() => {
+                  setHelpOpen(false);
+                  setBellOpen((v) => !v);
+                }}
                 aria-label={
                   bellUnread > 0
                     ? `${bellOpen ? "Close" : "Open"} notifications, ${bellUnread > 9 ? "9+" : bellUnread} unread`
@@ -362,7 +389,7 @@ export function AppShell() {
                 }
                 aria-expanded={bellOpen}
                 aria-controls="duty-notifications"
-                className="relative size-11 md:size-9 grid place-items-center rounded-md border border-border hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                className="relative size-11 shrink-0 md:size-9 grid place-items-center rounded-md border border-border hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               >
                 <BellRing className="size-4" aria-hidden="true" />
                 {bellUnread > 0 && (
@@ -465,14 +492,10 @@ export function AppShell() {
                     {canSeeSupport && (
                       <div className="border-b border-border">
                         <div className="px-3 py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                          Announcements
+                          Service updates
                         </div>
                         <div className="max-h-[200px] overflow-y-auto">
-                          {bellAnnouncements.length === 0 ? (
-                            <div className="px-4 py-6 text-center text-xs text-muted-foreground">
-                              No unread announcements.
-                            </div>
-                          ) : (
+                          {bellAnnouncements.length > 0 ? (
                             bellAnnouncements.map((a) => (
                               <div
                                 key={a.id}
@@ -496,21 +519,25 @@ export function AppShell() {
                                   <button
                                     type="button"
                                     className="mt-1 text-[11px] text-primary hover:underline"
-                                    onClick={() => {
-                                      void markAnnouncementSeen({
-                                        data: { announcementId: a.id },
-                                      }).then(() =>
-                                        queryClient.invalidateQueries({
-                                          queryKey: announcementQueryKey,
-                                        }),
-                                      );
-                                    }}
+                                    onClick={() => void markAnnouncementAsRead(a.id)}
                                   >
                                     Dismiss
                                   </button>
                                 </div>
                               </div>
                             ))
+                          ) : announcementsPending ? (
+                            <div className="px-4 py-6 text-center text-xs text-muted-foreground">
+                              Loading service updates…
+                            </div>
+                          ) : announcementsError ? (
+                            <div className="px-4 py-6 text-center text-xs text-muted-foreground">
+                              Service updates unavailable.
+                            </div>
+                          ) : (
+                            <div className="px-4 py-6 text-center text-xs text-muted-foreground">
+                              No unread service updates.
+                            </div>
                           )}
                         </div>
                       </div>
@@ -613,24 +640,46 @@ export function AppShell() {
               )}
             </div>
           )}
+          {canSeeSupport && (
+            <HelpUpdatesLauncher
+              open={helpOpen}
+              unreadCount={helpUnread}
+              announcements={updateAnnouncements}
+              announcementsPending={announcementsPending}
+              announcementsError={announcementsError}
+              introVisible={!bellOpen && !navOpen}
+              onOpenChange={(next) => {
+                if (next) setBellOpen(false);
+                setHelpOpen(next);
+              }}
+              onAskQuestion={() => setWorkflow("question")}
+              onReportProblem={() => setWorkflow("bug")}
+              onOpenMessages={() => navigate({ to: "/support" as never })}
+              onMarkAnnouncementRead={markAnnouncementAsRead}
+            />
+          )}
           {canLog && (
             <button
               onClick={() => setWorkflow("interaction")}
               title="Log Interaction"
               aria-label="Log Interaction"
-              className="md:hidden inline-flex size-11 items-center justify-center rounded-md border border-border hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              className="md:hidden inline-flex size-11 shrink-0 items-center justify-center rounded-md border border-border hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             >
               <Plus className="size-4" />
             </button>
           )}
           <button
             ref={menuTriggerRef}
-            onClick={() => setNavOpen(true)}
+            onClick={() => {
+              setBellOpen(false);
+              setHelpOpen(false);
+              setNavOpen(true);
+            }}
             title="Open menu"
             aria-label="Open menu"
             aria-expanded={navOpen}
             aria-controls="main-navigation"
-            className="inline-flex size-11 md:w-auto md:h-9 md:px-3 items-center justify-center gap-1.5 rounded-md border border-border text-xs uppercase tracking-[0.06em] font-semibold hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            className="inline-flex size-11 shrink-0 md:w-auto md:h-9 md:px-3 items-center justify-center gap-1.5 rounded-md border border-border text-xs uppercase tracking-[0.06em] font-semibold hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           >
             <Menu className="size-4" />
             <span className="hidden md:inline">Menu</span>
@@ -721,30 +770,6 @@ export function AppShell() {
               })}
             </nav>
             <div className="p-3 border-t border-sidebar-border space-y-2">
-              {can("reports.submit") && (
-                <button
-                  onClick={() => {
-                    setWorkflow("report");
-                    setNavOpen(false);
-                  }}
-                  className="w-full min-h-11 flex items-center gap-2 px-3 py-2 rounded-md bg-primary text-primary-foreground text-xs uppercase tracking-[0.06em] font-semibold hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                >
-                  <FileText className="size-4" />
-                  Submit a Match report
-                </button>
-              )}
-              {canLog && (
-                <button
-                  onClick={() => {
-                    setWorkflow("interaction");
-                    setNavOpen(false);
-                  }}
-                  className="w-full min-h-11 flex items-center gap-2 px-3 py-2 rounded-md border border-border text-xs uppercase tracking-[0.06em] font-semibold hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                >
-                  <Plus className="size-4" />
-                  Log interaction
-                </button>
-              )}
               {primaryAction &&
                 primaryAction.kind !== "interaction" &&
                 primaryAction.kind !== "report" && (
@@ -759,30 +784,7 @@ export function AppShell() {
                     {primaryAction.label}
                   </button>
                 )}
-              {canSeeSupport && (
-                <>
-                  <button
-                    onClick={() => {
-                      setWorkflow("bug");
-                      setNavOpen(false);
-                    }}
-                    className="w-full min-h-11 flex items-center gap-2 px-3 py-2 rounded-md border border-border text-xs uppercase tracking-[0.06em] font-semibold hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  >
-                    <Bug className="size-4" />
-                    Report a bug
-                  </button>
-                  <button
-                    onClick={() => {
-                      setWorkflow("question");
-                      setNavOpen(false);
-                    }}
-                    className="w-full min-h-11 flex items-center gap-2 px-3 py-2 rounded-md border border-border text-xs uppercase tracking-[0.06em] font-semibold hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  >
-                    <HelpCircle className="size-4" />
-                    Ask a question
-                  </button>
-                </>
-              )}
+              <ThemeToggle menu />
               <Link
                 to={"/account" as never}
                 onClick={closeMenu}
@@ -812,7 +814,7 @@ export function AppShell() {
   );
 }
 
-function ThemeToggle() {
+function ThemeToggle({ className, menu = false }: { className?: string; menu?: boolean }) {
   const { theme, toggle } = useTheme();
   const isDark = theme === "dark";
   return (
@@ -820,9 +822,16 @@ function ThemeToggle() {
       onClick={toggle}
       title={isDark ? "Switch to light mode" : "Switch to dark mode"}
       aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
-      className="size-11 md:size-9 grid place-items-center rounded-md border border-border hover:bg-accent text-foreground/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+      className={cn(
+        menu
+          ? "flex min-h-11 w-full items-center gap-2 rounded-md border border-border px-3 py-2 text-xs font-semibold uppercase tracking-[0.06em] hover:bg-accent sm:hidden"
+          : "size-11 shrink-0 place-items-center rounded-md border border-border text-foreground/80 hover:bg-accent md:size-9",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+        className,
+      )}
     >
       {isDark ? <Sun className="size-4" /> : <Moon className="size-4" />}
+      {menu && <span>{isDark ? "Light appearance" : "Dark appearance"}</span>}
     </button>
   );
 }

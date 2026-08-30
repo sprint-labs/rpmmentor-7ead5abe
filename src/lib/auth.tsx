@@ -75,6 +75,10 @@ export type Permission =
   | "calendar.view"
   /** Add, edit or remove shared team calendar events. */
   | "calendar.manage"
+  /** View the operational Bulletin Board within the caller's database scope. */
+  | "bulletins.view"
+  /** Assign and edit structured Bulletin Board work across the team. */
+  | "bulletins.manage"
   | "executive.view"
   | "audit.view"
   /** Open a bug report or question and reply on own threads. */
@@ -89,6 +93,7 @@ const MENTOR: Permission[] = [
   "reports.view", "reports.submit",
   "media.view", "media.upload", "media.edit",
   "calendar.view",
+  "bulletins.view",
   "support.send",
 ];
 
@@ -100,6 +105,7 @@ const MENTOR_MANAGER: Permission[] = [
   "interactions.manage",
   "reports.manage",
   "calendar.manage",
+  "bulletins.manage",
   "audit.view",
 ];
 
@@ -118,6 +124,8 @@ const ADMIN: Permission[] = [
   "reports.view", "reports.manage",
   "media.view", "media.edit",
   "calendar.view", "calendar.manage",
+  "bulletins.view",
+  "bulletins.manage",
   "executive.view", "audit.view",
   "support.send",
 ];
