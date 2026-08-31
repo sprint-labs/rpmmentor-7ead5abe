@@ -5,13 +5,12 @@ export const BULLETIN_VIEW_ROLES: readonly AppRole[] = [
   "super_admin",
   "admin",
   "mentor_manager",
-  "mentor",
 ];
 
 export const BULLETIN_MANAGE_ROLES: readonly AppRole[] = ["super_admin", "admin", "mentor_manager"];
 
 /** Roles represented in the assignable mentor directory. */
-export const BULLETIN_SELF_OWNER_ROLES: readonly AppRole[] = ["mentor_manager", "mentor"];
+export const BULLETIN_SELF_OWNER_ROLES: readonly AppRole[] = ["mentor_manager"];
 
 export interface BulletinAccess {
   canView: boolean;
@@ -27,9 +26,9 @@ export interface BulletinAccess {
 /**
  * Clamp a requested UI perspective to durable database permissions.
  *
- * Even a real manager gets mentor-like reads and writes while previewing
- * `mine`. Conversely, asking for `team` cannot elevate a mentor: it resolves
- * back to `mine` and retains the own-or-created predicate.
+ * Even a management user gets caller-scoped reads and writes when requesting
+ * `mine`. Asking for `team` cannot elevate any other role: unauthorised callers
+ * fail closed and receive no query scope.
  */
 export function bulletinAccessForRoles(
   roles: readonly AppRole[],

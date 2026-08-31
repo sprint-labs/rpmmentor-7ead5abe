@@ -1,16 +1,16 @@
 {
   "manifest_version": 1,
-  "captured_on": "2026-08-25",
+  "captured_on": "2026-08-31",
   "source": {
     "repository": "sprint-labs/rpmmentor-7ead5abe",
-    "origin_main_sha": "a04e29a73949161d2bf4ede7eceecfb3e88ac046",
+    "origin_main_sha": "d77e55693eba199f4720cc9d3451ec9ed9ff3689",
     "active_migration_files_on_origin_main": 41
   },
   "production": {
     "project_ref": "zdxxezquhvpjmoxlecjp",
     "project_name": "RPM Mentor Hub",
     "region": "eu-west-2",
-    "ledger_rows": 40,
+    "ledger_rows": 41,
     "migrations": [
       {
         "version": "20260811095729",
@@ -291,23 +291,30 @@
         "statement_count": 1,
         "sql_length": 2559,
         "sql_md5": "596adf78fabbf01a762417c53294d839"
+      },
+      {
+        "version": "20260828210605",
+        "name": "bulletin_board_mvp",
+        "statement_count": 1,
+        "sql_length": 15069,
+        "sql_md5": "d42eee06c2cecc5273096c806e13faa0"
       }
     ]
   },
   "reviewed_forward_migrations": [
     {
-      "version": "20260828210605",
-      "name": "bulletin_board_mvp",
+      "version": "20260831153349",
+      "name": "restrict_bulletins_to_management_roles",
       "statement_count": 1,
-      "sql_length": 15069,
-      "sql_md5": "d42eee06c2cecc5273096c806e13faa0"
+      "sql_length": 2451,
+      "sql_md5": "d38e483de5f763f632f9488f451e0b7e"
     }
   ],
   "repository_comparison": {
-    "live_rows_with_byte_exact_local_statement": 24,
+    "live_rows_with_byte_exact_local_statement": 25,
     "live_rows_contained_inside_a_larger_local_file": 2,
     "live_rows_without_an_exact_local_statement": 10,
-    "origin_main_files_not_selected_by_those_matches": 15,
+    "origin_main_files_not_selected_by_those_matches": 14,
     "warning": "Version equality alone is insufficient. Reconcile from the production ledger statements, not from similarly named historical files."
   },
   "out_of_band_schema_state": [

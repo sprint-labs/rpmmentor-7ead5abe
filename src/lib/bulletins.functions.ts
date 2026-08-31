@@ -2,9 +2,9 @@
  * Authenticated data boundary for the internal Bulletin Board.
  *
  * RLS is the final backstop, but every function also checks the caller's stored
- * role and applies the same own-or-created scope for mentors. Management roles
- * may manage the team board; mentors may create their own work and append
- * updates to work they own or created. There is deliberately no delete path.
+ * role. Mentor Managers, Admins and Super Admins may use the operational board;
+ * Mentors are rejected before any bulletin query or write. There is deliberately
+ * no delete path.
  */
 import { createServerFn } from "@tanstack/react-start";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -442,8 +442,8 @@ export const addBulletinUpdate = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((data) => addBulletinUpdateInput.parse(data))
   .handler(async ({ data, context }): Promise<BulletinUpdate> => {
-    // Appending does not expose a view selector. Preserve the durable access
-    // rule: managers may append team-wide; everyone else is clamped to mine.
+    // Appending does not expose a view selector. Stored management roles are
+    // required here and independently by RLS.
     const access = await requireBulletinAccess(context.supabase, context.userId, "team");
     const client = asBulletinClient(context.supabase);
 

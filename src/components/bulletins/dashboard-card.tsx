@@ -20,8 +20,8 @@ interface BulletinDashboardCardProps {
 /**
  * A small, durable entry point into the operational workspace.
  *
- * RLS shapes the counts to the signed-in caller: mentors see their own work,
- * while management roles see the team. The full workflow stays on /bulletins.
+ * Management roles see team counts here. Mentors cannot mount this entry point
+ * and are independently rejected by the route, server functions and RLS.
  */
 export function BulletinDashboardCard({ scope }: BulletinDashboardCardProps) {
   const { user } = useAuth();
