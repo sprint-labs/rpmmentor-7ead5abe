@@ -2,6 +2,7 @@ import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowRight, Bug, Check, LifeBuoy, Megaphone, MessageSquarePlus, X } from "lucide-react";
 import type { AnnouncementRow } from "@/lib/support/schema";
+import { AnnouncementAttachments } from "@/components/support/announcement-attachments";
 import { cn } from "@/lib/utils";
 
 const HELP_UPDATES_HINT_STORAGE_KEY = "rpm-help-updates-intro-v1";
@@ -209,6 +210,11 @@ export function HelpUpdatesLauncher({
                                   {announcement.body}
                                 </p>
                               )}
+                              <AnnouncementAttachments
+                                attachments={announcement.attachments}
+                                compact
+                                className="mt-2"
+                              />
                               <button
                                 type="button"
                                 aria-disabled={isRead}
