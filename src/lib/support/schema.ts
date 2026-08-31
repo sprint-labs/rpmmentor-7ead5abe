@@ -66,16 +66,45 @@ export const listAllSupportThreadsQuery = z.object({
 });
 export type ListAllSupportThreadsQuery = z.input<typeof listAllSupportThreadsQuery>;
 
-export const createAnnouncementInput = z.object({
-  kind: z.enum(ANNOUNCEMENT_KINDS),
-  title: z.string().trim().min(1, "Title is required").max(160),
-  body: z.string().trim().max(4000).default(""),
-  endsAt: z.string().datetime({ offset: true }).nullish(),
-});
+export const createAnnouncementInput = z
+  .object({
+    kind: z.enum(ANNOUNCEMENT_KINDS),
+    title: z.string().trim().min(1, "Title is required").max(160),
+    body: z.string().trim().max(4000).default(""),
+    startsAt: z.string().datetime({ offset: true }).nullish(),
+    endsAt: z.string().datetime({ offset: true }).nullish(),
+    deferActivation: z.boolean().default(false),
+  })
+  .superRefine((input, context) => {
+    if (!input.endsAt) return;
+    const startMs = input.startsAt ? Date.parse(input.startsAt) : Date.now();
+    if (Date.parse(input.endsAt) <= startMs) {
+      context.addIssue({
+        code: "custom",
+        path: ["endsAt"],
+        message: "End time must be after the broadcast starts",
+      });
+    }
+  });
 export type CreateAnnouncementInput = z.input<typeof createAnnouncementInput>;
+
+export const listAnnouncementsAdminQuery = z.object({
+  page: z.number().int().min(1).default(1),
+  pageSize: z.number().int().min(1).max(100).default(30),
+});
 
 export const endAnnouncementInput = z.object({
   announcementId: z.string().regex(UUID, "announcementId must be an announcements.id"),
+});
+
+export const publishAnnouncementInput = endAnnouncementInput;
+export const discardAnnouncementDraftInput = endAnnouncementInput;
+
+export const createAnnouncementUploadTargetInput = z.object({
+  announcementId: z.string().regex(UUID, "announcementId must be an announcements.id"),
+  fileName: z.string().trim().min(1).max(200),
+  mimeType: z.string().trim().min(1).max(200),
+  fileSize: z.number().int().positive(),
 });
 
 export const markAnnouncementReadInput = z.object({
@@ -126,6 +155,19 @@ export interface SupportThreadDetail extends SupportThread {
   messages: SupportMessage[];
 }
 
+export interface AnnouncementAttachment {
+  path: string;
+  fileName: string;
+  mimeType: string;
+  fileSize: number;
+  url: string | null;
+}
+
+export interface AnnouncementUploadTarget {
+  path: string;
+  token: string;
+}
+
 export interface AnnouncementRow {
   id: string;
   kind: AnnouncementKind;
@@ -137,4 +179,5 @@ export interface AnnouncementRow {
   createdBy: string;
   createdAt: string;
   readAt: string | null;
+  attachments?: AnnouncementAttachment[];
 }
