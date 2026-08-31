@@ -163,7 +163,6 @@ export function BroadcastCentre() {
   const list = useServerFn(listAdminAnnouncements);
   const create = useServerFn(createAnnouncement);
   const end = useServerFn(endAnnouncement);
-  const composerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [kind, setKind] = useState<AnnouncementKind>("feature");
@@ -370,7 +369,6 @@ export function BroadcastCentre() {
     setExpiryMode("none");
     setEndsAt("");
     setAttachment(null);
-    composerRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     toast.success("Broadcast copied into the composer");
   }
 
@@ -422,7 +420,7 @@ export function BroadcastCentre() {
       </Card>
 
       <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(340px,0.85fr)]">
-        <Card ref={composerRef} className="space-y-5 p-4 sm:p-5">
+        <Card className="space-y-5 p-4 sm:p-5">
           <div className="flex items-start justify-between gap-3">
             <div>
               <h3 className="text-sm font-semibold">Create broadcast</h3>

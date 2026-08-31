@@ -50,6 +50,10 @@ export type Database = {
       announcements: {
         Row: {
           active: boolean
+          attachment_mime: string | null
+          attachment_name: string | null
+          attachment_path: string | null
+          attachment_size: number | null
           body: string
           created_at: string
           created_by: string
@@ -61,6 +65,10 @@ export type Database = {
         }
         Insert: {
           active?: boolean
+          attachment_mime?: string | null
+          attachment_name?: string | null
+          attachment_path?: string | null
+          attachment_size?: number | null
           body?: string
           created_at?: string
           created_by: string
@@ -72,6 +80,10 @@ export type Database = {
         }
         Update: {
           active?: boolean
+          attachment_mime?: string | null
+          attachment_name?: string | null
+          attachment_path?: string | null
+          attachment_size?: number | null
           body?: string
           created_at?: string
           created_by?: string

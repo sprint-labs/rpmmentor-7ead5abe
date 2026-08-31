@@ -25,6 +25,22 @@ export type SupportSeverity = (typeof SUPPORT_SEVERITIES)[number];
 export const ANNOUNCEMENT_KINDS = ["feature", "info", "incident", "downtime"] as const;
 export type AnnouncementKind = (typeof ANNOUNCEMENT_KINDS)[number];
 
+export const ANNOUNCEMENT_ATTACHMENT_MAX_BYTES = 25 * 1024 * 1024;
+
+export interface AnnouncementAttachment {
+  path: string;
+  name: string;
+  mime: string;
+  size: number;
+}
+
+export const announcementAttachmentInput = z.object({
+  path: z.string().trim().min(1).max(500).startsWith("announcements/"),
+  name: z.string().trim().min(1).max(255),
+  mime: z.string().trim().min(1).max(150),
+  size: z.number().int().min(0).max(ANNOUNCEMENT_ATTACHMENT_MAX_BYTES),
+});
+
 export const SUPPORT_THREAD_STATUS_LABEL: Record<SupportThreadStatus, string> = {
   open: "Open",
   waiting_on_admin: "Waiting on admin",
@@ -70,7 +86,9 @@ export const createAnnouncementInput = z.object({
   kind: z.enum(ANNOUNCEMENT_KINDS),
   title: z.string().trim().min(1, "Title is required").max(160),
   body: z.string().trim().max(4000).default(""),
+  startsAt: z.string().datetime({ offset: true }).nullish(),
   endsAt: z.string().datetime({ offset: true }).nullish(),
+  attachment: announcementAttachmentInput.nullish(),
 });
 export type CreateAnnouncementInput = z.input<typeof createAnnouncementInput>;
 
@@ -137,4 +155,5 @@ export interface AnnouncementRow {
   createdBy: string;
   createdAt: string;
   readAt: string | null;
+  attachment: AnnouncementAttachment | null;
 }

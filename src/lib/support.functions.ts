@@ -21,6 +21,7 @@ import {
   markAnnouncementReadInput,
   replySupportThreadInput,
   setSupportThreadStatusInput,
+  type AnnouncementAttachment,
   type AnnouncementKind,
   type AnnouncementRow,
   type SupportMessage,
@@ -62,6 +63,10 @@ type AnnouncementDbRow = {
   active: boolean;
   created_by: string;
   created_at: string;
+  attachment_path: string | null;
+  attachment_name: string | null;
+  attachment_mime: string | null;
+  attachment_size: number | null;
 };
 
 function asThreadKind(value: string): SupportThreadKind {
@@ -114,6 +119,19 @@ function mapMessage(row: MessageRow): SupportMessage {
 }
 
 function mapAnnouncement(row: AnnouncementDbRow, readAt: string | null): AnnouncementRow {
+  const attachment: AnnouncementAttachment | null =
+    row.attachment_path &&
+    row.attachment_name &&
+    row.attachment_mime &&
+    row.attachment_size !== null
+      ? {
+          path: row.attachment_path,
+          name: row.attachment_name,
+          mime: row.attachment_mime,
+          size: row.attachment_size,
+        }
+      : null;
+
   return {
     id: row.id,
     kind: asAnnouncementKind(row.kind),
@@ -125,6 +143,7 @@ function mapAnnouncement(row: AnnouncementDbRow, readAt: string | null): Announc
     createdBy: row.created_by,
     createdAt: row.created_at,
     readAt,
+    attachment,
   };
 }
 
@@ -132,7 +151,7 @@ const THREAD_COLUMNS =
   "id, kind, subject, status, author_id, page_path, severity, created_at, updated_at, last_message_at";
 const MESSAGE_COLUMNS = "id, thread_id, author_id, body, created_at";
 const ANNOUNCEMENT_COLUMNS =
-  "id, kind, title, body, starts_at, ends_at, active, created_by, created_at";
+  "id, kind, title, body, starts_at, ends_at, active, created_by, created_at, attachment_path, attachment_name, attachment_mime, attachment_size";
 
 export const createSupportThread = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -334,6 +353,26 @@ export const listActiveAnnouncements = createServerFn({ method: "GET" })
     return announcements.map((row) => mapAnnouncement(row, readById.get(row.id) ?? null));
   });
 
+export const listAdminAnnouncements = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<AnnouncementRow[]> => {
+    await requireRole(
+      context.supabase,
+      context.userId,
+      SUPPORT_INBOX_ROLES,
+      "view all announcements",
+    );
+
+    const { data: rows, error } = await context.supabase
+      .from("announcements")
+      .select(ANNOUNCEMENT_COLUMNS)
+      .order("starts_at", { ascending: false })
+      .limit(50);
+    if (error) throw new Error(error.message);
+
+    return ((rows ?? []) as AnnouncementDbRow[]).map((row) => mapAnnouncement(row, null));
+  });
+
 export const markAnnouncementRead = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((data) => markAnnouncementReadInput.parse(data))
@@ -367,7 +406,12 @@ export const createAnnouncement = createServerFn({ method: "POST" })
         kind: data.kind,
         title: data.title,
         body: data.body ?? "",
+        starts_at: data.startsAt ?? new Date().toISOString(),
         ends_at: data.endsAt ?? null,
+        attachment_path: data.attachment?.path ?? null,
+        attachment_name: data.attachment?.name ?? null,
+        attachment_mime: data.attachment?.mime ?? null,
+        attachment_size: data.attachment?.size ?? null,
         created_by: context.userId,
         active: true,
       })

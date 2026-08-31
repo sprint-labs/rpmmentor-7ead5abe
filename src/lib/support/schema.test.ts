@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  ANNOUNCEMENT_ATTACHMENT_MAX_BYTES,
   createAnnouncementInput,
   createSupportThreadInput,
   replySupportThreadInput,
@@ -90,5 +91,37 @@ describe("createAnnouncementInput", () => {
         }).kind,
       ).toBe(kind);
     }
+  });
+
+  it("accepts scheduling and one attachment", () => {
+    const parsed = createAnnouncementInput.parse({
+      kind: "feature",
+      title: "New media flow",
+      body: "You can now attach a short video.",
+      startsAt: "2026-09-01T09:00:00.000Z",
+      endsAt: "2026-09-08T09:00:00.000Z",
+      attachment: {
+        path: "announcements/2026/example.mp4",
+        name: "example.mp4",
+        mime: "video/mp4",
+        size: 1024,
+      },
+    });
+    expect(parsed.attachment?.name).toBe("example.mp4");
+  });
+
+  it("rejects oversized or incorrectly scoped attachments", () => {
+    expect(() =>
+      createAnnouncementInput.parse({
+        kind: "info",
+        title: "Notice",
+        attachment: {
+          path: "goalkeepers/example.pdf",
+          name: "example.pdf",
+          mime: "application/pdf",
+          size: ANNOUNCEMENT_ATTACHMENT_MAX_BYTES + 1,
+        },
+      }),
+    ).toThrow();
   });
 });
