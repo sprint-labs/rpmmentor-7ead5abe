@@ -6,23 +6,38 @@
  * Row Level Security remains the backstop.
  */
 import { createServerFn } from "@tanstack/react-start";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/integrations/supabase/types";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { requireRole, SUPPORT_INBOX_ROLES } from "@/lib/roles.server";
+import { MEDIA_BUCKET } from "@/lib/storage/bucket";
+import {
+  MAX_ANNOUNCEMENT_ATTACHMENTS,
+  buildAnnouncementObjectName,
+  originalAnnouncementFileName,
+  validateAnnouncementAttachment,
+} from "@/lib/support/announcement-attachment-rules";
 import {
   ANNOUNCEMENT_KINDS,
   SUPPORT_SEVERITIES,
   SUPPORT_THREAD_KINDS,
   SUPPORT_THREAD_STATUSES,
   createAnnouncementInput,
+  createAnnouncementUploadTargetInput,
   createSupportThreadInput,
+  discardAnnouncementDraftInput,
   endAnnouncementInput,
   getSupportThreadQuery,
   listAllSupportThreadsQuery,
+  listAnnouncementsAdminQuery,
   markAnnouncementReadInput,
+  publishAnnouncementInput,
   replySupportThreadInput,
   setSupportThreadStatusInput,
+  type AnnouncementAttachment,
   type AnnouncementKind,
   type AnnouncementRow,
+  type AnnouncementUploadTarget,
   type SupportMessage,
   type SupportSeverity,
   type SupportThread,
@@ -30,6 +45,8 @@ import {
   type SupportThreadKind,
   type SupportThreadStatus,
 } from "@/lib/support/schema";
+
+type AuthedClient = SupabaseClient<Database>;
 
 type ThreadRow = {
   id: string;
@@ -113,7 +130,11 @@ function mapMessage(row: MessageRow): SupportMessage {
   };
 }
 
-function mapAnnouncement(row: AnnouncementDbRow, readAt: string | null): AnnouncementRow {
+function mapAnnouncement(
+  row: AnnouncementDbRow,
+  readAt: string | null,
+  attachments: AnnouncementAttachment[] = [],
+): AnnouncementRow {
   return {
     id: row.id,
     kind: asAnnouncementKind(row.kind),
@@ -125,6 +146,7 @@ function mapAnnouncement(row: AnnouncementDbRow, readAt: string | null): Announc
     createdBy: row.created_by,
     createdAt: row.created_at,
     readAt,
+    attachments,
   };
 }
 
@@ -133,6 +155,98 @@ const THREAD_COLUMNS =
 const MESSAGE_COLUMNS = "id, thread_id, author_id, body, created_at";
 const ANNOUNCEMENT_COLUMNS =
   "id, kind, title, body, starts_at, ends_at, active, created_by, created_at";
+const ANNOUNCEMENT_FOLDER = "announcements";
+const DRAFT_WINDOW_MS = 30 * 60 * 1000;
+
+function announcementFolder(announcementId: string): string {
+  return `${ANNOUNCEMENT_FOLDER}/${announcementId}`;
+}
+
+function draftCutoffIso(): string {
+  return new Date(Date.now() - DRAFT_WINDOW_MS).toISOString();
+}
+
+function metadataRecord(value: unknown): Record<string, unknown> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  return value as Record<string, unknown>;
+}
+
+function metadataSize(metadata: Record<string, unknown>): number {
+  if (typeof metadata.size === "number" && Number.isFinite(metadata.size)) return metadata.size;
+  if (typeof metadata.size === "string") {
+    const parsed = Number(metadata.size);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return 0;
+}
+
+async function listAnnouncementObjectPaths(
+  supabase: AuthedClient,
+  announcementId: string,
+): Promise<string[]> {
+  const folder = announcementFolder(announcementId);
+  const { data, error } = await supabase.storage.from(MEDIA_BUCKET).list(folder, {
+    limit: MAX_ANNOUNCEMENT_ATTACHMENTS + 1,
+    sortBy: { column: "created_at", order: "asc" },
+  });
+
+  if (error) throw new Error(error.message);
+  return (data ?? [])
+    .filter((item) => Boolean(item.id) && item.name !== ".emptyFolderPlaceholder")
+    .map((item) => `${folder}/${item.name}`);
+}
+
+async function loadAnnouncementAttachments(
+  supabase: AuthedClient,
+  announcementId: string,
+): Promise<AnnouncementAttachment[]> {
+  const folder = announcementFolder(announcementId);
+  const { data, error } = await supabase.storage.from(MEDIA_BUCKET).list(folder, {
+    limit: MAX_ANNOUNCEMENT_ATTACHMENTS,
+    sortBy: { column: "created_at", order: "asc" },
+  });
+
+  if (error) {
+    console.warn(`Could not list attachments for announcement ${announcementId}: ${error.message}`);
+    return [];
+  }
+
+  const files = (data ?? []).filter(
+    (item) => Boolean(item.id) && item.name !== ".emptyFolderPlaceholder",
+  );
+
+  return Promise.all(
+    files.map(async (file) => {
+      const path = `${folder}/${file.name}`;
+      const metadata = metadataRecord(file.metadata);
+      const { data: signed, error: signedError } = await supabase.storage
+        .from(MEDIA_BUCKET)
+        .createSignedUrl(path, 60 * 60);
+
+      return {
+        path,
+        fileName: originalAnnouncementFileName(file.name),
+        mimeType:
+          typeof metadata.mimetype === "string"
+            ? metadata.mimetype
+            : typeof metadata.contentType === "string"
+              ? metadata.contentType
+              : "application/octet-stream",
+        fileSize: metadataSize(metadata),
+        url: signedError ? null : signed.signedUrl,
+      };
+    }),
+  );
+}
+
+async function mapAnnouncementWithAttachments(
+  supabase: AuthedClient,
+  row: AnnouncementDbRow,
+  readAt: string | null,
+): Promise<AnnouncementRow> {
+  const attachments = await loadAnnouncementAttachments(supabase, row.id);
+  return mapAnnouncement(row, readAt, attachments);
+}
 
 export const createSupportThread = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -331,7 +445,43 @@ export const listActiveAnnouncements = createServerFn({ method: "GET" })
       (reads ?? []).map((row) => [row.announcement_id as string, (row.read_at as string) ?? null]),
     );
 
-    return announcements.map((row) => mapAnnouncement(row, readById.get(row.id) ?? null));
+    return Promise.all(
+      announcements.map((row) =>
+        mapAnnouncementWithAttachments(context.supabase, row, readById.get(row.id) ?? null),
+      ),
+    );
+  });
+
+export const listAnnouncementsAdmin = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .validator((data) => listAnnouncementsAdminQuery.parse(data ?? {}))
+  .handler(async ({ data, context }): Promise<{ rows: AnnouncementRow[]; total: number }> => {
+    await requireRole(
+      context.supabase,
+      context.userId,
+      SUPPORT_INBOX_ROLES,
+      "view all broadcasts",
+    );
+
+    const page = data.page ?? 1;
+    const pageSize = data.pageSize ?? 30;
+    const from = (page - 1) * pageSize;
+    const to = from + pageSize - 1;
+    const { data: rows, error, count } = await context.supabase
+      .from("announcements")
+      .select(ANNOUNCEMENT_COLUMNS, { count: "exact" })
+      .order("created_at", { ascending: false })
+      .range(from, to);
+    if (error) throw new Error(error.message);
+
+    return {
+      rows: await Promise.all(
+        ((rows ?? []) as AnnouncementDbRow[]).map((row) =>
+          mapAnnouncementWithAttachments(context.supabase, row, null),
+        ),
+      ),
+      total: count ?? 0,
+    };
   });
 
 export const markAnnouncementRead = createServerFn({ method: "POST" })
@@ -367,9 +517,10 @@ export const createAnnouncement = createServerFn({ method: "POST" })
         kind: data.kind,
         title: data.title,
         body: data.body ?? "",
+        starts_at: data.startsAt ?? new Date().toISOString(),
         ends_at: data.endsAt ?? null,
         created_by: context.userId,
-        active: true,
+        active: !data.deferActivation,
       })
       .select(ANNOUNCEMENT_COLUMNS)
       .single();
@@ -377,6 +528,134 @@ export const createAnnouncement = createServerFn({ method: "POST" })
       throw new Error(error?.message ?? "Could not create the announcement.");
     }
     return mapAnnouncement(inserted as AnnouncementDbRow, null);
+  });
+
+export const createAnnouncementUploadTarget = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((data) => createAnnouncementUploadTargetInput.parse(data))
+  .handler(async ({ data, context }): Promise<AnnouncementUploadTarget> => {
+    await requireRole(
+      context.supabase,
+      context.userId,
+      SUPPORT_INBOX_ROLES,
+      "attach media to announcements",
+    );
+
+    const validationError = validateAnnouncementAttachment({
+      name: data.fileName,
+      type: data.mimeType,
+      size: data.fileSize,
+    });
+    if (validationError) throw new Error(validationError);
+
+    const { data: announcement, error: announcementError } = await context.supabase
+      .from("announcements")
+      .select("id, kind, active, created_by, created_at")
+      .eq("id", data.announcementId)
+      .eq("created_by", context.userId)
+      .eq("active", false)
+      .gte("created_at", draftCutoffIso())
+      .maybeSingle();
+    if (announcementError) throw new Error(announcementError.message);
+    if (!announcement) {
+      throw new Error("This broadcast draft is unavailable or has already been published.");
+    }
+    if (announcement.kind !== "feature" && announcement.kind !== "info") {
+      throw new Error("Media can only be attached to feature and update broadcasts.");
+    }
+
+    const existingPaths = await listAnnouncementObjectPaths(context.supabase, data.announcementId);
+    if (existingPaths.length >= MAX_ANNOUNCEMENT_ATTACHMENTS) {
+      throw new Error(`A broadcast can have up to ${MAX_ANNOUNCEMENT_ATTACHMENTS} attachments.`);
+    }
+
+    const objectName = buildAnnouncementObjectName(data.fileName, crypto.randomUUID());
+    const path = `${announcementFolder(data.announcementId)}/${objectName}`;
+    const { data: signed, error } = await context.supabase.storage
+      .from(MEDIA_BUCKET)
+      .createSignedUploadUrl(path, { upsert: false });
+    if (error || !signed) {
+      throw new Error(error?.message ?? "Could not prepare the media upload.");
+    }
+
+    return { path, token: signed.token };
+  });
+
+export const publishAnnouncement = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((data) => publishAnnouncementInput.parse(data))
+  .handler(async ({ data, context }): Promise<AnnouncementRow> => {
+    await requireRole(
+      context.supabase,
+      context.userId,
+      SUPPORT_INBOX_ROLES,
+      "publish announcements",
+    );
+
+    const { data: updated, error } = await context.supabase
+      .from("announcements")
+      .update({ active: true })
+      .eq("id", data.announcementId)
+      .eq("created_by", context.userId)
+      .eq("active", false)
+      .gte("created_at", draftCutoffIso())
+      .select(ANNOUNCEMENT_COLUMNS)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+
+    if (updated) {
+      return mapAnnouncementWithAttachments(context.supabase, updated as AnnouncementDbRow, null);
+    }
+
+    const { data: current, error: currentError } = await context.supabase
+      .from("announcements")
+      .select(ANNOUNCEMENT_COLUMNS)
+      .eq("id", data.announcementId)
+      .eq("created_by", context.userId)
+      .maybeSingle();
+    if (currentError) throw new Error(currentError.message);
+    if (current?.active) {
+      return mapAnnouncementWithAttachments(context.supabase, current as AnnouncementDbRow, null);
+    }
+
+    throw new Error("This broadcast draft is unavailable or too old to publish.");
+  });
+
+export const discardAnnouncementDraft = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((data) => discardAnnouncementDraftInput.parse(data))
+  .handler(async ({ data, context }): Promise<{ ok: true }> => {
+    await requireRole(
+      context.supabase,
+      context.userId,
+      SUPPORT_INBOX_ROLES,
+      "discard announcement drafts",
+    );
+
+    const { data: draft, error: draftError } = await context.supabase
+      .from("announcements")
+      .select("id")
+      .eq("id", data.announcementId)
+      .eq("created_by", context.userId)
+      .eq("active", false)
+      .gte("created_at", draftCutoffIso())
+      .maybeSingle();
+    if (draftError) throw new Error(draftError.message);
+    if (!draft) return { ok: true };
+
+    const paths = await listAnnouncementObjectPaths(context.supabase, data.announcementId);
+    if (paths.length > 0) {
+      const { error: removeError } = await context.supabase.storage.from(MEDIA_BUCKET).remove(paths);
+      if (removeError) throw new Error(removeError.message);
+    }
+
+    const { error: deleteError } = await context.supabase
+      .from("announcements")
+      .delete()
+      .eq("id", data.announcementId)
+      .eq("active", false);
+    if (deleteError) throw new Error(deleteError.message);
+    return { ok: true };
   });
 
 export const endAnnouncement = createServerFn({ method: "POST" })
@@ -394,5 +673,5 @@ export const endAnnouncement = createServerFn({ method: "POST" })
       .maybeSingle();
     if (error) throw new Error(error.message);
     if (!updated) throw new Error("That announcement was not found.");
-    return mapAnnouncement(updated as AnnouncementDbRow, null);
+    return mapAnnouncementWithAttachments(context.supabase, updated as AnnouncementDbRow, null);
   });
