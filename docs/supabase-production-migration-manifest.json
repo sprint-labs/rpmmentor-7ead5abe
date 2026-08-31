@@ -3,14 +3,14 @@
   "captured_on": "2026-08-31",
   "source": {
     "repository": "sprint-labs/rpmmentor-7ead5abe",
-    "origin_main_sha": "d77e55693eba199f4720cc9d3451ec9ed9ff3689",
+    "origin_main_sha": "551b883de03982bde72827b65af7a4cbfe583537",
     "active_migration_files_on_origin_main": 41
   },
   "production": {
     "project_ref": "zdxxezquhvpjmoxlecjp",
     "project_name": "RPM Mentor Hub",
     "region": "eu-west-2",
-    "ledger_rows": 41,
+    "ledger_rows": 42,
     "migrations": [
       {
         "version": "20260811095729",
@@ -298,23 +298,22 @@
         "statement_count": 1,
         "sql_length": 15069,
         "sql_md5": "d42eee06c2cecc5273096c806e13faa0"
+      },
+      {
+        "version": "20260831161158",
+        "name": "restrict_bulletins_to_management_roles",
+        "statement_count": 1,
+        "sql_length": 2451,
+        "sql_md5": "d38e483de5f763f632f9488f451e0b7e"
       }
     ]
   },
-  "reviewed_forward_migrations": [
-    {
-      "version": "20260831153349",
-      "name": "restrict_bulletins_to_management_roles",
-      "statement_count": 1,
-      "sql_length": 2451,
-      "sql_md5": "d38e483de5f763f632f9488f451e0b7e"
-    }
-  ],
+  "reviewed_forward_migrations": [],
   "repository_comparison": {
-    "live_rows_with_byte_exact_local_statement": 25,
+    "live_rows_with_byte_exact_local_statement": 26,
     "live_rows_contained_inside_a_larger_local_file": 2,
     "live_rows_without_an_exact_local_statement": 10,
-    "origin_main_files_not_selected_by_those_matches": 14,
+    "origin_main_files_not_selected_by_those_matches": 13,
     "warning": "Version equality alone is insufficient. Reconcile from the production ledger statements, not from similarly named historical files."
   },
   "out_of_band_schema_state": [
@@ -328,13 +327,19 @@
   "staging": {
     "project_ref": "emyxyqqftwnjpcmctkpe",
     "project_name": "RPM Mentor Hub — Staging",
-    "ledger_rows": 13,
+    "ledger_rows": 16,
     "ledger_strategy": "current-schema snapshot",
-    "schema_parity_with_production": true
+    "schema_parity_with_production": false,
+    "drift_summary": [
+      "Production has restrict_bulletins_to_management_roles; staging does not.",
+      "Staging has announcement_media_and_scheduling and match_event_participation; production does not."
+    ]
   },
   "schema_fingerprints": {
+    "status": "historical_shared_baseline",
+    "note": "These fingerprints predate the later 31 August production and staging migrations. Refresh them before using them for a parity decision.",
     "normalisation": "PostgreSQL catalogue definitions with repeated whitespace collapsed; sorted within each section; MD5 over the resulting newline-delimited section.",
-    "production_and_staging": [
+    "last_verified_production_and_staging": [
       {
         "section": "tables",
         "item_count": 25,
@@ -393,8 +398,8 @@
     ]
   },
   "safety": {
-    "production_writes_performed_for_this_manifest": true,
-    "staging_writes_performed_for_this_manifest": true,
+    "production_writes_performed_for_this_manifest": false,
+    "staging_writes_performed_for_this_manifest": false,
     "migration_repair_performed": false,
     "db_push_performed": false
   }
