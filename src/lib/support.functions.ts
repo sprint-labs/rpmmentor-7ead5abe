@@ -9,6 +9,10 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { requireRole, SUPPORT_INBOX_ROLES } from "@/lib/roles.server";
 import {
+  ADMIN_RECENT_ANNOUNCEMENT_LIMIT,
+  mergeAdminAnnouncementPages,
+} from "@/lib/support/admin-announcements";
+import {
   ANNOUNCEMENT_KINDS,
   SUPPORT_SEVERITIES,
   SUPPORT_THREAD_KINDS,
@@ -363,14 +367,28 @@ export const listAdminAnnouncements = createServerFn({ method: "GET" })
       "view all announcements",
     );
 
-    const { data: rows, error } = await context.supabase
+    const nowIso = new Date().toISOString();
+    const currentQuery = context.supabase
       .from("announcements")
       .select(ANNOUNCEMENT_COLUMNS)
+      .eq("active", true)
+      .or(`ends_at.is.null,ends_at.gt.${nowIso}`)
+      .order("starts_at", { ascending: false });
+    const recentQuery = context.supabase
+      .from("announcements")
+      .select(ANNOUNCEMENT_COLUMNS)
+      .or(`active.eq.false,ends_at.lte.${nowIso}`)
       .order("starts_at", { ascending: false })
-      .limit(50);
-    if (error) throw new Error(error.message);
+      .limit(ADMIN_RECENT_ANNOUNCEMENT_LIMIT);
 
-    return ((rows ?? []) as AnnouncementDbRow[]).map((row) => mapAnnouncement(row, null));
+    const [currentResult, recentResult] = await Promise.all([currentQuery, recentQuery]);
+    if (currentResult.error) throw new Error(currentResult.error.message);
+    if (recentResult.error) throw new Error(recentResult.error.message);
+
+    return mergeAdminAnnouncementPages(
+      (currentResult.data ?? []) as AnnouncementDbRow[],
+      (recentResult.data ?? []) as AnnouncementDbRow[],
+    ).map((row) => mapAnnouncement(row, null));
   });
 
 export const markAnnouncementRead = createServerFn({ method: "POST" })

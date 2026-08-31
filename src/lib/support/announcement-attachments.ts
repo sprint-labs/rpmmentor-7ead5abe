@@ -1,4 +1,11 @@
 import { supabase } from "@/integrations/supabase/client";
+import { getUploadAccessToken } from "@/lib/media-store";
+import {
+  describeUploadError,
+  formatFileLimit,
+  RESUMABLE_UPLOAD_THRESHOLD_BYTES,
+  uploadObjectBytes,
+} from "@/lib/media-upload-transport";
 import { MEDIA_BUCKET } from "@/lib/storage/bucket";
 import {
   ANNOUNCEMENT_ATTACHMENT_MAX_BYTES,
@@ -77,11 +84,44 @@ export async function uploadAnnouncementAttachment(file: File): Promise<Announce
   const name = safeFileName(file.name);
   const path = `announcements/${new Date().getUTCFullYear()}/${crypto.randomUUID()}-${name}`;
   const mime = inferMimeType(file);
-  const { error } = await supabase.storage.from(MEDIA_BUCKET).upload(path, file, {
-    contentType: mime,
-    upsert: false,
+  const url = import.meta.env["VITE_SUPABASE_URL"] as string | undefined;
+  const anonKey = import.meta.env["VITE_SUPABASE_PUBLISHABLE_KEY"] as string | undefined;
+  const limitLabel = formatFileLimit(ANNOUNCEMENT_ATTACHMENT_MAX_BYTES);
+
+  if (!url || !anonKey) {
+    throw new Error("Upload failed: storage is not configured.");
+  }
+
+  const token = await getUploadAccessToken(file.size > RESUMABLE_UPLOAD_THRESHOLD_BYTES);
+  if (!token) {
+    throw new Error("Your session has expired. Sign in again and retry this upload.");
+  }
+
+  const uploadFile = file.type ? file : new File([file], file.name, { type: mime });
+
+  await uploadObjectBytes({
+    path,
+    file: uploadFile,
+    accessToken: token,
+    getAccessToken: async () => {
+      const next = await getUploadAccessToken(false);
+      if (!next) {
+        throw new Error("Your session has expired. Sign in again and retry this upload.");
+      }
+      return next;
+    },
+    supabaseUrl: url,
+    anonKey,
+    bucket: MEDIA_BUCKET,
+    limitLabel,
+    standardUpload: async (objectPath, objectFile) => {
+      const { error } = await supabase.storage.from(MEDIA_BUCKET).upload(objectPath, objectFile, {
+        contentType: mime,
+        upsert: false,
+      });
+      if (error) throw new Error(describeUploadError(error, limitLabel));
+    },
   });
-  if (error) throw new Error(`Could not upload attachment: ${error.message}`);
 
   return {
     path,
