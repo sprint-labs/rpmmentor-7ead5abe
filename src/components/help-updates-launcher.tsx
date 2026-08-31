@@ -2,6 +2,7 @@ import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowRight, Bug, Check, LifeBuoy, Megaphone, MessageSquarePlus, X } from "lucide-react";
 import type { AnnouncementRow } from "@/lib/support/schema";
+import { AnnouncementMedia, ANNOUNCEMENT_KIND_LABEL } from "@/components/announcement-media";
 import { cn } from "@/lib/utils";
 
 const HELP_UPDATES_HINT_STORAGE_KEY = "rpm-help-updates-intro-v1";
@@ -20,12 +21,6 @@ interface HelpUpdatesLauncherProps {
   onMarkAnnouncementRead: (announcementId: string) => void | Promise<void>;
 }
 
-const ANNOUNCEMENT_LABEL: Record<AnnouncementRow["kind"], string> = {
-  feature: "New feature",
-  info: "Update",
-  incident: "Incident",
-  downtime: "Downtime",
-};
 
 export function HelpUpdatesLauncher({
   open,
@@ -177,7 +172,7 @@ export function HelpUpdatesLauncher({
                 <div className="flex items-center justify-between border-b border-border px-3 py-2">
                   <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                     <Megaphone className="size-3.5" aria-hidden="true" />
-                    What&apos;s new
+                    Updates
                   </div>
                   {announcements.some((announcement) => !announcement.readAt) && (
                     <span className="text-[10px] font-semibold uppercase tracking-wider text-primary">
@@ -201,14 +196,15 @@ export function HelpUpdatesLauncher({
                             />
                             <div className="min-w-0 flex-1">
                               <div className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-                                {ANNOUNCEMENT_LABEL[announcement.kind]}
+                                {ANNOUNCEMENT_KIND_LABEL[announcement.kind]}
                               </div>
                               <div className="mt-0.5 text-sm font-medium">{announcement.title}</div>
                               {announcement.body && (
-                                <p className="mt-1 line-clamp-3 whitespace-pre-line text-xs leading-relaxed text-muted-foreground">
+                                <p className="mt-1 whitespace-pre-line text-xs leading-relaxed text-muted-foreground">
                                   {announcement.body}
                                 </p>
                               )}
+                              <AnnouncementMedia attachment={announcement.attachment} compact />
                               <button
                                 type="button"
                                 aria-disabled={isRead}

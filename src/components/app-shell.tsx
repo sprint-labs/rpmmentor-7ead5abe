@@ -150,9 +150,7 @@ export function AppShell() {
   });
   const inboxItems = inbox?.items ?? [];
   const inboxUnread = inboxItems.filter((item) => !item.readAt).length;
-  const updateAnnouncements = announcements.filter(
-    (announcement) => announcement.kind === "feature" || announcement.kind === "info",
-  );
+  const updateAnnouncements = announcements;
   const bellAnnouncements = announcements.filter(
     (announcement) =>
       (announcement.kind === "incident" || announcement.kind === "downtime") &&
@@ -160,7 +158,10 @@ export function AppShell() {
   );
   const bannerAnnouncements = announcements.filter((a) => isAnnouncementBannerVisible(a));
   const bellAnnouncementUnread = bellAnnouncements.length;
-  const helpUnread = updateAnnouncements.filter((announcement) => !announcement.readAt).length;
+  const helpUnread = updateAnnouncements.filter(
+    (announcement) =>
+      (announcement.kind === "feature" || announcement.kind === "info") && !announcement.readAt,
+  ).length;
   const bellUnread = visibleNotificationUnreadCount(
     inboxUnread,
     notif.unread,
