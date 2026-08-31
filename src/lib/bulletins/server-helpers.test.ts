@@ -10,14 +10,16 @@ import {
 } from "./server-helpers";
 
 describe("Bulletin Board role decisions", () => {
-  it("gives mentors a caller-scoped view without team management", () => {
-    expect(bulletinAccessForRoles(["mentor"], "mine")).toEqual({
-      canView: true,
-      canManage: false,
-      restrictToUser: true,
-      effectiveScope: "mine",
-      canSelfOwn: true,
-    });
+  it("rejects mentors from every Bulletin Board scope", () => {
+    for (const scope of ["mine", "team"] as const) {
+      expect(bulletinAccessForRoles(["mentor"], scope)).toEqual({
+        canView: false,
+        canManage: false,
+        restrictToUser: false,
+        effectiveScope: "mine",
+        canSelfOwn: false,
+      });
+    }
   });
 
   it("gives every management role the team-wide view only when team is requested", () => {
@@ -49,16 +51,6 @@ describe("Bulletin Board role decisions", () => {
         canSelfOwn: false,
       });
     }
-  });
-
-  it("clamps a mentor's team request back to mine", () => {
-    expect(bulletinAccessForRoles(["mentor"], "team")).toEqual({
-      canView: true,
-      canManage: false,
-      restrictToUser: true,
-      effectiveScope: "mine",
-      canSelfOwn: true,
-    });
   });
 
   it("fails closed for a roleless account and honours a second stored management role", () => {

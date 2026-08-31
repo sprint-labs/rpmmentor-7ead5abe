@@ -10,7 +10,7 @@ BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 SET search_path = public, extensions;
 
-SELECT plan(51);
+SELECT plan(53);
 
 -- ---------------------------------------------------------------------------
 -- Schema and API surface
@@ -236,6 +236,18 @@ VALUES
     '{"name":"Departing Mentor","initials":"DM"}'::jsonb,
     now(),
     now()
+  ),
+  (
+    '00000000-0000-0000-0000-000000000007',
+    'authenticated',
+    'authenticated',
+    'bulletin-super-admin@example.invalid',
+    '',
+    now(),
+    '{"provider":"email","providers":["email"]}'::jsonb,
+    '{"name":"Bulletin Super Admin","initials":"BS"}'::jsonb,
+    now(),
+    now()
   );
 
 UPDATE public.profiles
@@ -246,6 +258,7 @@ SET name = CASE id
   WHEN '00000000-0000-0000-0000-000000000004' THEN 'Bulletin Admin'
   WHEN '00000000-0000-0000-0000-000000000005' THEN 'Roleless User'
   WHEN '00000000-0000-0000-0000-000000000006' THEN 'Departing Mentor'
+  WHEN '00000000-0000-0000-0000-000000000007' THEN 'Bulletin Super Admin'
 END
 WHERE id IN (
   '00000000-0000-0000-0000-000000000001',
@@ -253,7 +266,8 @@ WHERE id IN (
   '00000000-0000-0000-0000-000000000003',
   '00000000-0000-0000-0000-000000000004',
   '00000000-0000-0000-0000-000000000005',
-  '00000000-0000-0000-0000-000000000006'
+  '00000000-0000-0000-0000-000000000006',
+  '00000000-0000-0000-0000-000000000007'
 );
 
 INSERT INTO public.user_roles (user_id, role)
@@ -262,7 +276,8 @@ VALUES
   ('00000000-0000-0000-0000-000000000002', 'mentor'),
   ('00000000-0000-0000-0000-000000000003', 'mentor'),
   ('00000000-0000-0000-0000-000000000004', 'admin'),
-  ('00000000-0000-0000-0000-000000000006', 'mentor');
+  ('00000000-0000-0000-0000-000000000006', 'mentor'),
+  ('00000000-0000-0000-0000-000000000007', 'super_admin');
 
 INSERT INTO public.bulletin_items (
   id,
@@ -349,8 +364,8 @@ SET LOCAL ROLE authenticated;
 
 SELECT is(
   (SELECT count(*)::integer FROM public.bulletin_items),
-  2,
-  '15 mentor A sees only work they created or own'
+  0,
+  '15 mentor A cannot see Bulletin Board work'
 );
 
 RESET ROLE;
@@ -363,8 +378,8 @@ SET LOCAL ROLE authenticated;
 
 SELECT is(
   (SELECT count(*)::integer FROM public.bulletin_items),
-  2,
-  '16 mentor B sees only work they created or own'
+  0,
+  '16 mentor B cannot see Bulletin Board work'
 );
 
 RESET ROLE;
@@ -379,6 +394,34 @@ SELECT is(
   (SELECT count(*)::integer FROM public.bulletin_items),
   6,
   '17 Mentor Manager sees the team board'
+);
+
+RESET ROLE;
+SELECT set_config(
+  'request.jwt.claims',
+  '{"sub":"00000000-0000-0000-0000-000000000004","role":"authenticated"}',
+  true
+);
+SET LOCAL ROLE authenticated;
+
+SELECT is(
+  (SELECT count(*)::integer FROM public.bulletin_items),
+  6,
+  '17a Admin sees the team board'
+);
+
+RESET ROLE;
+SELECT set_config(
+  'request.jwt.claims',
+  '{"sub":"00000000-0000-0000-0000-000000000007","role":"authenticated"}',
+  true
+);
+SET LOCAL ROLE authenticated;
+
+SELECT is(
+  (SELECT count(*)::integer FROM public.bulletin_items),
+  6,
+  '17b Super Admin sees the team board'
 );
 
 RESET ROLE;
@@ -407,7 +450,7 @@ SELECT set_config(
 );
 SET LOCAL ROLE authenticated;
 
-SELECT lives_ok(
+SELECT throws_ok(
   $$
     INSERT INTO public.bulletin_items (
       id, kind, title, subject_type, subject_name, owner_id
@@ -420,21 +463,15 @@ SELECT lives_ok(
       '00000000-0000-0000-0000-000000000002'
     )
   $$,
-  '19 mentor can create open work owned by themselves'
+  '42501',
+  NULL,
+  '19 mentor cannot create Bulletin Board work'
 );
 
-SELECT ok(
-  EXISTS (
-    SELECT 1
-    FROM public.bulletin_items
-    WHERE id = '11000000-0000-0000-0000-000000000001'
-      AND created_by = '00000000-0000-0000-0000-000000000002'
-      AND created_by_name = 'Mentor A'
-      AND owner_name = 'Mentor A'
-      AND status = 'open'
-      AND version = 1
-  ),
-  '20 the database derives actor snapshots, open status and initial version'
+SELECT is(
+  (SELECT count(*)::integer FROM public.bulletin_items),
+  0,
+  '20 rejected mentor creation leaves no visible Bulletin Board row'
 );
 
 SELECT throws_ok(
@@ -644,6 +681,14 @@ UPDATE public.bulletin_items
 SET title = 'Mentor should not edit', version = 2
 WHERE id = '10000000-0000-0000-0000-000000000001';
 
+RESET ROLE;
+SELECT set_config(
+  'request.jwt.claims',
+  '{"sub":"00000000-0000-0000-0000-000000000001","role":"authenticated"}',
+  true
+);
+SET LOCAL ROLE authenticated;
+
 SELECT ok(
   EXISTS (
     SELECT 1
@@ -654,14 +699,6 @@ SELECT ok(
   ),
   '31 mentor structured updates are filtered by RLS'
 );
-
-RESET ROLE;
-SELECT set_config(
-  'request.jwt.claims',
-  '{"sub":"00000000-0000-0000-0000-000000000001","role":"authenticated"}',
-  true
-);
-SET LOCAL ROLE authenticated;
 
 SELECT lives_ok(
   $$
@@ -745,7 +782,7 @@ SELECT set_config(
 );
 SET LOCAL ROLE authenticated;
 
-SELECT lives_ok(
+SELECT throws_ok(
   $$
     INSERT INTO public.bulletin_updates (id, bulletin_id, body)
     VALUES (
@@ -754,23 +791,18 @@ SELECT lives_ok(
       'Mentor A progressed their item.'
     )
   $$,
-  '38 mentor can append an update to work they own'
+  '42501',
+  NULL,
+  '38 mentor cannot append an update to Bulletin Board work'
 );
 
-SELECT ok(
-  EXISTS (
-    SELECT 1
-    FROM public.bulletin_updates AS u
-    JOIN public.bulletin_items AS i ON i.id = u.bulletin_id
-    WHERE u.id = '20000000-0000-0000-0000-000000000001'
-      AND u.author_id = '00000000-0000-0000-0000-000000000002'
-      AND u.author_name = 'Mentor A'
-      AND i.version = 2
-  ),
-  '39 update actor is derived and parent version advances exactly once'
+SELECT is(
+  (SELECT count(*)::integer FROM public.bulletin_updates),
+  0,
+  '39 mentor cannot see Bulletin Board update history'
 );
 
-SELECT lives_ok(
+SELECT throws_ok(
   $$
     INSERT INTO public.bulletin_updates (id, bulletin_id, body)
     VALUES (
@@ -779,7 +811,9 @@ SELECT lives_ok(
       'Creator A added context after reassignment.'
     )
   $$,
-  '40 mentor can append to visible work they created after reassignment'
+  '42501',
+  NULL,
+  '40 mentor cannot append to work they created before reassignment'
 );
 
 SELECT throws_ok(
@@ -804,7 +838,7 @@ SELECT set_config(
 );
 SET LOCAL ROLE authenticated;
 
-SELECT lives_ok(
+SELECT throws_ok(
   $$
     INSERT INTO public.bulletin_updates (id, bulletin_id, body)
     VALUES (
@@ -813,7 +847,9 @@ SELECT lives_ok(
       'Assigned Mentor B progressed the item.'
     )
   $$,
-  '42 assigned mentor can append progress'
+  '42501',
+  NULL,
+  '42 assigned mentor cannot append progress'
 );
 
 RESET ROLE;
@@ -868,8 +904,8 @@ SET LOCAL ROLE authenticated;
 
 SELECT is(
   (SELECT count(*)::integer FROM public.bulletin_updates),
-  3,
-  '45 mentor A sees update history only for visible items'
+  0,
+  '45 mentor A sees no Bulletin Board update history'
 );
 
 RESET ROLE;
@@ -882,8 +918,8 @@ SET LOCAL ROLE authenticated;
 
 SELECT is(
   (SELECT count(*)::integer FROM public.bulletin_updates),
-  3,
-  '46 mentor B sees update history only for visible items'
+  0,
+  '46 mentor B sees no Bulletin Board update history'
 );
 
 RESET ROLE;
@@ -896,7 +932,7 @@ SET LOCAL ROLE authenticated;
 
 SELECT is(
   (SELECT count(*)::integer FROM public.bulletin_updates),
-  4,
+  1,
   '47 management sees all team update history'
 );
 

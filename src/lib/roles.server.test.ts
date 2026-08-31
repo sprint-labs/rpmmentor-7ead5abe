@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { Constants } from "@/integrations/supabase/types";
 import {
@@ -24,11 +25,20 @@ describe("roles.server", () => {
     expect(hasAnyRole([], ["super_admin"])).toBe(false);
   });
 
-  it("lets every operational role view bulletins but limits team management", () => {
+  it("keeps Bulletin Board access exclusive to management roles", () => {
     for (const role of ROLES) {
-      expect(roleHasPermission(role, "bulletins.view")).toBe(true);
-      expect(roleHasPermission(role, "bulletins.manage")).toBe(role !== "mentor");
+      const expected = role !== "mentor";
+      expect(roleHasPermission(role, "bulletins.view")).toBe(expected);
+      expect(roleHasPermission(role, "bulletins.manage")).toBe(expected);
     }
+  });
+
+  it("keeps the Bulletin Board card off the Mentor dashboard", () => {
+    const source = readFileSync(
+      new URL("../components/mentor/mentor-dashboard.tsx", import.meta.url),
+      "utf8",
+    );
+    expect(source).not.toMatch(/BulletinDashboardCard/);
   });
 
   it("keeps destructive entity controls exclusive to Super Admin", () => {
