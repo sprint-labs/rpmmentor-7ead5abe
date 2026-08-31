@@ -15,6 +15,7 @@ const matchEvent: NotifiableEvent = {
   startTime: "15:00",
   goalkeeperName: "James Beadle",
   playerId: "22222222-2222-4222-8222-222222222222",
+  participationStatus: "played",
 };
 
 const coffeeEvent: NotifiableEvent = {
@@ -76,6 +77,30 @@ describe("buildEventNotification", () => {
     expect(n.body).toContain("You need to submit: Interaction");
     expect(n.body).not.toContain("Match Report");
     expect(n.linkPath).toContain("/interactions");
+  });
+
+  it("asks for participation confirmation instead of promising a Match Report", () => {
+    const n = buildEventNotification(
+      "event_assigned",
+      { ...matchEvent, participationStatus: "not_confirmed" },
+      { now },
+    );
+    expect(n.body).toContain("confirm whether this goalkeeper played");
+    expect(n.body).not.toContain("You need to submit: Match Report");
+    expect(n.body).not.toContain("Due by:");
+    expect(n.linkPath).toBe("/calendar");
+  });
+
+  it("states that no Match Report is required when the goalkeeper did not play", () => {
+    const n = buildEventNotification(
+      "event_updated",
+      { ...matchEvent, participationStatus: "did_not_play" },
+      { now },
+    );
+    expect(n.body).toContain("Did not play");
+    expect(n.body).toContain("no Match Report is required");
+    expect(n.body).not.toContain("Due by:");
+    expect(n.linkPath).toBe("/calendar");
   });
 
   it("states the deadline as 48 hours after the scheduled time", () => {

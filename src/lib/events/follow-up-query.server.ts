@@ -5,6 +5,11 @@
  * the two can never disagree about what counts as outstanding.
  */
 import { resolveFollowUp, type FollowUp } from "./follow-up";
+import {
+  DEFAULT_MATCH_PARTICIPATION_STATUS,
+  isMatchParticipationStatus,
+  type MatchParticipationStatus,
+} from "./participation";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 export type QueryClient = { from: (table: string) => any };
@@ -12,7 +17,7 @@ export type QueryClient = { from: (table: string) => any };
 // One literal, not a concatenation: supabase-js infers the row type from the
 // select string, and joining pieces together erases that inference.
 export const EVENT_COLUMNS =
-  "id, title, event_type, event_date, start_time, end_time, location, notes, player_id, goalkeeper_name, assigned_mentor_id, assigned_mentor_name, status, cancellation_reason, follow_up_waived_at, follow_up_waived_by, follow_up_waiver_reason";
+  "id, title, event_type, event_date, start_time, end_time, location, notes, participation_status, player_id, goalkeeper_name, assigned_mentor_id, assigned_mentor_name, status, cancellation_reason, follow_up_waived_at, follow_up_waived_by, follow_up_waiver_reason";
 
 /**
  * How far back to look. Older events are history: the calendar remains the
@@ -30,6 +35,7 @@ export interface EventRow {
   end_time: string | null;
   location: string | null;
   notes: string | null;
+  participation_status: string | null;
   player_id: string | null;
   goalkeeper_name: string | null;
   assigned_mentor_id: string | null;
@@ -53,6 +59,7 @@ export interface EventFollowUpRow {
   goalkeeperName: string | null;
   assignedMentorId: string | null;
   assignedMentorName: string;
+  participationStatus: MatchParticipationStatus;
   cancellationReason: string;
   waiverReason: string;
   followUp: FollowUp;
@@ -134,6 +141,9 @@ export function toFollowUpRow(
     goalkeeperName: row.goalkeeper_name,
     assignedMentorId: row.assigned_mentor_id,
     assignedMentorName: row.assigned_mentor_name ?? "",
+    participationStatus: isMatchParticipationStatus(row.participation_status)
+      ? row.participation_status
+      : DEFAULT_MATCH_PARTICIPATION_STATUS,
     cancellationReason: row.cancellation_reason ?? "",
     waiverReason: row.follow_up_waiver_reason ?? "",
     followUp: resolveFollowUp(
@@ -145,6 +155,7 @@ export function toFollowUpRow(
         cancelled: row.status === "cancelled",
         waived: Boolean(row.follow_up_waived_at),
         completedRecordId,
+        participationStatus: row.participation_status,
       },
       now,
     ),

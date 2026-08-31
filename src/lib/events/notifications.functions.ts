@@ -12,6 +12,7 @@ import { FOLLOW_UP_MANAGE_ROLES } from "./follow-up.functions";
 import type { NotificationKind } from "./notification-copy";
 
 const INBOX_LIMIT = 60;
+const INBOX_SCAN_LIMIT = 240;
 
 export interface AppNotification {
   id: string;
@@ -29,6 +30,23 @@ export interface NotificationInbox {
   unread: number;
 }
 
+/**
+ * Durable overdue messages describe a derived state that can later change.
+ * Keep the stored notification for audit/history, but only surface it while the
+ * linked event is still currently overdue. This closes historical false alerts
+ * without deleting or rewriting any notification rows.
+ */
+export function filterCurrentOverdueNotifications(
+  items: readonly AppNotification[],
+  currentOverdueEventIds: ReadonlySet<string>,
+): AppNotification[] {
+  return items.filter(
+    (item) =>
+      item.kind !== "follow_up_overdue" ||
+      (Boolean(item.eventId) && currentOverdueEventIds.has(item.eventId as string)),
+  );
+}
+
 export const listNotifications = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<NotificationInbox> => {
@@ -36,9 +54,11 @@ export const listNotifications = createServerFn({ method: "GET" })
       .from("notifications")
       .select("id, kind, title, body, link_path, created_at, read_at, calendar_event_id")
       .order("created_at", { ascending: false })
-      .limit(INBOX_LIMIT);
+      // Scan beyond the visible page because stale derived overdue rows may be
+      // filtered below; they must not crowd older, still-valid messages out.
+      .limit(INBOX_SCAN_LIMIT);
     if (error) throw new Error(error.message);
-    const items = (data ?? []).map((row) => ({
+    const storedItems: AppNotification[] = (data ?? []).map((row) => ({
       id: row.id as string,
       kind: row.kind as string,
       title: row.title as string,
@@ -48,6 +68,20 @@ export const listNotifications = createServerFn({ method: "GET" })
       readAt: (row.read_at as string | null) ?? null,
       eventId: (row.calendar_event_id as string | null) ?? null,
     }));
+    let items = storedItems;
+    if (storedItems.some((item) => item.kind === "follow_up_overdue")) {
+      const { loadEventFollowUps } = await import("./follow-up-query.server");
+      // Notifications are already RLS-scoped to the caller. Resolve only their
+      // own assigned events here, even when the caller also has a manager role.
+      const current = await loadEventFollowUps(context.supabase, context.userId, false);
+      const overdueIds = new Set(
+        current
+          .filter((row) => row.followUp.status === "overdue")
+          .map((row) => row.eventId),
+      );
+      items = filterCurrentOverdueNotifications(storedItems, overdueIds);
+    }
+    items = items.slice(0, INBOX_LIMIT);
     return { items, unread: items.filter((i) => !i.readAt).length };
   });
 
@@ -106,6 +140,7 @@ export const syncOverdueFollowUpNotifications = createServerFn({ method: "POST" 
         end_time: row.endTime,
         goalkeeper_name: row.goalkeeperName,
         player_id: row.playerId,
+        participation_status: row.participationStatus,
         assigned_mentor_id: row.assignedMentorId,
       });
       if (ok) created += 1;

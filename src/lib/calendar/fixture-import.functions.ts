@@ -24,11 +24,12 @@ import {
   type FixtureImportCommitResult,
 } from "@/lib/calendar/fixture-import";
 import { requireRole } from "@/lib/roles.server";
+import { DEFAULT_MATCH_PARTICIPATION_STATUS } from "@/lib/events/participation";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const COLUMNS =
-  "id, title, event_type, event_date, start_time, end_time, location, notes, player_id, goalkeeper_name, assigned_mentor_id, assigned_mentor_name, status, cancellation_reason, follow_up_waived_at, follow_up_waiver_reason, created_by, created_by_name";
+  "id, title, event_type, event_date, start_time, end_time, location, notes, participation_status, player_id, goalkeeper_name, assigned_mentor_id, assigned_mentor_name, status, cancellation_reason, follow_up_waived_at, follow_up_waiver_reason, created_by, created_by_name";
 
 const commitRowSchema = z.object({
   rowNumber: z.number().int().positive(),
@@ -154,6 +155,10 @@ export const commitFixtureImport = createServerFn({ method: "POST" })
             ...validated,
             ...people,
             end_time: null,
+            // A fixture association is not evidence that this goalkeeper played.
+            // Only a later manager confirmation (or future trusted lineup adapter)
+            // may turn this into a Match Report obligation.
+            participation_status: DEFAULT_MATCH_PARTICIPATION_STATUS,
             created_by: context.userId,
             created_by_name: profile?.name ?? "",
           })

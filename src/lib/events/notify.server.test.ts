@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
-import { notifyEventCancelled, type NotifiableEventRow } from "./notify.server";
+import {
+  notifyEventCancelled,
+  notifyFollowUpOverdue,
+  type NotifiableEventRow,
+} from "./notify.server";
 
 const ACTOR = "11111111-1111-4111-8111-111111111111";
 const MENTOR = "22222222-2222-4222-8222-222222222222";
@@ -34,5 +38,29 @@ describe("notifyEventCancelled", () => {
       expected,
     );
     expect(insert).toHaveBeenCalledOnce();
+  });
+});
+
+describe("notifyFollowUpOverdue", () => {
+  it("creates a Match Report reminder and link for a goalkeeper confirmed as Played", async () => {
+    const insert = vi.fn().mockResolvedValue({ error: null });
+    const supabase = { from: vi.fn(() => ({ insert })) };
+
+    await expect(
+      notifyFollowUpOverdue(supabase as never, ACTOR, {
+        ...event,
+        title: "Northbridge v Riverside",
+        event_type: "Match",
+        participation_status: "played",
+      }),
+    ).resolves.toBe(true);
+
+    expect(insert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: expect.stringContaining("Match Report"),
+        link_path: expect.stringContaining("/reports?"),
+      }),
+    );
+    expect(insert.mock.calls[0]?.[0].link_path).toContain("eventId=");
   });
 });

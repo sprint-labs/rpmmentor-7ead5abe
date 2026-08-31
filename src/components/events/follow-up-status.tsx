@@ -20,6 +20,7 @@ const STATUS_CHIP: Record<FollowUpStatus, string> = {
   pending: "border-warning/30 bg-warning/10 text-warning",
   completed: "border-success/30 bg-success/10 text-success",
   overdue: "border-destructive/40 bg-destructive/10 text-destructive",
+  confirmation_needed: "border-warning/35 bg-warning/10 text-warning",
   cancelled: "border-border bg-muted text-muted-foreground line-through",
   not_required: "border-border bg-muted text-muted-foreground",
 };
@@ -48,7 +49,12 @@ export function followUpDetail(followUp: FollowUp, waiverReason: string, cancell
   const required = followUpRequirementLabel(followUp.kind);
   switch (followUp.status) {
     case "scheduled":
+      if (followUp.participationStatus === "not_confirmed") {
+        return "Participation not confirmed — confirm who played after the Match";
+      }
       return `${required} due ${formatLondonInstant(followUp.deadlineMs)}`;
+    case "confirmation_needed":
+      return "Confirm whether this goalkeeper played — no Match Report is overdue";
     case "pending":
       return `${required} due ${formatLondonInstant(followUp.deadlineMs)} · ${describeDeadlineDistance(followUp.deadlineMs)}`;
     case "overdue":
@@ -58,6 +64,9 @@ export function followUpDetail(followUp: FollowUp, waiverReason: string, cancell
     case "cancelled":
       return cancellationReason ? `Event cancelled — ${cancellationReason}` : "Event cancelled";
     case "not_required":
+      if (followUp.participationStatus === "did_not_play") {
+        return "Did not play — no Match Report required";
+      }
       return waiverReason ? `Waived — ${waiverReason}` : "Waived by a manager";
   }
 }
@@ -67,12 +76,23 @@ export function FollowUpActionLink({
   event,
   followUp,
   label,
+  canConfirmParticipation = false,
 }: {
   event: NotifiableEvent;
   followUp: FollowUp;
   label?: string;
+  canConfirmParticipation?: boolean;
 }) {
+  if (followUp.status === "confirmation_needed") {
+    if (!canConfirmParticipation) return null;
+    return (
+      <Link to="/calendar" className="text-xs font-medium text-primary hover:underline">
+        Confirm participation
+      </Link>
+    );
+  }
   if (!followUp.kind) return null;
+  if (followUp.kind === "match_report" && followUp.participationStatus !== "played") return null;
   if (followUp.status === "completed" || followUp.status === "cancelled" || followUp.status === "not_required") {
     return null;
   }
