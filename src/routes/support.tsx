@@ -12,24 +12,20 @@ import { toast } from "sonner";
 import { LifeBuoy, Megaphone, MessageSquarePlus, Bug } from "lucide-react";
 import { PageHeader, Card } from "@/components/primitives";
 import { withPermission } from "@/components/require-permission";
+import { BroadcastManager } from "@/components/support/broadcast-manager";
 import { useAuth } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 import {
-  createAnnouncement,
-  endAnnouncement,
   getSupportThread,
-  listActiveAnnouncements,
   listAllSupportThreads,
   listMySupportThreads,
   replySupportThread,
   setSupportThreadStatus,
 } from "@/lib/support.functions";
 import {
-  ANNOUNCEMENT_KINDS,
   SUPPORT_THREAD_KINDS,
   SUPPORT_THREAD_STATUSES,
   SUPPORT_THREAD_STATUS_LABEL,
-  type AnnouncementKind,
   type SupportThread,
   type SupportThreadKind,
   type SupportThreadStatus,
@@ -493,147 +489,5 @@ function ThreadDetail({
 }
 
 function BroadcastsPanel() {
-  const queryClient = useQueryClient();
-  const list = useServerFn(listActiveAnnouncements);
-  const create = useServerFn(createAnnouncement);
-  const end = useServerFn(endAnnouncement);
-
-  const [kind, setKind] = useState<AnnouncementKind>("feature");
-  const [title, setTitle] = useState("");
-  const [body, setBody] = useState("");
-  const [endsAt, setEndsAt] = useState("");
-
-  const { data, isLoading, refetch } = useQuery({
-    queryKey: ["announcements", "admin"],
-    queryFn: () => list(),
-    staleTime: 30_000,
-  });
-
-  const createMutation = useMutation({
-    mutationFn: () =>
-      create({
-        data: {
-          kind,
-          title,
-          body,
-          endsAt: endsAt ? new Date(endsAt).toISOString() : null,
-        },
-      }),
-    onSuccess: async () => {
-      toast.success("Broadcast posted");
-      setTitle("");
-      setBody("");
-      setEndsAt("");
-      await refetch();
-      void queryClient.invalidateQueries({ queryKey: ["announcements"] });
-    },
-    onError: (err: Error) => toast.error(err.message),
-  });
-
-  const endMutation = useMutation({
-    mutationFn: (announcementId: string) => end({ data: { announcementId } }),
-    onSuccess: async () => {
-      toast.success("Broadcast ended");
-      await refetch();
-      void queryClient.invalidateQueries({ queryKey: ["announcements"] });
-    },
-    onError: (err: Error) => toast.error(err.message),
-  });
-
-  const activeIncident = (data ?? []).filter(
-    (a) => a.active && (a.kind === "incident" || a.kind === "downtime"),
-  );
-
-  return (
-    <div className="grid gap-4 lg:grid-cols-2">
-      <Card className="p-4 space-y-3">
-        <h2 className="text-sm font-semibold">Compose broadcast</h2>
-        <label className="block text-xs text-muted-foreground">
-          Kind
-          <select
-            value={kind}
-            onChange={(e) => setKind(e.target.value as AnnouncementKind)}
-            className="mt-1 h-9 w-full rounded-md border border-border bg-background px-2 text-sm"
-          >
-            {ANNOUNCEMENT_KINDS.map((k) => (
-              <option key={k} value={k}>
-                {k}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="block text-xs text-muted-foreground">
-          Title
-          <input
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            maxLength={160}
-            className="mt-1 h-9 w-full rounded-md border border-border bg-background px-3 text-sm"
-          />
-        </label>
-        <label className="block text-xs text-muted-foreground">
-          Body
-          <textarea
-            value={body}
-            onChange={(e) => setBody(e.target.value)}
-            maxLength={4000}
-            rows={5}
-            className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
-          />
-        </label>
-        <label className="block text-xs text-muted-foreground">
-          Ends at (optional)
-          <input
-            type="datetime-local"
-            value={endsAt}
-            onChange={(e) => setEndsAt(e.target.value)}
-            className="mt-1 h-9 w-full rounded-md border border-border bg-background px-3 text-sm"
-          />
-        </label>
-        <button
-          type="button"
-          disabled={createMutation.isPending || !title.trim()}
-          onClick={() => createMutation.mutate()}
-          className="inline-flex h-9 items-center rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground disabled:opacity-60"
-        >
-          {createMutation.isPending ? "Posting…" : "Post broadcast"}
-        </button>
-      </Card>
-
-      <Card className="p-4 space-y-3">
-        <h2 className="text-sm font-semibold">Active incident / downtime</h2>
-        {isLoading ? (
-          <div className="text-sm text-muted-foreground">Loading…</div>
-        ) : activeIncident.length === 0 ? (
-          <div className="text-sm text-muted-foreground">
-            No active incident or downtime notices.
-          </div>
-        ) : (
-          <ul className="space-y-2">
-            {activeIncident.map((a) => (
-              <li key={a.id} className="rounded-md border border-border px-3 py-2">
-                <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                  {a.kind}
-                </div>
-                <div className="text-sm font-medium">{a.title}</div>
-                {a.body && (
-                  <div className="mt-1 text-xs text-muted-foreground whitespace-pre-wrap">
-                    {a.body}
-                  </div>
-                )}
-                <button
-                  type="button"
-                  disabled={endMutation.isPending}
-                  onClick={() => endMutation.mutate(a.id)}
-                  className="mt-2 inline-flex h-8 items-center rounded-md border border-destructive/40 px-2.5 text-xs text-destructive hover:bg-destructive/10"
-                >
-                  End now
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-      </Card>
-    </div>
-  );
+  return <BroadcastManager />;
 }
