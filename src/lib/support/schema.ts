@@ -27,6 +27,34 @@ export type AnnouncementKind = (typeof ANNOUNCEMENT_KINDS)[number];
 
 export const ANNOUNCEMENT_ATTACHMENT_MAX_BYTES = 25 * 1024 * 1024;
 
+export const ANNOUNCEMENT_ATTACHMENT_MIME_BY_EXTENSION = {
+  jpg: ["image/jpeg"],
+  jpeg: ["image/jpeg"],
+  png: ["image/png"],
+  webp: ["image/webp"],
+  gif: ["image/gif"],
+  mp4: ["video/mp4"],
+  mov: ["video/quicktime"],
+  webm: ["video/webm", "audio/webm"],
+  mp3: ["audio/mpeg"],
+  m4a: ["audio/mp4", "audio/x-m4a"],
+  wav: ["audio/wav"],
+  aac: ["audio/aac"],
+  pdf: ["application/pdf"],
+} as const;
+
+export const ANNOUNCEMENT_ATTACHMENT_ACCEPT = Array.from(
+  new Set(Object.values(ANNOUNCEMENT_ATTACHMENT_MIME_BY_EXTENSION).flat()),
+).join(",");
+
+export function isAnnouncementAttachmentTypeAllowed(name: string, mime: string): boolean {
+  const extension = name.split(".").pop()?.toLowerCase() ?? "";
+  const accepted = ANNOUNCEMENT_ATTACHMENT_MIME_BY_EXTENSION[
+    extension as keyof typeof ANNOUNCEMENT_ATTACHMENT_MIME_BY_EXTENSION
+  ] as readonly string[] | undefined;
+  return Boolean(accepted?.includes(mime.trim().toLowerCase()));
+}
+
 export interface AnnouncementAttachment {
   path: string;
   name: string;
@@ -34,12 +62,22 @@ export interface AnnouncementAttachment {
   size: number;
 }
 
-export const announcementAttachmentInput = z.object({
-  path: z.string().trim().min(1).max(500).startsWith("announcements/"),
-  name: z.string().trim().min(1).max(255),
-  mime: z.string().trim().min(1).max(150),
-  size: z.number().int().min(0).max(ANNOUNCEMENT_ATTACHMENT_MAX_BYTES),
-});
+export const announcementAttachmentInput = z
+  .object({
+    path: z.string().trim().min(1).max(500).startsWith("announcements/"),
+    name: z.string().trim().min(1).max(255),
+    mime: z.string().trim().toLowerCase().min(1).max(150),
+    size: z.number().int().min(0).max(ANNOUNCEMENT_ATTACHMENT_MAX_BYTES),
+  })
+  .superRefine((attachment, context) => {
+    if (!isAnnouncementAttachmentTypeAllowed(attachment.name, attachment.mime)) {
+      context.addIssue({
+        code: "custom",
+        path: ["mime"],
+        message: "Attachment type does not match an allowed file extension.",
+      });
+    }
+  });
 
 export const SUPPORT_THREAD_STATUS_LABEL: Record<SupportThreadStatus, string> = {
   open: "Open",
@@ -82,14 +120,28 @@ export const listAllSupportThreadsQuery = z.object({
 });
 export type ListAllSupportThreadsQuery = z.input<typeof listAllSupportThreadsQuery>;
 
-export const createAnnouncementInput = z.object({
-  kind: z.enum(ANNOUNCEMENT_KINDS),
-  title: z.string().trim().min(1, "Title is required").max(160),
-  body: z.string().trim().max(4000).default(""),
-  startsAt: z.string().datetime({ offset: true }).nullish(),
-  endsAt: z.string().datetime({ offset: true }).nullish(),
-  attachment: announcementAttachmentInput.nullish(),
-});
+export const createAnnouncementInput = z
+  .object({
+    kind: z.enum(ANNOUNCEMENT_KINDS),
+    title: z.string().trim().min(1, "Title is required").max(160),
+    body: z.string().trim().max(4000).default(""),
+    startsAt: z.string().datetime({ offset: true }).nullish(),
+    endsAt: z.string().datetime({ offset: true }).nullish(),
+    attachment: announcementAttachmentInput.nullish(),
+  })
+  .superRefine((announcement, context) => {
+    if (
+      announcement.startsAt &&
+      announcement.endsAt &&
+      Date.parse(announcement.endsAt) <= Date.parse(announcement.startsAt)
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["endsAt"],
+        message: "The end time must be after the publish time.",
+      });
+    }
+  });
 export type CreateAnnouncementInput = z.input<typeof createAnnouncementInput>;
 
 export const endAnnouncementInput = z.object({

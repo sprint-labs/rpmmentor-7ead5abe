@@ -63,7 +63,10 @@ vi.mock("@/integrations/supabase/client", () => ({
 }));
 
 import { ANNOUNCEMENT_ATTACHMENT_MAX_BYTES } from "@/lib/support/schema";
-import { uploadAnnouncementAttachment } from "@/lib/support/announcement-attachments";
+import {
+  announcementAttachmentMime,
+  uploadAnnouncementAttachment,
+} from "@/lib/support/announcement-attachments";
 
 function attachment(name: string, size: number, type = "video/mp4"): File {
   const file = new File(["bytes"], name, { type });
@@ -105,10 +108,22 @@ describe("uploadAnnouncementAttachment", () => {
     expect(storageState.uploaded).toEqual([{ path: result.path, contentType: "application/pdf" }]);
   });
 
+  it("infers preview and upload MIME from an allowed extension when the browser omits it", () => {
+    expect(announcementAttachmentMime(attachment("preview.png", 1024, ""))).toBe("image/png");
+  });
+
   it("rejects files over 25 MB before contacting Storage", async () => {
     await expect(
       uploadAnnouncementAttachment(attachment("huge.mp4", ANNOUNCEMENT_ATTACHMENT_MAX_BYTES + 1)),
     ).rejects.toThrow("Attachments must be 25 MB or smaller.");
+    expect(tusState.objectNames).toHaveLength(0);
+    expect(storageState.uploaded).toHaveLength(0);
+  });
+
+  it("rejects a misleading extension when the browser reports a disallowed MIME type", async () => {
+    await expect(
+      uploadAnnouncementAttachment(attachment("notice.pdf", 1024, "text/html")),
+    ).rejects.toThrow("Use an image, MP4, MOV, WebM, audio file or PDF.");
     expect(tusState.objectNames).toHaveLength(0);
     expect(storageState.uploaded).toHaveLength(0);
   });

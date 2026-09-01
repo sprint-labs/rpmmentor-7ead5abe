@@ -6,6 +6,10 @@
  */
 export const ADMIN_RECENT_ANNOUNCEMENT_LIMIT = 50;
 
+export function endedAtForAnnouncement(startsAt: string, nowIso: string): string | null {
+  return Date.parse(startsAt) < Date.parse(nowIso) ? nowIso : null;
+}
+
 export function mergeAdminAnnouncementPages<T extends { id: string }>(
   current: T[],
   recent: T[],

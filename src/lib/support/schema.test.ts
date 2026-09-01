@@ -110,6 +110,21 @@ describe("createAnnouncementInput", () => {
     expect(parsed.attachment?.name).toBe("example.mp4");
   });
 
+  it("normalises an allowed attachment MIME type for the database constraint", () => {
+    const parsed = createAnnouncementInput.parse({
+      kind: "info",
+      title: "PDF notice",
+      attachment: {
+        path: "announcements/2026/example.pdf",
+        name: "example.pdf",
+        mime: " APPLICATION/PDF ",
+        size: 1024,
+      },
+    });
+
+    expect(parsed.attachment?.mime).toBe("application/pdf");
+  });
+
   it("rejects oversized or incorrectly scoped attachments", () => {
     expect(() =>
       createAnnouncementInput.parse({
@@ -123,5 +138,31 @@ describe("createAnnouncementInput", () => {
         },
       }),
     ).toThrow();
+  });
+
+  it("rejects attachment metadata when the MIME type does not match the extension", () => {
+    expect(() =>
+      createAnnouncementInput.parse({
+        kind: "info",
+        title: "Notice",
+        attachment: {
+          path: "announcements/2026/notice.pdf",
+          name: "notice.pdf",
+          mime: "text/html",
+          size: 1024,
+        },
+      }),
+    ).toThrow("Attachment type does not match an allowed file extension.");
+  });
+
+  it("rejects an expiry that is not after the publish time", () => {
+    expect(() =>
+      createAnnouncementInput.parse({
+        kind: "downtime",
+        title: "Maintenance",
+        startsAt: "2026-09-02T10:00:00.000Z",
+        endsAt: "2026-09-02T09:00:00.000Z",
+      }),
+    ).toThrow("The end time must be after the publish time.");
   });
 });

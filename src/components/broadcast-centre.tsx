@@ -1,11 +1,4 @@
-import {
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type ChangeEvent,
-  type DragEvent,
-} from "react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type DragEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
@@ -38,6 +31,7 @@ import {
   endAnnouncement,
   listAdminAnnouncements,
 } from "@/lib/support.functions";
+import { useAnnouncementClock } from "@/lib/support/announcement-clock";
 import type {
   AnnouncementAttachment,
   AnnouncementKind,
@@ -46,6 +40,7 @@ import type {
 import {
   ANNOUNCEMENT_ATTACHMENT_ACCEPT,
   announcementAttachmentError,
+  announcementAttachmentMime,
   removeAnnouncementAttachment,
   uploadAnnouncementAttachment,
 } from "@/lib/support/announcement-attachments";
@@ -109,10 +104,7 @@ function formatDateTime(value: string): string {
   }).format(new Date(value));
 }
 
-function statusOf(
-  announcement: AnnouncementRow,
-  now: number,
-): "live" | "scheduled" | "ended" {
+function statusOf(announcement: AnnouncementRow, now: number): "live" | "scheduled" | "ended" {
   if (!announcement.active) return "ended";
   if (announcement.endsAt && Date.parse(announcement.endsAt) <= now) return "ended";
   if (Date.parse(announcement.startsAt) > now) return "scheduled";
@@ -231,25 +223,29 @@ export function BroadcastCentre() {
     return () => URL.revokeObjectURL(url);
   }, [attachmentFile]);
 
-  const { data = [], isLoading, isError, refetch } = useQuery({
+  const {
+    data = [],
+    isLoading,
+    isError,
+    refetch,
+  } = useQuery({
     queryKey: ["announcements", "admin", "all"],
     queryFn: () => list(),
     staleTime: 30_000,
+    refetchInterval: 30_000,
   });
 
-  const now = Date.now();
+  const now = useAnnouncementClock();
   const live = data.filter((announcement) => statusOf(announcement, now) === "live");
   const scheduled = data.filter((announcement) => statusOf(announcement, now) === "scheduled");
-  const recent = data
-    .filter((announcement) => statusOf(announcement, now) === "ended")
-    .slice(0, 8);
+  const recent = data.filter((announcement) => statusOf(announcement, now) === "ended").slice(0, 8);
 
   const previewAttachment = useMemo<AnnouncementAttachment | null>(() => {
     if (!attachmentFile) return null;
     return {
       path: "preview",
       name: attachmentFile.name,
-      mime: attachmentFile.type || "application/octet-stream",
+      mime: announcementAttachmentMime(attachmentFile),
       size: attachmentFile.size,
     };
   }, [attachmentFile]);
@@ -291,7 +287,8 @@ export function BroadcastCentre() {
   function resolvedEnd(start: Date): string | null {
     if (expiryMode === "none") return null;
     if (expiryMode === "24h") return new Date(start.getTime() + 24 * 60 * 60 * 1000).toISOString();
-    if (expiryMode === "7d") return new Date(start.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString();
+    if (expiryMode === "7d")
+      return new Date(start.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
     const date = new Date(endsAt);
     if (!endsAt || Number.isNaN(date.getTime())) throw new Error("Choose a valid end time.");
@@ -440,7 +437,9 @@ export function BroadcastCentre() {
           </div>
 
           <fieldset>
-            <legend className="text-xs font-medium text-foreground">What kind of message is this?</legend>
+            <legend className="text-xs font-medium text-foreground">
+              What kind of message is this?
+            </legend>
             <div className="mt-2 grid gap-2 sm:grid-cols-2">
               {(Object.keys(KIND_META) as AnnouncementKind[]).map((option) => {
                 const meta = KIND_META[option];
@@ -757,7 +756,10 @@ export function BroadcastCentre() {
               </div>
               {(kind === "incident" || kind === "downtime") && (
                 <div className="flex items-start gap-2">
-                  <AlertTriangle className="mt-0.5 size-4 shrink-0 text-amber-500" aria-hidden="true" />
+                  <AlertTriangle
+                    className="mt-0.5 size-4 shrink-0 text-amber-500"
+                    aria-hidden="true"
+                  />
                   <div>
                     <div className="font-medium">Service alert</div>
                     <div className="mt-0.5 text-muted-foreground">

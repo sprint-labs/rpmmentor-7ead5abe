@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, type SyntheticEvent } from "react";
 import {
   ExternalLink,
   FileAudio,
@@ -11,6 +11,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { MEDIA_BUCKET } from "@/lib/storage/bucket";
 import type { AnnouncementAttachment, AnnouncementKind } from "@/lib/support/schema";
 import { cn } from "@/lib/utils";
+
+const ANNOUNCEMENT_SIGNED_URL_SECONDS = 5 * 60;
+const ANNOUNCEMENT_SIGNED_URL_REFRESH_MS = 4 * 60 * 1000;
 
 export const ANNOUNCEMENT_KIND_LABEL: Record<AnnouncementKind, string> = {
   feature: "New feature",
@@ -61,8 +64,15 @@ export function AnnouncementMedia({
   className?: string;
 }) {
   const [signedUrl, setSignedUrl] = useState<string | null>(previewUrl ?? null);
+  const isPlayingRef = useRef(false);
+  const mediaElementRef = useRef<HTMLMediaElement | null>(null);
+  const pendingSignedUrlRef = useRef<string | null>(null);
+  const pendingPlaybackPositionRef = useRef<number | null>(null);
 
   useEffect(() => {
+    isPlayingRef.current = false;
+    pendingSignedUrlRef.current = null;
+    pendingPlaybackPositionRef.current = null;
     if (!attachment) {
       setSignedUrl(null);
       return;
@@ -72,17 +82,35 @@ export function AnnouncementMedia({
       return;
     }
 
+    const attachmentPath = attachment.path;
+    const isStream =
+      attachmentKind(attachment.mime) === "video" || attachmentKind(attachment.mime) === "audio";
     let cancelled = false;
+    let refreshTimer: number | undefined;
     setSignedUrl(null);
-    void supabase.storage
-      .from(MEDIA_BUCKET)
-      .createSignedUrl(attachment.path, 60 * 60)
-      .then(({ data, error }) => {
-        if (!cancelled && !error) setSignedUrl(data.signedUrl);
-      });
+
+    async function refreshSignedUrl() {
+      const { data, error } = await supabase.storage
+        .from(MEDIA_BUCKET)
+        .createSignedUrl(attachmentPath, ANNOUNCEMENT_SIGNED_URL_SECONDS);
+      if (cancelled) return;
+      if (!error) {
+        if (isStream && isPlayingRef.current) pendingSignedUrlRef.current = data.signedUrl;
+        else {
+          if (isStream && mediaElementRef.current) {
+            pendingPlaybackPositionRef.current = mediaElementRef.current.currentTime;
+          }
+          setSignedUrl(data.signedUrl);
+        }
+      }
+      refreshTimer = window.setTimeout(refreshSignedUrl, ANNOUNCEMENT_SIGNED_URL_REFRESH_MS);
+    }
+
+    void refreshSignedUrl();
 
     return () => {
       cancelled = true;
+      if (refreshTimer !== undefined) window.clearTimeout(refreshTimer);
     };
   }, [attachment, previewUrl]);
 
@@ -91,6 +119,33 @@ export function AnnouncementMedia({
   const kind = attachmentKind(attachment.mime);
   const url = previewUrl ?? signedUrl;
   const mediaClass = compact ? "max-h-44" : "max-h-72";
+
+  function handlePlaybackStart() {
+    isPlayingRef.current = true;
+  }
+
+  function handlePlaybackPause(event: SyntheticEvent<HTMLMediaElement>) {
+    isPlayingRef.current = false;
+    if (pendingSignedUrlRef.current) {
+      pendingPlaybackPositionRef.current = event.currentTarget.currentTime;
+      setSignedUrl(pendingSignedUrlRef.current);
+      pendingSignedUrlRef.current = null;
+    }
+  }
+
+  function handlePlaybackEnd() {
+    isPlayingRef.current = false;
+    if (pendingSignedUrlRef.current) {
+      setSignedUrl(pendingSignedUrlRef.current);
+      pendingSignedUrlRef.current = null;
+    }
+  }
+
+  function restorePlaybackPosition(event: SyntheticEvent<HTMLMediaElement>) {
+    if (pendingPlaybackPositionRef.current === null) return;
+    event.currentTarget.currentTime = pendingPlaybackPositionRef.current;
+    pendingPlaybackPositionRef.current = null;
+  }
 
   if (kind === "image" && url) {
     return (
@@ -101,11 +156,7 @@ export function AnnouncementMedia({
         className={cn("mt-3 block overflow-hidden rounded-md border border-border", className)}
         aria-label={`Open ${attachment.name}`}
       >
-        <img
-          src={url}
-          alt={attachment.name}
-          className={cn("w-full object-cover", mediaClass)}
-        />
+        <img src={url} alt={attachment.name} className={cn("w-full object-cover", mediaClass)} />
       </a>
     );
   }
@@ -113,9 +164,16 @@ export function AnnouncementMedia({
   if (kind === "video" && url) {
     return (
       <video
+        ref={(element) => {
+          mediaElementRef.current = element;
+        }}
         controls
         preload="metadata"
         src={url}
+        onPlay={handlePlaybackStart}
+        onPause={handlePlaybackPause}
+        onEnded={handlePlaybackEnd}
+        onLoadedMetadata={restorePlaybackPosition}
         className={cn(
           "mt-3 w-full rounded-md border border-border bg-black object-contain",
           mediaClass,
@@ -130,9 +188,16 @@ export function AnnouncementMedia({
   if (kind === "audio" && url) {
     return (
       <audio
+        ref={(element) => {
+          mediaElementRef.current = element;
+        }}
         controls
         preload="metadata"
         src={url}
+        onPlay={handlePlaybackStart}
+        onPause={handlePlaybackPause}
+        onEnded={handlePlaybackEnd}
+        onLoadedMetadata={restorePlaybackPosition}
         className={cn("mt-3 w-full", className)}
       >
         Your browser cannot play this audio.
@@ -146,12 +211,16 @@ export function AnnouncementMedia({
         <AttachmentIcon mime={attachment.mime} />
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-xs font-medium text-foreground">{attachment.name}</span>
+        <span className="block truncate text-xs font-medium text-foreground">
+          {attachment.name}
+        </span>
         <span className="block text-[10px] text-muted-foreground">
           {formatAttachmentSize(attachment.size)}
         </span>
       </span>
-      {url && <ExternalLink className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />}
+      {url && (
+        <ExternalLink className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
+      )}
     </>
   );
 
