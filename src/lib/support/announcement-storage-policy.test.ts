@@ -55,4 +55,21 @@ describe("announcement Storage hardening migration", () => {
     expect(migration).toContain("CHECK (ends_at IS NULL OR ends_at > starts_at)");
     expect(migration).toContain("announcements_attachment_mime_check");
   });
+
+  it("exposes the upload-readiness marker only after the hardening policies", () => {
+    const marker = "CREATE OR REPLACE FUNCTION public.announcement_media_storage_ready_v1()";
+    expect(migration).toContain(marker);
+    expect(migration.indexOf(marker)).toBeGreaterThan(
+      migration.indexOf("CREATE POLICY gk_media_delete_privileged"),
+    );
+    expect(migration).toContain(
+      "REVOKE ALL ON FUNCTION public.announcement_media_storage_ready_v1() FROM PUBLIC;",
+    );
+    expect(migration).toContain(
+      "GRANT EXECUTE ON FUNCTION public.announcement_media_storage_ready_v1() TO authenticated;",
+    );
+    expect(migration).toContain("SECURITY INVOKER");
+    expect(migration).toContain("SET search_path = ''");
+    expect(migration).not.toContain("SECURITY DEFINER");
+  });
 });

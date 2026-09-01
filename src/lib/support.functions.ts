@@ -18,6 +18,7 @@ import {
   LEGACY_ANNOUNCEMENT_COLUMNS,
   queryAnnouncementsWithSchemaCompatibility,
 } from "@/lib/support/announcement-schema-compat";
+import { requireAnnouncementMediaStorageReady } from "@/lib/support/announcement-media-capability";
 import {
   ANNOUNCEMENT_KINDS,
   SUPPORT_SEVERITIES,
@@ -453,6 +454,10 @@ export const createAnnouncement = createServerFn({ method: "POST" })
     const startsAt = data.startsAt ?? new Date().toISOString();
     if (data.endsAt && Date.parse(data.endsAt) <= Date.parse(startsAt)) {
       throw new Error("The end time must be after the publish time.");
+    }
+
+    if (data.attachment) {
+      await requireAnnouncementMediaStorageReady((name) => context.supabase.rpc(name));
     }
 
     const insertQuery = context.supabase.from("announcements").insert({

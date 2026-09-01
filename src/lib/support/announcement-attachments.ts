@@ -7,6 +7,7 @@ import {
   uploadObjectBytes,
 } from "@/lib/media-upload-transport";
 import { MEDIA_BUCKET } from "@/lib/storage/bucket";
+import { requireAnnouncementMediaStorageReady } from "@/lib/support/announcement-media-capability";
 import {
   ANNOUNCEMENT_ATTACHMENT_MIME_BY_EXTENSION,
   ANNOUNCEMENT_ATTACHMENT_MAX_BYTES,
@@ -52,6 +53,11 @@ export function announcementAttachmentError(file: File): string | null {
 export async function uploadAnnouncementAttachment(file: File): Promise<AnnouncementAttachment> {
   const validationError = announcementAttachmentError(file);
   if (validationError) throw new Error(validationError);
+
+  // Storage uses the caller's browser session. Positively confirm that the
+  // hardening migration has replaced the legacy broad policies before deriving
+  // a path, fetching an upload token or sending any bytes.
+  await requireAnnouncementMediaStorageReady((name) => supabase.rpc(name));
 
   const name = safeFileName(file.name);
   const path = `announcements/${new Date().getUTCFullYear()}/${crypto.randomUUID()}-${name}`;

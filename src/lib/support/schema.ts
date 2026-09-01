@@ -26,6 +26,8 @@ export const ANNOUNCEMENT_KINDS = ["feature", "info", "incident", "downtime"] as
 export type AnnouncementKind = (typeof ANNOUNCEMENT_KINDS)[number];
 
 export const ANNOUNCEMENT_ATTACHMENT_MAX_BYTES = 25 * 1024 * 1024;
+export const ANNOUNCEMENT_ATTACHMENT_UNAVAILABLE_MESSAGE =
+  "Media attachments are unavailable until the Broadcast storage security migration is applied.";
 
 export const ANNOUNCEMENT_ATTACHMENT_MIME_BY_EXTENSION = {
   jpg: ["image/jpeg"],

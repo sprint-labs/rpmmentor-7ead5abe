@@ -43,21 +43,15 @@ import {
   announcementAttachmentMime,
   uploadAnnouncementAttachment,
 } from "@/lib/support/announcement-attachments";
+import {
+  readBroadcastDraft,
+  removeBroadcastDraft,
+  writeBroadcastDraft,
+  type BroadcastDraft,
+} from "@/lib/support/broadcast-draft-storage";
 
-const DRAFT_KEY = "rpm-broadcast-draft-v2";
-
-type PublishMode = "now" | "later";
-type ExpiryMode = "none" | "24h" | "7d" | "custom";
-
-type StoredDraft = {
-  kind: AnnouncementKind;
-  title: string;
-  body: string;
-  publishMode: PublishMode;
-  startsAt: string;
-  expiryMode: ExpiryMode;
-  endsAt: string;
-};
+type PublishMode = BroadcastDraft["publishMode"];
+type ExpiryMode = BroadcastDraft["expiryMode"];
 
 const KIND_META: Record<
   AnnouncementKind,
@@ -169,38 +163,33 @@ export function BroadcastCentre() {
   const [dragActive, setDragActive] = useState(false);
 
   useEffect(() => {
-    try {
-      const raw = window.localStorage.getItem(DRAFT_KEY);
-      if (raw) {
-        const draft = JSON.parse(raw) as Partial<StoredDraft>;
-        if (draft.kind && ["feature", "info", "incident", "downtime"].includes(draft.kind)) {
-          setKind(draft.kind);
-        }
-        if (typeof draft.title === "string") setTitle(draft.title);
-        if (typeof draft.body === "string") setBody(draft.body);
-        if (draft.publishMode === "now" || draft.publishMode === "later") {
-          setPublishMode(draft.publishMode);
-        }
-        if (typeof draft.startsAt === "string" && draft.startsAt) setStartsAt(draft.startsAt);
-        if (
-          draft.expiryMode === "none" ||
-          draft.expiryMode === "24h" ||
-          draft.expiryMode === "7d" ||
-          draft.expiryMode === "custom"
-        ) {
-          setExpiryMode(draft.expiryMode);
-        }
-        if (typeof draft.endsAt === "string") setEndsAt(draft.endsAt);
+    const draft = readBroadcastDraft();
+    if (draft) {
+      if (draft.kind && ["feature", "info", "incident", "downtime"].includes(draft.kind)) {
+        setKind(draft.kind);
       }
-    } catch {
-      window.localStorage.removeItem(DRAFT_KEY);
+      if (typeof draft.title === "string") setTitle(draft.title);
+      if (typeof draft.body === "string") setBody(draft.body);
+      if (draft.publishMode === "now" || draft.publishMode === "later") {
+        setPublishMode(draft.publishMode);
+      }
+      if (typeof draft.startsAt === "string" && draft.startsAt) setStartsAt(draft.startsAt);
+      if (
+        draft.expiryMode === "none" ||
+        draft.expiryMode === "24h" ||
+        draft.expiryMode === "7d" ||
+        draft.expiryMode === "custom"
+      ) {
+        setExpiryMode(draft.expiryMode);
+      }
+      if (typeof draft.endsAt === "string") setEndsAt(draft.endsAt);
     }
     setDraftReady(true);
   }, []);
 
   useEffect(() => {
     if (!draftReady) return;
-    const draft: StoredDraft = {
+    const draft: BroadcastDraft = {
       kind,
       title,
       body,
@@ -209,7 +198,7 @@ export function BroadcastCentre() {
       expiryMode,
       endsAt,
     };
-    window.localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+    writeBroadcastDraft(draft);
   }, [body, draftReady, endsAt, expiryMode, kind, publishMode, startsAt, title]);
 
   useEffect(() => {
@@ -306,7 +295,7 @@ export function BroadcastCentre() {
     setExpiryMode("none");
     setEndsAt("");
     setAttachment(null);
-    window.localStorage.removeItem(DRAFT_KEY);
+    removeBroadcastDraft();
   }
 
   const createMutation = useMutation({

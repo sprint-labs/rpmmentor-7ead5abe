@@ -177,3 +177,22 @@ USING (
     )
   )
 );
+
+-- This marker is deliberately created after every hardening statement. The
+-- application fails closed when the RPC is absent, so an application deploy
+-- cannot upload Broadcast media while the legacy broad policies are still in
+-- place. The attachment schema migration is a prerequisite because the policy
+-- definitions above reference its columns. The v1 suffix binds callers to this
+-- policy contract; a future incompatible policy contract must use a new marker.
+CREATE OR REPLACE FUNCTION public.announcement_media_storage_ready_v1()
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY INVOKER
+SET search_path = ''
+AS $$
+  SELECT true;
+$$;
+
+REVOKE ALL ON FUNCTION public.announcement_media_storage_ready_v1() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.announcement_media_storage_ready_v1() TO authenticated;

@@ -6,10 +6,18 @@ const authState = vi.hoisted(() => ({
     expires_at: Math.floor(Date.now() / 1000) + 3600,
   } as { access_token: string; expires_at: number } | null,
   refreshedToken: "refreshed-token",
+  sessionRequests: 0,
 }));
 
 const storageState = vi.hoisted(() => ({
   uploaded: [] as Array<{ path: string; contentType?: string }>,
+}));
+
+const capabilityState = vi.hoisted(() => ({
+  ready: true as boolean | null,
+  error: null as { message: string } | null,
+  throws: false,
+  calls: [] as string[],
 }));
 
 const tusState = vi.hoisted(() => ({
@@ -40,8 +48,16 @@ vi.mock("tus-js-client", () => {
 
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
+    rpc: async (name: string) => {
+      capabilityState.calls.push(name);
+      if (capabilityState.throws) throw new Error("network unavailable");
+      return { data: capabilityState.ready, error: capabilityState.error };
+    },
     auth: {
-      getSession: async () => ({ data: { session: authState.session } }),
+      getSession: async () => {
+        authState.sessionRequests += 1;
+        return { data: { session: authState.session } };
+      },
       refreshSession: async () => ({
         data: {
           session: authState.session
@@ -80,7 +96,12 @@ describe("uploadAnnouncementAttachment", () => {
       access_token: "session-token",
       expires_at: Math.floor(Date.now() / 1000) + 3600,
     };
+    authState.sessionRequests = 0;
     storageState.uploaded = [];
+    capabilityState.ready = true;
+    capabilityState.error = null;
+    capabilityState.throws = false;
+    capabilityState.calls = [];
     tusState.objectNames = [];
     tusState.sizes = [];
     vi.stubEnv("VITE_SUPABASE_URL", "https://zdxxezquhvpjmoxlecjp.supabase.co");
@@ -124,6 +145,30 @@ describe("uploadAnnouncementAttachment", () => {
     await expect(
       uploadAnnouncementAttachment(attachment("notice.pdf", 1024, "text/html")),
     ).rejects.toThrow("Use an image, MP4, MOV, WebM, audio file or PDF.");
+    expect(tusState.objectNames).toHaveLength(0);
+    expect(storageState.uploaded).toHaveLength(0);
+  });
+
+  it("fails closed before upload when the storage-hardening marker is unavailable", async () => {
+    capabilityState.ready = null;
+    capabilityState.error = { message: "function does not exist" };
+
+    await expect(
+      uploadAnnouncementAttachment(attachment("notice.pdf", 1024, "application/pdf")),
+    ).rejects.toThrow("Media attachments are unavailable");
+    expect(capabilityState.calls).toEqual(["announcement_media_storage_ready_v1"]);
+    expect(authState.sessionRequests).toBe(0);
+    expect(tusState.objectNames).toHaveLength(0);
+    expect(storageState.uploaded).toHaveLength(0);
+  });
+
+  it("fails closed before upload when the readiness check cannot complete", async () => {
+    capabilityState.throws = true;
+
+    await expect(
+      uploadAnnouncementAttachment(attachment("notice.pdf", 1024, "application/pdf")),
+    ).rejects.toThrow("Media attachments are unavailable");
+    expect(authState.sessionRequests).toBe(0);
     expect(tusState.objectNames).toHaveLength(0);
     expect(storageState.uploaded).toHaveLength(0);
   });
