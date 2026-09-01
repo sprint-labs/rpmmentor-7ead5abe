@@ -73,6 +73,86 @@ describe("Broadcast delivery windows", () => {
     );
   });
 
+  it("rejects a nonexistent local publish time instead of normalising it", () => {
+    const originalTimezone = process.env.TZ;
+    process.env.TZ = "Europe/London";
+
+    try {
+      expect(() =>
+        resolveBroadcastWindow(
+          {
+            publishMode: "later",
+            startsAt: "2027-03-28T01:30",
+            expiryMode: "none",
+            endsAt: "",
+          },
+          Date.parse("2027-03-27T12:00:00.000Z"),
+        ),
+      ).toThrow("Choose a valid publish time.");
+      expect(
+        resolveBroadcastWindow(
+          {
+            publishMode: "later",
+            startsAt: "2027-03-28T02:30",
+            expiryMode: "none",
+            endsAt: "",
+          },
+          Date.parse("2027-03-27T12:00:00.000Z"),
+        ).startsAt,
+      ).toBe("2027-03-28T01:30:00.000Z");
+    } finally {
+      if (originalTimezone === undefined) delete process.env.TZ;
+      else process.env.TZ = originalTimezone;
+    }
+  });
+
+  it("rejects a nonexistent local custom expiry instead of normalising it", () => {
+    const originalTimezone = process.env.TZ;
+    process.env.TZ = "Europe/London";
+
+    try {
+      expect(() =>
+        resolveBroadcastWindow(
+          {
+            publishMode: "now",
+            startsAt: "",
+            expiryMode: "custom",
+            endsAt: "2027-03-28T01:30",
+          },
+          Date.parse("2027-03-27T12:00:00.000Z"),
+        ),
+      ).toThrow("Choose a valid end time.");
+    } finally {
+      if (originalTimezone === undefined) delete process.env.TZ;
+      else process.env.TZ = originalTimezone;
+    }
+  });
+
+  it("rejects normalised calendar values while preserving explicit instants", () => {
+    expect(() =>
+      resolveBroadcastWindow(
+        {
+          publishMode: "later",
+          startsAt: "2027-02-30T12:00",
+          expiryMode: "none",
+          endsAt: "",
+        },
+        Date.parse("2027-02-01T12:00:00.000Z"),
+      ),
+    ).toThrow("Choose a valid publish time.");
+    expect(
+      resolveBroadcastWindow(
+        {
+          publishMode: "later",
+          startsAt: "2027-03-28T01:30:00.000Z",
+          expiryMode: "none",
+          endsAt: "",
+        },
+        Date.parse("2027-03-27T12:00:00.000Z"),
+      ).startsAt,
+    ).toBe("2027-03-28T01:30:00.000Z");
+  });
+
   it("anchors relative expiry to the final publish-now timestamp", () => {
     const resolved = resolveBroadcastWindow(
       { publishMode: "now", startsAt: "", expiryMode: "24h", endsAt: "" },

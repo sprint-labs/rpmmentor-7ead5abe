@@ -16,6 +16,35 @@ export type ResolvedBroadcastWindow = {
   endsAt: string | null;
 };
 
+const DATE_TIME_LOCAL = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.(\d{1,3}))?)?$/;
+const DATE_TIME_WITH_OFFSET = /(?:Z|[+-]\d{2}:\d{2})$/i;
+
+function parseBroadcastDateTime(value: string, errorMessage: string): Date {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) throw new Error(errorMessage);
+
+  if (DATE_TIME_WITH_OFFSET.test(value)) return parsed;
+  const localParts = DATE_TIME_LOCAL.exec(value);
+  if (!localParts) throw new Error(errorMessage);
+  const [, year, month, day, hour, minute, second = "0", fraction = "0"] = localParts;
+  const milliseconds = Number(fraction.padEnd(3, "0"));
+  if (
+    parsed.getFullYear() !== Number(year) ||
+    parsed.getMonth() + 1 !== Number(month) ||
+    parsed.getDate() !== Number(day) ||
+    parsed.getHours() !== Number(hour) ||
+    parsed.getMinutes() !== Number(minute) ||
+    parsed.getSeconds() !== Number(second) ||
+    parsed.getMilliseconds() !== milliseconds
+  ) {
+    // Date normalises nonexistent local wall times across DST gaps (and
+    // out-of-range calendar values). Never publish at a time other than the
+    // one still shown in the native datetime-local control.
+    throw new Error(errorMessage);
+  }
+  return parsed;
+}
+
 function expiryForServerStart(
   mode: BroadcastExpiryMode | undefined,
   startsAt: string,
@@ -56,10 +85,11 @@ export function resolveBroadcastWindow(
   nowMs = Date.now(),
 ): ResolvedBroadcastWindow {
   const scheduled = input.publishMode === "later";
-  const start = scheduled ? new Date(input.startsAt) : new Date(nowMs);
-  if ((!input.startsAt && scheduled) || Number.isNaN(start.getTime())) {
-    throw new Error("Choose a valid publish time.");
-  }
+  if (!input.startsAt && scheduled) throw new Error("Choose a valid publish time.");
+  const start = scheduled
+    ? parseBroadcastDateTime(input.startsAt, "Choose a valid publish time.")
+    : new Date(nowMs);
+  if (Number.isNaN(start.getTime())) throw new Error("Choose a valid publish time.");
 
   let endsAt: string | null;
   if (input.expiryMode === "none") {
@@ -70,8 +100,7 @@ export function resolveBroadcastWindow(
     endsAt = new Date(start.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString();
   } else {
     if (!input.endsAt) throw new Error("Choose a valid end time.");
-    const end = new Date(input.endsAt);
-    if (Number.isNaN(end.getTime())) throw new Error("Choose a valid end time.");
+    const end = parseBroadcastDateTime(input.endsAt, "Choose a valid end time.");
     endsAt = end.toISOString();
   }
 
