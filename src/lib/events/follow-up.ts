@@ -15,6 +15,7 @@
  */
 import { addHours, londonWallClockMs } from "@/lib/time/london";
 import type { InteractionTypeValue } from "@/lib/interactions/schema";
+import { normalizeMatchParticipationStatus, type MatchParticipationStatus } from "./participation";
 
 /**
  * The three event types a manager may schedule.
@@ -67,7 +68,13 @@ export const INTERACTION_TYPE_BY_EVENT_TYPE: Partial<Record<EventType, Interacti
 };
 
 export type FollowUpStatus =
-  "scheduled" | "pending" | "completed" | "overdue" | "cancelled" | "not_required";
+  | "scheduled"
+  | "pending"
+  | "completed"
+  | "overdue"
+  | "cancelled"
+  | "not_required"
+  | "confirmation_needed";
 
 export const FOLLOW_UP_WINDOW_HOURS = 48;
 
@@ -78,6 +85,7 @@ export const FOLLOW_UP_STATUS_LABEL: Record<FollowUpStatus, string> = {
   overdue: "Overdue",
   cancelled: "Cancelled",
   not_required: "Not required",
+  confirmation_needed: "Confirm participation",
 };
 
 /** Statuses that still need someone to act. */
@@ -85,11 +93,14 @@ export const OPEN_FOLLOW_UP_STATUSES: readonly FollowUpStatus[] = [
   "scheduled",
   "pending",
   "overdue",
+  "confirmation_needed",
 ];
 
 /** The stored facts a status is computed from. */
 export interface FollowUpSource {
   eventType: string;
+  /** Only meaningful for a Match. Missing or unknown values fail closed to Not confirmed. */
+  participationStatus?: string | null;
   /** Calendar date, "YYYY-MM-DD". */
   eventDate: string;
   /** London wall-clock "HH:MM". Null only on rows created before a time was required. */
@@ -106,6 +117,10 @@ export interface FollowUpSource {
 export interface FollowUp {
   /** Null for a legacy event type, which carries no requirement. */
   kind: FollowUpKind | null;
+  /** Normalised for a Match and null for every other event type. */
+  participationStatus: MatchParticipationStatus | null;
+  /** The persisted manager-waiver fact, independent of the derived status. */
+  waived: boolean;
   status: FollowUpStatus;
   /** Instant the event is scheduled to finish. */
   endsAtMs: number;
@@ -119,7 +134,7 @@ export interface FollowUp {
  *
  * Precedence is deliberate:
  *
- *   completed > cancelled > not required > time-based
+ *   completed > cancelled > waiver > participation > time-based
  *
  * A saved, linked record is a fact about the world, so it outranks everything —
  * cancelling an event after the write-up landed must not erase the evidence that
@@ -130,9 +145,22 @@ export interface FollowUp {
  * `completedRecordId`, which is only ever supplied by reading a persisted row.
  */
 export function resolveFollowUp(source: FollowUpSource, now: number = Date.now()): FollowUp {
-  const kind = isEventType(source.eventType)
+  const isMatch = source.eventType === "Match";
+  const participationStatus = isMatch
+    ? normalizeMatchParticipationStatus(source.participationStatus)
+    : null;
+  const eventTypeKind = isEventType(source.eventType)
     ? FOLLOW_UP_KIND_BY_EVENT_TYPE[source.eventType]
     : null;
+
+  // An existing linked Match Report remains visible even if historic
+  // participation is unconfirmed or later corrected. Otherwise a Match only
+  // creates a report requirement once participation is explicitly Played.
+  const kind = isMatch
+    ? source.completedRecordId || participationStatus === "played"
+      ? "match_report"
+      : null
+    : eventTypeKind;
 
   const endsAtMs = londonWallClockMs(source.eventDate, source.endTime || source.startTime);
   const deadlineMs = Number.isFinite(endsAtMs) ? addHours(endsAtMs, FOLLOW_UP_WINDOW_HOURS) : NaN;
@@ -140,7 +168,16 @@ export function resolveFollowUp(source: FollowUpSource, now: number = Date.now()
   const status = ((): FollowUpStatus => {
     if (source.completedRecordId) return "completed";
     if (source.cancelled) return "cancelled";
+    // Preserve an existing explicit manager decision for historic rows. The
+    // new safe participation default must not silently reopen waived work.
     if (source.waived) return "not_required";
+    if (participationStatus === "did_not_play") return "not_required";
+    if (participationStatus === "not_confirmed") {
+      // Before the fixture there is nothing to confirm yet. Afterwards this is
+      // an explicit lightweight action, never an overdue Match Report.
+      if (!Number.isFinite(endsAtMs) || now < endsAtMs) return "scheduled";
+      return "confirmation_needed";
+    }
     // An unparseable date cannot be judged against the clock. Treat it as still
     // to come rather than inventing an overdue alert from bad data.
     if (!Number.isFinite(endsAtMs)) return "scheduled";
@@ -149,7 +186,15 @@ export function resolveFollowUp(source: FollowUpSource, now: number = Date.now()
     return "overdue";
   })();
 
-  return { kind, status, endsAtMs, deadlineMs, completedRecordId: source.completedRecordId };
+  return {
+    kind,
+    status,
+    participationStatus,
+    waived: source.waived,
+    endsAtMs,
+    deadlineMs,
+    completedRecordId: source.completedRecordId,
+  };
 }
 
 /** What the assigned mentor is being asked to produce, in plain words. */

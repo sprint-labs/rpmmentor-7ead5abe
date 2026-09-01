@@ -16,13 +16,10 @@ import {
   type FollowUpKind,
 } from "./follow-up";
 import { formatLondonInstant, londonWallClockMs } from "@/lib/time/london";
+import { normalizeMatchParticipationStatus } from "./participation";
 
 export type NotificationKind =
-  | "event_assigned"
-  | "event_updated"
-  | "event_unassigned"
-  | "event_cancelled"
-  | "follow_up_overdue";
+  "event_assigned" | "event_updated" | "event_unassigned" | "event_cancelled" | "follow_up_overdue";
 
 /** The event facts a notification is built from. */
 export interface NotifiableEvent {
@@ -34,6 +31,7 @@ export interface NotifiableEvent {
   endTime?: string | null;
   goalkeeperName: string | null;
   playerId: string | null;
+  participationStatus?: string | null;
   status?: string;
 }
 
@@ -103,10 +101,20 @@ export function followUpLinkPath(event: NotifiableEvent, kind: FollowUpKind | nu
 function describe(event: NotifiableEvent, kind: FollowUpKind | null, deadlineMs: number): string {
   const gk = event.goalkeeperName || "an unnamed goalkeeper";
   const required = followUpRequirementLabel(kind);
-  const lines = [
-    `${event.eventType} with ${gk}`,
-    `Scheduled: ${formatEventWhen(event)} (London)`,
-  ];
+  const lines = [`${event.eventType} with ${gk}`, `Scheduled: ${formatEventWhen(event)} (London)`];
+  if (event.eventType === "Match") {
+    const participation = normalizeMatchParticipationStatus(event.participationStatus);
+    if (participation === "not_confirmed") {
+      lines.push(
+        "Participation: Not confirmed — a Mentor Manager or administrator needs to confirm who played; no Match Report is due unless this goalkeeper is marked Played",
+      );
+      return lines.join("\n");
+    }
+    if (participation === "did_not_play") {
+      lines.push("Participation: Did not play — no Match Report is required");
+      return lines.join("\n");
+    }
+  }
   if (kind) {
     lines.push(`You need to submit: ${required}`);
     lines.push(`Due by: ${formatLondonInstant(deadlineMs)} (London)`);
@@ -134,6 +142,7 @@ export function buildEventNotification(
       cancelled: kind === "event_cancelled",
       waived: false,
       completedRecordId: null,
+      participationStatus: event.participationStatus,
     },
     options.now ?? Date.now(),
   );
@@ -141,7 +150,10 @@ export function buildEventNotification(
   const gk = event.goalkeeperName || "an unnamed goalkeeper";
   const when = formatEventWhen(event);
   const detail = describe(event, followUp.kind, followUp.deadlineMs);
-  const link = followUpLinkPath(event, followUp.kind);
+  const link =
+    event.eventType === "Match" && followUp.participationStatus !== "played"
+      ? "/calendar"
+      : followUpLinkPath(event, followUp.kind);
 
   switch (kind) {
     case "event_assigned":

@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
+  assertMatchParticipationUpdatable,
   toTeamCalendarEvent,
   validateEvent,
   type CalendarEventSelect,
@@ -20,6 +21,7 @@ function row(overrides: Partial<CalendarEventSelect> = {}): CalendarEventSelect 
     end_time: null,
     location: "Northbridge",
     notes: "",
+    participation_status: "not_confirmed",
     player_id: PLAYER,
     goalkeeper_name: "Alex Testkeeper",
     assigned_mentor_id: MENTOR,
@@ -49,6 +51,7 @@ describe("toTeamCalendarEvent", () => {
       assigned_mentor_id: MENTOR,
       assigned_mentor_name: "Morgan Mentor",
       status: "scheduled",
+      participation_status: "not_confirmed",
       follow_up_waiver_reason: "Covered in person",
     });
   });
@@ -95,7 +98,29 @@ describe("validateEvent still refuses retired types on write", () => {
     expect(validateEvent({ ...base, event_type: "Training Ground Visit" }).event_type).toBe(
       "Training Ground Visit",
     );
-    expect(() => validateEvent({ ...base, event_type: "Meeting" })).toThrow(/Match, Training Ground/i);
+    expect(() => validateEvent({ ...base, event_type: "Meeting" })).toThrow(
+      /Match, Training Ground/i,
+    );
+  });
+});
+
+describe("match participation write boundary", () => {
+  it("requires a cancelled Match to be reinstated before participation can change", () => {
+    expect(() =>
+      assertMatchParticipationUpdatable({ event_type: "Match", status: "cancelled" }),
+    ).toThrow(/reinstate the Match/i);
+  });
+
+  it("accepts an active Match and still rejects non-Match events", () => {
+    expect(() =>
+      assertMatchParticipationUpdatable({ event_type: "Match", status: "scheduled" }),
+    ).not.toThrow();
+    expect(() =>
+      assertMatchParticipationUpdatable({
+        event_type: "Training Ground Visit",
+        status: "scheduled",
+      }),
+    ).toThrow(/only be confirmed for a Match/i);
   });
 });
 
@@ -104,9 +129,43 @@ describe("calendar event query columns", () => {
     const source = readFileSync(new URL("./calendar.functions.ts", import.meta.url), "utf8");
     expect(source).toMatch(/assigned_mentor_id, assigned_mentor_name/);
     expect(source).toMatch(/follow_up_waived_at, follow_up_waiver_reason/);
+    expect(source).toMatch(/participation_status/);
     expect(source).toMatch(/list_mentor_directory/);
     expect(source).toMatch(/notifyEventAssigned/);
     expect(source).not.toMatch(/as TeamCalendarEvent/);
     expect(source).not.toMatch(/as TeamCalendarEvent\[\]/);
+  });
+
+  it("defaults newly scheduled Match associations safely and role-gates participation updates", () => {
+    const source = readFileSync(new URL("./calendar.functions.ts", import.meta.url), "utf8");
+    expect(source).toContain("participation_status: DEFAULT_MATCH_PARTICIPATION_STATUS");
+    expect(source).toMatch(/updateMatchParticipation[\s\S]*CALENDAR_MANAGE_ROLES/);
+    expect(source).toMatch(/\.eq\("event_type", "Match"\)/);
+    expect(source).toMatch(/\.neq\("status", "cancelled"\)/);
+  });
+
+  it("fails closed when the existing event cannot be read before an edit", () => {
+    const source = readFileSync(new URL("./calendar.functions.ts", import.meta.url), "utf8");
+    const updateSource = source.slice(
+      source.indexOf("export const updateCalendarEvent"),
+      source.indexOf("export const updateMatchParticipation"),
+    );
+    const readIndex = updateSource.indexOf("error: beforeError");
+    const errorGuardIndex = updateSource.indexOf(
+      "if (beforeError) throw new Error(beforeError.message)",
+    );
+    const missingGuardIndex = updateSource.indexOf(
+      'if (!before) throw new Error("That calendar event could not be updated.")',
+    );
+    const writeIndex = updateSource.indexOf(".update({");
+
+    expect(readIndex).toBeGreaterThan(-1);
+    expect(errorGuardIndex).toBeGreaterThan(readIndex);
+    expect(missingGuardIndex).toBeGreaterThan(errorGuardIndex);
+    expect(writeIndex).toBeGreaterThan(missingGuardIndex);
+    expect(updateSource).toContain(
+      "before.player_id !== fields.player_id || before.event_type !== fields.event_type",
+    );
+    expect(updateSource).toContain("participation_status: DEFAULT_MATCH_PARTICIPATION_STATUS");
   });
 });

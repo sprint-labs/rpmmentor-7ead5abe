@@ -315,7 +315,15 @@
       }
     ]
   },
-  "reviewed_forward_migrations": [],
+  "reviewed_forward_migrations": [
+    {
+      "version": "20260901115505",
+      "name": "match_event_participation",
+      "statement_count": 1,
+      "sql_length": 5585,
+      "sql_md5": "f341ca6d77c6aed04064eb386529d17d"
+    }
+  ],
   "repository_comparison": {
     "live_rows_with_byte_exact_local_statement": 27,
     "live_rows_contained_inside_a_larger_local_file": 2,

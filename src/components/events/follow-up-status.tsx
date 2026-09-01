@@ -20,6 +20,7 @@ const STATUS_CHIP: Record<FollowUpStatus, string> = {
   pending: "border-warning/30 bg-warning/10 text-warning",
   completed: "border-success/30 bg-success/10 text-success",
   overdue: "border-destructive/40 bg-destructive/10 text-destructive",
+  confirmation_needed: "border-warning/35 bg-warning/10 text-warning",
   cancelled: "border-border bg-muted text-muted-foreground line-through",
   not_required: "border-border bg-muted text-muted-foreground",
 };
@@ -44,11 +45,20 @@ export function FollowUpStatusPill({
  * The one-line explanation that sits under a status: what is owed and by when,
  * or why nothing is.
  */
-export function followUpDetail(followUp: FollowUp, waiverReason: string, cancellationReason: string): string {
+export function followUpDetail(
+  followUp: FollowUp,
+  waiverReason: string,
+  cancellationReason: string,
+): string {
   const required = followUpRequirementLabel(followUp.kind);
   switch (followUp.status) {
     case "scheduled":
+      if (followUp.participationStatus === "not_confirmed") {
+        return "Participation not confirmed — confirm who played after the Match";
+      }
       return `${required} due ${formatLondonInstant(followUp.deadlineMs)}`;
+    case "confirmation_needed":
+      return "Confirm whether this goalkeeper played — no Match Report is overdue";
     case "pending":
       return `${required} due ${formatLondonInstant(followUp.deadlineMs)} · ${describeDeadlineDistance(followUp.deadlineMs)}`;
     case "overdue":
@@ -58,8 +68,37 @@ export function followUpDetail(followUp: FollowUp, waiverReason: string, cancell
     case "cancelled":
       return cancellationReason ? `Event cancelled — ${cancellationReason}` : "Event cancelled";
     case "not_required":
-      return waiverReason ? `Waived — ${waiverReason}` : "Waived by a manager";
+      if (followUp.waived) {
+        return waiverReason ? `Waived — ${waiverReason}` : "Waived by a manager";
+      }
+      if (followUp.participationStatus === "did_not_play") {
+        return "Did not play — no Match Report required";
+      }
+      return "No write-up required";
   }
+}
+
+/** Accurate copy for clearing a persisted waiver without overstating what reopens. */
+export function unwaivePresentation(followUp: FollowUp): {
+  label: string;
+  successMessage: string;
+} {
+  if (followUp.status === "not_required" && followUp.kind !== null) {
+    return { label: "Require write-up again", successMessage: "Write-up required again." };
+  }
+  if (followUp.participationStatus === "did_not_play") {
+    return {
+      label: "Remove waiver",
+      successMessage: "Waiver removed. Did not play still requires no Match Report.",
+    };
+  }
+  if (followUp.participationStatus === "not_confirmed") {
+    return {
+      label: "Remove waiver",
+      successMessage: "Waiver removed. Confirm participation before any Match Report is required.",
+    };
+  }
+  return { label: "Remove waiver", successMessage: "Waiver removed." };
 }
 
 /** A link straight to the form that discharges the requirement. */
@@ -67,24 +106,35 @@ export function FollowUpActionLink({
   event,
   followUp,
   label,
+  canConfirmParticipation = false,
 }: {
   event: NotifiableEvent;
   followUp: FollowUp;
   label?: string;
+  canConfirmParticipation?: boolean;
 }) {
+  if (followUp.status === "confirmation_needed") {
+    if (!canConfirmParticipation) return null;
+    return (
+      <Link to="/calendar" className="text-xs font-medium text-primary hover:underline">
+        Confirm participation
+      </Link>
+    );
+  }
   if (!followUp.kind) return null;
-  if (followUp.status === "completed" || followUp.status === "cancelled" || followUp.status === "not_required") {
+  if (followUp.kind === "match_report" && followUp.participationStatus !== "played") return null;
+  if (
+    followUp.status === "completed" ||
+    followUp.status === "cancelled" ||
+    followUp.status === "not_required"
+  ) {
     return null;
   }
   const path = followUpLinkPath(event, followUp.kind);
   const [to, query] = path.split("?");
   const search = Object.fromEntries(new URLSearchParams(query ?? ""));
   return (
-    <Link
-      to={to}
-      search={search}
-      className="text-xs font-medium text-primary hover:underline"
-    >
+    <Link to={to} search={search} className="text-xs font-medium text-primary hover:underline">
       {label ?? `Submit ${followUpRequirementLabel(followUp.kind)}`}
     </Link>
   );

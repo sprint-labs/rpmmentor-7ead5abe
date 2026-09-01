@@ -11,6 +11,11 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import type { Database } from "@/integrations/supabase/types";
 import { requireRole, type AppRole } from "@/lib/roles.server";
 import { EVENT_TYPES, isEventType, type EventType } from "@/lib/events/follow-up";
+import {
+  DEFAULT_MATCH_PARTICIPATION_STATUS,
+  isMatchParticipationStatus,
+  type MatchParticipationStatus,
+} from "@/lib/events/participation";
 
 export const CALENDAR_MANAGE_ROLES: readonly AppRole[] = ["mentor_manager", "admin", "super_admin"];
 
@@ -37,6 +42,7 @@ export type CalendarEventSelect = Pick<
   | "end_time"
   | "location"
   | "notes"
+  | "participation_status"
   | "player_id"
   | "goalkeeper_name"
   | "assigned_mentor_id"
@@ -67,6 +73,9 @@ export function toTeamCalendarEvent(row: CalendarEventSelect): TeamCalendarEvent
     end_time: row.end_time,
     location: row.location,
     notes: row.notes,
+    participation_status: isMatchParticipationStatus(row.participation_status)
+      ? row.participation_status
+      : DEFAULT_MATCH_PARTICIPATION_STATUS,
     player_id: row.player_id,
     goalkeeper_name: row.goalkeeper_name,
     assigned_mentor_id: row.assigned_mentor_id,
@@ -89,6 +98,7 @@ export interface TeamCalendarEvent {
   end_time: string | null;
   location: string | null;
   notes: string;
+  participation_status: MatchParticipationStatus;
   player_id: string | null;
   goalkeeper_name: string | null;
   assigned_mentor_id: string | null;
@@ -101,10 +111,26 @@ export interface TeamCalendarEvent {
   created_by_name: string;
 }
 
+/**
+ * A cancelled fixture is closed until management explicitly reinstates it.
+ * Participation must not reopen that obligation indirectly or generate active
+ * Match Report copy for an event that the follow-up resolver treats as closed.
+ */
+export function assertMatchParticipationUpdatable(
+  event: Pick<CalendarEventRow, "event_type" | "status">,
+): void {
+  if (event.event_type !== "Match") {
+    throw new Error("Participation can only be confirmed for a Match event.");
+  }
+  if (event.status === "cancelled") {
+    throw new Error("Reinstate the Match before confirming participation.");
+  }
+}
+
 // One literal, not a concatenation: supabase-js infers the row type from the
 // select string, and joining pieces together erases that inference.
 const COLUMNS =
-  "id, title, event_type, event_date, start_time, end_time, location, notes, player_id, goalkeeper_name, assigned_mentor_id, assigned_mentor_name, status, cancellation_reason, follow_up_waived_at, follow_up_waiver_reason, created_by, created_by_name";
+  "id, title, event_type, event_date, start_time, end_time, location, notes, participation_status, player_id, goalkeeper_name, assigned_mentor_id, assigned_mentor_name, status, cancellation_reason, follow_up_waived_at, follow_up_waiver_reason, created_by, created_by_name";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -280,6 +306,7 @@ export const createCalendarEvent = createServerFn({ method: "POST" })
         ...data,
         ...people,
         end_time: null,
+        participation_status: DEFAULT_MATCH_PARTICIPATION_STATUS,
         created_by: context.userId,
         created_by_name: profile?.name ?? "",
       })
@@ -317,26 +344,91 @@ export const updateCalendarEvent = createServerFn({ method: "POST" })
 
     // Read the previous values first, so the change can be described to whoever
     // it affects — including a mentor the event has just been taken away from.
-    const { data: before } = await context.supabase
+    const { data: before, error: beforeError } = await context.supabase
       .from("calendar_events")
-      .select("assigned_mentor_id, event_date, start_time, end_time, player_id, event_type")
+      .select(
+        "assigned_mentor_id, event_date, start_time, end_time, player_id, event_type, participation_status",
+      )
       .eq("id", id)
       .maybeSingle();
+    if (beforeError) throw new Error(beforeError.message);
+    if (!before) throw new Error("That calendar event could not be updated.");
 
     const { data: row, error } = await context.supabase
       .from("calendar_events")
       // `end_time` is cleared rather than left behind: the form no longer
       // collects one, so a stored value would be invisible and unmaintainable.
-      .update({ ...fields, ...people, end_time: null })
+      // A different goalkeeper or newly selected Match is a new participation
+      // question. Never carry a previous person's Played answer across it.
+      .update({
+        ...fields,
+        ...people,
+        end_time: null,
+        ...(before.player_id !== fields.player_id || before.event_type !== fields.event_type
+          ? { participation_status: DEFAULT_MATCH_PARTICIPATION_STATUS }
+          : {}),
+      })
       .eq("id", id)
       .select(COLUMNS)
       .maybeSingle();
     if (error) throw new Error(error.message);
     if (!row) throw new Error("That calendar event could not be updated.");
 
-    if (before) {
-      await notifyEventChanged(context.supabase, context.userId, toTeamCalendarEvent(row), before);
+    await notifyEventChanged(context.supabase, context.userId, toTeamCalendarEvent(row), before);
+    return toTeamCalendarEvent(row);
+  });
+
+/**
+ * Confirm whether the goalkeeper linked to a Match actually played.
+ *
+ * This deliberately updates the existing goalkeeper/event association instead
+ * of creating another fixture or follow-up row. The same field is the future
+ * integration point for a trusted lineup provider; any automated writer must
+ * still use a server-side path with the same role and audit guarantees.
+ */
+export const updateMatchParticipation = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((data: { id: string; participation_status: string }) => {
+    if (!UUID_RE.test(data?.id ?? "")) throw new Error("An event id is required.");
+    if (!isMatchParticipationStatus(data?.participation_status)) {
+      throw new Error("Choose Not confirmed, Played or Did not play.");
     }
+    return { id: data.id, participation_status: data.participation_status };
+  })
+  .handler(async ({ data, context }): Promise<TeamCalendarEvent> => {
+    const { notifyEventChanged } = await import("@/lib/events/notify.server");
+    await requireRole(
+      context.supabase,
+      context.userId,
+      CALENDAR_MANAGE_ROLES,
+      "confirm match participation",
+    );
+
+    const { data: before, error: beforeError } = await context.supabase
+      .from("calendar_events")
+      .select(
+        "event_type, assigned_mentor_id, event_date, start_time, end_time, player_id, participation_status, status",
+      )
+      .eq("id", data.id)
+      .maybeSingle();
+    if (beforeError) throw new Error(beforeError.message);
+    if (!before) throw new Error("That calendar event no longer exists.");
+    assertMatchParticipationUpdatable(before);
+
+    const { data: row, error } = await context.supabase
+      .from("calendar_events")
+      .update({ participation_status: data.participation_status })
+      .eq("id", data.id)
+      .eq("event_type", "Match")
+      // Repeat the cancellation condition on the write so a concurrent cancel
+      // between the read above and this update still fails closed.
+      .neq("status", "cancelled")
+      .select(COLUMNS)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!row) throw new Error("That Match participation could not be updated.");
+
+    await notifyEventChanged(context.supabase, context.userId, toTeamCalendarEvent(row), before);
     return toTeamCalendarEvent(row);
   });
 
