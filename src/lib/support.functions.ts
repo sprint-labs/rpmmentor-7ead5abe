@@ -9,6 +9,16 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { requireRole, SUPPORT_INBOX_ROLES } from "@/lib/roles.server";
 import {
+  ADMIN_RECENT_ANNOUNCEMENT_LIMIT,
+  endedAtForAnnouncement,
+  mergeAdminAnnouncementPages,
+} from "@/lib/support/admin-announcements";
+import {
+  ANNOUNCEMENT_COLUMNS,
+  LEGACY_ANNOUNCEMENT_COLUMNS,
+  queryAnnouncementsWithSchemaCompatibility,
+} from "@/lib/support/announcement-schema-compat";
+import {
   ANNOUNCEMENT_KINDS,
   SUPPORT_SEVERITIES,
   SUPPORT_THREAD_KINDS,
@@ -21,6 +31,7 @@ import {
   markAnnouncementReadInput,
   replySupportThreadInput,
   setSupportThreadStatusInput,
+  type AnnouncementAttachment,
   type AnnouncementKind,
   type AnnouncementRow,
   type SupportMessage,
@@ -62,6 +73,10 @@ type AnnouncementDbRow = {
   active: boolean;
   created_by: string;
   created_at: string;
+  attachment_path?: string | null;
+  attachment_name?: string | null;
+  attachment_mime?: string | null;
+  attachment_size?: number | null;
 };
 
 function asThreadKind(value: string): SupportThreadKind {
@@ -114,6 +129,17 @@ function mapMessage(row: MessageRow): SupportMessage {
 }
 
 function mapAnnouncement(row: AnnouncementDbRow, readAt: string | null): AnnouncementRow {
+  const attachmentSize = row.attachment_size;
+  const attachment: AnnouncementAttachment | null =
+    row.attachment_path && row.attachment_name && row.attachment_mime && attachmentSize != null
+      ? {
+          path: row.attachment_path,
+          name: row.attachment_name,
+          mime: row.attachment_mime,
+          size: attachmentSize,
+        }
+      : null;
+
   return {
     id: row.id,
     kind: asAnnouncementKind(row.kind),
@@ -125,15 +151,13 @@ function mapAnnouncement(row: AnnouncementDbRow, readAt: string | null): Announc
     createdBy: row.created_by,
     createdAt: row.created_at,
     readAt,
+    attachment,
   };
 }
 
 const THREAD_COLUMNS =
   "id, kind, subject, status, author_id, page_path, severity, created_at, updated_at, last_message_at";
 const MESSAGE_COLUMNS = "id, thread_id, author_id, body, created_at";
-const ANNOUNCEMENT_COLUMNS =
-  "id, kind, title, body, starts_at, ends_at, active, created_by, created_at";
-
 export const createSupportThread = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((data) => createSupportThreadInput.parse(data))
@@ -307,13 +331,24 @@ export const listActiveAnnouncements = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<AnnouncementRow[]> => {
     const nowIso = new Date().toISOString();
-    const { data: rows, error } = await context.supabase
-      .from("announcements")
-      .select(ANNOUNCEMENT_COLUMNS)
-      .eq("active", true)
-      .lte("starts_at", nowIso)
-      .or(`ends_at.is.null,ends_at.gt.${nowIso}`)
-      .order("starts_at", { ascending: false });
+    const { data: rows, error } = await queryAnnouncementsWithSchemaCompatibility(
+      () =>
+        context.supabase
+          .from("announcements")
+          .select(ANNOUNCEMENT_COLUMNS)
+          .eq("active", true)
+          .lte("starts_at", nowIso)
+          .or(`ends_at.is.null,ends_at.gt.${nowIso}`)
+          .order("starts_at", { ascending: false }),
+      () =>
+        context.supabase
+          .from("announcements")
+          .select(LEGACY_ANNOUNCEMENT_COLUMNS)
+          .eq("active", true)
+          .lte("starts_at", nowIso)
+          .or(`ends_at.is.null,ends_at.gt.${nowIso}`)
+          .order("starts_at", { ascending: false }),
+    );
     if (error) throw new Error(error.message);
 
     const announcements = (rows ?? []) as AnnouncementDbRow[];
@@ -332,6 +367,60 @@ export const listActiveAnnouncements = createServerFn({ method: "GET" })
     );
 
     return announcements.map((row) => mapAnnouncement(row, readById.get(row.id) ?? null));
+  });
+
+export const listAdminAnnouncements = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<AnnouncementRow[]> => {
+    await requireRole(
+      context.supabase,
+      context.userId,
+      SUPPORT_INBOX_ROLES,
+      "view all announcements",
+    );
+
+    const nowIso = new Date().toISOString();
+    const currentQuery = queryAnnouncementsWithSchemaCompatibility(
+      () =>
+        context.supabase
+          .from("announcements")
+          .select(ANNOUNCEMENT_COLUMNS)
+          .eq("active", true)
+          .or(`ends_at.is.null,ends_at.gt.${nowIso}`)
+          .order("starts_at", { ascending: false }),
+      () =>
+        context.supabase
+          .from("announcements")
+          .select(LEGACY_ANNOUNCEMENT_COLUMNS)
+          .eq("active", true)
+          .or(`ends_at.is.null,ends_at.gt.${nowIso}`)
+          .order("starts_at", { ascending: false }),
+    );
+    const recentQuery = queryAnnouncementsWithSchemaCompatibility(
+      () =>
+        context.supabase
+          .from("announcements")
+          .select(ANNOUNCEMENT_COLUMNS)
+          .or(`active.eq.false,ends_at.lte.${nowIso}`)
+          .order("starts_at", { ascending: false })
+          .limit(ADMIN_RECENT_ANNOUNCEMENT_LIMIT),
+      () =>
+        context.supabase
+          .from("announcements")
+          .select(LEGACY_ANNOUNCEMENT_COLUMNS)
+          .or(`active.eq.false,ends_at.lte.${nowIso}`)
+          .order("starts_at", { ascending: false })
+          .limit(ADMIN_RECENT_ANNOUNCEMENT_LIMIT),
+    );
+
+    const [currentResult, recentResult] = await Promise.all([currentQuery, recentQuery]);
+    if (currentResult.error) throw new Error(currentResult.error.message);
+    if (recentResult.error) throw new Error(recentResult.error.message);
+
+    return mergeAdminAnnouncementPages(
+      (currentResult.data ?? []) as AnnouncementDbRow[],
+      (recentResult.data ?? []) as AnnouncementDbRow[],
+    ).map((row) => mapAnnouncement(row, null));
   });
 
 export const markAnnouncementRead = createServerFn({ method: "POST" })
@@ -361,18 +450,31 @@ export const createAnnouncement = createServerFn({ method: "POST" })
       "create announcements",
     );
 
-    const { data: inserted, error } = await context.supabase
-      .from("announcements")
-      .insert({
-        kind: data.kind,
-        title: data.title,
-        body: data.body ?? "",
-        ends_at: data.endsAt ?? null,
-        created_by: context.userId,
-        active: true,
-      })
-      .select(ANNOUNCEMENT_COLUMNS)
-      .single();
+    const startsAt = data.startsAt ?? new Date().toISOString();
+    if (data.endsAt && Date.parse(data.endsAt) <= Date.parse(startsAt)) {
+      throw new Error("The end time must be after the publish time.");
+    }
+
+    const insertQuery = context.supabase.from("announcements").insert({
+      kind: data.kind,
+      title: data.title,
+      body: data.body ?? "",
+      starts_at: startsAt,
+      ends_at: data.endsAt ?? null,
+      ...(data.attachment
+        ? {
+            attachment_path: data.attachment.path,
+            attachment_name: data.attachment.name,
+            attachment_mime: data.attachment.mime,
+            attachment_size: data.attachment.size,
+          }
+        : {}),
+      created_by: context.userId,
+      active: true,
+    });
+    const { data: inserted, error } = data.attachment
+      ? await insertQuery.select(ANNOUNCEMENT_COLUMNS).single()
+      : await insertQuery.select(LEGACY_ANNOUNCEMENT_COLUMNS).single();
     if (error || !inserted) {
       throw new Error(error?.message ?? "Could not create the announcement.");
     }
@@ -386,13 +488,35 @@ export const endAnnouncement = createServerFn({ method: "POST" })
     await requireRole(context.supabase, context.userId, SUPPORT_INBOX_ROLES, "end announcements");
 
     const nowIso = new Date().toISOString();
+    const { data: existing, error: existingError } =
+      await queryAnnouncementsWithSchemaCompatibility(
+        () =>
+          context.supabase
+            .from("announcements")
+            .select(ANNOUNCEMENT_COLUMNS)
+            .eq("id", data.announcementId)
+            .maybeSingle(),
+        () =>
+          context.supabase
+            .from("announcements")
+            .select(LEGACY_ANNOUNCEMENT_COLUMNS)
+            .eq("id", data.announcementId)
+            .maybeSingle(),
+      );
+    if (existingError) throw new Error(existingError.message);
+    if (!existing) throw new Error("That announcement was not found.");
+    const existingAnnouncement = existing as unknown as AnnouncementDbRow;
+
     const { data: updated, error } = await context.supabase
       .from("announcements")
-      .update({ active: false, ends_at: nowIso })
+      .update({
+        active: false,
+        ends_at: endedAtForAnnouncement(existingAnnouncement.starts_at, nowIso),
+      })
       .eq("id", data.announcementId)
-      .select(ANNOUNCEMENT_COLUMNS)
+      .select(LEGACY_ANNOUNCEMENT_COLUMNS)
       .maybeSingle();
     if (error) throw new Error(error.message);
     if (!updated) throw new Error("That announcement was not found.");
-    return mapAnnouncement(updated as AnnouncementDbRow, null);
+    return mapAnnouncement({ ...existingAnnouncement, ...(updated as AnnouncementDbRow) }, null);
   });

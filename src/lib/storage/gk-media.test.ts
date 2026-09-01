@@ -4,10 +4,11 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 /**
  * Automated tests for gk-media bucket RLS.
  *
- * Policies under test (see supabase/migrations/20260714124833_*.sql):
+ * Policies under test:
  *   - anon:          no access to any storage.objects row in gk-media
- *   - authenticated: SELECT / INSERT / UPDATE any object in gk-media;
- *                    DELETE only when owner = auth.uid() OR has admin/super_admin role
+ *   - authenticated: normal media access remains role/owner scoped
+ *   - announcements: only Super Admin may mutate reserved objects; other users
+ *                    may read one only while its linked Broadcast is live
  *   - super_admin:   full access, including DELETE of files owned by other users
  *
  * Requires env vars (in .env.local, not committed):
@@ -20,12 +21,9 @@ const BUCKET = "gk-media";
 const RUN_ID = `test-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 const PREFIX = `automated-tests/${RUN_ID}`;
 
-const SUPABASE_URL =
-  process.env.VITE_SUPABASE_URL ?? process.env.SUPABASE_URL ?? "";
+const SUPABASE_URL = process.env.VITE_SUPABASE_URL ?? process.env.SUPABASE_URL ?? "";
 const SUPABASE_KEY =
-  process.env.VITE_SUPABASE_PUBLISHABLE_KEY ??
-  process.env.SUPABASE_PUBLISHABLE_KEY ??
-  "";
+  process.env.VITE_SUPABASE_PUBLISHABLE_KEY ?? process.env.SUPABASE_PUBLISHABLE_KEY ?? "";
 
 // These suites talk to a live Supabase project. Without a URL and key there is
 // nothing to talk to, so skip rather than fail: the credentials live in
@@ -71,9 +69,7 @@ anonSuite("gk-media :: anon (unauthenticated)", () => {
   });
 
   it("cannot upload to gk-media", async () => {
-    const { error } = await client.storage
-      .from(BUCKET)
-      .upload(path, fileBlob("anon-upload"));
+    const { error } = await client.storage.from(BUCKET).upload(path, fileBlob("anon-upload"));
     expect(error).toBeTruthy();
   });
 
@@ -86,17 +82,13 @@ anonSuite("gk-media :: anon (unauthenticated)", () => {
   });
 
   it("cannot download an object in gk-media", async () => {
-    const { data, error } = await client.storage
-      .from(BUCKET)
-      .download(`${PREFIX}/nonexistent.txt`);
+    const { data, error } = await client.storage.from(BUCKET).download(`${PREFIX}/nonexistent.txt`);
     expect(data).toBeFalsy();
     expect(error).toBeTruthy();
   });
 
   it("cannot delete objects in gk-media", async () => {
-    const { data, error } = await client.storage
-      .from(BUCKET)
-      .remove([`${PREFIX}/anything.txt`]);
+    const { data, error } = await client.storage.from(BUCKET).remove([`${PREFIX}/anything.txt`]);
     // Either it errors, or RLS filters and returns 0 removed rows.
     if (!error) {
       expect(data ?? []).toHaveLength(0);
@@ -110,8 +102,7 @@ anonSuite("gk-media :: anon (unauthenticated)", () => {
 
 const mentorEmail = process.env.TEST_MENTOR_EMAIL;
 const mentorPassword = process.env.TEST_MENTOR_PASSWORD;
-const mentorSuite =
-  hasSupabaseEnv && mentorEmail && mentorPassword ? describe : describe.skip;
+const mentorSuite = hasSupabaseEnv && mentorEmail && mentorPassword ? describe : describe.skip;
 
 mentorSuite("gk-media :: authenticated (mentor)", () => {
   let client: SupabaseClient;
@@ -147,9 +138,7 @@ mentorSuite("gk-media :: authenticated (mentor)", () => {
   });
 
   it("can download its own uploaded file", async () => {
-    const { data, error } = await client.storage
-      .from(BUCKET)
-      .download(ownPath);
+    const { data, error } = await client.storage.from(BUCKET).download(ownPath);
     expect(error).toBeNull();
     expect(data).toBeTruthy();
     const text = await data!.text();
@@ -158,16 +147,20 @@ mentorSuite("gk-media :: authenticated (mentor)", () => {
 
   it("can delete its own uploaded file (owner)", async () => {
     const toDelete = `${PREFIX}/mentor-to-delete.txt`;
-    const upload = await client.storage
-      .from(BUCKET)
-      .upload(toDelete, fileBlob("delete-me"));
+    const upload = await client.storage.from(BUCKET).upload(toDelete, fileBlob("delete-me"));
     expect(upload.error).toBeNull();
 
-    const { data, error } = await client.storage
-      .from(BUCKET)
-      .remove([toDelete]);
+    const { data, error } = await client.storage.from(BUCKET).remove([toDelete]);
     expect(error).toBeNull();
     expect(data?.length).toBe(1);
+  });
+
+  it("cannot upload into the reserved announcements folder", async () => {
+    const { data, error } = await client.storage
+      .from(BUCKET)
+      .upload(`announcements/${RUN_ID}/mentor-attempt.pdf`, fileBlob("not-a-broadcast"));
+    expect(data).toBeFalsy();
+    expect(error).toBeTruthy();
   });
 });
 
@@ -177,14 +170,14 @@ mentorSuite("gk-media :: authenticated (mentor)", () => {
 
 const adminEmail = process.env.TEST_SUPER_ADMIN_EMAIL;
 const adminPassword = process.env.TEST_SUPER_ADMIN_PASSWORD;
-const adminSuite =
-  hasSupabaseEnv && adminEmail && adminPassword ? describe : describe.skip;
+const adminSuite = hasSupabaseEnv && adminEmail && adminPassword ? describe : describe.skip;
 
 adminSuite("gk-media :: super_admin", () => {
   let admin: SupabaseClient;
   let mentorClient: SupabaseClient;
   const adminPath = `${PREFIX}/admin-own.txt`;
   const mentorSeededPath = `${PREFIX}/mentor-seed-for-admin-delete.txt`;
+  const announcementPath = `announcements/${RUN_ID}/super-admin-broadcast.pdf`;
   const cleanup: string[] = [];
 
   beforeAll(async () => {
@@ -220,12 +213,36 @@ adminSuite("gk-media :: super_admin", () => {
   });
 
   it("can download any file", async () => {
-    const { data, error } = await admin.storage
-      .from(BUCKET)
-      .download(adminPath);
+    const { data, error } = await admin.storage.from(BUCKET).download(adminPath);
     expect(error).toBeNull();
     expect(data).toBeTruthy();
   });
+
+  it("can upload into the reserved announcements folder", async () => {
+    const { data, error } = await admin.storage
+      .from(BUCKET)
+      .upload(announcementPath, new Blob(["broadcast"], { type: "application/pdf" }));
+    expect(error).toBeNull();
+    expect(data?.path).toBe(announcementPath);
+    cleanup.push(announcementPath);
+  });
+
+  it.runIf(mentorEmail && mentorPassword)(
+    "keeps an unlinked announcement object private from mentors",
+    async () => {
+      const download = await mentorClient.storage.from(BUCKET).download(announcementPath);
+      expect(download.data).toBeFalsy();
+      expect(download.error).toBeTruthy();
+
+      const update = await mentorClient.storage
+        .from(BUCKET)
+        .update(announcementPath, fileBlob("tampered"));
+      expect(update.error).toBeTruthy();
+
+      const removal = await mentorClient.storage.from(BUCKET).remove([announcementPath]);
+      if (!removal.error) expect(removal.data ?? []).toHaveLength(0);
+    },
+  );
 
   it.runIf(mentorEmail && mentorPassword)(
     "can delete a file owned by another user (privileged delete)",
@@ -235,9 +252,7 @@ adminSuite("gk-media :: super_admin", () => {
         .upload(mentorSeededPath, fileBlob("seeded-by-mentor"));
       expect(seed.error).toBeNull();
 
-      const { data, error } = await admin.storage
-        .from(BUCKET)
-        .remove([mentorSeededPath]);
+      const { data, error } = await admin.storage.from(BUCKET).remove([mentorSeededPath]);
       expect(error).toBeNull();
       expect(data?.length).toBe(1);
     },

@@ -3,8 +3,8 @@
   "captured_on": "2026-08-31",
   "source": {
     "repository": "sprint-labs/rpmmentor-7ead5abe",
-    "origin_main_sha": "551b883de03982bde72827b65af7a4cbfe583537",
-    "active_migration_files_on_origin_main": 41
+    "origin_main_sha": "1ea1fc110df56e9dc7914c8e5a81bb55e1abf397",
+    "active_migration_files_on_origin_main": 42
   },
   "production": {
     "project_ref": "zdxxezquhvpjmoxlecjp",
@@ -308,7 +308,22 @@
       }
     ]
   },
-  "reviewed_forward_migrations": [],
+  "reviewed_forward_migrations": [
+    {
+      "version": "20260831193000",
+      "name": "announcement_media_and_scheduling",
+      "statement_count": 1,
+      "sql_length": 2579,
+      "sql_md5": "ad63cc515d496f3d3eaf3ffd4c1e9a31"
+    },
+    {
+      "version": "20260901104809",
+      "name": "secure_announcement_media_storage",
+      "statement_count": 1,
+      "sql_length": 5346,
+      "sql_md5": "edd0179125d56360058e50b2915b34dd"
+    }
+  ],
   "repository_comparison": {
     "live_rows_with_byte_exact_local_statement": 26,
     "live_rows_contained_inside_a_larger_local_file": 2,
