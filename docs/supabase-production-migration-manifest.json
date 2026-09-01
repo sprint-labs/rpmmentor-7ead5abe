@@ -327,8 +327,8 @@
       "version": "20260901111131",
       "name": "secure_announcement_media_storage",
       "statement_count": 1,
-      "sql_length": 6404,
-      "sql_md5": "0ce7473eaa40aeb22cc9142b2093e9e4"
+      "sql_length": 7676,
+      "sql_md5": "d1d37196297e16aaf512e9856994e2ea"
     }
   ],
   "repository_comparison": {

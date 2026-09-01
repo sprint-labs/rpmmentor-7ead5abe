@@ -54,6 +54,31 @@ CREATE INDEX IF NOT EXISTS announcements_attachment_path_idx
   ON public.announcements (attachment_path)
   WHERE attachment_path IS NOT NULL;
 
+-- A valid Auth session is not application access on its own. Recreate the
+-- announcement read policy so removing every user_roles row immediately
+-- revokes the feed and any new Storage authorization, even while a JWT is
+-- still valid. An already issued signed URL ages out within the application's
+-- five-minute lifetime. Super Admin retains scheduled and ended access.
+DROP POLICY IF EXISTS announcements_select_scoped ON public.announcements;
+
+CREATE POLICY announcements_select_scoped
+ON public.announcements
+FOR SELECT
+TO authenticated
+USING (
+  public.has_role((select auth.uid()), 'super_admin'::public.app_role)
+  OR (
+    (
+      public.has_role((select auth.uid()), 'mentor'::public.app_role)
+      OR public.has_role((select auth.uid()), 'mentor_manager'::public.app_role)
+      OR public.has_role((select auth.uid()), 'admin'::public.app_role)
+    )
+    AND active = true
+    AND starts_at <= now()
+    AND (ends_at IS NULL OR ends_at > now())
+  )
+);
+
 DROP POLICY IF EXISTS gk_media_read ON storage.objects;
 DROP POLICY IF EXISTS gk_media_select_authenticated ON storage.objects;
 DROP POLICY IF EXISTS gk_media_select_scoped ON storage.objects;
@@ -69,13 +94,20 @@ USING (
       (storage.foldername(name))[1] = 'announcements'
       AND (
         public.has_role((select auth.uid()), 'super_admin'::public.app_role)
-        OR EXISTS (
-          SELECT 1
-          FROM public.announcements AS announcement
-          WHERE announcement.attachment_path = storage.objects.name
-            AND announcement.active = true
-            AND announcement.starts_at <= now()
-            AND (announcement.ends_at IS NULL OR announcement.ends_at > now())
+        OR (
+          (
+            public.has_role((select auth.uid()), 'mentor'::public.app_role)
+            OR public.has_role((select auth.uid()), 'mentor_manager'::public.app_role)
+            OR public.has_role((select auth.uid()), 'admin'::public.app_role)
+          )
+          AND EXISTS (
+            SELECT 1
+            FROM public.announcements AS announcement
+            WHERE announcement.attachment_path = storage.objects.name
+              AND announcement.active = true
+              AND announcement.starts_at <= now()
+              AND (announcement.ends_at IS NULL OR announcement.ends_at > now())
+          )
         )
       )
     )

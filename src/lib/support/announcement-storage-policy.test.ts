@@ -17,6 +17,17 @@ function policy(name: string): string {
   return match[0];
 }
 
+function announcementStorageReadBranch(): string {
+  const select = policy("gk_media_select_scoped");
+  const start = select.indexOf("(storage.foldername(name))[1] = 'announcements'");
+  const end = select.indexOf(
+    "(storage.foldername(name))[1] IS DISTINCT FROM 'announcements'",
+    start,
+  );
+  if (start < 0 || end < 0) throw new Error("Announcement Storage read branch was not found");
+  return select.slice(start, end);
+}
+
 describe("announcement Storage hardening migration", () => {
   it("replaces every broad gk-media operation policy", () => {
     for (const name of [
@@ -36,6 +47,21 @@ describe("announcement Storage hardening migration", () => {
     expect(select).toContain("announcement.active = true");
     expect(select).toContain("announcement.starts_at <= now()");
     expect(select).toContain("announcement.ends_at > now()");
+  });
+
+  it("denies the announcement feed and media to roleless authenticated users", () => {
+    const announcementSelect = policy("announcements_select_scoped");
+    const storageAnnouncementSelect = announcementStorageReadBranch();
+
+    for (const role of ["mentor", "mentor_manager", "admin", "super_admin"]) {
+      expect(announcementSelect).toContain(`'${role}'::public.app_role`);
+      expect(storageAnnouncementSelect).toContain(`'${role}'::public.app_role`);
+    }
+
+    expect(announcementSelect).toContain("active = true");
+    expect(announcementSelect).toContain("starts_at <= now()");
+    expect(announcementSelect).toContain("ends_at > now()");
+    expect(storageAnnouncementSelect).toContain("AND EXISTS (");
   });
 
   it("requires Super Admin for announcement object mutations", () => {
