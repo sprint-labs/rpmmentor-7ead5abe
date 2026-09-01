@@ -93,6 +93,7 @@ const MENTOR: Permission[] = [
   "reports.view", "reports.submit",
   "media.view", "media.upload", "media.edit",
   "calendar.view",
+  "bulletins.view",
   "support.send",
 ];
 
