@@ -5,7 +5,49 @@ import {
   endedAtForAnnouncement,
   estimateAdminServerNow,
   mergeAdminAnnouncementPages,
+  nextAdminScheduleAt,
 } from "./admin-announcements";
+
+describe("nextAdminScheduleAt", () => {
+  it("rounds an hour-ahead target up near the end of an hour", () => {
+    const now = new Date(2026, 8, 1, 13, 59, 45);
+    const scheduled = new Date(nextAdminScheduleAt(now.getTime()));
+
+    expect(scheduled.getTime()).toBeGreaterThanOrEqual(now.getTime() + 60 * 60 * 1000);
+    expect([scheduled.getMinutes(), scheduled.getSeconds(), scheduled.getMilliseconds()]).toEqual([
+      0, 0, 0,
+    ]);
+  });
+
+  it("keeps an exact full-hour target", () => {
+    const now = new Date(2026, 8, 1, 13);
+    expect(nextAdminScheduleAt(now.getTime())).toBe(now.getTime() + 60 * 60 * 1000);
+  });
+
+  it("never moves inside the one-hour lead across a DST fall-back", () => {
+    const originalTimezone = process.env.TZ;
+    process.env.TZ = "Pacific/Chatham";
+
+    try {
+      const now = Date.parse("2026-04-04T13:14:45.000Z");
+      const scheduled = new Date(nextAdminScheduleAt(now));
+      const parsedFromDateTimeLocal = new Date(
+        scheduled.getFullYear(),
+        scheduled.getMonth(),
+        scheduled.getDate(),
+        scheduled.getHours(),
+        scheduled.getMinutes(),
+      );
+
+      expect(parsedFromDateTimeLocal.getTime()).toBe(scheduled.getTime());
+      expect(parsedFromDateTimeLocal.getTime()).toBeGreaterThanOrEqual(now + 60 * 60 * 1000);
+      expect(scheduled.getMinutes()).toBe(0);
+    } finally {
+      if (originalTimezone === undefined) delete process.env.TZ;
+      else process.env.TZ = originalTimezone;
+    }
+  });
+});
 
 describe("estimateAdminServerNow", () => {
   it("ignores a workstation clock that is hours ahead of the server", () => {

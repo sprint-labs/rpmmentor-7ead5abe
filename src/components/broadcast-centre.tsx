@@ -33,7 +33,11 @@ import {
   listAdminAnnouncements,
 } from "@/lib/support.functions";
 import { useAnnouncementClock } from "@/lib/support/announcement-clock";
-import { advanceAdminServerNow, estimateAdminServerNow } from "@/lib/support/admin-announcements";
+import {
+  advanceAdminServerNow,
+  estimateAdminServerNow,
+  nextAdminScheduleAt,
+} from "@/lib/support/admin-announcements";
 import type {
   AnnouncementAttachment,
   AnnouncementKind,
@@ -90,9 +94,7 @@ function toDateTimeLocal(date: Date): string {
 }
 
 function defaultScheduledAt(): string {
-  const date = new Date(Date.now() + 60 * 60 * 1000);
-  date.setMinutes(0, 0, 0);
-  return toDateTimeLocal(date);
+  return toDateTimeLocal(new Date(nextAdminScheduleAt(Date.now())));
 }
 
 function formatDateTime(value: string): string {
