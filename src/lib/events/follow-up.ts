@@ -119,6 +119,8 @@ export interface FollowUp {
   kind: FollowUpKind | null;
   /** Normalised for a Match and null for every other event type. */
   participationStatus: MatchParticipationStatus | null;
+  /** The persisted manager-waiver fact, independent of the derived status. */
+  waived: boolean;
   status: FollowUpStatus;
   /** Instant the event is scheduled to finish. */
   endsAtMs: number;
@@ -188,6 +190,7 @@ export function resolveFollowUp(source: FollowUpSource, now: number = Date.now()
     kind,
     status,
     participationStatus,
+    waived: source.waived,
     endsAtMs,
     deadlineMs,
     completedRecordId: source.completedRecordId,

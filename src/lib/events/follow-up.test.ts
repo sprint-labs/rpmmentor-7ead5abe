@@ -111,6 +111,7 @@ describe("match participation", () => {
     expect(result.participationStatus).toBe("did_not_play");
     expect(result.kind).toBeNull();
     expect(result.status).toBe("not_required");
+    expect(result.waived).toBe(false);
   });
 
   it("asks for participation confirmation after a Match without creating an overdue report", () => {
@@ -249,9 +250,9 @@ describe("status", () => {
   });
 
   it("shows Not required once a manager has waived it", () => {
-    expect(resolveFollowUp(matchEvent({ waived: true }), KICK_OFF + 200 * HOUR).status).toBe(
-      "not_required",
-    );
+    const result = resolveFollowUp(matchEvent({ waived: true }), KICK_OFF + 200 * HOUR);
+    expect(result.status).toBe("not_required");
+    expect(result.waived).toBe(true);
   });
 
   it("keeps a historic waiver closed when participation is still unconfirmed", () => {

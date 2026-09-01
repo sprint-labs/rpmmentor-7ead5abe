@@ -111,6 +111,22 @@ export interface TeamCalendarEvent {
   created_by_name: string;
 }
 
+/**
+ * A cancelled fixture is closed until management explicitly reinstates it.
+ * Participation must not reopen that obligation indirectly or generate active
+ * Match Report copy for an event that the follow-up resolver treats as closed.
+ */
+export function assertMatchParticipationUpdatable(
+  event: Pick<CalendarEventRow, "event_type" | "status">,
+): void {
+  if (event.event_type !== "Match") {
+    throw new Error("Participation can only be confirmed for a Match event.");
+  }
+  if (event.status === "cancelled") {
+    throw new Error("Reinstate the Match before confirming participation.");
+  }
+}
+
 // One literal, not a concatenation: supabase-js infers the row type from the
 // select string, and joining pieces together erases that inference.
 const COLUMNS =
@@ -391,21 +407,22 @@ export const updateMatchParticipation = createServerFn({ method: "POST" })
     const { data: before, error: beforeError } = await context.supabase
       .from("calendar_events")
       .select(
-        "event_type, assigned_mentor_id, event_date, start_time, end_time, player_id, participation_status",
+        "event_type, assigned_mentor_id, event_date, start_time, end_time, player_id, participation_status, status",
       )
       .eq("id", data.id)
       .maybeSingle();
     if (beforeError) throw new Error(beforeError.message);
     if (!before) throw new Error("That calendar event no longer exists.");
-    if (before.event_type !== "Match") {
-      throw new Error("Participation can only be confirmed for a Match event.");
-    }
+    assertMatchParticipationUpdatable(before);
 
     const { data: row, error } = await context.supabase
       .from("calendar_events")
       .update({ participation_status: data.participation_status })
       .eq("id", data.id)
       .eq("event_type", "Match")
+      // Repeat the cancellation condition on the write so a concurrent cancel
+      // between the read above and this update still fails closed.
+      .neq("status", "cancelled")
       .select(COLUMNS)
       .maybeSingle();
     if (error) throw new Error(error.message);

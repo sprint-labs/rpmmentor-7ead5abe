@@ -922,7 +922,8 @@ function CalendarPage() {
               const row = followUpByEvent.get(draft.id);
               if (!row) return null;
               const cancelled = row.followUp.status === "cancelled";
-              const waived = row.followUp.status === "not_required";
+              const waived = row.followUp.waived;
+              const canWaive = row.followUp.kind !== null;
               return (
                 <div className="mt-4 space-y-2 rounded-md border border-border bg-muted/30 p-3">
                   <div className="flex flex-wrap items-center gap-2">
@@ -954,14 +955,14 @@ function CalendarPage() {
                       >
                         Require write-up again
                       </button>
-                    ) : (
+                    ) : canWaive ? (
                       <button
                         onClick={() => handleWaive(draft.id)}
                         className="rounded-md border border-border px-2.5 py-1 text-[11px] hover:bg-accent"
                       >
                         Mark write-up not required
                       </button>
-                    )}
+                    ) : null}
                   </div>
                 </div>
               );

@@ -79,13 +79,15 @@ describe("buildEventNotification", () => {
     expect(n.linkPath).toContain("/interactions");
   });
 
-  it("asks for participation confirmation instead of promising a Match Report", () => {
+  it("assigns participation confirmation to calendar management, not the attending mentor", () => {
     const n = buildEventNotification(
       "event_assigned",
       { ...matchEvent, participationStatus: "not_confirmed" },
       { now },
     );
-    expect(n.body).toContain("confirm whether this goalkeeper played");
+    expect(n.body).toContain("a Mentor Manager or administrator needs to confirm who played");
+    expect(n.body).toContain("no Match Report is due unless this goalkeeper is marked Played");
+    expect(n.body).not.toContain("Action: confirm");
     expect(n.body).not.toContain("You need to submit: Match Report");
     expect(n.body).not.toContain("Due by:");
     expect(n.linkPath).toBe("/calendar");

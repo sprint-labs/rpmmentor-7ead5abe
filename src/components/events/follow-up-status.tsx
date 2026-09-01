@@ -45,7 +45,11 @@ export function FollowUpStatusPill({
  * The one-line explanation that sits under a status: what is owed and by when,
  * or why nothing is.
  */
-export function followUpDetail(followUp: FollowUp, waiverReason: string, cancellationReason: string): string {
+export function followUpDetail(
+  followUp: FollowUp,
+  waiverReason: string,
+  cancellationReason: string,
+): string {
   const required = followUpRequirementLabel(followUp.kind);
   switch (followUp.status) {
     case "scheduled":
@@ -64,10 +68,13 @@ export function followUpDetail(followUp: FollowUp, waiverReason: string, cancell
     case "cancelled":
       return cancellationReason ? `Event cancelled — ${cancellationReason}` : "Event cancelled";
     case "not_required":
+      if (followUp.waived) {
+        return waiverReason ? `Waived — ${waiverReason}` : "Waived by a manager";
+      }
       if (followUp.participationStatus === "did_not_play") {
         return "Did not play — no Match Report required";
       }
-      return waiverReason ? `Waived — ${waiverReason}` : "Waived by a manager";
+      return "No write-up required";
   }
 }
 
@@ -93,18 +100,18 @@ export function FollowUpActionLink({
   }
   if (!followUp.kind) return null;
   if (followUp.kind === "match_report" && followUp.participationStatus !== "played") return null;
-  if (followUp.status === "completed" || followUp.status === "cancelled" || followUp.status === "not_required") {
+  if (
+    followUp.status === "completed" ||
+    followUp.status === "cancelled" ||
+    followUp.status === "not_required"
+  ) {
     return null;
   }
   const path = followUpLinkPath(event, followUp.kind);
   const [to, query] = path.split("?");
   const search = Object.fromEntries(new URLSearchParams(query ?? ""));
   return (
-    <Link
-      to={to}
-      search={search}
-      className="text-xs font-medium text-primary hover:underline"
-    >
+    <Link to={to} search={search} className="text-xs font-medium text-primary hover:underline">
       {label ?? `Submit ${followUpRequirementLabel(followUp.kind)}`}
     </Link>
   );

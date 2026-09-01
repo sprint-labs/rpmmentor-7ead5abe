@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  notifyEventAssigned,
   notifyEventCancelled,
   notifyFollowUpOverdue,
   type NotifiableEventRow,
@@ -18,6 +19,31 @@ const event: NotifiableEventRow = {
   player_id: "44444444-4444-4444-8444-444444444444",
   assigned_mentor_id: MENTOR,
 };
+
+describe("notifyEventAssigned", () => {
+  it("does not tell an ordinary assigned mentor to perform a management-only confirmation", async () => {
+    const insert = vi.fn().mockResolvedValue({ error: null });
+    const supabase = { from: vi.fn(() => ({ insert })) };
+
+    await expect(
+      notifyEventAssigned(supabase as never, ACTOR, {
+        ...event,
+        event_type: "Match",
+        participation_status: "not_confirmed",
+      }),
+    ).resolves.toBe(true);
+
+    expect(insert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        recipient_id: MENTOR,
+        body: expect.stringContaining(
+          "a Mentor Manager or administrator needs to confirm who played",
+        ),
+      }),
+    );
+    expect(insert.mock.calls[0]?.[0].body).not.toContain("Action: confirm");
+  });
+});
 
 describe("notifyEventCancelled", () => {
   it("reports when no separate mentor notification is required", async () => {

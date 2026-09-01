@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
+  assertMatchParticipationUpdatable,
   toTeamCalendarEvent,
   validateEvent,
   type CalendarEventSelect,
@@ -97,7 +98,29 @@ describe("validateEvent still refuses retired types on write", () => {
     expect(validateEvent({ ...base, event_type: "Training Ground Visit" }).event_type).toBe(
       "Training Ground Visit",
     );
-    expect(() => validateEvent({ ...base, event_type: "Meeting" })).toThrow(/Match, Training Ground/i);
+    expect(() => validateEvent({ ...base, event_type: "Meeting" })).toThrow(
+      /Match, Training Ground/i,
+    );
+  });
+});
+
+describe("match participation write boundary", () => {
+  it("requires a cancelled Match to be reinstated before participation can change", () => {
+    expect(() =>
+      assertMatchParticipationUpdatable({ event_type: "Match", status: "cancelled" }),
+    ).toThrow(/reinstate the Match/i);
+  });
+
+  it("accepts an active Match and still rejects non-Match events", () => {
+    expect(() =>
+      assertMatchParticipationUpdatable({ event_type: "Match", status: "scheduled" }),
+    ).not.toThrow();
+    expect(() =>
+      assertMatchParticipationUpdatable({
+        event_type: "Training Ground Visit",
+        status: "scheduled",
+      }),
+    ).toThrow(/only be confirmed for a Match/i);
   });
 });
 
@@ -118,6 +141,7 @@ describe("calendar event query columns", () => {
     expect(source).toContain("participation_status: DEFAULT_MATCH_PARTICIPATION_STATUS");
     expect(source).toMatch(/updateMatchParticipation[\s\S]*CALENDAR_MANAGE_ROLES/);
     expect(source).toMatch(/\.eq\("event_type", "Match"\)/);
+    expect(source).toMatch(/\.neq\("status", "cancelled"\)/);
   });
 
   it("fails closed when the existing event cannot be read before an edit", () => {

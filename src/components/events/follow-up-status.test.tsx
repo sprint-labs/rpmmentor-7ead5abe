@@ -7,7 +7,7 @@ import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { FollowUp } from "@/lib/events/follow-up";
 import type { NotifiableEvent } from "@/lib/events/notification-copy";
-import { FollowUpActionLink } from "./follow-up-status";
+import { FollowUpActionLink, followUpDetail } from "./follow-up-status";
 
 vi.mock("@tanstack/react-router", () => ({
   Link: ({ children, to }: { children: ReactNode; to: string }) => <a href={to}>{children}</a>,
@@ -29,6 +29,7 @@ const event: NotifiableEvent = {
 const confirmation: FollowUp = {
   kind: null,
   participationStatus: "not_confirmed",
+  waived: false,
   status: "confirmation_needed",
   endsAtMs: Date.parse("2026-08-20T14:00:00Z"),
   deadlineMs: Date.parse("2026-08-22T14:00:00Z"),
@@ -48,5 +49,30 @@ describe("FollowUpActionLink participation permissions", () => {
     const route = readFileSync(resolve(process.cwd(), "src/routes/follow-ups.tsx"), "utf8");
     expect(route).toContain('data?.canManage && row.eventType === "Match"');
     expect(route).toContain("canConfirmParticipation={Boolean(data?.canManage)}");
+  });
+});
+
+describe("manager waiver presentation", () => {
+  const didNotPlay: FollowUp = {
+    ...confirmation,
+    participationStatus: "did_not_play",
+    status: "not_required",
+  };
+
+  it("does not describe participation-derived Not required as a manager waiver", () => {
+    expect(followUpDetail(didNotPlay, "", "")).toBe("Did not play — no Match Report required");
+  });
+
+  it("keeps a real manager waiver distinct even when the goalkeeper did not play", () => {
+    expect(followUpDetail({ ...didNotPlay, waived: true }, "Covered in person", "")).toBe(
+      "Waived — Covered in person",
+    );
+  });
+
+  it("drives the calendar editor action from the waiver fact, not Not required status", () => {
+    const route = readFileSync(resolve(process.cwd(), "src/routes/calendar.tsx"), "utf8");
+    expect(route).toContain("const waived = row.followUp.waived;");
+    expect(route).not.toContain('const waived = row.followUp.status === "not_required";');
+    expect(route).toContain("const canWaive = row.followUp.kind !== null;");
   });
 });
