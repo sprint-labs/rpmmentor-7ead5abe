@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 import type { AnnouncementAttachment } from "./schema";
 import { submitBroadcastAfterUpload } from "./broadcast-submit";
@@ -18,6 +19,17 @@ const STALE_DRAFT = {
 };
 
 describe("post-upload broadcast submission", () => {
+  it("locks native and custom composer controls for the whole submission", () => {
+    const source = readFileSync(
+      new URL("../../components/broadcast-centre.tsx", import.meta.url),
+      "utf8",
+    );
+
+    expect(source.match(/disabled=\{composerLocked\}/g)?.length).toBeGreaterThanOrEqual(10);
+    expect(source).toContain("aria-disabled={composerLocked}");
+    expect(source).toContain("if (composerLocked) return;");
+  });
+
   it("removes an unlinked upload and never submits a stale delivery window", async () => {
     const removeAttachment = vi.fn().mockResolvedValue(undefined);
     const submit = vi.fn();

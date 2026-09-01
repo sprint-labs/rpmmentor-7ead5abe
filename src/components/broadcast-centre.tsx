@@ -336,7 +336,10 @@ export function BroadcastCentre() {
     onError: (error: Error) => toast.error(error.message),
   });
 
+  const composerLocked = createMutation.isPending;
+
   function duplicateAnnouncement(announcement: AnnouncementRow) {
+    if (composerLocked) return;
     setKind(announcement.kind);
     setTitle(announcement.title);
     setBody(announcement.body);
@@ -407,6 +410,7 @@ export function BroadcastCentre() {
             {(title || body || attachmentFile) && (
               <button
                 type="button"
+                disabled={composerLocked}
                 onClick={clearComposer}
                 className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border px-2.5 text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
               >
@@ -415,7 +419,7 @@ export function BroadcastCentre() {
             )}
           </div>
 
-          <fieldset>
+          <fieldset disabled={composerLocked}>
             <legend className="text-xs font-medium text-foreground">
               What kind of message is this?
             </legend>
@@ -466,6 +470,7 @@ export function BroadcastCentre() {
                 <span className="font-normal text-muted-foreground">{title.length}/160</span>
               </span>
               <input
+                disabled={composerLocked}
                 value={title}
                 onChange={(event) => setTitle(event.target.value)}
                 maxLength={160}
@@ -486,6 +491,7 @@ export function BroadcastCentre() {
                 <span className="font-normal text-muted-foreground">{body.length}/4000</span>
               </span>
               <textarea
+                disabled={composerLocked}
                 value={body}
                 onChange={(event) => setBody(event.target.value)}
                 maxLength={4000}
@@ -507,6 +513,7 @@ export function BroadcastCentre() {
               {attachmentFile && (
                 <button
                   type="button"
+                  disabled={composerLocked}
                   onClick={() => setAttachment(null)}
                   className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border px-2.5 text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
                 >
@@ -517,6 +524,7 @@ export function BroadcastCentre() {
             <input
               ref={fileInputRef}
               type="file"
+              disabled={composerLocked}
               accept={ANNOUNCEMENT_ATTACHMENT_ACCEPT}
               onChange={handleFileChange}
               className="sr-only"
@@ -535,6 +543,7 @@ export function BroadcastCentre() {
                   </div>
                   <button
                     type="button"
+                    disabled={composerLocked}
                     onClick={() => fileInputRef.current?.click()}
                     className="h-8 rounded-md border border-border px-2.5 text-xs hover:bg-accent"
                   >
@@ -545,9 +554,13 @@ export function BroadcastCentre() {
             ) : (
               <div
                 role="button"
-                tabIndex={0}
-                onClick={() => fileInputRef.current?.click()}
+                aria-disabled={composerLocked}
+                tabIndex={composerLocked ? -1 : 0}
+                onClick={() => {
+                  if (!composerLocked) fileInputRef.current?.click();
+                }}
                 onKeyDown={(event) => {
+                  if (composerLocked) return;
                   if (event.key === "Enter" || event.key === " ") {
                     event.preventDefault();
                     fileInputRef.current?.click();
@@ -555,16 +568,23 @@ export function BroadcastCentre() {
                 }}
                 onDragEnter={(event) => {
                   event.preventDefault();
-                  setDragActive(true);
+                  if (!composerLocked) setDragActive(true);
                 }}
                 onDragOver={(event) => event.preventDefault()}
                 onDragLeave={(event) => {
                   event.preventDefault();
-                  setDragActive(false);
+                  if (!composerLocked) setDragActive(false);
                 }}
-                onDrop={handleDrop}
+                onDrop={(event) => {
+                  if (composerLocked) {
+                    event.preventDefault();
+                    return;
+                  }
+                  handleDrop(event);
+                }}
                 className={cn(
                   "mt-2 flex min-h-28 cursor-pointer flex-col items-center justify-center rounded-md border border-dashed px-4 py-5 text-center outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/15",
+                  composerLocked && "cursor-wait",
                   dragActive
                     ? "border-primary bg-primary/5"
                     : "border-border bg-muted/10 hover:border-foreground/30 hover:bg-muted/20",
@@ -587,6 +607,7 @@ export function BroadcastCentre() {
                   <button
                     key={mode}
                     type="button"
+                    disabled={composerLocked}
                     aria-pressed={publishMode === mode}
                     onClick={() => setPublishMode(mode)}
                     className={cn(
@@ -605,6 +626,7 @@ export function BroadcastCentre() {
                   Publish date and time
                   <input
                     type="datetime-local"
+                    disabled={composerLocked}
                     value={startsAt}
                     min={toDateTimeLocal(new Date())}
                     onChange={(event) => setStartsAt(event.target.value)}
@@ -618,6 +640,7 @@ export function BroadcastCentre() {
               <label className="block text-xs font-medium">
                 End broadcast
                 <select
+                  disabled={composerLocked}
                   value={expiryMode}
                   onChange={(event) => setExpiryMode(event.target.value as ExpiryMode)}
                   className="mt-2 h-10 w-full rounded-md border border-border bg-background px-2.5 text-xs"
@@ -633,6 +656,7 @@ export function BroadcastCentre() {
                   End date and time
                   <input
                     type="datetime-local"
+                    disabled={composerLocked}
                     value={endsAt}
                     onChange={(event) => setEndsAt(event.target.value)}
                     className="mt-1 h-9 w-full rounded-md border border-border bg-background px-2.5 text-xs text-foreground"
@@ -649,11 +673,11 @@ export function BroadcastCentre() {
             </div>
             <button
               type="button"
-              disabled={createMutation.isPending || !title.trim()}
+              disabled={composerLocked || !title.trim()}
               onClick={() => createMutation.mutate()}
               className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {createMutation.isPending ? (
+              {composerLocked ? (
                 "Publishing…"
               ) : (
                 <>
@@ -830,8 +854,9 @@ export function BroadcastCentre() {
                   <div className="flex items-center gap-2 pl-12 lg:pl-0">
                     <button
                       type="button"
+                      disabled={composerLocked}
                       onClick={() => duplicateAnnouncement(announcement)}
-                      className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border px-2.5 text-xs hover:bg-accent"
+                      className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border px-2.5 text-xs hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       <Copy className="size-3.5" aria-hidden="true" /> Duplicate
                     </button>
@@ -878,8 +903,9 @@ export function BroadcastCentre() {
                 </div>
                 <button
                   type="button"
+                  disabled={composerLocked}
                   onClick={() => duplicateAnnouncement(announcement)}
-                  className="inline-flex h-8 items-center gap-1.5 self-start rounded-md border border-border px-2.5 text-xs hover:bg-accent sm:self-auto"
+                  className="inline-flex h-8 items-center gap-1.5 self-start rounded-md border border-border px-2.5 text-xs hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50 sm:self-auto"
                 >
                   <Copy className="size-3.5" aria-hidden="true" /> Reuse
                 </button>
