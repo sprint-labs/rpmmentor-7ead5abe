@@ -230,17 +230,23 @@ function BulletinsPage() {
       <PageHeader
         title="Bulletin Board"
         titleClassName="break-words text-2xl leading-tight sm:text-3xl"
-        description="One operational workspace for daily updates, club needs, leads and mandates."
+        description={
+          scope === "team"
+            ? "One operational workspace for daily updates, club needs, leads and mandates."
+            : "Your assigned daily updates, club needs, leads and mandates."
+        }
         action={
           <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
             {refreshButton}
-            <Button
-              type="button"
-              className="min-h-11 sm:min-h-9"
-              onClick={() => setEditorItem(null)}
-            >
-              <Plus aria-hidden="true" /> New item
-            </Button>
+            {canManage ? (
+              <Button
+                type="button"
+                className="min-h-11 sm:min-h-9"
+                onClick={() => setEditorItem(null)}
+              >
+                <Plus aria-hidden="true" /> New item
+              </Button>
+            ) : null}
           </div>
         }
       />
@@ -267,6 +273,7 @@ function BulletinsPage() {
 
       <BulletinWorkspace
         kind={board}
+        canManage={canManage}
         rows={rows}
         total={listQuery.data?.total ?? 0}
         page={listQuery.data?.page ?? safePage}

@@ -2,9 +2,8 @@
  * Authenticated data boundary for the internal Bulletin Board.
  *
  * RLS is the final backstop, but every function also checks the caller's stored
- * role. Mentor Managers, Admins and Super Admins may use the operational board;
- * Mentors are rejected before any bulletin query or write. There is deliberately
- * no delete path.
+ * role. Management may use the team board; Mentors may read and append progress
+ * only for work currently assigned to them. There is deliberately no delete path.
  */
 import { createServerFn } from "@tanstack/react-start";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -34,9 +33,7 @@ import {
 import {
   bulletinAccessForRoles,
   BULLETIN_MANAGE_ROLES,
-  clampBulletinCreateStatus,
   getLondonAttentionWindow,
-  mineScopeCreateOwner,
   sanitiseBulletinSearch,
   type BulletinAccess,
 } from "@/lib/bulletins/server-helpers";
@@ -144,18 +141,8 @@ async function getProfileName(client: AuthedClient, userId: string): Promise<str
 
 async function resolveOwner(
   client: AuthedClient,
-  userId: string,
-  access: BulletinAccess,
   requestedOwnerId: string | null,
-  creatorName: string,
 ): Promise<{ owner_id: string | null; owner_name: string | null }> {
-  // Mine-scope work self-assigns only when the actor is genuinely represented
-  // in the mentor directory. Admin/Super Admin preview accounts remain
-  // unassigned and can still read the row through its created_by link.
-  if (!access.canManage) {
-    const owner = mineScopeCreateOwner(access, userId, creatorName);
-    return { owner_id: owner.ownerId, owner_name: owner.ownerName };
-  }
   if (!requestedOwnerId) return { owner_id: null, owner_name: null };
 
   const { data, error } = await client.rpc("list_mentor_directory");
@@ -183,7 +170,7 @@ async function countBulletins(
 ): Promise<number> {
   let query = client.from("bulletin_items").select("id", { count: "exact", head: true });
   if (access.restrictToUser) {
-    query = query.or(`created_by.eq.${userId},owner_id.eq.${userId}`);
+    query = query.eq("owner_id", userId);
   }
   if (filters.kind) query = query.eq("kind", filters.kind);
   if (filters.status) query = query.eq("status", filters.status);
@@ -210,7 +197,7 @@ export const listBulletins = createServerFn({ method: "GET" })
       .select(BULLETIN_ITEM_COLUMNS, { count: "exact" })
       .eq("kind", data.kind);
     if (access.restrictToUser) {
-      query = query.or(`created_by.eq.${context.userId},owner_id.eq.${context.userId}`);
+      query = query.eq("owner_id", context.userId);
     }
     if (data.status) query = query.eq("status", data.status);
     const search = sanitiseBulletinSearch(data.search);
@@ -250,7 +237,7 @@ export const getBulletinDetail = createServerFn({ method: "GET" })
 
     let itemQuery = client.from("bulletin_items").select(BULLETIN_ITEM_COLUMNS).eq("id", data.id);
     if (access.restrictToUser) {
-      itemQuery = itemQuery.or(`created_by.eq.${context.userId},owner_id.eq.${context.userId}`);
+      itemQuery = itemQuery.eq("owner_id", context.userId);
     }
     const { data: itemRow, error: itemError } = await itemQuery.maybeSingle();
     if (itemError) throw new Error(itemError.message);
@@ -350,14 +337,11 @@ export const createBulletin = createServerFn({ method: "POST" })
   .validator((data) => createBulletinInput.parse(data))
   .handler(async ({ data, context }): Promise<BulletinItem> => {
     const access = await requireBulletinAccess(context.supabase, context.userId, data.scope);
+    if (!access.canManage) {
+      throw new Error("Only Bulletin Board management can create work.");
+    }
     const creatorName = await getProfileName(context.supabase, context.userId);
-    const owner = await resolveOwner(
-      context.supabase,
-      context.userId,
-      access,
-      data.ownerId,
-      creatorName,
-    );
+    const owner = await resolveOwner(context.supabase, data.ownerId);
 
     const { data: row, error } = await asBulletinClient(context.supabase)
       .from("bulletin_items")
@@ -367,9 +351,7 @@ export const createBulletin = createServerFn({ method: "POST" })
         details: data.details,
         subject_type: data.subjectType,
         subject_name: data.subjectName,
-        // Every mine-scope preview opens work. Only a real team-management
-        // create may deliberately start in another status.
-        status: clampBulletinCreateStatus(access, data.status),
+        status: data.status,
         ...owner,
         next_action: data.nextAction,
         due_date: data.dueDate,
@@ -391,14 +373,7 @@ export const updateBulletin = createServerFn({ method: "POST" })
     if (!access.canManage) {
       throw new Error("Team scope is required to manage Bulletin Board work.");
     }
-    const editorName = await getProfileName(context.supabase, context.userId);
-    const owner = await resolveOwner(
-      context.supabase,
-      context.userId,
-      access,
-      data.ownerId,
-      editorName,
-    );
+    const owner = await resolveOwner(context.supabase, data.ownerId);
     const client = asBulletinClient(context.supabase);
     const { id, expectedVersion } = data;
 
@@ -442,15 +417,15 @@ export const addBulletinUpdate = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((data) => addBulletinUpdateInput.parse(data))
   .handler(async ({ data, context }): Promise<BulletinUpdate> => {
-    // Appending does not expose a view selector. Stored management roles are
-    // required here and independently by RLS.
+    // Appending does not expose a view selector. A Mentor's team request is
+    // clamped to their current assignments; RLS independently enforces it.
     const access = await requireBulletinAccess(context.supabase, context.userId, "team");
     const client = asBulletinClient(context.supabase);
 
     // Confirm the parent is inside the same server-side scope before writing.
     let parentQuery = client.from("bulletin_items").select("id").eq("id", data.bulletinId);
     if (access.restrictToUser) {
-      parentQuery = parentQuery.or(`created_by.eq.${context.userId},owner_id.eq.${context.userId}`);
+      parentQuery = parentQuery.eq("owner_id", context.userId);
     }
     const { data: parent, error: parentError } = await parentQuery.maybeSingle();
     if (parentError) throw new Error(parentError.message);

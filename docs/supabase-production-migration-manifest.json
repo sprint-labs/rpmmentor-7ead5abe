@@ -308,7 +308,15 @@
       }
     ]
   },
-  "reviewed_forward_migrations": [],
+  "reviewed_forward_migrations": [
+    {
+      "version": "20260901103459",
+      "name": "restore_assigned_mentor_bulletin_access",
+      "statement_count": 1,
+      "sql_length": 2236,
+      "sql_md5": "f7627406d3b6b9609cc44e55adda32bf"
+    }
+  ],
   "repository_comparison": {
     "live_rows_with_byte_exact_local_statement": 26,
     "live_rows_contained_inside_a_larger_local_file": 2,

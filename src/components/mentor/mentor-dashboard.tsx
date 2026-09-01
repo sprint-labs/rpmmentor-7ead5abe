@@ -47,6 +47,7 @@ import {
   followUpDetail,
 } from "@/components/events/follow-up-status";
 import { formatDateOnly } from "@/lib/interactions/schema";
+import { BulletinDashboardCard } from "@/components/bulletins/dashboard-card";
 
 import { lastNDaysPeriod } from "@/lib/dashboard-period";
 
@@ -252,6 +253,8 @@ export function MentorDashboard({ user }: Props) {
         onLogReport={() => setWorkflow("report")}
         onLogInteraction={() => openLog()}
       />
+
+      <BulletinDashboardCard scope="mine" />
 
       <section aria-label="Your activity">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
