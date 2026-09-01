@@ -1,7 +1,7 @@
 import { ANNOUNCEMENT_ATTACHMENT_UNAVAILABLE_MESSAGE } from "./schema";
 
 export const ANNOUNCEMENT_MEDIA_STORAGE_READINESS_RPC =
-  "announcement_media_storage_ready_v1" as const;
+  "announcement_media_storage_ready_v2" as const;
 
 type ReadinessResponse = {
   data: boolean | null;

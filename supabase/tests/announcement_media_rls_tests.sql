@@ -1,4 +1,4 @@
--- Broadcast announcement and gk-media RLS contract.
+-- Broadcast announcement and dedicated media-bucket RLS contract.
 --
 -- Run only against a disposable local Supabase database after migrations:
 --   supabase test db supabase/tests/announcement_media_rls_tests.sql
@@ -10,7 +10,7 @@ BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 SET search_path = public, extensions;
 
-SELECT plan(19);
+SELECT plan(25);
 
 SELECT ok(
   (SELECT relrowsecurity FROM pg_class WHERE oid = 'public.announcements'::regclass),
@@ -40,10 +40,10 @@ SELECT ok(
     FROM pg_policies
     WHERE schemaname = 'storage'
       AND tablename = 'objects'
-      AND policyname = 'gk_media_select_scoped'
+      AND policyname = 'gk_broadcast_media_select_scoped'
       AND cmd = 'SELECT'
   ),
-  '4 scoped gk-media SELECT policy exists'
+  '4 scoped Broadcast-media SELECT policy exists'
 );
 
 -- Auth users are created as postgres so the handle_new_user trigger supplies
@@ -214,31 +214,31 @@ VALUES
 INSERT INTO storage.objects (bucket_id, name, owner, metadata)
 VALUES
   (
-    'gk-media',
+    'gk-broadcast-media',
     'announcements/pgtap/live.pdf',
     '90000000-0000-0000-0000-000000000005',
     '{"mimetype":"application/pdf"}'::jsonb
   ),
   (
-    'gk-media',
+    'gk-broadcast-media',
     'announcements/pgtap/scheduled.pdf',
     '90000000-0000-0000-0000-000000000005',
     '{"mimetype":"application/pdf"}'::jsonb
   ),
   (
-    'gk-media',
+    'gk-broadcast-media',
     'announcements/pgtap/expired.pdf',
     '90000000-0000-0000-0000-000000000005',
     '{"mimetype":"application/pdf"}'::jsonb
   ),
   (
-    'gk-media',
+    'gk-broadcast-media',
     'announcements/pgtap/inactive.pdf',
     '90000000-0000-0000-0000-000000000005',
     '{"mimetype":"application/pdf"}'::jsonb
   ),
   (
-    'gk-media',
+    'gk-broadcast-media',
     'announcements/pgtap/unlinked.pdf',
     '90000000-0000-0000-0000-000000000005',
     '{"mimetype":"application/pdf"}'::jsonb
@@ -262,7 +262,7 @@ SELECT is(
   (
     SELECT count(*)::integer
     FROM storage.objects
-    WHERE bucket_id = 'gk-media'
+    WHERE bucket_id = 'gk-broadcast-media'
       AND (storage.foldername(name))[1] = 'announcements'
   ),
   0,
@@ -288,7 +288,7 @@ SELECT is(
   (
     SELECT string_agg(name, ',' ORDER BY name)
     FROM storage.objects
-    WHERE bucket_id = 'gk-media'
+    WHERE bucket_id = 'gk-broadcast-media'
       AND (storage.foldername(name))[1] = 'announcements'
   ),
   'announcements/pgtap/live.pdf',
@@ -313,7 +313,7 @@ SELECT is(
   (
     SELECT string_agg(name, ',' ORDER BY name)
     FROM storage.objects
-    WHERE bucket_id = 'gk-media'
+    WHERE bucket_id = 'gk-broadcast-media'
       AND (storage.foldername(name))[1] = 'announcements'
   ),
   'announcements/pgtap/live.pdf',
@@ -338,7 +338,7 @@ SELECT is(
   (
     SELECT string_agg(name, ',' ORDER BY name)
     FROM storage.objects
-    WHERE bucket_id = 'gk-media'
+    WHERE bucket_id = 'gk-broadcast-media'
       AND (storage.foldername(name))[1] = 'announcements'
   ),
   'announcements/pgtap/live.pdf',
@@ -364,40 +364,136 @@ SELECT is(
   (
     SELECT count(*)::integer
     FROM storage.objects
-    WHERE bucket_id = 'gk-media'
+    WHERE bucket_id = 'gk-broadcast-media'
       AND (storage.foldername(name))[1] = 'announcements'
   ),
   5,
   '15 Super Admin sees every reserved object'
 );
 
+-- Only Storage's size-checked standard/TUS routes may authorise an INSERT.
+-- A direct PostgREST write carries no storage.operation and a cross-bucket
+-- copy carries storage.object.copy, so both fail before they can bypass the
+-- dedicated bucket's byte and MIME limits.
+SELECT set_config('storage.operation', '', true);
+SELECT throws_ok(
+  $$
+    INSERT INTO storage.objects (bucket_id, name, owner, metadata)
+    VALUES (
+      'gk-broadcast-media',
+      'announcements/pgtap/direct-rest.pdf',
+      '90000000-0000-0000-0000-000000000005',
+      '{"mimetype":"application/pdf","contentLength":1,"size":26214401}'::jsonb
+    )
+  $$,
+  '42501',
+  NULL,
+  '16 direct PostgREST insert cannot bypass Storage limits'
+);
+
+SELECT set_config('storage.operation', 'storage.object.copy', true);
+SELECT throws_ok(
+  $$
+    INSERT INTO storage.objects (bucket_id, name, owner, metadata)
+    VALUES (
+      'gk-broadcast-media',
+      'announcements/pgtap/copied.pdf',
+      '90000000-0000-0000-0000-000000000005',
+      '{"mimetype":"application/pdf","contentLength":1,"size":26214401}'::jsonb
+    )
+  $$,
+  '42501',
+  NULL,
+  '17 Storage copy cannot bypass the destination bucket cap'
+);
+
+SELECT set_config('storage.operation', 'storage.object.upload', true);
+SELECT throws_ok(
+  $$
+    INSERT INTO storage.objects (bucket_id, name, owner, metadata)
+    VALUES (
+      'gk-broadcast-media',
+      'announcements/pgtap/unknown-length.pdf',
+      '90000000-0000-0000-0000-000000000005',
+      '{"mimetype":"application/pdf"}'::jsonb
+    )
+  $$,
+  '42501',
+  NULL,
+  '18 standard upload without a known length fails closed'
+);
+
+SELECT throws_ok(
+  $$
+    INSERT INTO storage.objects (bucket_id, name, owner, metadata)
+    VALUES (
+      'gk-broadcast-media',
+      'announcements/pgtap/disallowed.txt',
+      '90000000-0000-0000-0000-000000000005',
+      '{"mimetype":"text/plain","contentLength":1}'::jsonb
+    )
+  $$,
+  '42501',
+  NULL,
+  '19 standard upload with a disallowed MIME type fails closed'
+);
+
+SELECT lives_ok(
+  $$
+    INSERT INTO storage.objects (bucket_id, name, owner, metadata)
+    VALUES (
+      'gk-broadcast-media',
+      'announcements/pgtap/standard-upload.pdf',
+      '90000000-0000-0000-0000-000000000005',
+      '{"mimetype":"application/pdf","contentLength":1}'::jsonb
+    )
+  $$,
+  '20 Storage standard upload may create an unlinked object'
+);
+
+SELECT set_config('storage.operation', 'storage.tus.upload.create', true);
+SELECT lives_ok(
+  $$
+    INSERT INTO storage.objects (bucket_id, name, owner, metadata)
+    VALUES (
+      'gk-broadcast-media',
+      'announcements/pgtap/tus-upload.pdf',
+      '90000000-0000-0000-0000-000000000005',
+      '{"mimetype":"application/pdf","contentLength":26214400}'::jsonb
+    )
+  $$,
+  '21 Storage TUS upload may create an unlinked object'
+);
+
+SELECT set_config('storage.operation', '', true);
+
 SELECT is(
   (
     WITH changed AS (
       UPDATE storage.objects
       SET metadata = '{"mimetype":"application/pdf","test":"replacement"}'::jsonb
-      WHERE bucket_id = 'gk-media'
+      WHERE bucket_id = 'gk-broadcast-media'
         AND name = 'announcements/pgtap/live.pdf'
       RETURNING 1
     )
     SELECT count(*)::integer FROM changed
   ),
   0,
-  '16 Super Admin cannot replace a linked announcement object'
+  '22 Super Admin cannot replace a linked announcement object'
 );
 
 SELECT is(
   (
     WITH removed AS (
       DELETE FROM storage.objects
-      WHERE bucket_id = 'gk-media'
+      WHERE bucket_id = 'gk-broadcast-media'
         AND name = 'announcements/pgtap/live.pdf'
       RETURNING 1
     )
     SELECT count(*)::integer FROM removed
   ),
   0,
-  '17 Super Admin cannot delete a linked announcement object'
+  '23 Super Admin cannot delete a linked announcement object'
 );
 
 SELECT is(
@@ -405,28 +501,28 @@ SELECT is(
     WITH changed AS (
       UPDATE storage.objects
       SET metadata = '{"mimetype":"application/pdf","test":"cleanup"}'::jsonb
-      WHERE bucket_id = 'gk-media'
+      WHERE bucket_id = 'gk-broadcast-media'
         AND name = 'announcements/pgtap/unlinked.pdf'
       RETURNING 1
     )
     SELECT count(*)::integer FROM changed
   ),
-  1,
-  '18 Super Admin can still manage an unlinked announcement object'
+  0,
+  '24 Super Admin cannot replace even an unlinked Broadcast object'
 );
 
 SELECT is(
   (
     WITH removed AS (
       DELETE FROM storage.objects
-      WHERE bucket_id = 'gk-media'
+      WHERE bucket_id = 'gk-broadcast-media'
         AND name = 'announcements/pgtap/unlinked.pdf'
       RETURNING 1
     )
     SELECT count(*)::integer FROM removed
   ),
   1,
-  '19 Super Admin can clean up an unlinked announcement object'
+  '25 Super Admin can clean up an unlinked announcement object'
 );
 
 RESET ROLE;

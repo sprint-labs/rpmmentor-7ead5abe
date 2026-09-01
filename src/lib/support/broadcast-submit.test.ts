@@ -30,6 +30,42 @@ describe("post-upload broadcast submission", () => {
     expect(source).toContain("if (composerLocked) return;");
   });
 
+  it("samples an authenticated server clock before the first-broadcast upload", () => {
+    const source = readFileSync(
+      new URL("../../components/broadcast-centre.tsx", import.meta.url),
+      "utf8",
+    );
+    const mutationStart = source.indexOf("mutationFn: async () => {");
+    const mutationEnd = source.indexOf("onSuccess:", mutationStart);
+    const mutationSource = source.slice(mutationStart, mutationEnd);
+    const requestStart = mutationSource.indexOf("const clockRequestStartedAt");
+    const clockRead = mutationSource.indexOf("await getAdminClock()");
+    const preflight = mutationSource.indexOf("resolveBroadcastWindow(draftWindow");
+    const upload = mutationSource.indexOf("uploadAnnouncementAttachment(attachmentFile)");
+
+    expect(requestStart).toBeGreaterThanOrEqual(0);
+    expect(clockRead).toBeGreaterThan(requestStart);
+    expect(clockRead).toBeGreaterThanOrEqual(0);
+    expect(preflight).toBeGreaterThan(clockRead);
+    expect(upload).toBeGreaterThan(preflight);
+    expect(mutationSource).toContain("performance.now() - clockRequestStartedAt");
+    expect(mutationSource).toContain("Date.now() - clockRequestWallStartedAt");
+    expect(mutationSource).toMatch(/nowMs:\s*currentAdminServerNow\(\)/);
+  });
+
+  it("protects the publication clock endpoint with the Super Admin role", () => {
+    const source = readFileSync(new URL("../support.functions.ts", import.meta.url), "utf8");
+    const clockStart = source.indexOf("export const getAdminAnnouncementClock");
+    const clockEnd = source.indexOf("export const markAnnouncementRead", clockStart);
+    const clockSource = source.slice(clockStart, clockEnd);
+
+    expect(clockStart).toBeGreaterThanOrEqual(0);
+    expect(clockEnd).toBeGreaterThan(clockStart);
+    expect(clockSource).toContain('createServerFn({ method: "POST" })');
+    expect(clockSource).toContain("requireSupabaseAuth");
+    expect(clockSource).toContain("SUPPORT_INBOX_ROLES");
+  });
+
   it("removes an unlinked upload and never submits a stale delivery window", async () => {
     const removeAttachment = vi.fn().mockResolvedValue(undefined);
     const submit = vi.fn();

@@ -29,10 +29,11 @@ import { cn } from "@/lib/utils";
 import {
   createAnnouncement,
   endAnnouncement,
+  getAdminAnnouncementClock,
   listAdminAnnouncements,
 } from "@/lib/support.functions";
 import { useAnnouncementClock } from "@/lib/support/announcement-clock";
-import { estimateAdminServerNow } from "@/lib/support/admin-announcements";
+import { advanceAdminServerNow, estimateAdminServerNow } from "@/lib/support/admin-announcements";
 import type {
   AnnouncementAttachment,
   AnnouncementKind,
@@ -152,6 +153,7 @@ export function BroadcastCentre() {
   const list = useServerFn(listAdminAnnouncements);
   const create = useServerFn(createAnnouncement);
   const end = useServerFn(endAnnouncement);
+  const getAdminClock = useServerFn(getAdminAnnouncementClock);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [kind, setKind] = useState<AnnouncementKind>("feature");
@@ -287,8 +289,17 @@ export function BroadcastCentre() {
     mutationFn: async () => {
       if (!title.trim()) throw new Error("Add a title before publishing.");
       const draftWindow = { publishMode, startsAt, expiryMode, endsAt };
+      const clockRequestStartedAt = performance.now();
+      const clockRequestWallStartedAt = Date.now();
+      const clockSample = await getAdminClock();
+      const currentAdminServerNow = () =>
+        advanceAdminServerNow(
+          clockSample.serverNow,
+          performance.now() - clockRequestStartedAt,
+          Date.now() - clockRequestWallStartedAt,
+        );
       // Reject an invalid draft before uploading any bytes.
-      resolveBroadcastWindow(draftWindow);
+      resolveBroadcastWindow(draftWindow, currentAdminServerNow());
       const uploaded = attachmentFile ? await uploadAnnouncementAttachment(attachmentFile) : null;
       // A large upload can outlast a near start or expiry. Revalidate while
       // cleanup is still safe, then never delete after the create begins.
@@ -296,6 +307,7 @@ export function BroadcastCentre() {
         draft: draftWindow,
         attachment: uploaded,
         removeAttachment: removeUnlinkedAnnouncementAttachment,
+        nowMs: currentAdminServerNow(),
         submit: (delivery) =>
           create({
             data: {

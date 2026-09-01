@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   ADMIN_RECENT_ANNOUNCEMENT_LIMIT,
+  advanceAdminServerNow,
   endedAtForAnnouncement,
   estimateAdminServerNow,
   mergeAdminAnnouncementPages,
@@ -20,6 +21,32 @@ describe("estimateAdminServerNow", () => {
 
   it("falls back to client time for an older cached list response", () => {
     expect(estimateAdminServerNow(undefined, 0, 123_456)).toBe(123_456);
+  });
+});
+
+describe("advanceAdminServerNow", () => {
+  it("advances a standalone server sample without consulting the workstation clock", () => {
+    expect(advanceAdminServerNow("2026-09-01T10:00:00.000Z", 45_000)).toBe(
+      Date.parse("2026-09-01T10:00:45.000Z"),
+    );
+  });
+
+  it("does not move backwards when a monotonic sample is reset", () => {
+    expect(advanceAdminServerNow("2026-09-01T10:00:00.000Z", -1)).toBe(
+      Date.parse("2026-09-01T10:00:00.000Z"),
+    );
+  });
+
+  it("uses wall elapsed time when a monotonic clock pauses during sleep", () => {
+    expect(advanceAdminServerNow("2026-09-01T10:00:00.000Z", 1_000, 60_000)).toBe(
+      Date.parse("2026-09-01T10:01:00.000Z"),
+    );
+  });
+
+  it("fails closed when the server clock response is invalid", () => {
+    expect(() => advanceAdminServerNow("invalid", 0)).toThrow(
+      "Broadcast timing could not be verified. Refresh and try again.",
+    );
   });
 });
 

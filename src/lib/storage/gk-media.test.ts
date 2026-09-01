@@ -7,8 +7,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
  * Policies under test:
  *   - anon:          no access to any storage.objects row in gk-media
  *   - authenticated: normal media access remains role/owner scoped
- *   - announcements: only Super Admin may mutate reserved objects; other users
- *                    may read one only while its linked Broadcast is live
+ *   - announcements: the retired reserved prefix denies every authenticated role
  *   - super_admin:   full access, including DELETE of files owned by other users
  *
  * Requires env vars (in .env.local, not committed):
@@ -218,31 +217,13 @@ adminSuite("gk-media :: super_admin", () => {
     expect(data).toBeTruthy();
   });
 
-  it("can upload into the reserved announcements folder", async () => {
+  it("cannot upload into the retired announcements folder", async () => {
     const { data, error } = await admin.storage
       .from(BUCKET)
       .upload(announcementPath, new Blob(["broadcast"], { type: "application/pdf" }));
-    expect(error).toBeNull();
-    expect(data?.path).toBe(announcementPath);
-    cleanup.push(announcementPath);
+    expect(data).toBeFalsy();
+    expect(error).toBeTruthy();
   });
-
-  it.runIf(mentorEmail && mentorPassword)(
-    "keeps an unlinked announcement object private from mentors",
-    async () => {
-      const download = await mentorClient.storage.from(BUCKET).download(announcementPath);
-      expect(download.data).toBeFalsy();
-      expect(download.error).toBeTruthy();
-
-      const update = await mentorClient.storage
-        .from(BUCKET)
-        .update(announcementPath, fileBlob("tampered"));
-      expect(update.error).toBeTruthy();
-
-      const removal = await mentorClient.storage.from(BUCKET).remove([announcementPath]);
-      if (!removal.error) expect(removal.data ?? []).toHaveLength(0);
-    },
-  );
 
   it.runIf(mentorEmail && mentorPassword)(
     "can delete a file owned by another user (privileged delete)",

@@ -5,14 +5,17 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AnnouncementAttachment } from "@/lib/support/schema";
 import { AnnouncementMedia } from "./announcement-media";
 
-const { createSignedUrl } = vi.hoisted(() => ({
+const { createSignedUrl, storageFrom } = vi.hoisted(() => ({
   createSignedUrl: vi.fn(),
+  storageFrom: vi.fn(),
 }));
+
+storageFrom.mockImplementation(() => ({ createSignedUrl }));
 
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
     storage: {
-      from: () => ({ createSignedUrl }),
+      from: storageFrom,
     },
   },
 }));
@@ -44,6 +47,7 @@ describe("AnnouncementMedia", () => {
     await act(async () => undefined);
 
     expect(createSignedUrl).toHaveBeenCalledTimes(1);
+    expect(storageFrom).toHaveBeenCalledWith("gk-broadcast-media");
     expect(screen.getByRole("link", { name: "Open update.png" }).getAttribute("href")).toBe(
       "https://example.test/first",
     );

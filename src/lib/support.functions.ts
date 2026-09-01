@@ -21,7 +21,7 @@ import {
 import { requireAnnouncementMediaStorageReady } from "@/lib/support/announcement-media-capability";
 import { verifyStoredAnnouncementAttachment } from "@/lib/support/announcement-storage-verification";
 import { resolveServerBroadcastWindow } from "@/lib/support/broadcast-window";
-import { MEDIA_BUCKET } from "@/lib/storage/bucket";
+import { ANNOUNCEMENT_MEDIA_BUCKET } from "@/lib/storage/bucket";
 import {
   ANNOUNCEMENT_KINDS,
   SUPPORT_SEVERITIES,
@@ -431,6 +431,20 @@ export const listAdminAnnouncements = createServerFn({ method: "GET" })
     ).map((row) => ({ ...mapAnnouncement(row, null), serverNow: nowIso }));
   });
 
+// Use POST so browsers and intermediaries cannot reuse a stale clock response.
+export const getAdminAnnouncementClock = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<{ serverNow: string }> => {
+    await requireRole(
+      context.supabase,
+      context.userId,
+      SUPPORT_INBOX_ROLES,
+      "validate announcement scheduling",
+    );
+
+    return { serverNow: new Date().toISOString() };
+  });
+
 export const markAnnouncementRead = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((data) => markAnnouncementReadInput.parse(data))
@@ -461,7 +475,7 @@ export const createAnnouncement = createServerFn({ method: "POST" })
     if (data.attachment) {
       await requireAnnouncementMediaStorageReady((name) => context.supabase.rpc(name));
       await verifyStoredAnnouncementAttachment(data.attachment, (path) =>
-        context.supabase.storage.from(MEDIA_BUCKET).info(path),
+        context.supabase.storage.from(ANNOUNCEMENT_MEDIA_BUCKET).info(path),
       );
     }
 

@@ -320,15 +320,15 @@
       "version": "20260901111130",
       "name": "announcement_media_and_scheduling",
       "statement_count": 1,
-      "sql_length": 2579,
-      "sql_md5": "ad63cc515d496f3d3eaf3ffd4c1e9a31"
+      "sql_length": 2589,
+      "sql_md5": "97b7ed67dddeaae63ca348c2f0fe8fd9"
     },
     {
       "version": "20260901111131",
       "name": "secure_announcement_media_storage",
       "statement_count": 1,
-      "sql_length": 8698,
-      "sql_md5": "46ba771c71aa6314aef8c6fa8b1c711d"
+      "sql_length": 10681,
+      "sql_md5": "c6d8a923166984de796b880c76a49347"
     }
   ],
   "repository_comparison": {

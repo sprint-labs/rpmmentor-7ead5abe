@@ -21,6 +21,25 @@ export function estimateAdminServerNow(
   return serverNowMs + Math.max(0, clientNow - dataUpdatedAt);
 }
 
+/**
+ * Advance a fresh server sample with monotonic elapsed time. This avoids using
+ * the workstation wall clock for publication boundaries, including when the
+ * admin listing is empty and cannot carry its per-row server timestamp.
+ */
+export function advanceAdminServerNow(
+  serverNow: string,
+  monotonicElapsedMs: number,
+  wallElapsedMs = monotonicElapsedMs,
+): number {
+  const serverNowMs = Date.parse(serverNow);
+  if (!Number.isFinite(serverNowMs)) {
+    throw new Error("Broadcast timing could not be verified. Refresh and try again.");
+  }
+  const monotonic = Number.isFinite(monotonicElapsedMs) ? monotonicElapsedMs : 0;
+  const wall = Number.isFinite(wallElapsedMs) ? wallElapsedMs : 0;
+  return serverNowMs + Math.max(0, monotonic, wall);
+}
+
 export function endedAtForAnnouncement(startsAt: string, nowIso: string): string | null {
   return Date.parse(startsAt) < Date.parse(nowIso) ? nowIso : null;
 }

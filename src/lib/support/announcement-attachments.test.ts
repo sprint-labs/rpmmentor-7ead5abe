@@ -10,6 +10,7 @@ const authState = vi.hoisted(() => ({
 }));
 
 const storageState = vi.hoisted(() => ({
+  buckets: [] as string[],
   uploaded: [] as Array<{ path: string; contentType?: string }>,
   removed: [] as string[],
 }));
@@ -22,6 +23,7 @@ const capabilityState = vi.hoisted(() => ({
 }));
 
 const tusState = vi.hoisted(() => ({
+  bucketNames: [] as string[],
   objectNames: [] as string[],
   sizes: [] as number[],
 }));
@@ -35,6 +37,9 @@ vi.mock("tus-js-client", () => {
       this.options = options;
       tusState.objectNames.push(
         (options.metadata as { objectName?: string } | undefined)?.objectName ?? "",
+      );
+      tusState.bucketNames.push(
+        (options.metadata as { bucketName?: string } | undefined)?.bucketName ?? "",
       );
       tusState.sizes.push(file.size);
     }
@@ -68,16 +73,19 @@ vi.mock("@/integrations/supabase/client", () => ({
       }),
     },
     storage: {
-      from: () => ({
-        upload: async (path: string, _file: File, options?: { contentType?: string }) => {
-          storageState.uploaded.push({ path, contentType: options?.contentType });
-          return { error: null };
-        },
-        remove: async (paths: string[]) => {
-          storageState.removed.push(...paths);
-          return { error: null };
-        },
-      }),
+      from: (bucket: string) => {
+        storageState.buckets.push(bucket);
+        return {
+          upload: async (path: string, _file: File, options?: { contentType?: string }) => {
+            storageState.uploaded.push({ path, contentType: options?.contentType });
+            return { error: null };
+          },
+          remove: async (paths: string[]) => {
+            storageState.removed.push(...paths);
+            return { error: null };
+          },
+        };
+      },
     },
   },
 }));
@@ -102,12 +110,14 @@ describe("uploadAnnouncementAttachment", () => {
       expires_at: Math.floor(Date.now() / 1000) + 3600,
     };
     authState.sessionRequests = 0;
+    storageState.buckets = [];
     storageState.uploaded = [];
     storageState.removed = [];
     capabilityState.ready = true;
     capabilityState.error = null;
     capabilityState.throws = false;
     capabilityState.calls = [];
+    tusState.bucketNames = [];
     tusState.objectNames = [];
     tusState.sizes = [];
     vi.stubEnv("VITE_SUPABASE_URL", "https://zdxxezquhvpjmoxlecjp.supabase.co");
@@ -120,6 +130,7 @@ describe("uploadAnnouncementAttachment", () => {
     expect(result.name).toBe("clip.mp4");
     expect(result.size).toBe(6 * 1024 * 1024 + 1);
     expect(result.path).toMatch(/^announcements\/\d{4}\//);
+    expect(tusState.bucketNames).toEqual(["gk-broadcast-media"]);
     expect(tusState.objectNames).toEqual([result.path]);
     expect(tusState.sizes).toEqual([result.size]);
     expect(storageState.uploaded).toHaveLength(0);
@@ -131,6 +142,7 @@ describe("uploadAnnouncementAttachment", () => {
     );
 
     expect(result.mime).toBe("application/pdf");
+    expect(storageState.buckets).toEqual(["gk-broadcast-media"]);
     expect(tusState.objectNames).toHaveLength(0);
     expect(storageState.uploaded).toEqual([{ path: result.path, contentType: "application/pdf" }]);
   });
@@ -162,7 +174,7 @@ describe("uploadAnnouncementAttachment", () => {
     await expect(
       uploadAnnouncementAttachment(attachment("notice.pdf", 1024, "application/pdf")),
     ).rejects.toThrow("Media attachments are unavailable");
-    expect(capabilityState.calls).toEqual(["announcement_media_storage_ready_v1"]);
+    expect(capabilityState.calls).toEqual(["announcement_media_storage_ready_v2"]);
     expect(authState.sessionRequests).toBe(0);
     expect(tusState.objectNames).toHaveLength(0);
     expect(storageState.uploaded).toHaveLength(0);

@@ -18,18 +18,23 @@ function policy(name: string): string {
 }
 
 function announcementStorageReadBranch(): string {
-  const select = policy("gk_media_select_scoped");
-  const start = select.indexOf("(storage.foldername(name))[1] = 'announcements'");
-  const end = select.indexOf(
-    "(storage.foldername(name))[1] IS DISTINCT FROM 'announcements'",
-    start,
-  );
-  if (start < 0 || end < 0) throw new Error("Announcement Storage read branch was not found");
-  return select.slice(start, end);
+  return policy("gk_broadcast_media_select_scoped");
 }
 
 describe("announcement Storage hardening migration", () => {
-  it("replaces every broad gk-media operation policy", () => {
+  it("creates a dedicated private bucket with service-enforced upload limits", () => {
+    expect(migration).toContain(
+      "INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)",
+    );
+    expect(migration).toContain("'gk-broadcast-media'");
+    expect(migration).toContain("26214400");
+    expect(migration).toContain("allowed_mime_types = EXCLUDED.allowed_mime_types");
+    for (const mime of ["image/jpeg", "video/mp4", "audio/mpeg", "application/pdf"]) {
+      expect(migration).toContain(`'${mime}'`);
+    }
+  });
+
+  it("retires the old shared-bucket prefix without changing other gk-media access", () => {
     for (const name of [
       "gk_media_select_scoped",
       "gk_media_insert_authenticated",
@@ -38,11 +43,17 @@ describe("announcement Storage hardening migration", () => {
     ]) {
       expect(migration).toContain(`DROP POLICY IF EXISTS ${name} ON storage.objects;`);
       expect(migration).toContain(`CREATE POLICY ${name}`);
+      expect(policy(name)).toContain(
+        "(storage.foldername(name))[1] IS DISTINCT FROM 'announcements'",
+      );
     }
+    expect(policy("gk_media_select_scoped")).not.toContain(
+      "announcement.attachment_path = storage.objects.name",
+    );
   });
 
   it("only exposes announcement objects when the linked broadcast is live", () => {
-    const select = policy("gk_media_select_scoped");
+    const select = policy("gk_broadcast_media_select_scoped");
     expect(select).toContain("announcement.attachment_path = storage.objects.name");
     expect(select).toContain("announcement.active = true");
     expect(select).toContain("announcement.starts_at <= now()");
@@ -66,28 +77,51 @@ describe("announcement Storage hardening migration", () => {
 
   it("requires Super Admin for announcement object mutations", () => {
     for (const name of [
-      "gk_media_insert_authenticated",
-      "gk_media_update_privileged",
-      "gk_media_delete_privileged",
+      "gk_broadcast_media_insert_super_admin",
+      "gk_broadcast_media_delete_super_admin",
     ]) {
       const sql = policy(name);
-      expect(sql).toContain("(storage.foldername(name))[1] = 'announcements'");
+      expect(sql).toContain("bucket_id = 'gk-broadcast-media'");
       expect(sql).toContain("'super_admin'::public.app_role");
     }
-    expect(policy("gk_media_update_privileged")).toContain("WITH CHECK");
+    expect(migration).toContain(
+      "DROP POLICY IF EXISTS gk_broadcast_media_update_super_admin ON storage.objects;",
+    );
+    expect(migration).not.toContain("CREATE POLICY gk_broadcast_media_update_super_admin");
+  });
+
+  it("admits only size-checked standard and TUS upload operations", () => {
+    const insert = policy("gk_broadcast_media_insert_super_admin");
+    expect(insert).toContain("storage.allow_any_operation(ARRAY[");
+    for (const operation of [
+      "storage.object.upload",
+      "storage.tus.upload.create",
+      "storage.tus.upload.part",
+    ]) {
+      expect(insert).toContain(`'${operation}'`);
+    }
+    for (const bypass of [
+      "storage.object.copy",
+      "storage.object.move",
+      "storage.object.upload_signed",
+      "storage.s3.upload",
+    ]) {
+      expect(insert).not.toContain(`'${bypass}'`);
+    }
+    expect(insert).toContain("WHEN jsonb_typeof(metadata -> 'contentLength') = 'number'");
+    expect(insert).toContain("(metadata ->> 'contentLength')::numeric BETWEEN 0 AND 26214400");
+    expect(insert).toContain("(metadata ->> 'mimetype') IN (");
   });
 
   it("keeps linked announcement objects immutable while allowing unlinked cleanup", () => {
     for (const name of [
-      "gk_media_insert_authenticated",
-      "gk_media_update_privileged",
-      "gk_media_delete_privileged",
+      "gk_broadcast_media_insert_super_admin",
+      "gk_broadcast_media_delete_super_admin",
     ]) {
       const sql = policy(name);
       expect(sql).toContain("AND NOT EXISTS (");
       expect(sql).toContain("linked_announcement.attachment_path = storage.objects.name");
     }
-    expect(policy("gk_media_update_privileged").match(/AND NOT EXISTS \(/g)).toHaveLength(2);
   });
 
   it("enforces valid announcement windows and MIME allowlisting in the database", () => {
@@ -97,16 +131,19 @@ describe("announcement Storage hardening migration", () => {
   });
 
   it("exposes the upload-readiness marker only after the hardening policies", () => {
-    const marker = "CREATE OR REPLACE FUNCTION public.announcement_media_storage_ready_v1()";
+    const marker = "CREATE OR REPLACE FUNCTION public.announcement_media_storage_ready_v2()";
     expect(migration).toContain(marker);
     expect(migration.indexOf(marker)).toBeGreaterThan(
-      migration.indexOf("CREATE POLICY gk_media_delete_privileged"),
+      migration.indexOf("CREATE POLICY gk_broadcast_media_delete_super_admin"),
     );
     expect(migration).toContain(
-      "REVOKE ALL ON FUNCTION public.announcement_media_storage_ready_v1() FROM PUBLIC;",
+      "DROP FUNCTION IF EXISTS public.announcement_media_storage_ready_v1();",
     );
     expect(migration).toContain(
-      "GRANT EXECUTE ON FUNCTION public.announcement_media_storage_ready_v1() TO authenticated;",
+      "REVOKE ALL ON FUNCTION public.announcement_media_storage_ready_v2() FROM PUBLIC;",
+    );
+    expect(migration).toContain(
+      "GRANT EXECUTE ON FUNCTION public.announcement_media_storage_ready_v2() TO authenticated;",
     );
     expect(migration).toContain("SECURITY INVOKER");
     expect(migration).toContain("SET search_path = ''");

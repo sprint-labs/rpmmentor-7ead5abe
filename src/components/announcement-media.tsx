@@ -8,7 +8,7 @@ import {
   Video,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { MEDIA_BUCKET } from "@/lib/storage/bucket";
+import { ANNOUNCEMENT_MEDIA_BUCKET } from "@/lib/storage/bucket";
 import type { AnnouncementAttachment, AnnouncementKind } from "@/lib/support/schema";
 import { cn } from "@/lib/utils";
 
@@ -94,7 +94,7 @@ export function AnnouncementMedia({
       let nextRefreshMs = ANNOUNCEMENT_SIGNED_URL_RETRY_MS;
       try {
         const { data, error } = await supabase.storage
-          .from(MEDIA_BUCKET)
+          .from(ANNOUNCEMENT_MEDIA_BUCKET)
           .createSignedUrl(attachmentPath, ANNOUNCEMENT_SIGNED_URL_SECONDS);
         if (cancelled) return;
         if (!error && data?.signedUrl) {

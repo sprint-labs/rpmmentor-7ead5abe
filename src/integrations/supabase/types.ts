@@ -1262,7 +1262,7 @@ export type Database = {
       }
     }
     Functions: {
-      announcement_media_storage_ready_v1: { Args: never; Returns: boolean }
+      announcement_media_storage_ready_v2: { Args: never; Returns: boolean }
       duty_of_care_at: {
         Args: { as_of: string }
         Returns: {

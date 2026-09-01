@@ -6,7 +6,7 @@ import {
   RESUMABLE_UPLOAD_THRESHOLD_BYTES,
   uploadObjectBytes,
 } from "@/lib/media-upload-transport";
-import { MEDIA_BUCKET } from "@/lib/storage/bucket";
+import { ANNOUNCEMENT_MEDIA_BUCKET } from "@/lib/storage/bucket";
 import { requireAnnouncementMediaStorageReady } from "@/lib/support/announcement-media-capability";
 import {
   ANNOUNCEMENT_ATTACHMENT_MIME_BY_EXTENSION,
@@ -91,13 +91,15 @@ export async function uploadAnnouncementAttachment(file: File): Promise<Announce
     },
     supabaseUrl: url,
     anonKey,
-    bucket: MEDIA_BUCKET,
+    bucket: ANNOUNCEMENT_MEDIA_BUCKET,
     limitLabel,
     standardUpload: async (objectPath, objectFile) => {
-      const { error } = await supabase.storage.from(MEDIA_BUCKET).upload(objectPath, objectFile, {
-        contentType: mime,
-        upsert: false,
-      });
+      const { error } = await supabase.storage
+        .from(ANNOUNCEMENT_MEDIA_BUCKET)
+        .upload(objectPath, objectFile, {
+          contentType: mime,
+          upsert: false,
+        });
       if (error) throw new Error(describeUploadError(error, limitLabel));
     },
   });
@@ -115,6 +117,8 @@ export async function removeUnlinkedAnnouncementAttachment(
   attachment: AnnouncementAttachment,
 ): Promise<void> {
   if (!isAnnouncementAttachmentPathAllowed(attachment.path)) return;
-  const { error } = await supabase.storage.from(MEDIA_BUCKET).remove([attachment.path]);
+  const { error } = await supabase.storage
+    .from(ANNOUNCEMENT_MEDIA_BUCKET)
+    .remove([attachment.path]);
   if (error) throw new Error(error.message);
 }
