@@ -52,8 +52,9 @@ describe("announcement Storage hardening migration", () => {
   });
 
   it("enforces valid announcement windows and MIME allowlisting in the database", () => {
-    expect(migration).toContain("CHECK (ends_at IS NULL OR ends_at > starts_at)");
+    expect(migration).toContain("CHECK (ends_at IS NULL OR ends_at > starts_at) NOT VALID");
     expect(migration).toContain("announcements_attachment_mime_check");
+    expect(migration.match(/NOT VALID;/g)).toHaveLength(2);
   });
 
   it("exposes the upload-readiness marker only after the hardening policies", () => {

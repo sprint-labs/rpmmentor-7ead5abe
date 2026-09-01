@@ -5,6 +5,9 @@
 
 DO $$
 BEGIN
+  -- Do not let historical rows abort the storage-policy cutover. NOT VALID
+  -- still enforces each check for every new or updated row; validation remains
+  -- a deliberate follow-up after a read-only legacy-row preflight.
   IF NOT EXISTS (
     SELECT 1
     FROM pg_constraint
@@ -13,7 +16,7 @@ BEGIN
   ) THEN
     ALTER TABLE public.announcements
       ADD CONSTRAINT announcements_window_check
-      CHECK (ends_at IS NULL OR ends_at > starts_at);
+      CHECK (ends_at IS NULL OR ends_at > starts_at) NOT VALID;
   END IF;
 
   IF NOT EXISTS (
@@ -42,7 +45,7 @@ BEGIN
           'audio/aac',
           'application/pdf'
         )
-      );
+      ) NOT VALID;
   END IF;
 END;
 $$;
