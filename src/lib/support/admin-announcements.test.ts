@@ -5,6 +5,7 @@ import {
   estimateAdminServerNow,
   mergeAdminAnnouncementPages,
   nextAdminScheduleAt,
+  nextAdminScheduleInputMinAt,
 } from "./admin-announcements";
 
 describe("nextAdminScheduleAt", () => {
@@ -41,6 +42,43 @@ describe("nextAdminScheduleAt", () => {
       expect(parsedFromDateTimeLocal.getTime()).toBe(scheduled.getTime());
       expect(parsedFromDateTimeLocal.getTime()).toBeGreaterThanOrEqual(now + 60 * 60 * 1000);
       expect(scheduled.getMinutes()).toBe(0);
+    } finally {
+      if (originalTimezone === undefined) delete process.env.TZ;
+      else process.env.TZ = originalTimezone;
+    }
+  });
+});
+
+describe("nextAdminScheduleInputMinAt", () => {
+  it("selects the first minute strictly beyond the lead boundary", () => {
+    const now = new Date(2026, 8, 1, 13, 59, 30);
+    const minimum = new Date(nextAdminScheduleInputMinAt(now.getTime(), 30_000));
+
+    expect(minimum.getTime()).toBeGreaterThan(now.getTime() + 30_000);
+    expect([minimum.getMinutes(), minimum.getSeconds(), minimum.getMilliseconds()]).toEqual([
+      1, 0, 0,
+    ]);
+  });
+
+  it("survives an offset-free round-trip across a DST fall-back", () => {
+    const originalTimezone = process.env.TZ;
+    process.env.TZ = "Pacific/Chatham";
+
+    try {
+      // Pacific/Chatham repeats 02:45-03:44 here. A naive 02:46 local
+      // minimum would parse to the first occurrence, an hour in the past.
+      const now = Date.parse("2026-04-04T14:00:00.000Z");
+      const minimum = new Date(nextAdminScheduleInputMinAt(now, 30_000));
+      const parsedFromDateTimeLocal = new Date(
+        minimum.getFullYear(),
+        minimum.getMonth(),
+        minimum.getDate(),
+        minimum.getHours(),
+        minimum.getMinutes(),
+      );
+
+      expect(parsedFromDateTimeLocal.getTime()).toBe(minimum.getTime());
+      expect(parsedFromDateTimeLocal.getTime()).toBeGreaterThan(now + 30_000);
     } finally {
       if (originalTimezone === undefined) delete process.env.TZ;
       else process.env.TZ = originalTimezone;

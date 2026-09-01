@@ -37,6 +37,7 @@ import {
   advanceAdminServerNow,
   estimateAdminServerNow,
   nextAdminScheduleAt,
+  nextAdminScheduleInputMinAt,
 } from "@/lib/support/admin-announcements";
 import type {
   AnnouncementAttachment,
@@ -53,11 +54,16 @@ import {
 import {
   readBroadcastDraft,
   removeBroadcastDraft,
+  restoreBroadcastScheduleTime,
   writeBroadcastDraft,
+  type BroadcastScheduleTimeSource,
   type BroadcastDraft,
 } from "@/lib/support/broadcast-draft-storage";
 import { submitBroadcastAfterUpload } from "@/lib/support/broadcast-submit";
-import { resolveBroadcastWindow } from "@/lib/support/broadcast-window";
+import {
+  BROADCAST_SCHEDULE_MIN_LEAD_MS,
+  resolveBroadcastWindow,
+} from "@/lib/support/broadcast-window";
 
 type PublishMode = BroadcastDraft["publishMode"];
 type ExpiryMode = BroadcastDraft["expiryMode"];
@@ -93,8 +99,8 @@ function toDateTimeLocal(date: Date): string {
   return new Date(date.getTime() - offset * 60_000).toISOString().slice(0, 16);
 }
 
-function defaultScheduledAt(): string {
-  return toDateTimeLocal(new Date(nextAdminScheduleAt(Date.now())));
+function defaultScheduledAt(nowMs: number): string {
+  return toDateTimeLocal(new Date(nextAdminScheduleAt(nowMs)));
 }
 
 function formatDateTime(value: string): string {
@@ -157,12 +163,13 @@ export function BroadcastCentre() {
   const end = useServerFn(endAnnouncement);
   const getAdminClock = useServerFn(getAdminAnnouncementClock);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const scheduleTimeSourceRef = useRef<BroadcastScheduleTimeSource>("auto");
 
   const [kind, setKind] = useState<AnnouncementKind>("feature");
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [publishMode, setPublishMode] = useState<PublishMode>("now");
-  const [startsAt, setStartsAt] = useState(defaultScheduledAt);
+  const [startsAt, setStartsAt] = useState("");
   const [expiryMode, setExpiryMode] = useState<ExpiryMode>("none");
   const [endsAt, setEndsAt] = useState("");
   const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
@@ -181,7 +188,9 @@ export function BroadcastCentre() {
       if (draft.publishMode === "now" || draft.publishMode === "later") {
         setPublishMode(draft.publishMode);
       }
-      if (typeof draft.startsAt === "string" && draft.startsAt) setStartsAt(draft.startsAt);
+      const restoredSchedule = restoreBroadcastScheduleTime(draft);
+      scheduleTimeSourceRef.current = restoredSchedule.source;
+      setStartsAt(restoredSchedule.startsAt);
       if (
         draft.expiryMode === "none" ||
         draft.expiryMode === "24h" ||
@@ -203,6 +212,7 @@ export function BroadcastCentre() {
       body,
       publishMode,
       startsAt,
+      scheduleTimeSource: scheduleTimeSourceRef.current === "auto" ? "auto" : "user",
       expiryMode,
       endsAt,
     };
@@ -232,14 +242,49 @@ export function BroadcastCentre() {
     refetchInterval: 30_000,
   });
 
+  const {
+    data: adminClockSample,
+    isError: adminClockError,
+    isFetching: adminClockFetching,
+    refetch: refetchAdminClock,
+  } = useQuery({
+    queryKey: ["announcements", "admin", "clock"],
+    queryFn: async () => {
+      const monotonicStartedAt = performance.now();
+      const wallStartedAt = Date.now();
+      const sample = await getAdminClock();
+      // Treat a malformed response as a query failure instead of crashing a
+      // render while calculating native input bounds.
+      advanceAdminServerNow(sample.serverNow, 0);
+      return { ...sample, monotonicStartedAt, wallStartedAt };
+    },
+    enabled: draftReady,
+    staleTime: 25_000,
+    refetchInterval: 30_000,
+  });
+
   // Older servers omit serverNow, so retain a workstation-clock fallback for
   // rolling deployments while preventing skew once this response is present.
   const serverNow = data[0]?.serverNow;
   const clientNow = useAnnouncementClock();
   const now = estimateAdminServerNow(serverNow, dataUpdatedAt, clientNow);
+  const adminServerNow =
+    draftReady && adminClockSample
+      ? advanceAdminServerNow(
+          adminClockSample.serverNow,
+          performance.now() - adminClockSample.monotonicStartedAt,
+          Date.now() - adminClockSample.wallStartedAt,
+        )
+      : null;
   const live = data.filter((announcement) => statusOf(announcement, now) === "live");
   const scheduled = data.filter((announcement) => statusOf(announcement, now) === "scheduled");
   const recent = data.filter((announcement) => statusOf(announcement, now) === "ended").slice(0, 8);
+
+  useEffect(() => {
+    if (adminServerNow === null || scheduleTimeSourceRef.current !== "auto") return;
+    const next = defaultScheduledAt(adminServerNow);
+    setStartsAt((current) => (current === next ? current : next));
+  }, [adminServerNow]);
 
   const previewAttachment = useMemo<AnnouncementAttachment | null>(() => {
     if (!attachmentFile) return null;
@@ -280,7 +325,8 @@ export function BroadcastCentre() {
     setTitle("");
     setBody("");
     setPublishMode("now");
-    setStartsAt(defaultScheduledAt());
+    scheduleTimeSourceRef.current = "auto";
+    setStartsAt(adminServerNow === null ? "" : defaultScheduledAt(adminServerNow));
     setExpiryMode("none");
     setEndsAt("");
     setAttachment(null);
@@ -327,12 +373,8 @@ export function BroadcastCentre() {
           }),
       });
     },
-    onSuccess: async (announcement) => {
-      toast.success(
-        Date.parse(announcement.startsAt) > Date.now()
-          ? "Broadcast scheduled"
-          : "Broadcast published",
-      );
+    onSuccess: async () => {
+      toast.success(publishMode === "later" ? "Broadcast scheduled" : "Broadcast published");
       clearComposer();
       await refetch();
       void queryClient.invalidateQueries({ queryKey: ["announcements"] });
@@ -358,7 +400,8 @@ export function BroadcastCentre() {
     setTitle(announcement.title);
     setBody(announcement.body);
     setPublishMode("now");
-    setStartsAt(defaultScheduledAt());
+    scheduleTimeSourceRef.current = "auto";
+    setStartsAt(adminServerNow === null ? "" : defaultScheduledAt(adminServerNow));
     setExpiryMode("none");
     setEndsAt("");
     setAttachment(null);
@@ -636,17 +679,51 @@ export function BroadcastCentre() {
                 ))}
               </div>
               {publishMode === "later" && (
-                <label className="mt-3 block text-[11px] text-muted-foreground">
-                  Publish date and time
-                  <input
-                    type="datetime-local"
-                    disabled={composerLocked}
-                    value={startsAt}
-                    min={toDateTimeLocal(new Date())}
-                    onChange={(event) => setStartsAt(event.target.value)}
-                    className="mt-1 h-9 w-full rounded-md border border-border bg-background px-2.5 text-xs text-foreground"
-                  />
-                </label>
+                <div className="mt-3">
+                  <label className="block text-[11px] text-muted-foreground">
+                    Publish date and time
+                    <input
+                      type="datetime-local"
+                      disabled={composerLocked || adminServerNow === null}
+                      value={startsAt}
+                      min={
+                        adminServerNow === null
+                          ? undefined
+                          : toDateTimeLocal(
+                              new Date(
+                                nextAdminScheduleInputMinAt(
+                                  adminServerNow,
+                                  BROADCAST_SCHEDULE_MIN_LEAD_MS,
+                                ),
+                              ),
+                            )
+                      }
+                      onChange={(event) => {
+                        scheduleTimeSourceRef.current = "user";
+                        setStartsAt(event.target.value);
+                      }}
+                      className="mt-1 h-9 w-full rounded-md border border-border bg-background px-2.5 text-xs text-foreground"
+                    />
+                  </label>
+                  {adminServerNow === null && (
+                    <div className="mt-1 flex items-center gap-2 text-[10px] text-muted-foreground">
+                      <span>
+                        {adminClockError
+                          ? "Scheduling clock unavailable."
+                          : "Checking server time…"}
+                      </span>
+                      {adminClockError && !adminClockFetching && (
+                        <button
+                          type="button"
+                          onClick={() => void refetchAdminClock()}
+                          className="font-medium text-foreground underline underline-offset-2"
+                        >
+                          Retry
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
               )}
             </div>
 
@@ -687,7 +764,11 @@ export function BroadcastCentre() {
             </div>
             <button
               type="button"
-              disabled={composerLocked || !title.trim()}
+              disabled={
+                composerLocked ||
+                !title.trim() ||
+                (publishMode === "later" && adminServerNow === null)
+              }
               onClick={() => createMutation.mutate()}
               className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
             >

@@ -10,6 +10,19 @@ const ADMIN_DEFAULT_SCHEDULE_LEAD_MS = 60 * 60 * 1000;
 const MINUTE_MS = 60 * 1000;
 const FULL_HOUR_SEARCH_LIMIT_MINUTES = 24 * 60;
 
+function dateTimeLocalRoundTrips(candidateMs: number): boolean {
+  const candidate = new Date(candidateMs);
+  return (
+    new Date(
+      candidate.getFullYear(),
+      candidate.getMonth(),
+      candidate.getDate(),
+      candidate.getHours(),
+      candidate.getMinutes(),
+    ).getTime() === candidateMs
+  );
+}
+
 /**
  * Keep the default at least an hour ahead while aligning it to a full local
  * hour. Rounding the target down can otherwise produce an immediately invalid
@@ -21,17 +34,28 @@ export function nextAdminScheduleAt(nowMs: number): number {
 
   for (let offset = 0; offset <= FULL_HOUR_SEARCH_LIMIT_MINUTES; offset += 1) {
     const candidate = new Date(candidateMs);
-    const roundTrippedMs = new Date(
-      candidate.getFullYear(),
-      candidate.getMonth(),
-      candidate.getDate(),
-      candidate.getHours(),
-    ).getTime();
-    if (candidate.getMinutes() === 0 && roundTrippedMs === candidateMs) return candidateMs;
+    if (candidate.getMinutes() === 0 && dateTimeLocalRoundTrips(candidateMs)) return candidateMs;
     candidateMs += MINUTE_MS;
   }
 
   throw new Error("Broadcast default schedule could not be calculated.");
+}
+
+/**
+ * Native datetime-local inputs have minute precision and discard the timezone
+ * offset. Return the first selectable minute strictly beyond the scheduling
+ * lead that parses back to the same instant, including across DST fall-backs.
+ */
+export function nextAdminScheduleInputMinAt(nowMs: number, minimumLeadMs: number): number {
+  const earliestMs = nowMs + minimumLeadMs;
+  let candidateMs = (Math.floor(earliestMs / MINUTE_MS) + 1) * MINUTE_MS;
+
+  for (let offset = 0; offset <= FULL_HOUR_SEARCH_LIMIT_MINUTES; offset += 1) {
+    if (dateTimeLocalRoundTrips(candidateMs)) return candidateMs;
+    candidateMs += MINUTE_MS;
+  }
+
+  throw new Error("Broadcast scheduling minimum could not be calculated.");
 }
 
 /**

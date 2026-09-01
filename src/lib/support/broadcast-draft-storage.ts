@@ -2,15 +2,31 @@ import type { AnnouncementKind } from "./schema";
 
 const BROADCAST_DRAFT_STORAGE_KEY = "rpm-broadcast-draft-v2";
 
+export type BroadcastScheduleTimeSource = "auto" | "draft" | "user";
+
 export type BroadcastDraft = {
   kind: AnnouncementKind;
   title: string;
   body: string;
   publishMode: "now" | "later";
   startsAt: string;
+  scheduleTimeSource?: Exclude<BroadcastScheduleTimeSource, "draft">;
   expiryMode: "none" | "24h" | "7d" | "custom";
   endsAt: string;
 };
+
+export function restoreBroadcastScheduleTime(draft: Partial<BroadcastDraft>): {
+  startsAt: string;
+  source: BroadcastScheduleTimeSource;
+} {
+  const startsAt = typeof draft.startsAt === "string" ? draft.startsAt : "";
+  if (draft.scheduleTimeSource === "auto") return { startsAt: "", source: "auto" };
+  if (draft.scheduleTimeSource === "user") return { startsAt, source: "user" };
+  // Drafts saved before the source marker existed only need their hidden
+  // baseline preserved when the author had explicitly chosen scheduling.
+  if (draft.publishMode === "later" && startsAt) return { startsAt, source: "draft" };
+  return { startsAt: "", source: "auto" };
+}
 
 export type BroadcastDraftStorage = Pick<Storage, "getItem" | "setItem" | "removeItem">;
 

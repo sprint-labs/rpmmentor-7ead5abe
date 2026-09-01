@@ -53,6 +53,28 @@ describe("post-upload broadcast submission", () => {
     expect(mutationSource).toMatch(/nowMs:\s*currentAdminServerNow\(\)/);
   });
 
+  it("bases the schedule picker and its default on a sampled server clock", () => {
+    const source = readFileSync(
+      new URL("../../components/broadcast-centre.tsx", import.meta.url),
+      "utf8",
+    );
+
+    expect(source).toContain('queryKey: ["announcements", "admin", "clock"]');
+    expect(source).toContain("draftReady && adminClockSample");
+    expect(source).toContain('scheduleTimeSourceRef.current !== "auto"');
+    expect(source).toContain('scheduleTimeSourceRef.current = "user"');
+    expect(source).toContain("restoreBroadcastScheduleTime(draft)");
+    expect(source).toContain("scheduleTimeSource:");
+    expect(source).toContain("setStartsAt((current) => (current === next ? current : next))");
+    expect(source).toContain("nextAdminScheduleInputMinAt(");
+    expect(source).toContain("BROADCAST_SCHEDULE_MIN_LEAD_MS");
+    expect(source).toContain("Date.now() - adminClockSample.wallStartedAt");
+    expect(source).toContain("disabled={composerLocked || adminServerNow === null}");
+    expect(source).toContain('(publishMode === "later" && adminServerNow === null)');
+    expect(source).toContain("onClick={() => void refetchAdminClock()}");
+    expect(source).not.toContain("nextAdminScheduleAt(Date.now())");
+  });
+
   it("protects the publication clock endpoint with the Super Admin role", () => {
     const source = readFileSync(new URL("../support.functions.ts", import.meta.url), "utf8");
     const clockStart = source.indexOf("export const getAdminAnnouncementClock");

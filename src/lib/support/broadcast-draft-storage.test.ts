@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   readBroadcastDraft,
   removeBroadcastDraft,
+  restoreBroadcastScheduleTime,
   writeBroadcastDraft,
   type BroadcastDraft,
   type BroadcastDraftStorage,
@@ -13,6 +14,7 @@ const draft: BroadcastDraft = {
   body: "The draft remains usable without persistence.",
   publishMode: "later",
   startsAt: "2026-09-02T09:00",
+  scheduleTimeSource: "user",
   expiryMode: "24h",
   endsAt: "",
 };
@@ -31,6 +33,38 @@ describe("Broadcast draft storage", () => {
     const target = storage({ getItem: vi.fn(() => JSON.stringify(draft)) });
 
     expect(readBroadcastDraft(target)).toEqual(draft);
+  });
+
+  it("refreshes a hidden auto schedule when restoring a publish-now draft", () => {
+    expect(
+      restoreBroadcastScheduleTime({
+        publishMode: "now",
+        startsAt: "2026-09-01T09:00",
+      }),
+    ).toEqual({ startsAt: "", source: "auto" });
+    expect(
+      restoreBroadcastScheduleTime({
+        publishMode: "later",
+        startsAt: "2026-09-01T09:00",
+        scheduleTimeSource: "auto",
+      }),
+    ).toEqual({ startsAt: "", source: "auto" });
+  });
+
+  it("preserves legacy scheduled drafts and explicit user clearing", () => {
+    expect(
+      restoreBroadcastScheduleTime({
+        publishMode: "later",
+        startsAt: "2026-09-02T09:00",
+      }),
+    ).toEqual({ startsAt: "2026-09-02T09:00", source: "draft" });
+    expect(
+      restoreBroadcastScheduleTime({
+        publishMode: "later",
+        startsAt: "",
+        scheduleTimeSource: "user",
+      }),
+    ).toEqual({ startsAt: "", source: "user" });
   });
 
   it("recovers when reading and cleanup are both blocked", () => {
