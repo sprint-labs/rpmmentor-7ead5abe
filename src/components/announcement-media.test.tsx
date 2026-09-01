@@ -58,6 +58,56 @@ describe("AnnouncementMedia", () => {
     );
   });
 
+  it("retries a failed refresh before the retained signed URL expires", async () => {
+    vi.useFakeTimers();
+    createSignedUrl
+      .mockResolvedValueOnce({ data: { signedUrl: "https://example.test/first" }, error: null })
+      .mockResolvedValueOnce({ data: null, error: { message: "temporary failure" } })
+      .mockResolvedValueOnce({
+        data: { signedUrl: "https://example.test/recovered" },
+        error: null,
+      });
+
+    render(<AnnouncementMedia attachment={attachment} />);
+    await act(async () => undefined);
+
+    await act(async () => {
+      vi.advanceTimersByTime(4 * 60 * 1000);
+    });
+    expect(createSignedUrl).toHaveBeenCalledTimes(2);
+    expect(screen.getByRole("link", { name: "Open update.png" }).getAttribute("href")).toBe(
+      "https://example.test/first",
+    );
+
+    await act(async () => {
+      vi.advanceTimersByTime(15 * 1000);
+    });
+    expect(createSignedUrl).toHaveBeenCalledTimes(3);
+    expect(screen.getByRole("link", { name: "Open update.png" }).getAttribute("href")).toBe(
+      "https://example.test/recovered",
+    );
+  });
+
+  it("retries when the signed-URL request rejects", async () => {
+    vi.useFakeTimers();
+    createSignedUrl.mockRejectedValueOnce(new Error("network unavailable")).mockResolvedValueOnce({
+      data: { signedUrl: "https://example.test/recovered" },
+      error: null,
+    });
+
+    render(<AnnouncementMedia attachment={attachment} />);
+    await act(async () => undefined);
+    expect(createSignedUrl).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      vi.advanceTimersByTime(15 * 1000);
+    });
+    expect(createSignedUrl).toHaveBeenCalledTimes(2);
+    expect(screen.getByRole("link", { name: "Open update.png" }).getAttribute("href")).toBe(
+      "https://example.test/recovered",
+    );
+  });
+
   it("refreshes a playing stream before expiry and resumes at its previous position", async () => {
     vi.useFakeTimers();
     createSignedUrl

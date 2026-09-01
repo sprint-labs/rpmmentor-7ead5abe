@@ -41,6 +41,7 @@ import {
   ANNOUNCEMENT_ATTACHMENT_ACCEPT,
   announcementAttachmentError,
   announcementAttachmentMime,
+  removeUnlinkedAnnouncementAttachment,
   uploadAnnouncementAttachment,
 } from "@/lib/support/announcement-attachments";
 import {
@@ -49,6 +50,7 @@ import {
   writeBroadcastDraft,
   type BroadcastDraft,
 } from "@/lib/support/broadcast-draft-storage";
+import { resolveBroadcastWindow } from "@/lib/support/broadcast-window";
 
 type PublishMode = BroadcastDraft["publishMode"];
 type ExpiryMode = BroadcastDraft["expiryMode"];
@@ -262,30 +264,6 @@ export function BroadcastCentre() {
     setAttachment(event.dataTransfer.files?.[0] ?? null);
   }
 
-  function resolvedStart(): Date {
-    if (publishMode === "now") return new Date();
-    const date = new Date(startsAt);
-    if (!startsAt || Number.isNaN(date.getTime())) throw new Error("Choose a valid publish time.");
-    if (date.getTime() <= Date.now() + 30_000) {
-      throw new Error("Scheduled broadcasts need a future publish time.");
-    }
-    return date;
-  }
-
-  function resolvedEnd(start: Date): string | null {
-    if (expiryMode === "none") return null;
-    if (expiryMode === "24h") return new Date(start.getTime() + 24 * 60 * 60 * 1000).toISOString();
-    if (expiryMode === "7d")
-      return new Date(start.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString();
-
-    const date = new Date(endsAt);
-    if (!endsAt || Number.isNaN(date.getTime())) throw new Error("Choose a valid end time.");
-    if (date.getTime() <= start.getTime()) {
-      throw new Error("The end time must be after the publish time.");
-    }
-    return date.toISOString();
-  }
-
   function clearComposer() {
     setKind("feature");
     setTitle("");
@@ -301,9 +279,24 @@ export function BroadcastCentre() {
   const createMutation = useMutation({
     mutationFn: async () => {
       if (!title.trim()) throw new Error("Add a title before publishing.");
-      const start = resolvedStart();
-      const endAt = resolvedEnd(start);
+      const draftWindow = { publishMode, startsAt, expiryMode, endsAt };
+      // Reject an invalid draft before uploading any bytes.
+      resolveBroadcastWindow(draftWindow);
       const uploaded = attachmentFile ? await uploadAnnouncementAttachment(attachmentFile) : null;
+      // A large upload can outlast a near start or expiry; resolve again at send time.
+      let delivery;
+      try {
+        delivery = resolveBroadcastWindow(draftWindow);
+      } catch (error) {
+        if (uploaded) {
+          try {
+            await removeUnlinkedAnnouncementAttachment(uploaded);
+          } catch {
+            // The hardened policy keeps a failed-cleanup orphan private.
+          }
+        }
+        throw error;
+      }
 
       // A rejected response can be ambiguous: the insert may have committed
       // before the connection failed. Never delete a possibly linked object.
@@ -312,8 +305,9 @@ export function BroadcastCentre() {
           kind,
           title: title.trim(),
           body: body.trim(),
-          startsAt: start.toISOString(),
-          endsAt: endAt,
+          publishMode: delivery.scheduled ? "later" : "now",
+          startsAt: delivery.scheduled ? delivery.startsAt : null,
+          endsAt: delivery.endsAt,
           attachment: uploaded,
         },
       });

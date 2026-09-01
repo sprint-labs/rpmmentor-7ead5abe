@@ -98,6 +98,7 @@ describe("createAnnouncementInput", () => {
       kind: "feature",
       title: "New media flow",
       body: "You can now attach a short video.",
+      publishMode: "later",
       startsAt: "2026-09-01T09:00:00.000Z",
       endsAt: "2026-09-08T09:00:00.000Z",
       attachment: {
@@ -108,6 +109,7 @@ describe("createAnnouncementInput", () => {
       },
     });
     expect(parsed.attachment?.name).toBe("example.mp4");
+    expect(parsed.publishMode).toBe("later");
   });
 
   it("normalises an allowed attachment MIME type for the database constraint", () => {

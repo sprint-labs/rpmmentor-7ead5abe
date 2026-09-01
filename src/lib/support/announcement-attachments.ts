@@ -108,3 +108,12 @@ export async function uploadAnnouncementAttachment(file: File): Promise<Announce
     size: file.size,
   };
 }
+
+/** Remove a freshly uploaded object only while no create request has begun. */
+export async function removeUnlinkedAnnouncementAttachment(
+  attachment: AnnouncementAttachment,
+): Promise<void> {
+  if (!attachment.path.startsWith("announcements/")) return;
+  const { error } = await supabase.storage.from(MEDIA_BUCKET).remove([attachment.path]);
+  if (error) throw new Error(error.message);
+}

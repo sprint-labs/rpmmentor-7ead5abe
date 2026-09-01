@@ -14,6 +14,7 @@ import { cn } from "@/lib/utils";
 
 const ANNOUNCEMENT_SIGNED_URL_SECONDS = 5 * 60;
 const ANNOUNCEMENT_SIGNED_URL_REFRESH_MS = 4 * 60 * 1000;
+const ANNOUNCEMENT_SIGNED_URL_RETRY_MS = 15 * 1000;
 
 export const ANNOUNCEMENT_KIND_LABEL: Record<AnnouncementKind, string> = {
   feature: "New feature",
@@ -90,18 +91,25 @@ export function AnnouncementMedia({
     setSignedUrl(null);
 
     async function refreshSignedUrl() {
-      const { data, error } = await supabase.storage
-        .from(MEDIA_BUCKET)
-        .createSignedUrl(attachmentPath, ANNOUNCEMENT_SIGNED_URL_SECONDS);
-      if (cancelled) return;
-      if (!error) {
-        if (isStream && mediaElementRef.current) {
-          pendingPlaybackPositionRef.current = mediaElementRef.current.currentTime;
-          resumePlaybackAfterRefreshRef.current = isPlayingRef.current;
+      let nextRefreshMs = ANNOUNCEMENT_SIGNED_URL_RETRY_MS;
+      try {
+        const { data, error } = await supabase.storage
+          .from(MEDIA_BUCKET)
+          .createSignedUrl(attachmentPath, ANNOUNCEMENT_SIGNED_URL_SECONDS);
+        if (cancelled) return;
+        if (!error && data?.signedUrl) {
+          if (isStream && mediaElementRef.current) {
+            pendingPlaybackPositionRef.current = mediaElementRef.current.currentTime;
+            resumePlaybackAfterRefreshRef.current = isPlayingRef.current;
+          }
+          setSignedUrl(data.signedUrl);
+          nextRefreshMs = ANNOUNCEMENT_SIGNED_URL_REFRESH_MS;
         }
-        setSignedUrl(data.signedUrl);
+      } catch {
+        if (cancelled) return;
+        // A rejected network request follows the same short fail-safe retry.
       }
-      refreshTimer = window.setTimeout(refreshSignedUrl, ANNOUNCEMENT_SIGNED_URL_REFRESH_MS);
+      refreshTimer = window.setTimeout(refreshSignedUrl, nextRefreshMs);
     }
 
     void refreshSignedUrl();

@@ -127,6 +127,7 @@ export const createAnnouncementInput = z
     kind: z.enum(ANNOUNCEMENT_KINDS),
     title: z.string().trim().min(1, "Title is required").max(160),
     body: z.string().trim().max(4000).default(""),
+    publishMode: z.enum(["now", "later"]).optional(),
     startsAt: z.string().datetime({ offset: true }).nullish(),
     endsAt: z.string().datetime({ offset: true }).nullish(),
     attachment: announcementAttachmentInput.nullish(),

@@ -11,6 +11,7 @@ const authState = vi.hoisted(() => ({
 
 const storageState = vi.hoisted(() => ({
   uploaded: [] as Array<{ path: string; contentType?: string }>,
+  removed: [] as string[],
 }));
 
 const capabilityState = vi.hoisted(() => ({
@@ -72,7 +73,10 @@ vi.mock("@/integrations/supabase/client", () => ({
           storageState.uploaded.push({ path, contentType: options?.contentType });
           return { error: null };
         },
-        remove: async () => ({ error: null }),
+        remove: async (paths: string[]) => {
+          storageState.removed.push(...paths);
+          return { error: null };
+        },
       }),
     },
   },
@@ -81,6 +85,7 @@ vi.mock("@/integrations/supabase/client", () => ({
 import { ANNOUNCEMENT_ATTACHMENT_MAX_BYTES } from "@/lib/support/schema";
 import {
   announcementAttachmentMime,
+  removeUnlinkedAnnouncementAttachment,
   uploadAnnouncementAttachment,
 } from "@/lib/support/announcement-attachments";
 
@@ -98,6 +103,7 @@ describe("uploadAnnouncementAttachment", () => {
     };
     authState.sessionRequests = 0;
     storageState.uploaded = [];
+    storageState.removed = [];
     capabilityState.ready = true;
     capabilityState.error = null;
     capabilityState.throws = false;
@@ -171,5 +177,14 @@ describe("uploadAnnouncementAttachment", () => {
     expect(authState.sessionRequests).toBe(0);
     expect(tusState.objectNames).toHaveLength(0);
     expect(storageState.uploaded).toHaveLength(0);
+  });
+
+  it("can remove a definitely unlinked upload before create begins", async () => {
+    const uploaded = await uploadAnnouncementAttachment(
+      attachment("notice.pdf", 1024, "application/pdf"),
+    );
+
+    await removeUnlinkedAnnouncementAttachment(uploaded);
+    expect(storageState.removed).toEqual([uploaded.path]);
   });
 });
