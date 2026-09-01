@@ -92,11 +92,15 @@ export function BulletinAttentionStrip({
       value: summary.attention.dueSoon,
       className: summary.attention.dueSoon > 0 ? "text-warning" : "text-muted-foreground",
     },
-    {
-      label: "Unassigned",
-      value: summary.attention.unassigned,
-      className: summary.attention.unassigned > 0 ? "text-info" : "text-muted-foreground",
-    },
+    ...(summary.canManage
+      ? [
+          {
+            label: "Unassigned",
+            value: summary.attention.unassigned,
+            className: summary.attention.unassigned > 0 ? "text-info" : "text-muted-foreground",
+          },
+        ]
+      : []),
   ];
   const clear = cells.every((cell) => cell.value === 0);
 
@@ -123,7 +127,12 @@ export function BulletinAttentionStrip({
           As at {formatBulletinDate(summary.asOfDate)}
         </span>
       </div>
-      <div className="grid gap-px bg-border sm:grid-cols-3">
+      <div
+        className={cn(
+          "grid gap-px bg-border",
+          summary.canManage ? "sm:grid-cols-3" : "sm:grid-cols-2",
+        )}
+      >
         {cells.map((cell) => (
           <div key={cell.label} className="bg-card px-4 py-3">
             <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
@@ -204,6 +213,7 @@ export function BulletinBoardSelector({
 
 interface BulletinWorkspaceProps {
   kind: BulletinKind;
+  canManage: boolean;
   rows: BulletinItem[];
   total: number;
   page: number;
@@ -232,6 +242,7 @@ interface BulletinWorkspaceProps {
 
 export function BulletinWorkspace({
   kind,
+  canManage,
   rows,
   total,
   page,
@@ -363,12 +374,16 @@ export function BulletinWorkspace({
                 title={
                   hasFilters
                     ? "No matching items"
-                    : `No ${board.label.toLocaleLowerCase("en-GB")} yet`
+                    : canManage
+                      ? `No ${board.label.toLocaleLowerCase("en-GB")} yet`
+                      : `No ${board.label.toLocaleLowerCase("en-GB")} assigned to you`
                 }
                 description={
                   hasFilters
                     ? "Try a broader search or a different status."
-                    : `Create the first ${board.singular.toLocaleLowerCase("en-GB")} when there is real work to record.`
+                    : canManage
+                      ? `Create the first ${board.singular.toLocaleLowerCase("en-GB")} when there is real work to record.`
+                      : "Nothing is currently assigned to you on this board."
                 }
               />
             ) : (

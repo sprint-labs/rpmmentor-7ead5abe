@@ -20,8 +20,8 @@ interface BulletinDashboardCardProps {
 /**
  * A small, durable entry point into the operational workspace.
  *
- * Management roles see team counts here. Mentors cannot mount this entry point
- * and are independently rejected by the route, server functions and RLS.
+ * Management roles see team counts here. Mentors see only counts for work
+ * currently assigned to them; the server and RLS independently enforce scope.
  */
 export function BulletinDashboardCard({ scope }: BulletinDashboardCardProps) {
   const { user } = useAuth();
@@ -72,7 +72,9 @@ export function BulletinDashboardCard({ scope }: BulletinDashboardCardProps) {
         </div>
       ) : total === 0 ? (
         <p className="mt-4 text-sm text-muted-foreground">
-          No Bulletin Board work yet. Open the board to add the first item.
+          {scope === "team"
+            ? "No Bulletin Board work yet. Open the board to add the first item."
+            : "No Bulletin Board work is assigned to you."}
         </p>
       ) : (
         <>

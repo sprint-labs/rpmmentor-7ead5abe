@@ -87,6 +87,7 @@ const summary: BulletinSummary = {
 function workspaceProps() {
   return {
     kind: "deal" as const,
+    canManage: true,
     rows: items,
     total: 22,
     page: 1,
@@ -143,6 +144,13 @@ describe("Bulletin Board operational workspace", () => {
     expect(container.querySelector("svg[role='img']")).toBeNull();
   });
 
+  it("keeps unassigned team work out of a Mentor's personal attention strip", () => {
+    render(<BulletinAttentionStrip summary={{ ...summary, canManage: false }} />);
+    expect(screen.getByText("Overdue")).toBeTruthy();
+    expect(screen.getByText("Due soon")).toBeTruthy();
+    expect(screen.queryByText("Unassigned")).toBeNull();
+  });
+
   it("keeps the list and complete selected record together, with manager edit and append-only updates", async () => {
     const props = workspaceProps();
     render(<BulletinWorkspace {...props} />);
@@ -178,6 +186,22 @@ describe("Bulletin Board operational workspace", () => {
     expect(within(timelinePages).getByText("1 / 2")).toBeTruthy();
     fireEvent.click(within(timelinePages).getByRole("button", { name: "Next" }));
     expect(props.onUpdatesPageChange).toHaveBeenCalledWith(2);
+  });
+
+  it("lets an assigned Mentor append progress without exposing edit or assignment controls", async () => {
+    const props = workspaceProps();
+    const mentorDetail = { ...detail, canManage: false };
+    render(<BulletinWorkspace {...props} canManage={false} detail={mentorDetail} />);
+
+    const detailPanel = screen.getByRole("region", { name: "Selected bulletin details" });
+    expect(within(detailPanel).queryByRole("button", { name: "Edit & assign" })).toBeNull();
+
+    const update = within(detailPanel).getByRole("textbox", { name: "Add an update" });
+    fireEvent.change(update, { target: { value: "  Shortlist reviewed with Rich.  " } });
+    fireEvent.click(within(detailPanel).getByRole("button", { name: "Add update" }));
+    await waitFor(() =>
+      expect(props.onAddUpdate).toHaveBeenCalledWith("Shortlist reviewed with Rich."),
+    );
   });
 
   it("moves mobile focus only after a newly selected detail has loaded", async () => {
@@ -257,5 +281,20 @@ describe("Bulletin Board operational workspace", () => {
     );
     expect(screen.getByRole("heading", { name: "No matching items" })).toBeTruthy();
     expect(screen.getByText("Try a broader search or a different status.")).toBeTruthy();
+
+    rerender(
+      <BulletinWorkspace
+        {...props}
+        canManage={false}
+        rows={[]}
+        total={0}
+        detail={undefined}
+        listError={null}
+        search=""
+      />,
+    );
+    expect(screen.getByRole("heading", { name: "No deals assigned to you" })).toBeTruthy();
+    expect(screen.getByText("Nothing is currently assigned to you on this board.")).toBeTruthy();
+    expect(screen.queryByText(/Create the first/i)).toBeNull();
   });
 });
