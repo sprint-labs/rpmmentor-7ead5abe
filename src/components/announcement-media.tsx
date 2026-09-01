@@ -66,13 +66,13 @@ export function AnnouncementMedia({
   const [signedUrl, setSignedUrl] = useState<string | null>(previewUrl ?? null);
   const isPlayingRef = useRef(false);
   const mediaElementRef = useRef<HTMLMediaElement | null>(null);
-  const pendingSignedUrlRef = useRef<string | null>(null);
   const pendingPlaybackPositionRef = useRef<number | null>(null);
+  const resumePlaybackAfterRefreshRef = useRef(false);
 
   useEffect(() => {
     isPlayingRef.current = false;
-    pendingSignedUrlRef.current = null;
     pendingPlaybackPositionRef.current = null;
+    resumePlaybackAfterRefreshRef.current = false;
     if (!attachment) {
       setSignedUrl(null);
       return;
@@ -95,13 +95,11 @@ export function AnnouncementMedia({
         .createSignedUrl(attachmentPath, ANNOUNCEMENT_SIGNED_URL_SECONDS);
       if (cancelled) return;
       if (!error) {
-        if (isStream && isPlayingRef.current) pendingSignedUrlRef.current = data.signedUrl;
-        else {
-          if (isStream && mediaElementRef.current) {
-            pendingPlaybackPositionRef.current = mediaElementRef.current.currentTime;
-          }
-          setSignedUrl(data.signedUrl);
+        if (isStream && mediaElementRef.current) {
+          pendingPlaybackPositionRef.current = mediaElementRef.current.currentTime;
+          resumePlaybackAfterRefreshRef.current = isPlayingRef.current;
         }
+        setSignedUrl(data.signedUrl);
       }
       refreshTimer = window.setTimeout(refreshSignedUrl, ANNOUNCEMENT_SIGNED_URL_REFRESH_MS);
     }
@@ -124,27 +122,21 @@ export function AnnouncementMedia({
     isPlayingRef.current = true;
   }
 
-  function handlePlaybackPause(event: SyntheticEvent<HTMLMediaElement>) {
+  function handlePlaybackPause() {
     isPlayingRef.current = false;
-    if (pendingSignedUrlRef.current) {
-      pendingPlaybackPositionRef.current = event.currentTarget.currentTime;
-      setSignedUrl(pendingSignedUrlRef.current);
-      pendingSignedUrlRef.current = null;
-    }
   }
 
   function handlePlaybackEnd() {
     isPlayingRef.current = false;
-    if (pendingSignedUrlRef.current) {
-      setSignedUrl(pendingSignedUrlRef.current);
-      pendingSignedUrlRef.current = null;
-    }
   }
 
   function restorePlaybackPosition(event: SyntheticEvent<HTMLMediaElement>) {
     if (pendingPlaybackPositionRef.current === null) return;
+    const shouldResume = resumePlaybackAfterRefreshRef.current;
     event.currentTarget.currentTime = pendingPlaybackPositionRef.current;
     pendingPlaybackPositionRef.current = null;
+    resumePlaybackAfterRefreshRef.current = false;
+    if (shouldResume) void event.currentTarget.play().catch(() => undefined);
   }
 
   if (kind === "image" && url) {

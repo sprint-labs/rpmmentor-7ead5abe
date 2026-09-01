@@ -41,7 +41,6 @@ import {
   ANNOUNCEMENT_ATTACHMENT_ACCEPT,
   announcementAttachmentError,
   announcementAttachmentMime,
-  removeAnnouncementAttachment,
   uploadAnnouncementAttachment,
 } from "@/lib/support/announcement-attachments";
 
@@ -315,24 +314,20 @@ export function BroadcastCentre() {
       if (!title.trim()) throw new Error("Add a title before publishing.");
       const start = resolvedStart();
       const endAt = resolvedEnd(start);
-      let uploaded: AnnouncementAttachment | null = null;
+      const uploaded = attachmentFile ? await uploadAnnouncementAttachment(attachmentFile) : null;
 
-      try {
-        if (attachmentFile) uploaded = await uploadAnnouncementAttachment(attachmentFile);
-        return await create({
-          data: {
-            kind,
-            title: title.trim(),
-            body: body.trim(),
-            startsAt: start.toISOString(),
-            endsAt: endAt,
-            attachment: uploaded,
-          },
-        });
-      } catch (error) {
-        if (uploaded) await removeAnnouncementAttachment(uploaded.path);
-        throw error;
-      }
+      // A rejected response can be ambiguous: the insert may have committed
+      // before the connection failed. Never delete a possibly linked object.
+      return create({
+        data: {
+          kind,
+          title: title.trim(),
+          body: body.trim(),
+          startsAt: start.toISOString(),
+          endsAt: endAt,
+          attachment: uploaded,
+        },
+      });
     },
     onSuccess: async (announcement) => {
       toast.success(

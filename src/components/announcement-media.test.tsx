@@ -58,7 +58,7 @@ describe("AnnouncementMedia", () => {
     );
   });
 
-  it("defers a signed URL swap while media is playing", async () => {
+  it("refreshes a playing stream before expiry and resumes at its previous position", async () => {
     vi.useFakeTimers();
     createSignedUrl
       .mockResolvedValueOnce({ data: { signedUrl: "https://example.test/first" }, error: null })
@@ -74,6 +74,7 @@ describe("AnnouncementMedia", () => {
 
     const video = container.querySelector("video");
     expect(video?.getAttribute("src")).toBe("https://example.test/first");
+    const play = vi.spyOn(video!, "play").mockResolvedValue();
     video!.currentTime = 137;
     fireEvent.play(video!);
 
@@ -81,12 +82,11 @@ describe("AnnouncementMedia", () => {
       vi.advanceTimersByTime(4 * 60 * 1000);
     });
 
-    expect(video?.getAttribute("src")).toBe("https://example.test/first");
-    fireEvent.pause(video!);
     expect(video?.getAttribute("src")).toBe("https://example.test/refreshed");
     video!.currentTime = 0;
     fireEvent.loadedMetadata(video!);
     expect(video?.currentTime).toBe(137);
+    expect(play).toHaveBeenCalledTimes(1);
   });
 
   it("preserves a paused stream position during a scheduled URL refresh", async () => {
@@ -104,6 +104,7 @@ describe("AnnouncementMedia", () => {
     await act(async () => undefined);
 
     const video = container.querySelector("video");
+    const play = vi.spyOn(video!, "play").mockResolvedValue();
     video!.currentTime = 82;
 
     await act(async () => {
@@ -114,5 +115,6 @@ describe("AnnouncementMedia", () => {
     video!.currentTime = 0;
     fireEvent.loadedMetadata(video!);
     expect(video?.currentTime).toBe(82);
+    expect(play).not.toHaveBeenCalled();
   });
 });
