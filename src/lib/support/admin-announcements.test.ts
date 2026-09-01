@@ -2,8 +2,26 @@ import { describe, expect, it } from "vitest";
 import {
   ADMIN_RECENT_ANNOUNCEMENT_LIMIT,
   endedAtForAnnouncement,
+  estimateAdminServerNow,
   mergeAdminAnnouncementPages,
 } from "./admin-announcements";
+
+describe("estimateAdminServerNow", () => {
+  it("ignores a workstation clock that is hours ahead of the server", () => {
+    const workstationReceivedAt = Date.parse("2026-09-01T14:00:00.000Z");
+    expect(
+      estimateAdminServerNow(
+        "2026-09-01T10:00:00.000Z",
+        workstationReceivedAt,
+        workstationReceivedAt + 30_000,
+      ),
+    ).toBe(Date.parse("2026-09-01T10:00:30.000Z"));
+  });
+
+  it("falls back to client time for an older cached list response", () => {
+    expect(estimateAdminServerNow(undefined, 0, 123_456)).toBe(123_456);
+  });
+});
 
 describe("mergeAdminAnnouncementPages", () => {
   it("keeps an older live broadcast that would miss a newest-50 history page", () => {

@@ -83,6 +83,10 @@ type AnnouncementDbRow = {
   attachment_size?: number | null;
 };
 
+type AdminAnnouncementRow = AnnouncementRow & {
+  serverNow: string;
+};
+
 function asThreadKind(value: string): SupportThreadKind {
   return (SUPPORT_THREAD_KINDS as readonly string[]).includes(value)
     ? (value as SupportThreadKind)
@@ -375,7 +379,7 @@ export const listActiveAnnouncements = createServerFn({ method: "GET" })
 
 export const listAdminAnnouncements = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .handler(async ({ context }): Promise<AnnouncementRow[]> => {
+  .handler(async ({ context }): Promise<AdminAnnouncementRow[]> => {
     await requireRole(
       context.supabase,
       context.userId,
@@ -424,7 +428,7 @@ export const listAdminAnnouncements = createServerFn({ method: "GET" })
     return mergeAdminAnnouncementPages(
       (currentResult.data ?? []) as AnnouncementDbRow[],
       (recentResult.data ?? []) as AnnouncementDbRow[],
-    ).map((row) => mapAnnouncement(row, null));
+    ).map((row) => ({ ...mapAnnouncement(row, null), serverNow: nowIso }));
   });
 
 export const markAnnouncementRead = createServerFn({ method: "POST" })

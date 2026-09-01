@@ -6,6 +6,21 @@
  */
 export const ADMIN_RECENT_ANNOUNCEMENT_LIMIT = 50;
 
+/**
+ * Advance the server classification clock by elapsed client time. React Query's
+ * dataUpdatedAt and clientNow use the same workstation clock, so their
+ * difference is stable even when that clock is skewed from the server.
+ */
+export function estimateAdminServerNow(
+  serverNow: string | undefined,
+  dataUpdatedAt: number,
+  clientNow: number,
+): number {
+  const serverNowMs = serverNow ? Date.parse(serverNow) : Number.NaN;
+  if (!Number.isFinite(serverNowMs) || dataUpdatedAt <= 0) return clientNow;
+  return serverNowMs + Math.max(0, clientNow - dataUpdatedAt);
+}
+
 export function endedAtForAnnouncement(startsAt: string, nowIso: string): string | null {
   return Date.parse(startsAt) < Date.parse(nowIso) ? nowIso : null;
 }

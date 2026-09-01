@@ -32,6 +32,7 @@ import {
   listAdminAnnouncements,
 } from "@/lib/support.functions";
 import { useAnnouncementClock } from "@/lib/support/announcement-clock";
+import { estimateAdminServerNow } from "@/lib/support/admin-announcements";
 import type {
   AnnouncementAttachment,
   AnnouncementKind,
@@ -216,6 +217,7 @@ export function BroadcastCentre() {
 
   const {
     data = [],
+    dataUpdatedAt,
     isLoading,
     isError,
     refetch,
@@ -226,7 +228,11 @@ export function BroadcastCentre() {
     refetchInterval: 30_000,
   });
 
-  const now = useAnnouncementClock();
+  // Older servers omit serverNow, so retain a workstation-clock fallback for
+  // rolling deployments while preventing skew once this response is present.
+  const serverNow = data[0]?.serverNow;
+  const clientNow = useAnnouncementClock();
+  const now = estimateAdminServerNow(serverNow, dataUpdatedAt, clientNow);
   const live = data.filter((announcement) => statusOf(announcement, now) === "live");
   const scheduled = data.filter((announcement) => statusOf(announcement, now) === "scheduled");
   const recent = data.filter((announcement) => statusOf(announcement, now) === "ended").slice(0, 8);
