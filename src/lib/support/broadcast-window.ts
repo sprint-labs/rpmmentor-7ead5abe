@@ -3,6 +3,13 @@ export const BROADCAST_SCHEDULE_MIN_LEAD_MS = 30_000;
 export type BroadcastPublishMode = "now" | "later";
 export type BroadcastExpiryMode = "none" | "24h" | "7d" | "custom";
 
+export type BroadcastWindowDraft = {
+  publishMode: BroadcastPublishMode;
+  startsAt: string;
+  expiryMode: BroadcastExpiryMode;
+  endsAt: string;
+};
+
 export type ResolvedBroadcastWindow = {
   scheduled: boolean;
   startsAt: string;
@@ -28,12 +35,7 @@ export function validateResolvedBroadcastWindow(
 }
 
 export function resolveBroadcastWindow(
-  input: {
-    publishMode: BroadcastPublishMode;
-    startsAt: string;
-    expiryMode: BroadcastExpiryMode;
-    endsAt: string;
-  },
+  input: BroadcastWindowDraft,
   nowMs = Date.now(),
 ): ResolvedBroadcastWindow {
   const scheduled = input.publishMode === "later";

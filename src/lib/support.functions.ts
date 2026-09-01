@@ -452,13 +452,15 @@ export const createAnnouncement = createServerFn({ method: "POST" })
       "create announcements",
     );
 
-    const requestNow = Date.now();
-    const delivery = resolveServerBroadcastWindow(data, requestNow);
-    const startsAt = delivery.startsAt;
-
     if (data.attachment) {
       await requireAnnouncementMediaStorageReady((name) => context.supabase.rpc(name));
     }
+
+    // The capability RPC is the final awaited precondition. Resolve against
+    // the clock after it so a near schedule or expiry cannot go stale there.
+    const requestNow = Date.now();
+    const delivery = resolveServerBroadcastWindow(data, requestNow);
+    const startsAt = delivery.startsAt;
 
     const insertQuery = context.supabase.from("announcements").insert({
       kind: data.kind,

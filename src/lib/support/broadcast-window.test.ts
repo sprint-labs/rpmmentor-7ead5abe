@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   resolveBroadcastWindow,
@@ -8,6 +9,22 @@ import {
 const NOW = Date.parse("2026-09-01T12:00:00.000Z");
 
 describe("Broadcast delivery windows", () => {
+  it("keeps the authoritative server clock after the final readiness await", () => {
+    const source = readFileSync(new URL("../support.functions.ts", import.meta.url), "utf8");
+    const createStart = source.indexOf("export const createAnnouncement");
+    const createEnd = source.indexOf("export const endAnnouncement", createStart);
+    const createSource = source.slice(createStart, createEnd);
+    const readinessCheck = createSource.indexOf("requireAnnouncementMediaStorageReady");
+    const clockRead = createSource.indexOf("const requestNow = Date.now()");
+    const insert = createSource.indexOf('.from("announcements").insert');
+
+    expect(createStart).toBeGreaterThanOrEqual(0);
+    expect(createEnd).toBeGreaterThan(createStart);
+    expect(readinessCheck).toBeGreaterThanOrEqual(0);
+    expect(clockRead).toBeGreaterThan(readinessCheck);
+    expect(insert).toBeGreaterThan(clockRead);
+  });
+
   it("revalidates a scheduled start against the current time", () => {
     const input = {
       publishMode: "later" as const,

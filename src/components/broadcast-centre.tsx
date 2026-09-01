@@ -50,6 +50,7 @@ import {
   writeBroadcastDraft,
   type BroadcastDraft,
 } from "@/lib/support/broadcast-draft-storage";
+import { submitBroadcastAfterUpload } from "@/lib/support/broadcast-submit";
 import { resolveBroadcastWindow } from "@/lib/support/broadcast-window";
 
 type PublishMode = BroadcastDraft["publishMode"];
@@ -283,33 +284,24 @@ export function BroadcastCentre() {
       // Reject an invalid draft before uploading any bytes.
       resolveBroadcastWindow(draftWindow);
       const uploaded = attachmentFile ? await uploadAnnouncementAttachment(attachmentFile) : null;
-      // A large upload can outlast a near start or expiry; resolve again at send time.
-      let delivery;
-      try {
-        delivery = resolveBroadcastWindow(draftWindow);
-      } catch (error) {
-        if (uploaded) {
-          try {
-            await removeUnlinkedAnnouncementAttachment(uploaded);
-          } catch {
-            // The hardened policy keeps a failed-cleanup orphan private.
-          }
-        }
-        throw error;
-      }
-
-      // A rejected response can be ambiguous: the insert may have committed
-      // before the connection failed. Never delete a possibly linked object.
-      return create({
-        data: {
-          kind,
-          title: title.trim(),
-          body: body.trim(),
-          publishMode: delivery.scheduled ? "later" : "now",
-          startsAt: delivery.scheduled ? delivery.startsAt : null,
-          endsAt: delivery.endsAt,
-          attachment: uploaded,
-        },
+      // A large upload can outlast a near start or expiry. Revalidate while
+      // cleanup is still safe, then never delete after the create begins.
+      return submitBroadcastAfterUpload({
+        draft: draftWindow,
+        attachment: uploaded,
+        removeAttachment: removeUnlinkedAnnouncementAttachment,
+        submit: (delivery) =>
+          create({
+            data: {
+              kind,
+              title: title.trim(),
+              body: body.trim(),
+              publishMode: delivery.scheduled ? "later" : "now",
+              startsAt: delivery.scheduled ? delivery.startsAt : null,
+              endsAt: delivery.endsAt,
+              attachment: uploaded,
+            },
+          }),
       });
     },
     onSuccess: async (announcement) => {
