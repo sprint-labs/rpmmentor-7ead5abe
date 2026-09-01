@@ -58,10 +58,19 @@ describe("post-upload broadcast submission", () => {
       new URL("../../components/broadcast-centre.tsx", import.meta.url),
       "utf8",
     );
+    const composerLock = source.indexOf("const composerLocked");
+    const autoScheduleEffect = source.indexOf("useEffect(() => {", composerLock);
+    const duplicateStart = source.indexOf("function duplicateAnnouncement", autoScheduleEffect);
+    const autoScheduleSource = source.slice(autoScheduleEffect, duplicateStart);
 
     expect(source).toContain('queryKey: ["announcements", "admin", "clock"]');
     expect(source).toContain("draftReady && adminClockSample");
     expect(source).toContain('scheduleTimeSourceRef.current !== "auto"');
+    expect(composerLock).toBeGreaterThanOrEqual(0);
+    expect(autoScheduleEffect).toBeGreaterThan(composerLock);
+    expect(duplicateStart).toBeGreaterThan(autoScheduleEffect);
+    expect(autoScheduleSource).toContain("composerLocked ||");
+    expect(autoScheduleSource).toContain("}, [adminServerNow, composerLocked]);");
     expect(source).toContain('scheduleTimeSourceRef.current = "user"');
     expect(source).toContain("restoreBroadcastScheduleTime(draft)");
     expect(source).toContain("scheduleTimeSource:");

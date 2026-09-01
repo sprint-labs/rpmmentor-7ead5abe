@@ -280,12 +280,6 @@ export function BroadcastCentre() {
   const scheduled = data.filter((announcement) => statusOf(announcement, now) === "scheduled");
   const recent = data.filter((announcement) => statusOf(announcement, now) === "ended").slice(0, 8);
 
-  useEffect(() => {
-    if (adminServerNow === null || scheduleTimeSourceRef.current !== "auto") return;
-    const next = defaultScheduledAt(adminServerNow);
-    setStartsAt((current) => (current === next ? current : next));
-  }, [adminServerNow]);
-
   const previewAttachment = useMemo<AnnouncementAttachment | null>(() => {
     if (!attachmentFile) return null;
     return {
@@ -393,6 +387,14 @@ export function BroadcastCentre() {
   });
 
   const composerLocked = createMutation.isPending;
+
+  useEffect(() => {
+    if (composerLocked || adminServerNow === null || scheduleTimeSourceRef.current !== "auto") {
+      return;
+    }
+    const next = defaultScheduledAt(adminServerNow);
+    setStartsAt((current) => (current === next ? current : next));
+  }, [adminServerNow, composerLocked]);
 
   function duplicateAnnouncement(announcement: AnnouncementRow) {
     if (composerLocked) return;
