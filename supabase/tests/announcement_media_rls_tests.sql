@@ -10,7 +10,7 @@ BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 SET search_path = public, extensions;
 
-SELECT plan(25);
+SELECT plan(27);
 
 SELECT ok(
   (SELECT relrowsecurity FROM pg_class WHERE oid = 'public.announcements'::regclass),
@@ -523,6 +523,60 @@ SELECT is(
   ),
   1,
   '25 Super Admin can clean up an unlinked announcement object'
+);
+
+SELECT lives_ok(
+  $$
+    INSERT INTO public.announcements (
+      id,
+      kind,
+      title,
+      body,
+      starts_at,
+      ends_at,
+      active,
+      created_by
+    )
+    VALUES (
+      '91000000-0000-0000-0000-000000000005',
+      'info',
+      'Cancelled scheduled Broadcast',
+      '',
+      now() + interval '1 hour',
+      now(),
+      false,
+      '90000000-0000-0000-0000-000000000005'
+    )
+  $$,
+  '26 inactive scheduled cancellation may end before its planned start'
+);
+
+SELECT throws_ok(
+  $$
+    INSERT INTO public.announcements (
+      id,
+      kind,
+      title,
+      body,
+      starts_at,
+      ends_at,
+      active,
+      created_by
+    )
+    VALUES (
+      '91000000-0000-0000-0000-000000000006',
+      'info',
+      'Invalid active Broadcast',
+      '',
+      now() + interval '1 hour',
+      now(),
+      true,
+      '90000000-0000-0000-0000-000000000005'
+    )
+  $$,
+  '23514',
+  NULL,
+  '27 active scheduled Broadcast still requires its end after its start'
 );
 
 RESET ROLE;

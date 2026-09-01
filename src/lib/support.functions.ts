@@ -10,7 +10,6 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { requireRole, SUPPORT_INBOX_ROLES } from "@/lib/roles.server";
 import {
   ADMIN_RECENT_ANNOUNCEMENT_LIMIT,
-  endedAtForAnnouncement,
   mergeAdminAnnouncementPages,
 } from "@/lib/support/admin-announcements";
 import {
@@ -410,6 +409,7 @@ export const listAdminAnnouncements = createServerFn({ method: "GET" })
           .from("announcements")
           .select(ANNOUNCEMENT_COLUMNS)
           .or(`active.eq.false,ends_at.lte.${nowIso}`)
+          .order("ends_at", { ascending: false, nullsFirst: false })
           .order("starts_at", { ascending: false })
           .limit(ADMIN_RECENT_ANNOUNCEMENT_LIMIT),
       () =>
@@ -417,6 +417,7 @@ export const listAdminAnnouncements = createServerFn({ method: "GET" })
           .from("announcements")
           .select(LEGACY_ANNOUNCEMENT_COLUMNS)
           .or(`active.eq.false,ends_at.lte.${nowIso}`)
+          .order("ends_at", { ascending: false, nullsFirst: false })
           .order("starts_at", { ascending: false })
           .limit(ADMIN_RECENT_ANNOUNCEMENT_LIMIT),
     );
@@ -517,7 +518,6 @@ export const endAnnouncement = createServerFn({ method: "POST" })
   .handler(async ({ data, context }): Promise<AnnouncementRow> => {
     await requireRole(context.supabase, context.userId, SUPPORT_INBOX_ROLES, "end announcements");
 
-    const nowIso = new Date().toISOString();
     const { data: existing, error: existingError } =
       await queryAnnouncementsWithSchemaCompatibility(
         () =>
@@ -536,17 +536,46 @@ export const endAnnouncement = createServerFn({ method: "POST" })
     if (existingError) throw new Error(existingError.message);
     if (!existing) throw new Error("That announcement was not found.");
     const existingAnnouncement = existing as unknown as AnnouncementDbRow;
+    const nowMs = Date.now();
+    const nowIso = new Date(nowMs).toISOString();
+    if (
+      !existingAnnouncement.active ||
+      (existingAnnouncement.ends_at !== null && Date.parse(existingAnnouncement.ends_at) <= nowMs)
+    ) {
+      return mapAnnouncement(existingAnnouncement, null);
+    }
 
     const { data: updated, error } = await context.supabase
       .from("announcements")
       .update({
         active: false,
-        ends_at: endedAtForAnnouncement(existingAnnouncement.starts_at, nowIso),
+        ends_at: nowIso,
       })
       .eq("id", data.announcementId)
+      .eq("active", true)
+      .or(`ends_at.is.null,ends_at.gt.${nowIso}`)
       .select(LEGACY_ANNOUNCEMENT_COLUMNS)
       .maybeSingle();
     if (error) throw new Error(error.message);
-    if (!updated) throw new Error("That announcement was not found.");
+    if (!updated) {
+      const { data: terminal, error: terminalError } =
+        await queryAnnouncementsWithSchemaCompatibility(
+          () =>
+            context.supabase
+              .from("announcements")
+              .select(ANNOUNCEMENT_COLUMNS)
+              .eq("id", data.announcementId)
+              .maybeSingle(),
+          () =>
+            context.supabase
+              .from("announcements")
+              .select(LEGACY_ANNOUNCEMENT_COLUMNS)
+              .eq("id", data.announcementId)
+              .maybeSingle(),
+        );
+      if (terminalError) throw new Error(terminalError.message);
+      if (!terminal) throw new Error("That announcement was not found.");
+      return mapAnnouncement(terminal as unknown as AnnouncementDbRow, null);
+    }
     return mapAnnouncement({ ...existingAnnouncement, ...(updated as AnnouncementDbRow) }, null);
   });

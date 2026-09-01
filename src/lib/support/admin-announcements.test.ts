@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import {
   ADMIN_RECENT_ANNOUNCEMENT_LIMIT,
   advanceAdminServerNow,
-  endedAtForAnnouncement,
   estimateAdminServerNow,
   mergeAdminAnnouncementPages,
   nextAdminScheduleAt,
@@ -112,25 +111,5 @@ describe("mergeAdminAnnouncementPages", () => {
       shared,
       { id: "ended" },
     ]);
-  });
-});
-
-describe("endedAtForAnnouncement", () => {
-  it("timestamps a live Broadcast when it is ended", () => {
-    expect(endedAtForAnnouncement("2026-09-01T09:00:00.000Z", "2026-09-01T10:00:00.000Z")).toBe(
-      "2026-09-01T10:00:00.000Z",
-    );
-  });
-
-  it("leaves ends_at empty when a scheduled Broadcast is cancelled", () => {
-    expect(
-      endedAtForAnnouncement("2026-09-02T09:00:00.000Z", "2026-09-01T10:00:00.000Z"),
-    ).toBeNull();
-  });
-
-  it("leaves ends_at empty at the exact scheduled start boundary", () => {
-    expect(
-      endedAtForAnnouncement("2026-09-01T10:00:00.000Z", "2026-09-01T10:00:00.000Z"),
-    ).toBeNull();
   });
 });

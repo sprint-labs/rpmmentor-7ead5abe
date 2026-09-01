@@ -27,6 +27,24 @@ describe("Broadcast delivery windows", () => {
     expect(insert).toBeGreaterThan(clockRead);
   });
 
+  it("records a stable terminal event before capping recent Broadcasts", () => {
+    const source = readFileSync(new URL("../support.functions.ts", import.meta.url), "utf8");
+    const listStart = source.indexOf("export const listAdminAnnouncements");
+    const clockStart = source.indexOf("export const getAdminAnnouncementClock", listStart);
+    const endStart = source.indexOf("export const endAnnouncement", clockStart);
+    const listSource = source.slice(listStart, clockStart);
+    const endSource = source.slice(endStart);
+
+    expect(
+      listSource.match(/\.order\("ends_at", \{ ascending: false, nullsFirst: false \}\)/g),
+    ).toHaveLength(2);
+    expect(endSource).toContain("Date.parse(existingAnnouncement.ends_at) <= nowMs");
+    expect(endSource).toContain("ends_at: nowIso");
+    expect(endSource).toContain('.eq("active", true)');
+    expect(endSource).toContain("ends_at.gt.${nowIso}");
+    expect(endSource).toContain("const { data: terminal, error: terminalError }");
+  });
+
   it("revalidates a scheduled start against the current time", () => {
     const input = {
       publishMode: "later" as const,

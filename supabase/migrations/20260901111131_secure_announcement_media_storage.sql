@@ -16,7 +16,7 @@ BEGIN
   ) THEN
     ALTER TABLE public.announcements
       ADD CONSTRAINT announcements_window_check
-      CHECK (ends_at IS NULL OR ends_at > starts_at) NOT VALID;
+      CHECK (NOT active OR ends_at IS NULL OR ends_at > starts_at) NOT VALID;
   END IF;
 
   IF NOT EXISTS (
