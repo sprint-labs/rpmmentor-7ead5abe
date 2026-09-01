@@ -96,5 +96,17 @@ describe("broadcast delivery helpers", () => {
         now,
       ),
     ).toBe("ended");
+
+    expect(
+      getBroadcastStatus(
+        {
+          active: false,
+          startsAt: "2026-08-31T10:00:00.000Z",
+          endsAt: null,
+          createdAt: "2026-08-31T10:00:00.000Z",
+        },
+        now,
+      ),
+    ).toBe("draft");
   });
 });

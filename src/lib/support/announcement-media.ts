@@ -20,3 +20,10 @@ export async function uploadAnnouncementAttachment(
 
   return target.path;
 }
+
+export async function removeAnnouncementAttachment(path: string): Promise<void> {
+  const { error } = await supabase.storage.from(MEDIA_BUCKET).remove([path]);
+  if (error) {
+    console.warn(`Could not remove unused broadcast attachment ${path}: ${error.message}`);
+  }
+}

@@ -122,10 +122,9 @@ export function getBroadcastStatus(
   const nowMs = now.getTime();
   const startsMs = new Date(announcement.startsAt).getTime();
   const endsMs = announcement.endsAt ? new Date(announcement.endsAt).getTime() : null;
-  const createdMs = new Date(announcement.createdAt).getTime();
 
   if (!announcement.active) {
-    if (!announcement.endsAt && nowMs - createdMs < 30 * 60 * 1000) return "draft";
+    if (!announcement.endsAt) return "draft";
     return "ended";
   }
   if (endsMs !== null && endsMs <= nowMs) return "ended";

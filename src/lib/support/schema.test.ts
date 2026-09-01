@@ -91,4 +91,48 @@ describe("createAnnouncementInput", () => {
       ).toBe(kind);
     }
   });
+
+  it("accepts scheduling and one attachment on the announcement row", () => {
+    const parsed = createAnnouncementInput.parse({
+      kind: "feature",
+      title: "New media flow",
+      body: "You can now attach a short video.",
+      startsAt: "2026-09-01T09:00:00.000Z",
+      endsAt: "2026-09-08T09:00:00.000Z",
+      attachment: {
+        path: "announcements/2026/example.mp4",
+        fileName: "example.mp4",
+        mimeType: "video/mp4",
+        fileSize: 1024,
+      },
+    });
+    expect(parsed.attachment?.fileName).toBe("example.mp4");
+  });
+
+  it("rejects attachments on service alerts and files outside announcements/", () => {
+    expect(() =>
+      createAnnouncementInput.parse({
+        kind: "incident",
+        title: "Outage",
+        attachment: {
+          path: "announcements/2026/clip.mp4",
+          fileName: "clip.mp4",
+          mimeType: "video/mp4",
+          fileSize: 1024,
+        },
+      }),
+    ).toThrow();
+    expect(() =>
+      createAnnouncementInput.parse({
+        kind: "info",
+        title: "Notice",
+        attachment: {
+          path: "goalkeepers/example.pdf",
+          fileName: "example.pdf",
+          mimeType: "application/pdf",
+          fileSize: 1024,
+        },
+      }),
+    ).toThrow();
+  });
 });

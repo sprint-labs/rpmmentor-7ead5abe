@@ -35,7 +35,6 @@ import {
   discardAnnouncementDraft,
   endAnnouncement,
   listAnnouncementsAdmin,
-  publishAnnouncement,
 } from "@/lib/support.functions";
 import {
   ANNOUNCEMENT_KINDS,
@@ -49,7 +48,10 @@ import {
   formatAttachmentBytes,
   validateAnnouncementAttachment,
 } from "@/lib/support/announcement-attachment-rules";
-import { uploadAnnouncementAttachment } from "@/lib/support/announcement-media";
+import {
+  uploadAnnouncementAttachment,
+  removeAnnouncementAttachment,
+} from "@/lib/support/announcement-media";
 import {
   ANNOUNCEMENT_KIND_LABEL,
   BROADCAST_TEMPLATES,
@@ -97,7 +99,6 @@ export function BroadcastManager() {
   const list = useServerFn(listAnnouncementsAdmin);
   const create = useServerFn(createAnnouncement);
   const prepareUpload = useServerFn(createAnnouncementUploadTarget);
-  const publish = useServerFn(publishAnnouncement);
   const discard = useServerFn(discardAnnouncementDraft);
   const end = useServerFn(endAnnouncement);
   const composerRef = useRef<HTMLDivElement>(null);
@@ -144,8 +145,7 @@ export function BroadcastManager() {
             title: parsed.title,
             body: parsed.body,
             scheduleMode: parsed.scheduleMode === "later" ? "later" : "now",
-            startsAtLocal:
-              typeof parsed.startsAtLocal === "string" ? parsed.startsAtLocal : "",
+            startsAtLocal: typeof parsed.startsAtLocal === "string" ? parsed.startsAtLocal : "",
             expiryMode:
               parsed.expiryMode === "24h" ||
               parsed.expiryMode === "7d" ||
@@ -228,10 +228,7 @@ export function BroadcastManager() {
   function applyTemplate(templateId: string) {
     const template = BROADCAST_TEMPLATES.find((item) => item.id === templateId);
     if (!template) return;
-    if (
-      (template.kind === "incident" || template.kind === "downtime") &&
-      pendingFiles.length > 0
-    ) {
+    if ((template.kind === "incident" || template.kind === "downtime") && pendingFiles.length > 0) {
       toast.error("Remove the media attachments before using a service alert template.");
       return;
     }
@@ -245,7 +242,7 @@ export function BroadcastManager() {
     }
 
     if (pendingFiles.length + files.length > MAX_ANNOUNCEMENT_ATTACHMENTS) {
-      toast.error(`You can attach up to ${MAX_ANNOUNCEMENT_ATTACHMENTS} files.`);
+      toast.error("A broadcast can have one media attachment.");
       return;
     }
 
@@ -315,43 +312,50 @@ export function BroadcastManager() {
         endsAtLocal: draft.endsAtLocal,
       });
       const hasAttachments = pendingFiles.length > 0;
-      let created: AnnouncementRow | null = null;
+      let uploadedPath: string | null = null;
 
       try {
-        const announcement = await create({
+        let attachment:
+          | {
+              path: string;
+              fileName: string;
+              mimeType: string;
+              fileSize: number;
+            }
+          | undefined;
+
+        if (hasAttachments) {
+          const item = pendingFiles[0];
+          if (!item) throw new Error("Choose a media file before publishing.");
+          const target = await prepareUpload({
+            data: {
+              fileName: item.file.name,
+              mimeType: item.file.type,
+              fileSize: item.file.size,
+            },
+          });
+          uploadedPath = await uploadAnnouncementAttachment(item.file, target);
+          attachment = {
+            path: uploadedPath,
+            fileName: item.file.name,
+            mimeType: item.file.type,
+            fileSize: item.file.size,
+          };
+        }
+
+        return await create({
           data: {
             kind: draft.kind,
             title: draft.title,
             body: draft.body,
             startsAt: timing.startsAt,
             endsAt: timing.endsAt,
-            deferActivation: hasAttachments,
+            attachment,
           },
         });
-        created = announcement;
-
-        if (!hasAttachments) return announcement;
-
-        for (const item of pendingFiles) {
-          const target = await prepareUpload({
-            data: {
-              announcementId: announcement.id,
-              fileName: item.file.name,
-              mimeType: item.file.type,
-              fileSize: item.file.size,
-            },
-          });
-          await uploadAnnouncementAttachment(item.file, target);
-        }
-
-        return await publish({ data: { announcementId: announcement.id } });
       } catch (cause) {
-        if (created && hasAttachments) {
-          try {
-            await discard({ data: { announcementId: created.id } });
-          } catch {
-            // Preserve the original error. A recent inactive draft remains hidden from users.
-          }
+        if (uploadedPath) {
+          await removeAnnouncementAttachment(uploadedPath);
         }
         throw cause;
       }
@@ -503,8 +507,8 @@ export function BroadcastManager() {
                     <Paperclip className="size-3.5" /> Media
                   </div>
                   <p className="mt-1 text-[11px] text-muted-foreground">
-                    Up to {MAX_ANNOUNCEMENT_ATTACHMENTS} images, videos, audio files or PDFs. Service
-                    alerts stay text only for clarity.
+                    Up to one image, video, audio file or PDF. Service alerts stay text only for
+                    clarity.
                   </p>
                 </div>
                 <span className="text-[10px] text-muted-foreground">
@@ -531,13 +535,16 @@ export function BroadcastManager() {
               >
                 <FileUp className="size-5 text-muted-foreground" />
                 <span className="mt-2 text-xs font-medium">
-                  {attachmentEnabled ? "Choose files or drop them here" : "Media is unavailable for service alerts"}
+                  {attachmentEnabled
+                    ? "Choose files or drop them here"
+                    : "Media is unavailable for service alerts"}
                 </span>
-                <span className="mt-1 text-[10px] text-muted-foreground">Maximum 25 MB per file</span>
+                <span className="mt-1 text-[10px] text-muted-foreground">
+                  Maximum 25 MB per file
+                </span>
                 <input
                   ref={fileInputRef}
                   type="file"
-                  multiple
                   disabled={!attachmentEnabled}
                   accept={ANNOUNCEMENT_ATTACHMENT_ACCEPT}
                   className="sr-only"
@@ -592,9 +599,7 @@ export function BroadcastManager() {
                           updateDraft({
                             scheduleMode: mode,
                             startsAtLocal:
-                              mode === "later"
-                                ? draft.startsAtLocal || defaultScheduledTime()
-                                : "",
+                              mode === "later" ? draft.startsAtLocal || defaultScheduledTime() : "",
                           })
                         }
                         className={cn(
@@ -726,7 +731,9 @@ export function BroadcastManager() {
         </div>
 
         {isLoading ? (
-          <div className="px-4 py-8 text-center text-sm text-muted-foreground">Loading broadcasts…</div>
+          <div className="px-4 py-8 text-center text-sm text-muted-foreground">
+            Loading broadcasts…
+          </div>
         ) : isError ? (
           <div className="px-4 py-8 text-center text-sm text-destructive">
             {(error as Error).message}
@@ -755,7 +762,9 @@ export function BroadcastManager() {
                           </span>
                         )}
                       </div>
-                      <div className="mt-1.5 truncate text-sm font-medium">{announcement.title}</div>
+                      <div className="mt-1.5 truncate text-sm font-medium">
+                        {announcement.title}
+                      </div>
                       {announcement.body && (
                         <div className="mt-1 line-clamp-2 whitespace-pre-line text-xs leading-relaxed text-muted-foreground">
                           {announcement.body}
@@ -809,7 +818,10 @@ export function BroadcastManager() {
         )}
       </Card>
 
-      <Dialog open={reviewOpen} onOpenChange={(next) => !createMutation.isPending && setReviewOpen(next)}>
+      <Dialog
+        open={reviewOpen}
+        onOpenChange={(next) => !createMutation.isPending && setReviewOpen(next)}
+      >
         <DialogContent className="max-h-[90dvh] max-w-2xl overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Review broadcast</DialogTitle>

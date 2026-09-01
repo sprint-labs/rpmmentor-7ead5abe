@@ -308,6 +308,13 @@
       "statement_count": 1,
       "sql_length": 2451,
       "sql_md5": "d38e483de5f763f632f9488f451e0b7e"
+    },
+    {
+      "version": "20260831193000",
+      "name": "announcement_media_and_scheduling",
+      "statement_count": 1,
+      "sql_length": 2579,
+      "sql_md5": "ad63cc515d496f3d3eaf3ffd4c1e9a31"
     }
   ],
   "repository_comparison": {

@@ -25,6 +25,15 @@ export type SupportSeverity = (typeof SUPPORT_SEVERITIES)[number];
 export const ANNOUNCEMENT_KINDS = ["feature", "info", "incident", "downtime"] as const;
 export type AnnouncementKind = (typeof ANNOUNCEMENT_KINDS)[number];
 
+export const ANNOUNCEMENT_ATTACHMENT_MAX_BYTES = 25 * 1024 * 1024;
+
+export const announcementAttachmentInput = z.object({
+  path: z.string().trim().min(1).max(500).startsWith("announcements/"),
+  fileName: z.string().trim().min(1).max(255),
+  mimeType: z.string().trim().min(1).max(150),
+  fileSize: z.number().int().min(1).max(ANNOUNCEMENT_ATTACHMENT_MAX_BYTES),
+});
+
 export const SUPPORT_THREAD_STATUS_LABEL: Record<SupportThreadStatus, string> = {
   open: "Open",
   waiting_on_admin: "Waiting on admin",
@@ -73,9 +82,16 @@ export const createAnnouncementInput = z
     body: z.string().trim().max(4000).default(""),
     startsAt: z.string().datetime({ offset: true }).nullish(),
     endsAt: z.string().datetime({ offset: true }).nullish(),
-    deferActivation: z.boolean().default(false),
+    attachment: announcementAttachmentInput.nullish(),
   })
   .superRefine((input, context) => {
+    if (input.attachment && input.kind !== "feature" && input.kind !== "info") {
+      context.addIssue({
+        code: "custom",
+        path: ["attachment"],
+        message: "Media can only be attached to feature and update broadcasts",
+      });
+    }
     if (!input.endsAt) return;
     const startMs = input.startsAt ? Date.parse(input.startsAt) : Date.now();
     if (Date.parse(input.endsAt) <= startMs) {
@@ -97,11 +113,9 @@ export const endAnnouncementInput = z.object({
   announcementId: z.string().regex(UUID, "announcementId must be an announcements.id"),
 });
 
-export const publishAnnouncementInput = endAnnouncementInput;
 export const discardAnnouncementDraftInput = endAnnouncementInput;
 
 export const createAnnouncementUploadTargetInput = z.object({
-  announcementId: z.string().regex(UUID, "announcementId must be an announcements.id"),
   fileName: z.string().trim().min(1).max(200),
   mimeType: z.string().trim().min(1).max(200),
   fileSize: z.number().int().positive(),

@@ -1,5 +1,6 @@
-export const MAX_ANNOUNCEMENT_ATTACHMENTS = 4;
+export const MAX_ANNOUNCEMENT_ATTACHMENTS = 1;
 export const MAX_ANNOUNCEMENT_ATTACHMENT_BYTES = 25 * 1024 * 1024;
+export const ANNOUNCEMENT_ATTACHMENT_PATH_PREFIX = "announcements/";
 
 export const ANNOUNCEMENT_ATTACHMENT_MIME_TYPES = [
   "image/jpeg",
@@ -66,4 +67,28 @@ export function originalAnnouncementFileName(objectName: string): string {
   const separator = objectName.indexOf("__");
   if (separator === -1) return objectName;
   return objectName.slice(separator + 2) || "attachment";
+}
+
+/** Canonical attachment from Super Admin-written announcement columns, never from a storage listing. */
+export function attachmentFromAnnouncementColumns(input: {
+  attachment_path: string | null;
+  attachment_name: string | null;
+  attachment_mime: string | null;
+  attachment_size: number | null;
+}): { path: string; fileName: string; mimeType: string; fileSize: number } | null {
+  if (
+    !input.attachment_path ||
+    !input.attachment_name ||
+    !input.attachment_mime ||
+    input.attachment_size === null
+  ) {
+    return null;
+  }
+
+  return {
+    path: input.attachment_path,
+    fileName: input.attachment_name,
+    mimeType: input.attachment_mime,
+    fileSize: input.attachment_size,
+  };
 }
