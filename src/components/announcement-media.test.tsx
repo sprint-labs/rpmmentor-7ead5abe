@@ -108,6 +108,22 @@ describe("AnnouncementMedia", () => {
     );
   });
 
+  it.each([
+    { name: "update.mov", mime: "video/quicktime", element: "video" },
+    { name: "update.aac", mime: "audio/aac", element: "audio" },
+  ])("offers a direct link when the browser cannot decode $mime", ({ name, mime, element }) => {
+    const { container } = render(
+      <AnnouncementMedia
+        attachment={{ ...attachment, name, mime }}
+        previewUrl="https://example.test/media"
+      />,
+    );
+
+    const link = screen.getByRole("link", { name: `Open attachment: ${name}` });
+    expect(link.getAttribute("href")).toBe("https://example.test/media");
+    expect(container.querySelector(element)?.contains(link)).toBe(false);
+  });
+
   it("refreshes a playing stream before expiry and resumes at its previous position", async () => {
     vi.useFakeTimers();
     createSignedUrl

@@ -163,45 +163,68 @@ export function AnnouncementMedia({
 
   if (kind === "video" && url) {
     return (
-      <video
-        ref={(element) => {
-          mediaElementRef.current = element;
-        }}
-        controls
-        preload="metadata"
-        src={url}
-        onPlay={handlePlaybackStart}
-        onPause={handlePlaybackPause}
-        onEnded={handlePlaybackEnd}
-        onLoadedMetadata={restorePlaybackPosition}
-        className={cn(
-          "mt-3 w-full rounded-md border border-border bg-black object-contain",
-          mediaClass,
-          className,
-        )}
-      >
-        Your browser cannot play this video.
-      </video>
+      <div className={cn("mt-3", className)}>
+        <video
+          ref={(element) => {
+            mediaElementRef.current = element;
+          }}
+          controls
+          preload="metadata"
+          src={url}
+          onPlay={handlePlaybackStart}
+          onPause={handlePlaybackPause}
+          onEnded={handlePlaybackEnd}
+          onLoadedMetadata={restorePlaybackPosition}
+          className={cn(
+            "w-full rounded-md border border-border bg-black object-contain",
+            mediaClass,
+          )}
+        >
+          Your browser cannot play this video.
+        </video>
+        <a
+          href={url}
+          target="_blank"
+          rel="noreferrer"
+          aria-label={`Open attachment: ${attachment.name}`}
+          className="mt-1 inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+        >
+          Open attachment
+          <ExternalLink className="size-3" aria-hidden="true" />
+        </a>
+      </div>
     );
   }
 
   if (kind === "audio" && url) {
     return (
-      <audio
-        ref={(element) => {
-          mediaElementRef.current = element;
-        }}
-        controls
-        preload="metadata"
-        src={url}
-        onPlay={handlePlaybackStart}
-        onPause={handlePlaybackPause}
-        onEnded={handlePlaybackEnd}
-        onLoadedMetadata={restorePlaybackPosition}
-        className={cn("mt-3 w-full", className)}
-      >
-        Your browser cannot play this audio.
-      </audio>
+      <div className={cn("mt-3", className)}>
+        <audio
+          ref={(element) => {
+            mediaElementRef.current = element;
+          }}
+          controls
+          preload="metadata"
+          src={url}
+          onPlay={handlePlaybackStart}
+          onPause={handlePlaybackPause}
+          onEnded={handlePlaybackEnd}
+          onLoadedMetadata={restorePlaybackPosition}
+          className="w-full"
+        >
+          Your browser cannot play this audio.
+        </audio>
+        <a
+          href={url}
+          target="_blank"
+          rel="noreferrer"
+          aria-label={`Open attachment: ${attachment.name}`}
+          className="mt-1 inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+        >
+          Open attachment
+          <ExternalLink className="size-3" aria-hidden="true" />
+        </a>
+      </div>
     );
   }
 
