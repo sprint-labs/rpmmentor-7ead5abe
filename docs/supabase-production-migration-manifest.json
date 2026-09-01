@@ -317,7 +317,7 @@
   },
   "reviewed_forward_migrations": [
     {
-      "version": "20260831195144",
+      "version": "20260901115505",
       "name": "match_event_participation",
       "statement_count": 1,
       "sql_length": 5585,
