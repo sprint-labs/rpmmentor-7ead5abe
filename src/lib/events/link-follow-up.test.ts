@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  assertMatchReportMatchesEvent,
   DUPLICATE_FOLLOW_UP_MESSAGE,
   isDuplicateFollowUp,
   verifyFollowUpTarget,
@@ -16,6 +17,7 @@ interface EventShape {
   event_type: string;
   event_date: string;
   status: string;
+  participation_status: string;
   player_id: string | null;
   goalkeeper_name: string | null;
   assigned_mentor_id: string | null;
@@ -25,13 +27,31 @@ interface EventShape {
  * The only two reads `verifyFollowUpTarget` makes: the event, and the caller's
  * roles. Deliberately minimal — this tests the decision, not PostgREST.
  */
-function fakeDb(event: EventShape | null, roles: Record<string, string[]> = {}) {
+function fakeDb(
+  event: EventShape | null,
+  roles: Record<string, string[]> = {},
+  existingReport = false,
+) {
   return {
     from(table: string) {
       if (table === "calendar_events") {
         return {
           select: () => ({
             eq: () => ({ maybeSingle: async () => ({ data: event, error: null }) }),
+          }),
+        };
+      }
+      if (table === "match_reports_cache") {
+        return {
+          select: () => ({
+            eq: () => ({
+              is: () => ({
+                maybeSingle: async () => ({
+                  data: existingReport ? { report_id: "historic-report" } : null,
+                  error: null,
+                }),
+              }),
+            }),
           }),
         };
       }
@@ -54,6 +74,7 @@ const matchEvent: EventShape = {
   event_type: "Match",
   event_date: "2026-08-15",
   status: "scheduled",
+  participation_status: "played",
   player_id: PLAYER,
   goalkeeper_name: "James Beadle",
   assigned_mentor_id: MENTOR,
@@ -72,6 +93,8 @@ describe("verifyFollowUpTarget", () => {
       playerId: PLAYER,
       goalkeeperName: "James Beadle",
       eventDate: "2026-08-15",
+      assignedMentorId: MENTOR,
+      existingReportId: null,
       interactionType: null,
     });
   });
@@ -104,6 +127,52 @@ describe("verifyFollowUpTarget", () => {
     await expect(
       verifyFollowUpTarget(fakeDb(matchEvent) as never, MENTOR, EVENT, "interaction"),
     ).rejects.toThrow(/written up with a Match Report/i);
+  });
+
+  it("refuses a Match Report until participation is confirmed as Played", async () => {
+    await expect(
+      verifyFollowUpTarget(
+        fakeDb({ ...matchEvent, participation_status: "not_confirmed" }) as never,
+        MENTOR,
+        EVENT,
+        "match_report",
+      ),
+    ).rejects.toThrow(/Confirm.*Played/i);
+  });
+
+  it("refuses a Match Report when the goalkeeper did not play", async () => {
+    await expect(
+      verifyFollowUpTarget(
+        fakeDb({ ...matchEvent, participation_status: "did_not_play" }) as never,
+        MENTOR,
+        EVENT,
+        "match_report",
+      ),
+    ).rejects.toThrow(/Did not play/i);
+  });
+
+  it.each(["not_confirmed", "did_not_play"])(
+    "keeps an existing linked report retryable when participation is %s",
+    async (participationStatus) => {
+      const target = await verifyFollowUpTarget(
+        fakeDb({ ...matchEvent, participation_status: participationStatus }, {}, true) as never,
+        MENTOR,
+        EVENT,
+        "match_report",
+      );
+      expect(target.eventId).toBe(EVENT);
+      expect(target.existingReportId).toBe("historic-report");
+    },
+  );
+
+  it("returns an existing linked report even when participation is Played", async () => {
+    const target = await verifyFollowUpTarget(
+      fakeDb(matchEvent, {}, true) as never,
+      MENTOR,
+      EVENT,
+      "match_report",
+    );
+    expect(target.existingReportId).toBe("historic-report");
   });
 
   it("refuses a retired event type outright", async () => {
@@ -164,6 +233,72 @@ describe("verifyFollowUpTarget", () => {
     );
     expect(target.playerId).toBe(PLAYER);
     expect(target.goalkeeperName).toBe("Someone Else");
+  });
+});
+
+describe("assertMatchReportMatchesEvent", () => {
+  const target = {
+    eventId: EVENT,
+    playerId: PLAYER,
+    goalkeeperName: "James Beadle",
+    eventDate: "2026-08-15",
+    assignedMentorId: MENTOR,
+    existingReportId: null,
+    interactionType: null,
+  };
+
+  it("accepts the canonical goalkeeper and event date with harmless name formatting", () => {
+    expect(() =>
+      assertMatchReportMatchesEvent(target, {
+        goalkeeperName: "  james   BEADLE ",
+        matchDate: "2026-08-15",
+      }),
+    ).not.toThrow();
+  });
+
+  it("refuses a report for another goalkeeper", () => {
+    expect(() =>
+      assertMatchReportMatchesEvent(target, {
+        goalkeeperName: "Another Goalkeeper",
+        matchDate: "2026-08-15",
+      }),
+    ).toThrow(/event is for James Beadle/i);
+  });
+
+  it("refuses a report for another fixture date", () => {
+    expect(() =>
+      assertMatchReportMatchesEvent(target, {
+        goalkeeperName: "James Beadle",
+        matchDate: "2026-08-16",
+      }),
+    ).toThrow(/event is dated 2026-08-15/i);
+  });
+
+  it("refuses self-healing when the event was moved to another goalkeeper after the report", () => {
+    expect(() =>
+      assertMatchReportMatchesEvent(
+        { ...target, goalkeeperName: "Current Event Goalkeeper" },
+        { goalkeeperName: "Saved Report Goalkeeper", matchDate: "2026-08-15" },
+      ),
+    ).toThrow(/event is for Current Event Goalkeeper/i);
+  });
+
+  it("refuses self-healing when the event date changed after the report", () => {
+    expect(() =>
+      assertMatchReportMatchesEvent(
+        { ...target, eventDate: "2026-08-20" },
+        { goalkeeperName: "James Beadle", matchDate: "2026-08-15" },
+      ),
+    ).toThrow(/event is dated 2026-08-20/i);
+  });
+
+  it("refuses a first linked report when the event has no canonical player", () => {
+    expect(() =>
+      assertMatchReportMatchesEvent(
+        { ...target, playerId: null },
+        { goalkeeperName: "James Beadle", matchDate: "2026-08-15" },
+      ),
+    ).toThrow(/no canonical goalkeeper/i);
   });
 });
 

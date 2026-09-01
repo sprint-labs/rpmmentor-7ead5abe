@@ -161,6 +161,7 @@ export type Database = {
           id: string
           location: string | null
           notes: string
+          participation_status: string
           player_id: string | null
           start_time: string | null
           status: string
@@ -186,6 +187,7 @@ export type Database = {
           id?: string
           location?: string | null
           notes?: string
+          participation_status?: string
           player_id?: string | null
           start_time?: string | null
           status?: string
@@ -211,6 +213,7 @@ export type Database = {
           id?: string
           location?: string | null
           notes?: string
+          participation_status?: string
           player_id?: string | null
           start_time?: string | null
           status?: string

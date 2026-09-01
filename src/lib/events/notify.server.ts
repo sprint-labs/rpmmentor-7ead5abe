@@ -30,6 +30,7 @@ export interface NotifiableEventRow {
   end_time?: string | null;
   goalkeeper_name: string | null;
   player_id: string | null;
+  participation_status?: string | null;
   assigned_mentor_id: string | null;
 }
 
@@ -43,6 +44,7 @@ function toNotifiable(row: NotifiableEventRow): NotifiableEvent {
     endTime: row.end_time ?? null,
     goalkeeperName: row.goalkeeper_name,
     playerId: row.player_id,
+    participationStatus: row.participation_status,
   };
 }
 
@@ -109,6 +111,7 @@ export async function notifyEventChanged(
     end_time?: string | null;
     player_id: string | null;
     event_type: string;
+    participation_status?: string | null;
   },
 ): Promise<boolean> {
   const results: boolean[] = [];
@@ -138,8 +141,11 @@ export async function notifyEventChanged(
     (row.end_time ?? null) !== (previous.end_time ?? null);
   const goalkeeperChanged = row.player_id !== previous.player_id;
   const typeChanged = row.event_type !== previous.event_type;
+  const participationChanged =
+    (row.participation_status ?? "not_confirmed") !==
+    (previous.participation_status ?? "not_confirmed");
 
-  if (!scheduleMoved && !goalkeeperChanged && !typeChanged) return true;
+  if (!scheduleMoved && !goalkeeperChanged && !typeChanged && !participationChanged) return true;
   if (!row.assigned_mentor_id || row.assigned_mentor_id === actorId) return true;
 
   const copy = buildEventNotification("event_updated", toNotifiable(row));

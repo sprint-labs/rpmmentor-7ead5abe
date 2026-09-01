@@ -11,11 +11,17 @@ import {
   type FollowUpSource,
 } from "./follow-up";
 import { londonWallClockMs } from "@/lib/time/london";
+import {
+  DEFAULT_MATCH_PARTICIPATION_STATUS,
+  MATCH_PARTICIPATION_STATUSES,
+  normalizeMatchParticipationStatus,
+} from "./participation";
 
 /** A Match at 15:00 London on a summer Saturday, nothing recorded yet. */
 function matchEvent(over: Partial<FollowUpSource> = {}): FollowUpSource {
   return {
     eventType: "Match",
+    participationStatus: "played",
     eventDate: "2026-08-15",
     startTime: "15:00",
     cancelled: false,
@@ -69,6 +75,101 @@ describe("event types", () => {
   });
 });
 
+describe("match participation", () => {
+  it("defines a safe Not confirmed default and normalises unknown provider values", () => {
+    expect(MATCH_PARTICIPATION_STATUSES).toEqual(["not_confirmed", "played", "did_not_play"]);
+    expect(DEFAULT_MATCH_PARTICIPATION_STATUS).toBe("not_confirmed");
+    expect(normalizeMatchParticipationStatus(undefined)).toBe("not_confirmed");
+    expect(normalizeMatchParticipationStatus(null)).toBe("not_confirmed");
+    expect(normalizeMatchParticipationStatus("starter")).toBe("not_confirmed");
+    expect(normalizeMatchParticipationStatus("played")).toBe("played");
+  });
+
+  it("requires reports for only the two Played goalkeepers in a five-goalkeeper fixture", () => {
+    const participation = [
+      "played",
+      "did_not_play",
+      "not_confirmed",
+      "played",
+      "did_not_play",
+    ] as const;
+
+    const followUps = participation.map((participationStatus) =>
+      resolveFollowUp(matchEvent({ participationStatus }), KICK_OFF + 100 * HOUR),
+    );
+
+    expect(followUps.filter(({ kind }) => kind === "match_report")).toHaveLength(2);
+    expect(followUps.filter(({ status }) => status === "overdue")).toHaveLength(2);
+  });
+
+  it("does not require a report when the goalkeeper Did not play", () => {
+    const result = resolveFollowUp(
+      matchEvent({ participationStatus: "did_not_play" }),
+      KICK_OFF + 100 * HOUR,
+    );
+
+    expect(result.participationStatus).toBe("did_not_play");
+    expect(result.kind).toBeNull();
+    expect(result.status).toBe("not_required");
+    expect(result.waived).toBe(false);
+  });
+
+  it("asks for participation confirmation after a Match without creating an overdue report", () => {
+    const result = resolveFollowUp(
+      matchEvent({ participationStatus: "not_confirmed" }),
+      KICK_OFF + 100 * HOUR,
+    );
+
+    expect(result.participationStatus).toBe("not_confirmed");
+    expect(result.kind).toBeNull();
+    expect(result.status).toBe("confirmation_needed");
+  });
+
+  it("keeps an unconfirmed future Match scheduled until there is something to confirm", () => {
+    expect(
+      resolveFollowUp(matchEvent({ participationStatus: "not_confirmed" }), KICK_OFF - HOUR).status,
+    ).toBe("scheduled");
+  });
+
+  it("treats a missing historic participation value as Not confirmed, never Played", () => {
+    const result = resolveFollowUp(
+      matchEvent({ participationStatus: undefined }),
+      KICK_OFF + 100 * HOUR,
+    );
+
+    expect(result.participationStatus).toBe("not_confirmed");
+    expect(result.kind).toBeNull();
+    expect(result.status).toBe("confirmation_needed");
+  });
+
+  it("keeps an existing linked report completed regardless of participation", () => {
+    for (const participationStatus of ["not_confirmed", "did_not_play"] as const) {
+      const result = resolveFollowUp(
+        matchEvent({ participationStatus, completedRecordId: "mr_existing" }),
+        KICK_OFF + 100 * HOUR,
+      );
+
+      expect(result.kind).toBe("match_report");
+      expect(result.status).toBe("completed");
+      expect(result.completedRecordId).toBe("mr_existing");
+    }
+  });
+
+  it("ignores participation safely for non-Match follow-ups", () => {
+    const result = resolveFollowUp(
+      matchEvent({
+        eventType: "Training Ground Visit",
+        participationStatus: "did_not_play",
+      }),
+      KICK_OFF + HOUR,
+    );
+
+    expect(result.participationStatus).toBeNull();
+    expect(result.kind).toBe("interaction");
+    expect(result.status).toBe("pending");
+  });
+});
+
 describe("deadline", () => {
   it("is 48 hours after the scheduled start when there is no end time", () => {
     const { deadlineMs, endsAtMs } = resolveFollowUp(matchEvent(), KICK_OFF);
@@ -77,10 +178,7 @@ describe("deadline", () => {
   });
 
   it("is measured from the end time when one is stored", () => {
-    const { deadlineMs } = resolveFollowUp(
-      matchEvent({ endTime: "17:00" }),
-      KICK_OFF,
-    );
+    const { deadlineMs } = resolveFollowUp(matchEvent({ endTime: "17:00" }), KICK_OFF);
     expect(deadlineMs).toBe(londonWallClockMs("2026-08-15", "17:00") + 48 * HOUR);
   });
 
@@ -128,10 +226,7 @@ describe("status", () => {
   });
 
   it("stays Completed however long ago the deadline was", () => {
-    const late = resolveFollowUp(
-      matchEvent({ completedRecordId: "mr_1" }),
-      KICK_OFF + 1000 * HOUR,
-    );
+    const late = resolveFollowUp(matchEvent({ completedRecordId: "mr_1" }), KICK_OFF + 1000 * HOUR);
     expect(late.status).toBe("completed");
   });
 
@@ -155,9 +250,17 @@ describe("status", () => {
   });
 
   it("shows Not required once a manager has waived it", () => {
-    expect(resolveFollowUp(matchEvent({ waived: true }), KICK_OFF + 200 * HOUR).status).toBe(
-      "not_required",
+    const result = resolveFollowUp(matchEvent({ waived: true }), KICK_OFF + 200 * HOUR);
+    expect(result.status).toBe("not_required");
+    expect(result.waived).toBe(true);
+  });
+
+  it("keeps a historic waiver closed when participation is still unconfirmed", () => {
+    const result = resolveFollowUp(
+      matchEvent({ waived: true, participationStatus: "not_confirmed" }),
+      KICK_OFF + 200 * HOUR,
     );
+    expect(result.status).toBe("not_required");
   });
 
   it("treats an unreadable date as still to come rather than inventing an alert", () => {

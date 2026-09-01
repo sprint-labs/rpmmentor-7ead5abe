@@ -16,6 +16,7 @@ import {
   listCalendarEvents,
   createCalendarEvent,
   updateCalendarEvent,
+  updateMatchParticipation,
   deleteCalendarEvent,
   listAssignableMentors,
   CALENDAR_EVENT_TYPES,
@@ -31,12 +32,14 @@ import {
   waiveEventFollowUp,
 } from "@/lib/events/follow-up.functions";
 import { eventFollowUpsQueryKey } from "@/lib/events/query-keys";
+import { notificationsQueryKey } from "@/lib/events/query-keys";
 import { isEventType, FOLLOW_UP_KIND_BY_EVENT_TYPE, followUpRequirementLabel } from "@/lib/events/follow-up";
 import { cancellationFeedback } from "@/lib/events/notification-copy";
 import {
   FollowUpActionLink,
   FollowUpStatusPill,
   followUpDetail,
+  unwaivePresentation,
 } from "@/components/events/follow-up-status";
 import {
   missingReportTypes,
@@ -46,6 +49,8 @@ import {
   type ReportCoverageEntry,
   type TrackedReportType,
 } from "@/lib/calendar/report-coverage";
+import { MatchParticipationControl } from "@/components/events/match-participation-control";
+import { MATCH_PARTICIPATION_STATUS_LABEL } from "@/lib/events/participation";
 
 function MissingReports({
   coverage,
@@ -202,7 +207,7 @@ function followUpHint(eventType: string): string {
 
 function CalendarPage() {
   const { gkId, new: openNewOnMount, title: prefillTitle, notes: prefillNotes } = Route.useSearch();
-  const { can } = useAuth();
+  const { can, user } = useAuth();
   const canManage = can("calendar.manage");
   const [workflow, setWorkflow] = useState<WorkflowKind | null>(null);
   /** Goalkeeper/date carried into Log Interaction when opened from a calendar day or event. */
@@ -217,6 +222,7 @@ function CalendarPage() {
   const fetchEvents = useServerFn(listCalendarEvents);
   const createEvent = useServerFn(createCalendarEvent);
   const editEvent = useServerFn(updateCalendarEvent);
+  const setMatchParticipation = useServerFn(updateMatchParticipation);
   const removeEvent = useServerFn(deleteCalendarEvent);
 
   const { data: events = [], isLoading } = useQuery({
@@ -280,6 +286,7 @@ function CalendarPage() {
 
   const [draft, setDraft] = useState<Draft | null>(null);
   const [saving, setSaving] = useState(false);
+  const [participationSaving, setParticipationSaving] = useState<string | null>(null);
   const [importOpen, setImportOpen] = useState(false);
 
   async function refreshEvents() {
@@ -287,6 +294,32 @@ function CalendarPage() {
       queryClient.invalidateQueries({ queryKey: ["calendar-events"] }),
       queryClient.invalidateQueries({ queryKey: eventFollowUpsQueryKey }),
     ]);
+  }
+
+  async function handleParticipation(
+    event: DisplayEvent,
+    participationStatus: TeamCalendarEvent["participation_status"],
+  ) {
+    if (event.raw.participation_status === participationStatus) return;
+    setParticipationSaving(event.id);
+    try {
+      await setMatchParticipation({
+        data: { id: event.id, participation_status: participationStatus },
+      });
+      await Promise.all([
+        refreshEvents(),
+        queryClient.invalidateQueries({
+          queryKey: notificationsQueryKey(user?.id ?? "anonymous"),
+        }),
+      ]);
+      toast.success(
+        `${event.gkName || "Goalkeeper"}: ${MATCH_PARTICIPATION_STATUS_LABEL[participationStatus]}.`,
+      );
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not update participation.");
+    } finally {
+      setParticipationSaving(null);
+    }
   }
 
   /** Cancel an event, keeping it on the record with the reason attached. */
@@ -333,11 +366,11 @@ function CalendarPage() {
     }
   }
 
-  async function handleUnwaive(id: string) {
+  async function handleUnwaive(id: string, successMessage: string) {
     try {
       await unwaiveFollowUp({ data: { id } });
       await refreshEvents();
-      toast.success("Write-up required again.");
+      toast.success(successMessage);
       setDraft(null);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not reinstate the follow-up.");
@@ -691,6 +724,21 @@ function CalendarPage() {
                         .filter(Boolean)
                         .join(" · ")}
                     </div>
+                    {e.type === "Match" &&
+                      (canManage ? (
+                        <div className="mt-1.5">
+                          <MatchParticipationControl
+                            status={e.raw.participation_status}
+                            disabled={participationSaving === e.id}
+                            label={`Participation — ${e.gkName || "goalkeeper"}`}
+                            onChange={(status) => handleParticipation(e, status)}
+                          />
+                        </div>
+                      ) : (
+                        <div className="mt-1 text-[11px] text-muted-foreground">
+                          Participation: {MATCH_PARTICIPATION_STATUS_LABEL[e.raw.participation_status]}
+                        </div>
+                      ))}
                     {e.notes && <div className="mt-0.5 whitespace-pre-wrap text-xs text-muted-foreground">{e.notes}</div>}
                     {(() => {
                       const row = followUpByEvent.get(e.id);
@@ -713,6 +761,7 @@ function CalendarPage() {
                               playerId: row.playerId,
                             }}
                             followUp={row.followUp}
+                            canConfirmParticipation={canManage}
                           />
                         </div>
                       );
@@ -874,7 +923,9 @@ function CalendarPage() {
               const row = followUpByEvent.get(draft.id);
               if (!row) return null;
               const cancelled = row.followUp.status === "cancelled";
-              const waived = row.followUp.status === "not_required";
+              const waived = row.followUp.waived;
+              const canWaive = row.followUp.kind !== null;
+              const unwaive = unwaivePresentation(row.followUp);
               return (
                 <div className="mt-4 space-y-2 rounded-md border border-border bg-muted/30 p-3">
                   <div className="flex flex-wrap items-center gap-2">
@@ -901,19 +952,19 @@ function CalendarPage() {
                     )}
                     {waived ? (
                       <button
-                        onClick={() => handleUnwaive(draft.id)}
+                        onClick={() => handleUnwaive(draft.id, unwaive.successMessage)}
                         className="rounded-md border border-border px-2.5 py-1 text-[11px] hover:bg-accent"
                       >
-                        Require write-up again
+                        {unwaive.label}
                       </button>
-                    ) : (
+                    ) : canWaive ? (
                       <button
                         onClick={() => handleWaive(draft.id)}
                         className="rounded-md border border-border px-2.5 py-1 text-[11px] hover:bg-accent"
                       >
                         Mark write-up not required
                       </button>
-                    )}
+                    ) : null}
                   </div>
                 </div>
               );

@@ -12,7 +12,8 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, RefreshCw } from "lucide-react";
+import { AlertCircle, AlertTriangle, RefreshCw } from "lucide-react";
+import { toast } from "sonner";
 import { PageHeader, Card, SectionTitle } from "@/components/primitives";
 import { withPermission } from "@/components/require-permission";
 import {
@@ -31,6 +32,9 @@ import {
 } from "@/components/events/follow-up-status";
 import { formatDateOnly } from "@/lib/interactions/schema";
 import { useAuth } from "@/lib/auth";
+import { updateMatchParticipation } from "@/lib/calendar.functions";
+import { MatchParticipationControl } from "@/components/events/match-participation-control";
+import type { MatchParticipationStatus } from "@/lib/events/participation";
 
 export const Route = createFileRoute("/follow-ups")({
   component: withPermission(FollowUpsPage, "calendar.view"),
@@ -41,6 +45,7 @@ type Filter = "open" | FollowUpStatus | "all";
 const FILTERS: { value: Filter; label: string }[] = [
   { value: "open", label: "Needs action" },
   { value: "overdue", label: FOLLOW_UP_STATUS_LABEL.overdue },
+  { value: "confirmation_needed", label: FOLLOW_UP_STATUS_LABEL.confirmation_needed },
   { value: "pending", label: FOLLOW_UP_STATUS_LABEL.pending },
   { value: "scheduled", label: FOLLOW_UP_STATUS_LABEL.scheduled },
   { value: "completed", label: FOLLOW_UP_STATUS_LABEL.completed },
@@ -55,13 +60,19 @@ function matchesFilter(row: EventFollowUpRow, filter: Filter): boolean {
   return row.followUp.status === filter;
 }
 
+function isFollowUpListItem(row: EventFollowUpRow): boolean {
+  return row.followUp.kind !== null || row.followUp.status === "confirmation_needed";
+}
+
 function FollowUpsPage() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const fetchFollowUps = useServerFn(listEventFollowUps);
   const syncOverdue = useServerFn(syncOverdueFollowUpNotifications);
+  const setMatchParticipation = useServerFn(updateMatchParticipation);
   const [filter, setFilter] = useState<Filter>("open");
   const [mineOnly, setMineOnly] = useState(false);
+  const [participationSaving, setParticipationSaving] = useState<string | null>(null);
 
   const { data, isLoading, isError, error, refetch, isFetching } = useQuery({
     queryKey: eventFollowUpsQueryKey,
@@ -94,17 +105,18 @@ function FollowUpsPage() {
 
   const visible = useMemo(() => {
     const filtered = rows
-      .filter((r) => r.followUp.kind !== null)
+      .filter(isFollowUpListItem)
       .filter((r) => (mineOnly ? r.mine : true))
       .filter((r) => matchesFilter(r, filter));
     // Most urgent first: overdue, then the soonest deadline.
     const rank: Record<FollowUpStatus, number> = {
       overdue: 0,
-      pending: 1,
-      scheduled: 2,
-      completed: 3,
-      not_required: 4,
-      cancelled: 5,
+      confirmation_needed: 1,
+      pending: 2,
+      scheduled: 3,
+      completed: 4,
+      not_required: 5,
+      cancelled: 6,
     };
     return filtered.sort((a, b) => {
       const byStatus = rank[a.followUp.status] - rank[b.followUp.status];
@@ -114,13 +126,33 @@ function FollowUpsPage() {
   }, [rows, filter, mineOnly]);
 
   const counts = useMemo(() => {
-    const scope = rows.filter((r) => r.followUp.kind !== null && (mineOnly ? r.mine : true));
+    const scope = rows.filter((r) => isFollowUpListItem(r) && (mineOnly ? r.mine : true));
     return {
       overdue: scope.filter((r) => r.followUp.status === "overdue").length,
+      confirmationNeeded: scope.filter((r) => r.followUp.status === "confirmation_needed").length,
       pending: scope.filter((r) => r.followUp.status === "pending").length,
       scheduled: scope.filter((r) => r.followUp.status === "scheduled").length,
     };
   }, [rows, mineOnly]);
+
+  async function handleParticipation(eventId: string, status: MatchParticipationStatus) {
+    setParticipationSaving(eventId);
+    try {
+      await setMatchParticipation({ data: { id: eventId, participation_status: status } });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: eventFollowUpsQueryKey }),
+        queryClient.invalidateQueries({ queryKey: ["calendar-events"] }),
+        queryClient.invalidateQueries({
+          queryKey: notificationsQueryKey(user?.id ?? "anonymous"),
+        }),
+      ]);
+      toast.success("Match participation updated.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not update participation.");
+    } finally {
+      setParticipationSaving(null);
+    }
+  }
 
   return (
     <div className="space-y-5">
@@ -157,6 +189,22 @@ function FollowUpsPage() {
         </div>
       )}
 
+      {counts.confirmationNeeded > 0 && (
+        <div className="flex items-start gap-2 rounded-md border border-warning/35 bg-warning/10 px-3 py-2.5 text-sm">
+          <AlertCircle className="mt-0.5 size-4 shrink-0 text-warning" />
+          <div>
+            <div className="font-medium">
+              Confirm who played in {counts.confirmationNeeded} Match event
+              {counts.confirmationNeeded === 1 ? "" : "s"}
+            </div>
+            <div className="text-xs text-muted-foreground">
+              These are not overdue Match Reports. Confirm participation first; only Played creates
+              a report requirement.
+            </div>
+          </div>
+        </div>
+      )}
+
       <Card>
         <div className="mb-3 flex flex-wrap items-center gap-2">
           {FILTERS.map((f) => (
@@ -188,6 +236,9 @@ function FollowUpsPage() {
         <div className="mb-3 flex flex-wrap gap-4 text-xs text-muted-foreground">
           <span>
             Overdue <strong className="text-destructive">{counts.overdue}</strong>
+          </span>
+          <span>
+            Confirm participation <strong className="text-warning">{counts.confirmationNeeded}</strong>
           </span>
           <span>
             Pending <strong className="text-warning">{counts.pending}</strong>
@@ -234,6 +285,16 @@ function FollowUpsPage() {
                     <div className="mt-1 text-xs text-muted-foreground">
                       {followUpDetail(row.followUp, row.waiverReason, row.cancellationReason)}
                     </div>
+                    {data?.canManage && row.eventType === "Match" && (
+                      <div className="mt-2">
+                        <MatchParticipationControl
+                          status={row.participationStatus}
+                          disabled={participationSaving === row.eventId}
+                          label={`Participation — ${row.goalkeeperName || "goalkeeper"}`}
+                          onChange={(status) => handleParticipation(row.eventId, status)}
+                        />
+                      </div>
+                    )}
                   </div>
                   <div className="flex shrink-0 flex-col items-end gap-1">
                     <FollowUpActionLink
@@ -249,6 +310,7 @@ function FollowUpsPage() {
                       }}
                       followUp={row.followUp}
                       label={`Submit ${followUpRequirementLabel(row.followUp.kind)}`}
+                      canConfirmParticipation={Boolean(data?.canManage)}
                     />
                     <Link to="/calendar" className="text-[11px] text-muted-foreground hover:underline">
                       View in calendar
@@ -268,6 +330,10 @@ function FollowUpsPage() {
             <strong className="text-foreground">Scheduled</strong> — the event has not happened yet.
           </li>
           <li>
+            <strong className="text-foreground">Confirm participation</strong> — the Match happened,
+            but nobody has confirmed whether this goalkeeper played; no report is overdue yet.
+          </li>
+          <li>
             <strong className="text-foreground">Pending</strong> — it has happened and the 48-hour
             window is still open.
           </li>
@@ -285,7 +351,7 @@ function FollowUpsPage() {
           </li>
           <li>
             <strong className="text-foreground">Not required</strong> — a manager waived it and
-            recorded why.
+            recorded why, or the goalkeeper was confirmed as Did not play.
           </li>
         </ul>
         <p className="mt-2 text-xs text-muted-foreground">
