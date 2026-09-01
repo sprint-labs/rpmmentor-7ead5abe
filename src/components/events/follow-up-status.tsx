@@ -78,6 +78,29 @@ export function followUpDetail(
   }
 }
 
+/** Accurate copy for clearing a persisted waiver without overstating what reopens. */
+export function unwaivePresentation(followUp: FollowUp): {
+  label: string;
+  successMessage: string;
+} {
+  if (followUp.status === "not_required" && followUp.kind !== null) {
+    return { label: "Require write-up again", successMessage: "Write-up required again." };
+  }
+  if (followUp.participationStatus === "did_not_play") {
+    return {
+      label: "Remove waiver",
+      successMessage: "Waiver removed. Did not play still requires no Match Report.",
+    };
+  }
+  if (followUp.participationStatus === "not_confirmed") {
+    return {
+      label: "Remove waiver",
+      successMessage: "Waiver removed. Confirm participation before any Match Report is required.",
+    };
+  }
+  return { label: "Remove waiver", successMessage: "Waiver removed." };
+}
+
 /** A link straight to the form that discharges the requirement. */
 export function FollowUpActionLink({
   event,

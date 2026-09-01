@@ -7,7 +7,7 @@ import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { FollowUp } from "@/lib/events/follow-up";
 import type { NotifiableEvent } from "@/lib/events/notification-copy";
-import { FollowUpActionLink, followUpDetail } from "./follow-up-status";
+import { FollowUpActionLink, followUpDetail, unwaivePresentation } from "./follow-up-status";
 
 vi.mock("@tanstack/react-router", () => ({
   Link: ({ children, to }: { children: ReactNode; to: string }) => <a href={to}>{children}</a>,
@@ -67,6 +67,21 @@ describe("manager waiver presentation", () => {
     expect(followUpDetail({ ...didNotPlay, waived: true }, "Covered in person", "")).toBe(
       "Waived — Covered in person",
     );
+    expect(unwaivePresentation({ ...didNotPlay, waived: true })).toEqual({
+      label: "Remove waiver",
+      successMessage: "Waiver removed. Did not play still requires no Match Report.",
+    });
+  });
+
+  it("only says a write-up is required again when clearing the waiver reopens one", () => {
+    expect(
+      unwaivePresentation({
+        ...didNotPlay,
+        kind: "match_report",
+        participationStatus: "played",
+        waived: true,
+      }),
+    ).toEqual({ label: "Require write-up again", successMessage: "Write-up required again." });
   });
 
   it("drives the calendar editor action from the waiver fact, not Not required status", () => {
@@ -74,5 +89,6 @@ describe("manager waiver presentation", () => {
     expect(route).toContain("const waived = row.followUp.waived;");
     expect(route).not.toContain('const waived = row.followUp.status === "not_required";');
     expect(route).toContain("const canWaive = row.followUp.kind !== null;");
+    expect(route).toContain("const unwaive = unwaivePresentation(row.followUp);");
   });
 });

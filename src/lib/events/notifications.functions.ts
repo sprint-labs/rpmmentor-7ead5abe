@@ -10,9 +10,11 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { getUserRoles, hasAnyRole } from "@/lib/roles.server";
 import { FOLLOW_UP_MANAGE_ROLES } from "./follow-up.functions";
 import type { NotificationKind } from "./notification-copy";
+import type { QueryClient } from "./follow-up-query.server";
 
 const INBOX_LIMIT = 60;
 const INBOX_SCAN_LIMIT = 240;
+const EVENT_STATUS_BATCH = 100;
 
 export interface AppNotification {
   id: string;
@@ -47,6 +49,42 @@ export function filterCurrentOverdueNotifications(
   );
 }
 
+/**
+ * Assignment/update messages are actionable snapshots, so hide them once the
+ * linked event is cancelled. This read-time reconciliation closes the race where
+ * cancellation commits after an event update but before its notification insert,
+ * while retaining the stored notification row for audit/history.
+ */
+export function filterCancelledActiveEventNotifications(
+  items: readonly AppNotification[],
+  cancelledEventIds: ReadonlySet<string>,
+): AppNotification[] {
+  return items.filter(
+    (item) =>
+      (item.kind !== "event_assigned" && item.kind !== "event_updated") ||
+      !item.eventId ||
+      !cancelledEventIds.has(item.eventId),
+  );
+}
+
+async function loadCancelledEventIds(
+  supabase: QueryClient,
+  eventIds: readonly string[],
+): Promise<Set<string>> {
+  const cancelled = new Set<string>();
+  for (let start = 0; start < eventIds.length; start += EVENT_STATUS_BATCH) {
+    const { data, error } = await supabase
+      .from("calendar_events")
+      .select("id, status")
+      .in("id", eventIds.slice(start, start + EVENT_STATUS_BATCH));
+    if (error) throw new Error(error.message);
+    for (const row of data ?? []) {
+      if (row.status === "cancelled") cancelled.add(row.id as string);
+    }
+  }
+  return cancelled;
+}
+
 export const listNotifications = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<NotificationInbox> => {
@@ -69,17 +107,29 @@ export const listNotifications = createServerFn({ method: "GET" })
       eventId: (row.calendar_event_id as string | null) ?? null,
     }));
     let items = storedItems;
+    const activeEventIds = [
+      ...new Set(
+        storedItems
+          .filter(
+            (item) =>
+              (item.kind === "event_assigned" || item.kind === "event_updated") && item.eventId,
+          )
+          .map((item) => item.eventId as string),
+      ),
+    ];
+    if (activeEventIds.length > 0) {
+      const cancelledIds = await loadCancelledEventIds(context.supabase, activeEventIds);
+      items = filterCancelledActiveEventNotifications(items, cancelledIds);
+    }
     if (storedItems.some((item) => item.kind === "follow_up_overdue")) {
       const { loadEventFollowUps } = await import("./follow-up-query.server");
       // Notifications are already RLS-scoped to the caller. Resolve only their
       // own assigned events here, even when the caller also has a manager role.
       const current = await loadEventFollowUps(context.supabase, context.userId, false);
       const overdueIds = new Set(
-        current
-          .filter((row) => row.followUp.status === "overdue")
-          .map((row) => row.eventId),
+        current.filter((row) => row.followUp.status === "overdue").map((row) => row.eventId),
       );
-      items = filterCurrentOverdueNotifications(storedItems, overdueIds);
+      items = filterCurrentOverdueNotifications(items, overdueIds);
     }
     items = items.slice(0, INBOX_LIMIT);
     return { items, unread: items.filter((i) => !i.readAt).length };

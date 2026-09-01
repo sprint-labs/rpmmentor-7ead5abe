@@ -39,6 +39,7 @@ import {
   FollowUpActionLink,
   FollowUpStatusPill,
   followUpDetail,
+  unwaivePresentation,
 } from "@/components/events/follow-up-status";
 import {
   missingReportTypes,
@@ -365,11 +366,11 @@ function CalendarPage() {
     }
   }
 
-  async function handleUnwaive(id: string) {
+  async function handleUnwaive(id: string, successMessage: string) {
     try {
       await unwaiveFollowUp({ data: { id } });
       await refreshEvents();
-      toast.success("Write-up required again.");
+      toast.success(successMessage);
       setDraft(null);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not reinstate the follow-up.");
@@ -924,6 +925,7 @@ function CalendarPage() {
               const cancelled = row.followUp.status === "cancelled";
               const waived = row.followUp.waived;
               const canWaive = row.followUp.kind !== null;
+              const unwaive = unwaivePresentation(row.followUp);
               return (
                 <div className="mt-4 space-y-2 rounded-md border border-border bg-muted/30 p-3">
                   <div className="flex flex-wrap items-center gap-2">
@@ -950,10 +952,10 @@ function CalendarPage() {
                     )}
                     {waived ? (
                       <button
-                        onClick={() => handleUnwaive(draft.id)}
+                        onClick={() => handleUnwaive(draft.id, unwaive.successMessage)}
                         className="rounded-md border border-border px-2.5 py-1 text-[11px] hover:bg-accent"
                       >
-                        Require write-up again
+                        {unwaive.label}
                       </button>
                     ) : canWaive ? (
                       <button
