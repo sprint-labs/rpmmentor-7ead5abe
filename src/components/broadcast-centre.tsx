@@ -297,7 +297,10 @@ export function BroadcastCentre() {
               title: title.trim(),
               body: body.trim(),
               publishMode: delivery.scheduled ? "later" : "now",
+              expiryMode,
               startsAt: delivery.scheduled ? delivery.startsAt : null,
+              // Retain the resolved absolute value for rollback/old-server
+              // compatibility. New servers use expiryMode as the authority.
               endsAt: delivery.endsAt,
               attachment: uploaded,
             },

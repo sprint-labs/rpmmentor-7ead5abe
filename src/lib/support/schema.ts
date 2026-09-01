@@ -7,6 +7,8 @@
 import { z } from "zod";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const ANNOUNCEMENT_ATTACHMENT_PATH =
+  /^announcements\/\d{4}\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-[a-zA-Z0-9._-]{1,140}$/;
 
 export const SUPPORT_THREAD_KINDS = ["bug", "question"] as const;
 export type SupportThreadKind = (typeof SUPPORT_THREAD_KINDS)[number];
@@ -57,6 +59,10 @@ export function isAnnouncementAttachmentTypeAllowed(name: string, mime: string):
   return Boolean(accepted?.includes(mime.trim().toLowerCase()));
 }
 
+export function isAnnouncementAttachmentPathAllowed(path: string): boolean {
+  return ANNOUNCEMENT_ATTACHMENT_PATH.test(path);
+}
+
 export interface AnnouncementAttachment {
   path: string;
   name: string;
@@ -66,7 +72,11 @@ export interface AnnouncementAttachment {
 
 export const announcementAttachmentInput = z
   .object({
-    path: z.string().trim().min(1).max(500).startsWith("announcements/"),
+    path: z
+      .string()
+      .trim()
+      .max(500)
+      .refine(isAnnouncementAttachmentPathAllowed, "Attachment path is not a Broadcast upload."),
     name: z.string().trim().min(1).max(255),
     mime: z.string().trim().toLowerCase().min(1).max(150),
     size: z.number().int().min(0).max(ANNOUNCEMENT_ATTACHMENT_MAX_BYTES),
@@ -128,11 +138,19 @@ export const createAnnouncementInput = z
     title: z.string().trim().min(1, "Title is required").max(160),
     body: z.string().trim().max(4000).default(""),
     publishMode: z.enum(["now", "later"]).optional(),
+    expiryMode: z.enum(["none", "24h", "7d", "custom"]).optional(),
     startsAt: z.string().datetime({ offset: true }).nullish(),
     endsAt: z.string().datetime({ offset: true }).nullish(),
     attachment: announcementAttachmentInput.nullish(),
   })
   .superRefine((announcement, context) => {
+    if (announcement.expiryMode === "custom" && !announcement.endsAt) {
+      context.addIssue({
+        code: "custom",
+        path: ["endsAt"],
+        message: "Choose a valid end time.",
+      });
+    }
     if (
       announcement.startsAt &&
       announcement.endsAt &&

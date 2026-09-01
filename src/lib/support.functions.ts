@@ -19,7 +19,9 @@ import {
   queryAnnouncementsWithSchemaCompatibility,
 } from "@/lib/support/announcement-schema-compat";
 import { requireAnnouncementMediaStorageReady } from "@/lib/support/announcement-media-capability";
+import { verifyStoredAnnouncementAttachment } from "@/lib/support/announcement-storage-verification";
 import { resolveServerBroadcastWindow } from "@/lib/support/broadcast-window";
+import { MEDIA_BUCKET } from "@/lib/storage/bucket";
 import {
   ANNOUNCEMENT_KINDS,
   SUPPORT_SEVERITIES,
@@ -454,9 +456,12 @@ export const createAnnouncement = createServerFn({ method: "POST" })
 
     if (data.attachment) {
       await requireAnnouncementMediaStorageReady((name) => context.supabase.rpc(name));
+      await verifyStoredAnnouncementAttachment(data.attachment, (path) =>
+        context.supabase.storage.from(MEDIA_BUCKET).info(path),
+      );
     }
 
-    // The capability RPC is the final awaited precondition. Resolve against
+    // Storage verification is the final awaited precondition. Resolve against
     // the clock after it so a near schedule or expiry cannot go stale there.
     const requestNow = Date.now();
     const delivery = resolveServerBroadcastWindow(data, requestNow);

@@ -11,6 +11,7 @@ import { requireAnnouncementMediaStorageReady } from "@/lib/support/announcement
 import {
   ANNOUNCEMENT_ATTACHMENT_MIME_BY_EXTENSION,
   ANNOUNCEMENT_ATTACHMENT_MAX_BYTES,
+  isAnnouncementAttachmentPathAllowed,
   isAnnouncementAttachmentTypeAllowed,
   type AnnouncementAttachment,
 } from "@/lib/support/schema";
@@ -113,7 +114,7 @@ export async function uploadAnnouncementAttachment(file: File): Promise<Announce
 export async function removeUnlinkedAnnouncementAttachment(
   attachment: AnnouncementAttachment,
 ): Promise<void> {
-  if (!attachment.path.startsWith("announcements/")) return;
+  if (!isAnnouncementAttachmentPathAllowed(attachment.path)) return;
   const { error } = await supabase.storage.from(MEDIA_BUCKET).remove([attachment.path]);
   if (error) throw new Error(error.message);
 }

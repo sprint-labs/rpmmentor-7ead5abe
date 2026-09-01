@@ -16,6 +16,23 @@ export type ResolvedBroadcastWindow = {
   endsAt: string | null;
 };
 
+function expiryForServerStart(
+  mode: BroadcastExpiryMode | undefined,
+  startsAt: string,
+  suppliedEndsAt: string | null | undefined,
+): string | null {
+  if (mode === undefined) return suppliedEndsAt ?? null;
+  if (mode === "none") return null;
+  if (mode === "24h") {
+    return new Date(Date.parse(startsAt) + 24 * 60 * 60 * 1000).toISOString();
+  }
+  if (mode === "7d") {
+    return new Date(Date.parse(startsAt) + 7 * 24 * 60 * 60 * 1000).toISOString();
+  }
+  if (!suppliedEndsAt) throw new Error("Choose a valid end time.");
+  return suppliedEndsAt;
+}
+
 export function validateResolvedBroadcastWindow(
   window: ResolvedBroadcastWindow,
   nowMs = Date.now(),
@@ -77,6 +94,7 @@ export function resolveBroadcastWindow(
 export function resolveServerBroadcastWindow(
   input: {
     publishMode?: BroadcastPublishMode;
+    expiryMode?: BroadcastExpiryMode;
     startsAt?: string | null;
     endsAt?: string | null;
   },
@@ -95,7 +113,11 @@ export function resolveServerBroadcastWindow(
 
   const scheduled = input.publishMode === "later";
   const startsAt = scheduled && input.startsAt ? input.startsAt : new Date(nowMs).toISOString();
-  const resolved = { scheduled, startsAt, endsAt: input.endsAt ?? null };
+  const resolved = {
+    scheduled,
+    startsAt,
+    endsAt: expiryForServerStart(input.expiryMode, startsAt, input.endsAt),
+  };
   validateResolvedBroadcastWindow(resolved, nowMs);
   return resolved;
 }

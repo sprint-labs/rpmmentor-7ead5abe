@@ -4,7 +4,7 @@ import { submitBroadcastAfterUpload } from "./broadcast-submit";
 
 const NOW = Date.parse("2026-09-01T12:00:00.000Z");
 const ATTACHMENT: AnnouncementAttachment = {
-  path: "announcements/2026/example.pdf",
+  path: "announcements/2026/123e4567-e89b-12d3-a456-426614174000-example.pdf",
   name: "example.pdf",
   mime: "application/pdf",
   size: 1024,

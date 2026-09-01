@@ -99,10 +99,11 @@ describe("createAnnouncementInput", () => {
       title: "New media flow",
       body: "You can now attach a short video.",
       publishMode: "later",
+      expiryMode: "7d",
       startsAt: "2026-09-01T09:00:00.000Z",
       endsAt: "2026-09-08T09:00:00.000Z",
       attachment: {
-        path: "announcements/2026/example.mp4",
+        path: "announcements/2026/123e4567-e89b-12d3-a456-426614174000-example.mp4",
         name: "example.mp4",
         mime: "video/mp4",
         size: 1024,
@@ -110,6 +111,7 @@ describe("createAnnouncementInput", () => {
     });
     expect(parsed.attachment?.name).toBe("example.mp4");
     expect(parsed.publishMode).toBe("later");
+    expect(parsed.expiryMode).toBe("7d");
   });
 
   it("normalises an allowed attachment MIME type for the database constraint", () => {
@@ -117,7 +119,7 @@ describe("createAnnouncementInput", () => {
       kind: "info",
       title: "PDF notice",
       attachment: {
-        path: "announcements/2026/example.pdf",
+        path: "announcements/2026/123e4567-e89b-12d3-a456-426614174000-example.pdf",
         name: "example.pdf",
         mime: " APPLICATION/PDF ",
         size: 1024,
@@ -142,13 +144,30 @@ describe("createAnnouncementInput", () => {
     ).toThrow();
   });
 
+  it("rejects non-canonical and traversal-like Broadcast paths", () => {
+    for (const path of [
+      "announcements/../goalkeepers/example.pdf",
+      "announcements/%2e%2e/goalkeepers/example.pdf",
+      "announcements\\2026\\123e4567-e89b-12d3-a456-426614174000-example.pdf",
+      "announcements/2026//123e4567-e89b-12d3-a456-426614174000-example.pdf",
+      "announcements/2026/example.pdf",
+    ]) {
+      const result = createAnnouncementInput.safeParse({
+        kind: "info",
+        title: "Notice",
+        attachment: { path, name: "example.pdf", mime: "application/pdf", size: 1024 },
+      });
+      expect(result.success, path).toBe(false);
+    }
+  });
+
   it("rejects attachment metadata when the MIME type does not match the extension", () => {
     expect(() =>
       createAnnouncementInput.parse({
         kind: "info",
         title: "Notice",
         attachment: {
-          path: "announcements/2026/notice.pdf",
+          path: "announcements/2026/123e4567-e89b-12d3-a456-426614174000-notice.pdf",
           name: "notice.pdf",
           mime: "text/html",
           size: 1024,
@@ -166,5 +185,16 @@ describe("createAnnouncementInput", () => {
         endsAt: "2026-09-02T09:00:00.000Z",
       }),
     ).toThrow("The end time must be after the publish time.");
+  });
+
+  it("requires an end time for custom expiry", () => {
+    expect(() =>
+      createAnnouncementInput.parse({
+        kind: "info",
+        title: "Custom expiry",
+        publishMode: "now",
+        expiryMode: "custom",
+      }),
+    ).toThrow("Choose a valid end time.");
   });
 });

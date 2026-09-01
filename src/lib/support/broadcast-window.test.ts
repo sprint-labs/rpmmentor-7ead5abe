@@ -15,13 +15,15 @@ describe("Broadcast delivery windows", () => {
     const createEnd = source.indexOf("export const endAnnouncement", createStart);
     const createSource = source.slice(createStart, createEnd);
     const readinessCheck = createSource.indexOf("requireAnnouncementMediaStorageReady");
+    const storageVerification = createSource.indexOf("verifyStoredAnnouncementAttachment");
     const clockRead = createSource.indexOf("const requestNow = Date.now()");
     const insert = createSource.indexOf('.from("announcements").insert');
 
     expect(createStart).toBeGreaterThanOrEqual(0);
     expect(createEnd).toBeGreaterThan(createStart);
     expect(readinessCheck).toBeGreaterThanOrEqual(0);
-    expect(clockRead).toBeGreaterThan(readinessCheck);
+    expect(storageVerification).toBeGreaterThan(readinessCheck);
+    expect(clockRead).toBeGreaterThan(storageVerification);
     expect(insert).toBeGreaterThan(clockRead);
   });
 
@@ -134,5 +136,74 @@ describe("Broadcast delivery windows", () => {
         NOW,
       ),
     ).toThrow("Scheduled broadcasts need a future publish time.");
+  });
+
+  it("anchors publish-now preset expiry to the authoritative server clock", () => {
+    const resolved = resolveServerBroadcastWindow(
+      {
+        publishMode: "now",
+        expiryMode: "24h",
+        // A skewed browser may still submit stale absolute values. Presets
+        // deliberately ignore them and derive from the server start.
+        startsAt: "2026-09-01T14:00:00.000Z",
+        endsAt: "2026-09-02T14:00:00.000Z",
+      },
+      NOW,
+    );
+
+    expect(resolved).toEqual({
+      scheduled: false,
+      startsAt: "2026-09-01T12:00:00.000Z",
+      endsAt: "2026-09-02T12:00:00.000Z",
+    });
+  });
+
+  it("sends preset intent instead of a browser-derived absolute expiry", () => {
+    const source = readFileSync(
+      new URL("../../components/broadcast-centre.tsx", import.meta.url),
+      "utf8",
+    );
+
+    expect(source).toContain("expiryMode,");
+    expect(source).toContain("endsAt: delivery.endsAt");
+  });
+
+  it("derives scheduled preset expiry from the accepted schedule", () => {
+    const resolved = resolveServerBroadcastWindow(
+      {
+        publishMode: "later",
+        expiryMode: "7d",
+        startsAt: "2026-09-01T12:01:00.000Z",
+        endsAt: null,
+      },
+      NOW,
+    );
+
+    expect(resolved.endsAt).toBe("2026-09-08T12:01:00.000Z");
+  });
+
+  it("preserves an absolute fallback when an explicit older client omits expiryMode", () => {
+    const resolved = resolveServerBroadcastWindow(
+      {
+        publishMode: "now",
+        endsAt: "2026-09-02T12:00:00.000Z",
+      },
+      NOW,
+    );
+
+    expect(resolved.endsAt).toBe("2026-09-02T12:00:00.000Z");
+  });
+
+  it("rejects custom expiry without an absolute end at the resolver boundary", () => {
+    expect(() =>
+      resolveServerBroadcastWindow(
+        {
+          publishMode: "now",
+          expiryMode: "custom",
+          endsAt: null,
+        },
+        NOW,
+      ),
+    ).toThrow("Choose a valid end time.");
   });
 });
