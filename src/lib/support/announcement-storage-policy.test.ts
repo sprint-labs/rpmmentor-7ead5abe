@@ -77,6 +77,19 @@ describe("announcement Storage hardening migration", () => {
     expect(policy("gk_media_update_privileged")).toContain("WITH CHECK");
   });
 
+  it("keeps linked announcement objects immutable while allowing unlinked cleanup", () => {
+    for (const name of [
+      "gk_media_insert_authenticated",
+      "gk_media_update_privileged",
+      "gk_media_delete_privileged",
+    ]) {
+      const sql = policy(name);
+      expect(sql).toContain("AND NOT EXISTS (");
+      expect(sql).toContain("linked_announcement.attachment_path = storage.objects.name");
+    }
+    expect(policy("gk_media_update_privileged").match(/AND NOT EXISTS \(/g)).toHaveLength(2);
+  });
+
   it("enforces valid announcement windows and MIME allowlisting in the database", () => {
     expect(migration).toContain("CHECK (ends_at IS NULL OR ends_at > starts_at) NOT VALID");
     expect(migration).toContain("announcements_attachment_mime_check");

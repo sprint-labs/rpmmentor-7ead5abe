@@ -10,7 +10,7 @@ BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 SET search_path = public, extensions;
 
-SELECT plan(15);
+SELECT plan(19);
 
 SELECT ok(
   (SELECT relrowsecurity FROM pg_class WHERE oid = 'public.announcements'::regclass),
@@ -369,6 +369,64 @@ SELECT is(
   ),
   5,
   '15 Super Admin sees every reserved object'
+);
+
+SELECT is(
+  (
+    WITH changed AS (
+      UPDATE storage.objects
+      SET metadata = '{"mimetype":"application/pdf","test":"replacement"}'::jsonb
+      WHERE bucket_id = 'gk-media'
+        AND name = 'announcements/pgtap/live.pdf'
+      RETURNING 1
+    )
+    SELECT count(*)::integer FROM changed
+  ),
+  0,
+  '16 Super Admin cannot replace a linked announcement object'
+);
+
+SELECT is(
+  (
+    WITH removed AS (
+      DELETE FROM storage.objects
+      WHERE bucket_id = 'gk-media'
+        AND name = 'announcements/pgtap/live.pdf'
+      RETURNING 1
+    )
+    SELECT count(*)::integer FROM removed
+  ),
+  0,
+  '17 Super Admin cannot delete a linked announcement object'
+);
+
+SELECT is(
+  (
+    WITH changed AS (
+      UPDATE storage.objects
+      SET metadata = '{"mimetype":"application/pdf","test":"cleanup"}'::jsonb
+      WHERE bucket_id = 'gk-media'
+        AND name = 'announcements/pgtap/unlinked.pdf'
+      RETURNING 1
+    )
+    SELECT count(*)::integer FROM changed
+  ),
+  1,
+  '18 Super Admin can still manage an unlinked announcement object'
+);
+
+SELECT is(
+  (
+    WITH removed AS (
+      DELETE FROM storage.objects
+      WHERE bucket_id = 'gk-media'
+        AND name = 'announcements/pgtap/unlinked.pdf'
+      RETURNING 1
+    )
+    SELECT count(*)::integer FROM removed
+  ),
+  1,
+  '19 Super Admin can clean up an unlinked announcement object'
 );
 
 RESET ROLE;

@@ -126,6 +126,10 @@ USING (
 
 DROP POLICY IF EXISTS gk_media_insert_authenticated ON storage.objects;
 
+-- Uploads stay mutable only until an announcement row links their path. Once
+-- linked, block update, delete and same-path reinsertion so the verified byte
+-- size and MIME cannot change underneath a signed recipient URL. Super Admins
+-- can still remove or replace abandoned uploads that were never linked.
 CREATE POLICY gk_media_insert_authenticated
 ON storage.objects
 FOR INSERT
@@ -136,6 +140,11 @@ WITH CHECK (
     (
       (storage.foldername(name))[1] = 'announcements'
       AND public.has_role((select auth.uid()), 'super_admin'::public.app_role)
+      AND NOT EXISTS (
+        SELECT 1
+        FROM public.announcements AS linked_announcement
+        WHERE linked_announcement.attachment_path = storage.objects.name
+      )
     )
     OR (
       (storage.foldername(name))[1] IS DISTINCT FROM 'announcements'
@@ -157,6 +166,11 @@ USING (
     (
       (storage.foldername(name))[1] = 'announcements'
       AND public.has_role((select auth.uid()), 'super_admin'::public.app_role)
+      AND NOT EXISTS (
+        SELECT 1
+        FROM public.announcements AS linked_announcement
+        WHERE linked_announcement.attachment_path = storage.objects.name
+      )
     )
     OR (
       (storage.foldername(name))[1] IS DISTINCT FROM 'announcements'
@@ -175,6 +189,11 @@ WITH CHECK (
     (
       (storage.foldername(name))[1] = 'announcements'
       AND public.has_role((select auth.uid()), 'super_admin'::public.app_role)
+      AND NOT EXISTS (
+        SELECT 1
+        FROM public.announcements AS linked_announcement
+        WHERE linked_announcement.attachment_path = storage.objects.name
+      )
     )
     OR (
       (storage.foldername(name))[1] IS DISTINCT FROM 'announcements'
@@ -200,6 +219,11 @@ USING (
     (
       (storage.foldername(name))[1] = 'announcements'
       AND public.has_role((select auth.uid()), 'super_admin'::public.app_role)
+      AND NOT EXISTS (
+        SELECT 1
+        FROM public.announcements AS linked_announcement
+        WHERE linked_announcement.attachment_path = storage.objects.name
+      )
     )
     OR (
       (storage.foldername(name))[1] IS DISTINCT FROM 'announcements'
