@@ -217,11 +217,14 @@ function BulletinsPage() {
   // land there once so mentors/managers do not think the team board is empty.
   const didAutoSwitchBoard = useRef(false);
   useEffect(() => {
-    if (didAutoSwitchBoard.current || !summaryQuery.data) return;
-    if (board !== "daily_update") return;
+    if (didAutoSwitchBoard.current) return;
+    if (board !== "daily_update") {
+      didAutoSwitchBoard.current = true;
+      return;
+    }
+    if (!summaryQuery.data) return;
     if (search.q.trim() || status !== "all" || selectedId) return;
-    const currentTotal =
-      summaryQuery.data.boards.find((entry) => entry.kind === board)?.total ?? 0;
+    const currentTotal = summaryQuery.data.boards.find((entry) => entry.kind === board)?.total ?? 0;
     if (currentTotal > 0) return;
     const nextBoard = preferredBulletinBoardWithWork(summaryQuery.data);
     if (!nextBoard || nextBoard === board) return;
