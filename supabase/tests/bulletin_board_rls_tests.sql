@@ -10,7 +10,7 @@ BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 SET search_path = public, extensions;
 
-SELECT plan(57);
+SELECT plan(58);
 
 -- ---------------------------------------------------------------------------
 -- Schema and API surface
@@ -521,6 +521,16 @@ SELECT lives_ok(
   '22 mentor can create work owned by somebody else'
 );
 
+SELECT is(
+  (
+    SELECT owner_name
+    FROM public.bulletin_items
+    WHERE id = '11000000-0000-0000-0000-000000000003'
+  ),
+  'Mentor B',
+  '22a mentor assignment snapshots the colleague display name'
+);
+
 SELECT lives_ok(
   $$
     INSERT INTO public.bulletin_items (
@@ -703,6 +713,7 @@ SELECT ok(
     WHERE id = '10000000-0000-0000-0000-000000000001'
       AND title = 'Mentor A edited assignment'
       AND owner_id = '00000000-0000-0000-0000-000000000003'
+      AND owner_name = 'Mentor B'
       AND version = 2
   ),
   '31a mentor optimistic update advances version exactly once'
