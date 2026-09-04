@@ -10,7 +10,7 @@ BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 SET search_path = public, extensions;
 
-SELECT plan(56);
+SELECT plan(57);
 
 -- ---------------------------------------------------------------------------
 -- Schema and API surface
@@ -377,9 +377,9 @@ SELECT set_config(
 SET LOCAL ROLE authenticated;
 
 SELECT is(
-  (SELECT array_agg(id::text ORDER BY id)::text FROM public.bulletin_items),
-  '{10000000-0000-0000-0000-000000000001}',
-  '15 mentor A sees only their current assignment'
+  (SELECT count(*)::integer FROM public.bulletin_items),
+  6,
+  '15 mentor A sees the full team board'
 );
 
 RESET ROLE;
@@ -391,9 +391,9 @@ SELECT set_config(
 SET LOCAL ROLE authenticated;
 
 SELECT is(
-  (SELECT array_agg(id::text ORDER BY id)::text FROM public.bulletin_items),
-  '{10000000-0000-0000-0000-000000000002,10000000-0000-0000-0000-000000000003}',
-  '16 mentor B sees both current assignments'
+  (SELECT count(*)::integer FROM public.bulletin_items),
+  6,
+  '16 mentor B sees the full team board'
 );
 
 RESET ROLE;
@@ -464,7 +464,7 @@ SELECT set_config(
 );
 SET LOCAL ROLE authenticated;
 
-SELECT throws_ok(
+SELECT lives_ok(
   $$
     INSERT INTO public.bulletin_items (
       id, kind, title, subject_type, subject_name, owner_id
@@ -477,15 +477,13 @@ SELECT throws_ok(
       '00000000-0000-0000-0000-000000000002'
     )
   $$,
-  '42501',
-  NULL,
-  '19 mentor cannot create Bulletin Board work'
+  '19 mentor can create Bulletin Board work'
 );
 
 SELECT is(
   (SELECT count(*)::integer FROM public.bulletin_items),
-  1,
-  '20 rejected mentor creation leaves only the existing assignment visible'
+  7,
+  '20 mentor creation is visible on the team board'
 );
 
 SELECT throws_ok(
@@ -507,7 +505,7 @@ SELECT throws_ok(
   '21 mentor cannot forge created_by'
 );
 
-SELECT throws_ok(
+SELECT lives_ok(
   $$
     INSERT INTO public.bulletin_items (
       id, kind, title, subject_type, subject_name, owner_id
@@ -520,12 +518,10 @@ SELECT throws_ok(
       '00000000-0000-0000-0000-000000000003'
     )
   $$,
-  '42501',
-  NULL,
-  '22 mentor cannot create work owned by somebody else'
+  '22 mentor can create work owned by somebody else'
 );
 
-SELECT throws_ok(
+SELECT lives_ok(
   $$
     INSERT INTO public.bulletin_items (
       id, kind, title, subject_type, subject_name, owner_id
@@ -538,28 +534,24 @@ SELECT throws_ok(
       NULL
     )
   $$,
-  '42501',
-  NULL,
-  '23 mentor cannot create an unassigned queue item'
+  '23 mentor can create an unassigned queue item'
 );
 
-SELECT throws_ok(
+SELECT lives_ok(
   $$
     INSERT INTO public.bulletin_items (
       id, kind, title, subject_type, subject_name, status, owner_id
     ) VALUES (
       '11000000-0000-0000-0000-000000000005',
       'mandate',
-      'Mentor bypassed initial status',
+      'Mentor sets initial working status',
       'club',
       'Club status',
       'working',
       '00000000-0000-0000-0000-000000000002'
     )
   $$,
-  '42501',
-  NULL,
-  '24 mentor-created work must start open'
+  '24 mentor can create work with a non-open initial status'
 );
 
 RESET ROLE;
@@ -691,12 +683,30 @@ SELECT set_config(
 );
 SET LOCAL ROLE authenticated;
 
-UPDATE public.bulletin_items
-SET
-  title = 'Mentor should not edit',
-  owner_id = '00000000-0000-0000-0000-000000000003',
-  version = 2
-WHERE id = '10000000-0000-0000-0000-000000000001';
+SELECT lives_ok(
+  $$
+    UPDATE public.bulletin_items
+    SET
+      title = 'Mentor A edited assignment',
+      owner_id = '00000000-0000-0000-0000-000000000003',
+      version = 2
+    WHERE id = '10000000-0000-0000-0000-000000000001'
+      AND version = 1
+  $$,
+  '31 mentor can perform structured edits and reassignment'
+);
+
+SELECT ok(
+  EXISTS (
+    SELECT 1
+    FROM public.bulletin_items
+    WHERE id = '10000000-0000-0000-0000-000000000001'
+      AND title = 'Mentor A edited assignment'
+      AND owner_id = '00000000-0000-0000-0000-000000000003'
+      AND version = 2
+  ),
+  '31a mentor optimistic update advances version exactly once'
+);
 
 RESET ROLE;
 SELECT set_config(
@@ -705,18 +715,6 @@ SELECT set_config(
   true
 );
 SET LOCAL ROLE authenticated;
-
-SELECT ok(
-  EXISTS (
-    SELECT 1
-    FROM public.bulletin_items
-    WHERE id = '10000000-0000-0000-0000-000000000001'
-      AND title = 'Mentor A owned'
-      AND owner_id = '00000000-0000-0000-0000-000000000002'
-      AND version = 1
-  ),
-  '31 mentor structured edits and reassignment are filtered by RLS'
-);
 
 SELECT lives_ok(
   $$
@@ -743,9 +741,9 @@ SELECT throws_ok(
   $$
     UPDATE public.bulletin_items
     SET owner_id = '00000000-0000-0000-0000-000000000005',
-        version = 2
+        version = 3
     WHERE id = '10000000-0000-0000-0000-000000000001'
-      AND version = 1
+      AND version = 2
   $$,
   '42501',
   NULL,
@@ -819,14 +817,14 @@ SELECT is(
 );
 
 SELECT is(
-  (
-    SELECT version
-    FROM public.bulletin_items
-    WHERE id = '10000000-0000-0000-0000-000000000001'
-  ),
-  2,
-  '39a a mentor progress note advances the parent version exactly once'
-);
+    (
+      SELECT version
+      FROM public.bulletin_items
+      WHERE id = '10000000-0000-0000-0000-000000000001'
+    ),
+    3,
+    '39a a mentor progress note advances the parent version exactly once'
+  );
 
 SELECT throws_ok(
   $$
@@ -849,26 +847,22 @@ SELECT lives_ok(
     VALUES (
       '20000000-0000-0000-0000-000000000002',
       '10000000-0000-0000-0000-000000000003',
-      'Creator A added context after reassignment.'
+      'Mentor A added context on a peer assignment.'
     )
   $$,
-  '42501',
-  NULL,
-  '40 mentor cannot append to work they created before reassignment'
+  '40 mentor can append to work owned by another mentor'
 );
 
-SELECT throws_ok(
+SELECT lives_ok(
   $$
     INSERT INTO public.bulletin_updates (id, bulletin_id, body)
     VALUES (
       '20000000-0000-0000-0000-000000000003',
       '10000000-0000-0000-0000-000000000002',
-      'Mentor A must not reach Mentor B private work.'
+      'Mentor A can reach Mentor B team work.'
     )
   $$,
-  '42501',
-  NULL,
-  '41 mentor cannot append to another mentor private item'
+  '41 mentor can append to another mentor team item'
 );
 
 RESET ROLE;
@@ -879,7 +873,7 @@ SELECT set_config(
 );
 SET LOCAL ROLE authenticated;
 
-SELECT throws_ok(
+SELECT lives_ok(
   $$
     INSERT INTO public.bulletin_updates (id, bulletin_id, body)
     VALUES (
@@ -943,8 +937,8 @@ SET LOCAL ROLE authenticated;
 
 SELECT is(
   (SELECT count(*)::integer FROM public.bulletin_updates),
-  1,
-  '45 mentor A sees only update history for their current assignment'
+  5,
+  '45 mentor A sees full team update history'
 );
 
 RESET ROLE;
@@ -957,8 +951,8 @@ SET LOCAL ROLE authenticated;
 
 SELECT is(
   (SELECT count(*)::integer FROM public.bulletin_updates),
-  2,
-  '46 mentor B sees update history for both current assignments'
+  5,
+  '46 mentor B sees full team update history'
 );
 
 RESET ROLE;
@@ -971,7 +965,7 @@ SET LOCAL ROLE authenticated;
 
 SELECT is(
   (SELECT count(*)::integer FROM public.bulletin_updates),
-  3,
+  5,
   '47 management sees all team update history'
 );
 

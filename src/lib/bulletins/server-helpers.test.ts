@@ -8,19 +8,17 @@ import {
 } from "./server-helpers";
 
 describe("Bulletin Board role decisions", () => {
-  it("clamps mentors to their current assignments in every requested scope", () => {
-    for (const scope of ["mine", "team"] as const) {
-      expect(bulletinAccessForRoles(["mentor"], scope)).toEqual({
-        canView: true,
-        canManage: false,
-        restrictToUser: true,
-        effectiveScope: "mine",
-      });
-    }
+  it("gives mentors the same team board as management when team is requested", () => {
+    expect(bulletinAccessForRoles(["mentor"], "team")).toEqual({
+      canView: true,
+      canManage: true,
+      restrictToUser: false,
+      effectiveScope: "team",
+    });
   });
 
-  it("gives every management role the team-wide view only when team is requested", () => {
-    for (const role of ["mentor_manager", "admin", "super_admin"] as const) {
+  it("gives every operational management role the team-wide view only when team is requested", () => {
+    for (const role of ["mentor", "mentor_manager", "admin", "super_admin"] as const) {
       expect(bulletinAccessForRoles([role], "team")).toEqual({
         canView: true,
         canManage: true,
@@ -31,13 +29,7 @@ describe("Bulletin Board role decisions", () => {
   });
 
   it("gives management actors caller-scoped access while they request mine", () => {
-    expect(bulletinAccessForRoles(["mentor_manager"], "mine")).toEqual({
-      canView: true,
-      canManage: false,
-      restrictToUser: true,
-      effectiveScope: "mine",
-    });
-    for (const role of ["admin", "super_admin"] as const) {
+    for (const role of ["mentor", "mentor_manager", "admin", "super_admin"] as const) {
       expect(bulletinAccessForRoles([role], "mine")).toEqual({
         canView: true,
         canManage: false,
