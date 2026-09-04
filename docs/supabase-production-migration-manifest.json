@@ -322,6 +322,13 @@
       "statement_count": 1,
       "sql_length": 5585,
       "sql_md5": "f341ca6d77c6aed04064eb386529d17d"
+    },
+    {
+      "version": "20260904140000",
+      "name": "mentor_bulletin_team_access",
+      "statement_count": 1,
+      "sql_length": 3241,
+      "sql_md5": "954e56583701706449a30d0087bacc77"
     }
   ],
   "repository_comparison": {

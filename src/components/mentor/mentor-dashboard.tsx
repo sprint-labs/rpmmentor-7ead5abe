@@ -254,7 +254,7 @@ export function MentorDashboard({ user }: Props) {
         onLogInteraction={() => openLog()}
       />
 
-      <BulletinDashboardCard scope="mine" />
+      <BulletinDashboardCard scope="team" />
 
       <section aria-label="Your activity">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

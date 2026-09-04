@@ -25,19 +25,19 @@ describe("roles.server", () => {
     expect(hasAnyRole([], ["super_admin"])).toBe(false);
   });
 
-  it("lets every operational role view Bulletins but keeps management controls restricted", () => {
+  it("lets every operational role manage the team Bulletin Board", () => {
     for (const role of ROLES) {
       expect(roleHasPermission(role, "bulletins.view")).toBe(true);
-      expect(roleHasPermission(role, "bulletins.manage")).toBe(role !== "mentor");
+      expect(roleHasPermission(role, "bulletins.manage")).toBe(true);
     }
   });
 
-  it("shows the owner-scoped Bulletin Board card on the Mentor dashboard", () => {
+  it("shows the team Bulletin Board card on the Mentor dashboard", () => {
     const source = readFileSync(
       new URL("../components/mentor/mentor-dashboard.tsx", import.meta.url),
       "utf8",
     );
-    expect(source).toMatch(/<BulletinDashboardCard scope="mine" \/>/);
+    expect(source).toMatch(/<BulletinDashboardCard scope="team" \/>/);
   });
 
   it("keeps destructive entity controls exclusive to Super Admin", () => {

@@ -2,8 +2,9 @@
  * Authenticated data boundary for the internal Bulletin Board.
  *
  * RLS is the final backstop, but every function also checks the caller's stored
- * role. Management may use the team board; Mentors may read and append progress
- * only for work currently assigned to them. There is deliberately no delete path.
+ * role. Mentors, Mentor Managers, Admins and Super Admins share the team board
+ * (create, reassign, edit and append). There is deliberately no delete path.
+ * Broadcast/support inbox stays Super Admin only outside this module.
  */
 import { createServerFn } from "@tanstack/react-start";
 import type { SupabaseClient } from "@supabase/supabase-js";

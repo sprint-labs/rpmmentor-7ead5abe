@@ -94,6 +94,8 @@ const MENTOR: Permission[] = [
   "media.view", "media.upload", "media.edit",
   "calendar.view",
   "bulletins.view",
+  // Same team Bulletin Board as Mentor Managers: see every item and create work.
+  "bulletins.manage",
   "support.send",
 ];
 

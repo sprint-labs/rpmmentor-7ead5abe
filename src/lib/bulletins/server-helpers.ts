@@ -8,7 +8,16 @@ export const BULLETIN_VIEW_ROLES: readonly AppRole[] = [
   "mentor",
 ];
 
-export const BULLETIN_MANAGE_ROLES: readonly AppRole[] = ["super_admin", "admin", "mentor_manager"];
+/**
+ * Operational mentors share the team Bulletin Board with Mentor Managers.
+ * Broadcast/support inbox remains Super Admin only and is gated elsewhere.
+ */
+export const BULLETIN_MANAGE_ROLES: readonly AppRole[] = [
+  "super_admin",
+  "admin",
+  "mentor_manager",
+  "mentor",
+];
 
 export interface BulletinAccess {
   canView: boolean;
