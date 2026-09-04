@@ -1,6 +1,14 @@
 import { CalendarClock, Handshake, KanbanSquare, UserRoundSearch } from "lucide-react";
 
-import type { BulletinItem, BulletinKind } from "@/lib/bulletins/schema";
+import type { BulletinItem, BulletinKind, BulletinSummary } from "@/lib/bulletins/schema";
+
+/** Prefer active commercial boards when several are populated. */
+const BOARD_WORK_PRIORITY: readonly BulletinKind[] = [
+  "lead",
+  "deal",
+  "mandate",
+  "daily_update",
+];
 
 export const BULLETIN_BOARD_META: ReadonlyArray<{
   kind: BulletinKind;
@@ -52,6 +60,36 @@ const MONTH_FORMATTER = new Intl.DateTimeFormat("en-GB", { month: "short" });
 
 export function boardLabel(kind: BulletinKind): string {
   return BULLETIN_BOARD_META.find((board) => board.kind === kind)?.label ?? kind;
+}
+
+/**
+ * Pick a board that actually has work so an empty default Daily Updates landing
+ * does not look like the whole Bulletin Board is empty.
+ */
+export function preferredBulletinBoardWithWork(
+  summary: Pick<BulletinSummary, "boards">,
+): BulletinKind | null {
+  const ranked = [...summary.boards].sort((left, right) => {
+    if (right.total !== left.total) return right.total - left.total;
+    return BOARD_WORK_PRIORITY.indexOf(left.kind) - BOARD_WORK_PRIORITY.indexOf(right.kind);
+  });
+  return ranked.find((board) => board.total > 0)?.kind ?? null;
+}
+
+/** Boards with at least one item, for empty-state cross-links. */
+export function bulletinBoardsWithWork(
+  summary: Pick<BulletinSummary, "boards"> | undefined,
+  exclude?: BulletinKind,
+): Array<{ kind: BulletinKind; label: string; total: number }> {
+  if (!summary) return [];
+  return summary.boards
+    .filter((board) => board.total > 0 && board.kind !== exclude)
+    .map((board) => ({
+      kind: board.kind,
+      label: boardLabel(board.kind),
+      total: board.total,
+    }))
+    .sort((left, right) => right.total - left.total);
 }
 
 export function boardSingular(kind: BulletinKind): string {

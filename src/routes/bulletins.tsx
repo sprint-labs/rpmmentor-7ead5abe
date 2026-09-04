@@ -3,12 +3,16 @@ import { fallback, zodValidator } from "@tanstack/zod-adapter";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Plus, RefreshCw } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { z } from "zod";
 
 import { BulletinEditorDialog } from "@/components/bulletins/bulletin-editor-dialog";
-import { clampBulletinPage } from "@/components/bulletins/bulletin-display";
+import {
+  bulletinBoardsWithWork,
+  clampBulletinPage,
+  preferredBulletinBoardWithWork,
+} from "@/components/bulletins/bulletin-display";
 import {
   BulletinAttentionStrip,
   BulletinBoardSelector,
@@ -209,6 +213,30 @@ function BulletinsPage() {
   const changeSearch = (patch: Partial<BulletinSearch>, replace = false) =>
     void navigate({ search: { ...search, ...patch } as BulletinSearch, replace });
 
+  // Empty Daily Updates is the URL default. If another board already has work,
+  // land there once so mentors/managers do not think the team board is empty.
+  const didAutoSwitchBoard = useRef(false);
+  useEffect(() => {
+    if (didAutoSwitchBoard.current || !summaryQuery.data) return;
+    if (board !== "daily_update") return;
+    if (search.q.trim() || status !== "all" || selectedId) return;
+    const currentTotal =
+      summaryQuery.data.boards.find((entry) => entry.kind === board)?.total ?? 0;
+    if (currentTotal > 0) return;
+    const nextBoard = preferredBulletinBoardWithWork(summaryQuery.data);
+    if (!nextBoard || nextBoard === board) return;
+    didAutoSwitchBoard.current = true;
+    void navigate({
+      search: { ...search, board: nextBoard, page: 1, item: "" } as BulletinSearch,
+      replace: true,
+    });
+  }, [board, navigate, search, selectedId, status, summaryQuery.data]);
+
+  const boardsWithWork = useMemo(
+    () => bulletinBoardsWithWork(summaryQuery.data, board),
+    [board, summaryQuery.data],
+  );
+
   const refreshButton = (
     <Button
       type="button"
@@ -274,6 +302,7 @@ function BulletinsPage() {
       <BulletinWorkspace
         kind={board}
         canManage={canManage}
+        boardsWithWork={boardsWithWork}
         rows={rows}
         total={listQuery.data?.total ?? 0}
         page={listQuery.data?.page ?? safePage}
@@ -302,6 +331,9 @@ function BulletinsPage() {
         onRetryList={() => void listQuery.refetch()}
         onRetryDetail={() => void detailQuery.refetch()}
         onEdit={(item) => setEditorItem(item)}
+        onOpenBoard={(nextBoard) =>
+          changeSearch({ board: nextBoard, q: "", status: "all", page: 1, item: "" })
+        }
         onAddUpdate={(body) =>
           updateMutation
             .mutateAsync({ bulletinId: detailQuery.data!.item.id, body })
