@@ -8,7 +8,7 @@ import {
   BulletinBoardSelector,
   BulletinWorkspace,
 } from "@/components/bulletins/bulletin-workspace";
-import { bulletinOwnerLabel, clampBulletinPage } from "@/components/bulletins/bulletin-display";
+import { bulletinOwnerLabel, clampBulletinPage, preferredBulletinBoardWithWork, bulletinBoardsWithWork } from "@/components/bulletins/bulletin-display";
 import type { BulletinDetail, BulletinItem, BulletinSummary } from "@/lib/bulletins/schema";
 
 const items: BulletinItem[] = [
@@ -119,6 +119,21 @@ describe("Bulletin Board operational workspace", () => {
     expect(clampBulletinPage(999, 2)).toBe(2);
     expect(clampBulletinPage(0, 0)).toBe(1);
     expect(bulletinOwnerLabel({ ownerId: null, ownerName: "Departed Mentor" })).toBe("Unassigned");
+  });
+
+  it("prefers a populated board when Daily Updates is empty", () => {
+    const emptyDaily = {
+      boards: [
+        { kind: "daily_update" as const, total: 0, open: 0, blocked: 0 },
+        { kind: "deal" as const, total: 0, open: 0, blocked: 0 },
+        { kind: "lead" as const, total: 3, open: 1, blocked: 0 },
+        { kind: "mandate" as const, total: 0, open: 0, blocked: 0 },
+      ],
+    };
+    expect(preferredBulletinBoardWithWork(emptyDaily)).toBe("lead");
+    expect(bulletinBoardsWithWork(emptyDaily, "daily_update")).toEqual([
+      { kind: "lead", label: "Leads", total: 3 },
+    ]);
   });
 
   it("presents four distinct boards and makes the Deals meaning explicit", () => {

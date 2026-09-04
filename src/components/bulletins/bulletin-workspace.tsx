@@ -214,6 +214,7 @@ export function BulletinBoardSelector({
 interface BulletinWorkspaceProps {
   kind: BulletinKind;
   canManage: boolean;
+  boardsWithWork?: Array<{ kind: BulletinKind; label: string; total: number }>;
   rows: BulletinItem[];
   total: number;
   page: number;
@@ -238,11 +239,13 @@ interface BulletinWorkspaceProps {
   onEdit: (item: BulletinItem) => void;
   onAddUpdate: (body: string) => Promise<void>;
   onUpdatesPageChange: (page: number) => void;
+  onOpenBoard?: (kind: BulletinKind) => void;
 }
 
 export function BulletinWorkspace({
   kind,
   canManage,
+  boardsWithWork = [],
   rows,
   total,
   page,
@@ -267,6 +270,7 @@ export function BulletinWorkspace({
   onEdit,
   onAddUpdate,
   onUpdatesPageChange,
+  onOpenBoard,
 }: BulletinWorkspaceProps) {
   const board = BULLETIN_BOARD_META.find((candidate) => candidate.kind === kind)!;
   const detailRef = useRef<HTMLElement>(null);
@@ -381,9 +385,21 @@ export function BulletinWorkspace({
                 description={
                   hasFilters
                     ? "Try a broader search or a different status."
-                    : canManage
-                      ? `Create the first ${board.singular.toLocaleLowerCase("en-GB")} when there is real work to record.`
-                      : "Nothing is currently assigned to you on this board."
+                    : boardsWithWork.length > 0
+                      ? "This board is empty. Open a board that already has team work."
+                      : canManage
+                        ? `Create the first ${board.singular.toLocaleLowerCase("en-GB")} when there is real work to record.`
+                        : "Nothing is currently assigned to you on this board."
+                }
+                actionLabel={
+                  !hasFilters && boardsWithWork[0] && onOpenBoard
+                    ? `Open ${boardsWithWork[0].label} (${boardsWithWork[0].total})`
+                    : undefined
+                }
+                onAction={
+                  !hasFilters && boardsWithWork[0] && onOpenBoard
+                    ? () => onOpenBoard(boardsWithWork[0]!.kind)
+                    : undefined
                 }
               />
             ) : (

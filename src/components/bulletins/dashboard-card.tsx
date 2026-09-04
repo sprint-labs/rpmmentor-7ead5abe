@@ -20,8 +20,7 @@ interface BulletinDashboardCardProps {
 /**
  * A small, durable entry point into the operational workspace.
  *
- * Management roles see team counts here. Mentors see only counts for work
- * currently assigned to them; the server and RLS independently enforce scope.
+ * Mentors and managers share the team Bulletin Board counts here.
  */
 export function BulletinDashboardCard({ scope }: BulletinDashboardCardProps) {
   const { user } = useAuth();
