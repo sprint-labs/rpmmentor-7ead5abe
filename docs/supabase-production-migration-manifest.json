@@ -1,6 +1,6 @@
 {
   "manifest_version": 1,
-  "captured_on": "2026-09-01",
+  "captured_on": "2026-09-04",
   "source": {
     "repository": "sprint-labs/rpmmentor-7ead5abe",
     "origin_main_sha": "f752281d191f6dd60dc2921abd6db5d87d1d4945",
@@ -10,7 +10,7 @@
     "project_ref": "zdxxezquhvpjmoxlecjp",
     "project_name": "RPM Mentor Hub",
     "region": "eu-west-2",
-    "ledger_rows": 43,
+    "ledger_rows": 45,
     "migrations": [
       {
         "version": "20260811095729",
@@ -312,6 +312,20 @@
         "statement_count": 1,
         "sql_length": 2236,
         "sql_md5": "f7627406d3b6b9609cc44e55adda32bf"
+      },
+      {
+        "version": "20260904140000",
+        "name": "mentor_bulletin_team_access",
+        "statement_count": 1,
+        "sql_length": 3241,
+        "sql_md5": "954e56583701706449a30d0087bacc77"
+      },
+      {
+        "version": "20260904151000",
+        "name": "mentor_bulletin_assignment_writes",
+        "statement_count": 1,
+        "sql_length": 4278,
+        "sql_md5": "b98678438ec6b0ecc3a8e0fa396a84bd"
       }
     ]
   },
@@ -322,13 +336,6 @@
       "statement_count": 1,
       "sql_length": 5585,
       "sql_md5": "f341ca6d77c6aed04064eb386529d17d"
-    },
-    {
-      "version": "20260904140000",
-      "name": "mentor_bulletin_team_access",
-      "statement_count": 1,
-      "sql_length": 3241,
-      "sql_md5": "954e56583701706449a30d0087bacc77"
     }
   ],
   "repository_comparison": {
@@ -348,7 +355,7 @@
   ],
   "staging": {
     "project_ref": "emyxyqqftwnjpcmctkpe",
-    "project_name": "RPM Mentor Hub — Staging",
+    "project_name": "RPM Mentor Hub \u2014 Staging",
     "ledger_rows": 18,
     "ledger_strategy": "current-schema snapshot",
     "schema_parity_with_production": false,
