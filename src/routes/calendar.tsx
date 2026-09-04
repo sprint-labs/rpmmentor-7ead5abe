@@ -742,7 +742,12 @@ function CalendarPage() {
                     {e.notes && <div className="mt-0.5 whitespace-pre-wrap text-xs text-muted-foreground">{e.notes}</div>}
                     {(() => {
                       const row = followUpByEvent.get(e.id);
-                      if (!row || !row.followUp.kind) return null;
+                      if (
+                        !row ||
+                        (!row.followUp.kind && row.followUp.status !== "confirmation_needed")
+                      ) {
+                        return null;
+                      }
                       return (
                         <div className="mt-1.5 flex flex-wrap items-center gap-2">
                           <FollowUpStatusPill status={row.followUp.status} />

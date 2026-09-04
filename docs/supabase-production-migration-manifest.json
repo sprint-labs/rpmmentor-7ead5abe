@@ -322,6 +322,13 @@
       "statement_count": 1,
       "sql_length": 5585,
       "sql_md5": "f341ca6d77c6aed04064eb386529d17d"
+    },
+    {
+      "version": "20260903153746",
+      "name": "match_report_event_snapshot_guard",
+      "statement_count": 1,
+      "sql_length": 12836,
+      "sql_md5": "289fdb6e17122ca403cfa82cb099d880"
     }
   ],
   "repository_comparison": {

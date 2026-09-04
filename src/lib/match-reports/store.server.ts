@@ -197,10 +197,22 @@ export interface InsertCanonicalInput {
    * matching.
    */
   calendarEventId?: string | null;
+  /**
+   * Player identity read from the scheduled event during preflight. The
+   * database compares this with the locked event row and stores it as the
+   * report's immutable event-player snapshot.
+   */
+  calendarEventPlayerId?: string | null;
 }
 
 export type InsertCanonicalResult =
-  { ok: true; report_id: string; created: boolean } | { ok: false; message: string };
+  | {
+      ok: true;
+      report_id: string;
+      created: boolean;
+      calendarEventPlayerId?: string | null;
+    }
+  | { ok: false; message: string };
 
 /** True when `id` is the base identity itself or one of its ~2/~3 occurrences. */
 function isOccurrenceOf(id: string, base: string): boolean {
@@ -259,14 +271,21 @@ export async function insertCanonicalReport(
     // wrote — checked before every insert attempt, not just the first.
     const existing = await db
       .from(CANONICAL_TABLE)
-      .select("report_id")
+      .select("report_id,calendar_event_player_id")
       .eq("submission_key", input.submissionKey)
       .maybeSingle();
     if (!existing.error && existing.data) {
+      const row = existing.data as {
+        report_id: string;
+        calendar_event_player_id?: string | null;
+      };
       return {
         ok: true,
-        report_id: (existing.data as { report_id: string }).report_id,
+        report_id: row.report_id,
         created: false,
+        ...(input.calendarEventId
+          ? { calendarEventPlayerId: row.calendar_event_player_id ?? null }
+          : {}),
       };
     }
 
@@ -306,13 +325,25 @@ export async function insertCanonicalReport(
         submitted_by: input.submittedBy,
         submission_key: input.submissionKey,
         calendar_event_id: input.calendarEventId ?? null,
+        calendar_event_player_id: input.calendarEventPlayerId ?? null,
         synced_at: nowIso,
       })
-      .select("report_id")
+      .select("report_id,calendar_event_player_id")
       .maybeSingle();
 
     if (!error && data) {
-      return { ok: true, report_id: (data as { report_id: string }).report_id, created: true };
+      const row = data as {
+        report_id: string;
+        calendar_event_player_id?: string | null;
+      };
+      return {
+        ok: true,
+        report_id: row.report_id,
+        created: true,
+        ...(input.calendarEventId
+          ? { calendarEventPlayerId: row.calendar_event_player_id ?? null }
+          : {}),
+      };
     }
     if (error && isCalendarEventConflict(error)) {
       return {

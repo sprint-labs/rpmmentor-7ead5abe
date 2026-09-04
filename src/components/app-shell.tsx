@@ -34,7 +34,11 @@ import { WorkflowDialog, type WorkflowKind } from "@/components/workflows";
 import { useNotifications } from "@/lib/notifications";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { listNotifications, markNotificationsRead } from "@/lib/events/notifications.functions";
+import {
+  listNotifications,
+  markNotificationsRead,
+  visibleUnreadNotificationIds,
+} from "@/lib/events/notifications.functions";
 import { notificationsQueryKey } from "@/lib/events/query-keys";
 import { formatRelative } from "@/lib/mock-data";
 import { visibleNotificationUnreadCount } from "@/lib/notification-visibility";
@@ -170,7 +174,9 @@ export function AppShell() {
 
   async function markInboxAllRead() {
     try {
-      await markInboxRead({ data: { ids: [] } });
+      const ids = visibleUnreadNotificationIds(inboxItems);
+      if (ids.length === 0) return;
+      await markInboxRead({ data: { ids } });
       await queryClient.invalidateQueries({ queryKey: notificationQueryKey });
     } catch {
       // Nothing to recover: the inbox simply stays unread until the next attempt.

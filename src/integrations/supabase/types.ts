@@ -645,6 +645,7 @@ export type Database = {
         Row: {
           average: number | null
           calendar_event_id: string | null
+          calendar_event_player_id: string | null
           change_play: number | null
           coach: string
           comments: string | null
@@ -675,6 +676,7 @@ export type Database = {
         Insert: {
           average?: number | null
           calendar_event_id?: string | null
+          calendar_event_player_id?: string | null
           change_play?: number | null
           coach: string
           comments?: string | null
@@ -705,6 +707,7 @@ export type Database = {
         Update: {
           average?: number | null
           calendar_event_id?: string | null
+          calendar_event_player_id?: string | null
           change_play?: number | null
           coach?: string
           comments?: string | null
@@ -841,6 +844,7 @@ export type Database = {
           calendar_event_id: string | null
           created_at: string
           created_by: string | null
+          follow_up_basis: string | null
           id: string
           kind: string
           link_path: string
@@ -853,6 +857,7 @@ export type Database = {
           calendar_event_id?: string | null
           created_at?: string
           created_by?: string | null
+          follow_up_basis?: string | null
           id?: string
           kind: string
           link_path?: string
@@ -865,6 +870,7 @@ export type Database = {
           calendar_event_id?: string | null
           created_at?: string
           created_by?: string | null
+          follow_up_basis?: string | null
           id?: string
           kind?: string
           link_path?: string

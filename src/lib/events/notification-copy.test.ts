@@ -105,6 +105,33 @@ describe("buildEventNotification", () => {
     expect(n.linkPath).toBe("/calendar");
   });
 
+  it("links to an existing report instead of asking for another submission", () => {
+    const n = buildEventNotification("event_updated", matchEvent, {
+      now,
+      completedRecordId: "report-1",
+    });
+
+    expect(n.body).toContain("Match Report: already submitted");
+    expect(n.body).not.toContain("You need to submit");
+    expect(n.body).not.toContain("Due by:");
+    expect(n.linkPath).toBe("/reports/report-1");
+  });
+
+  it.each(["not_confirmed", "did_not_play"] as const)(
+    "keeps an existing report visible when participation is %s",
+    (participationStatus) => {
+      const n = buildEventNotification(
+        "event_updated",
+        { ...matchEvent, participationStatus },
+        { now, completedRecordId: "report-1" },
+      );
+
+      expect(n.body).toContain("Match Report: already submitted");
+      expect(n.body).not.toContain("You need to submit");
+      expect(n.linkPath).toBe("/reports/report-1");
+    },
+  );
+
   it("states the deadline as 48 hours after the scheduled time", () => {
     const n = buildEventNotification("event_assigned", matchEvent, { now });
     // 15:00 on the 15th, plus 48 hours, is 15:00 on the 17th London time.
