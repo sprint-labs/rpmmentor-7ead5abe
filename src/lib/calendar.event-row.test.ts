@@ -142,6 +142,8 @@ describe("calendar event query columns", () => {
     expect(source).toMatch(/updateMatchParticipation[\s\S]*CALENDAR_MANAGE_ROLES/);
     expect(source).toMatch(/\.eq\("event_type", "Match"\)/);
     expect(source).toMatch(/\.neq\("status", "cancelled"\)/);
+    expect(source).toContain('participationUpdate.eq("player_id", before.player_id)');
+    expect(source).toContain('participationUpdate.is("player_id", null)');
   });
 
   it("fails closed when the existing event cannot be read before an edit", () => {

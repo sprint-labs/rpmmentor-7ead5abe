@@ -13,9 +13,11 @@
 import {
   buildEventNotification,
   type CancellationNotificationResult,
+  type FollowUpNotificationBasis,
   type NotifiableEvent,
   type NotificationKind,
 } from "./notification-copy";
+import { normalizeMatchParticipationStatus } from "./participation";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 export type NotifyClient = { from: (table: string) => any };
@@ -62,7 +64,10 @@ async function insert(
   eventId: string,
   kind: NotificationKind,
   copy: { title: string; body: string; linkPath: string },
-  ignoreDuplicates = false,
+  options: {
+    ignoreDuplicates?: boolean;
+    followUpBasis?: FollowUpNotificationBasis | null;
+  } = {},
 ): Promise<boolean> {
   const { error } = await supabase.from("notifications").insert({
     recipient_id: recipientId,
@@ -72,10 +77,11 @@ async function insert(
     body: copy.body,
     link_path: copy.linkPath,
     created_by: actorId,
+    follow_up_basis: options.followUpBasis ?? null,
   });
   if (!error) return true;
   // 23505 is a unique violation: the alert is already in their inbox.
-  if (ignoreDuplicates && error.code === "23505") return true;
+  if (options.ignoreDuplicates && error.code === "23505") return true;
   return false;
 }
 
@@ -84,11 +90,12 @@ export async function notifyEventAssigned(
   supabase: NotifyClient,
   actorId: string,
   row: NotifiableEventRow,
+  completedRecordId: string | null = null,
 ): Promise<boolean> {
   if (!row.assigned_mentor_id) return true;
   // A manager scheduling their own attendance does not need telling.
   if (row.assigned_mentor_id === actorId) return true;
-  const copy = buildEventNotification("event_assigned", toNotifiable(row));
+  const copy = buildEventNotification("event_assigned", toNotifiable(row), { completedRecordId });
   return insert(supabase, row.assigned_mentor_id, actorId, row.id, "event_assigned", copy);
 }
 
@@ -116,6 +123,40 @@ export async function notifyEventChanged(
 ): Promise<boolean> {
   const results: boolean[] = [];
   const reassigned = row.assigned_mentor_id !== previous.assigned_mentor_id;
+  const scheduleMoved =
+    row.event_date !== previous.event_date ||
+    row.start_time !== previous.start_time ||
+    (row.end_time ?? null) !== (previous.end_time ?? null);
+  const goalkeeperChanged = row.player_id !== previous.player_id;
+  const typeChanged = row.event_type !== previous.event_type;
+  const participationChanged =
+    (row.participation_status ?? "not_confirmed") !==
+    (previous.participation_status ?? "not_confirmed");
+
+  if (
+    !reassigned &&
+    !scheduleMoved &&
+    !goalkeeperChanged &&
+    !typeChanged &&
+    !participationChanged
+  ) {
+    return true;
+  }
+
+  let completedRecordId: string | null = null;
+  if (row.event_type === "Match") {
+    // Participation can be confirmed after a historic report is already
+    // linked. Read the active completion before composing the notification so
+    // the mentor is never asked to submit the same Match Report again.
+    const { data: report, error: reportError } = await supabase
+      .from("match_reports_cache")
+      .select("report_id")
+      .eq("calendar_event_id", row.id)
+      .is("deleted_at", null)
+      .maybeSingle();
+    if (reportError) return false;
+    completedRecordId = (report?.report_id as string | null | undefined) ?? null;
+  }
 
   if (reassigned) {
     if (previous.assigned_mentor_id && previous.assigned_mentor_id !== actorId) {
@@ -131,24 +172,15 @@ export async function notifyEventChanged(
         ),
       );
     }
-    results.push(await notifyEventAssigned(supabase, actorId, row));
+    results.push(await notifyEventAssigned(supabase, actorId, row, completedRecordId));
     return results.every(Boolean);
   }
 
-  const scheduleMoved =
-    row.event_date !== previous.event_date ||
-    row.start_time !== previous.start_time ||
-    (row.end_time ?? null) !== (previous.end_time ?? null);
-  const goalkeeperChanged = row.player_id !== previous.player_id;
-  const typeChanged = row.event_type !== previous.event_type;
-  const participationChanged =
-    (row.participation_status ?? "not_confirmed") !==
-    (previous.participation_status ?? "not_confirmed");
-
-  if (!scheduleMoved && !goalkeeperChanged && !typeChanged && !participationChanged) return true;
   if (!row.assigned_mentor_id || row.assigned_mentor_id === actorId) return true;
 
-  const copy = buildEventNotification("event_updated", toNotifiable(row));
+  const copy = buildEventNotification("event_updated", toNotifiable(row), {
+    completedRecordId,
+  });
   return insert(supabase, row.assigned_mentor_id, actorId, row.id, "event_updated", copy);
 }
 
@@ -182,6 +214,19 @@ export async function notifyFollowUpOverdue(
   row: NotifiableEventRow,
 ): Promise<boolean> {
   if (!row.assigned_mentor_id) return true;
+  const followUpBasis: FollowUpNotificationBasis | null =
+    row.event_type === "Match"
+      ? normalizeMatchParticipationStatus(row.participation_status) === "played"
+        ? "match_played"
+        : null
+      : row.event_type === "Training Ground Visit" || row.event_type === "Coffee Catch-up"
+        ? "interaction"
+        : null;
+  // A direct or stale caller must not create an unverified Match reminder.
+  if (!followUpBasis) return false;
   const copy = buildEventNotification("follow_up_overdue", toNotifiable(row));
-  return insert(supabase, row.assigned_mentor_id, actorId, row.id, "follow_up_overdue", copy, true);
+  return insert(supabase, row.assigned_mentor_id, actorId, row.id, "follow_up_overdue", copy, {
+    ignoreDuplicates: true,
+    followUpBasis,
+  });
 }

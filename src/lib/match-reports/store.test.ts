@@ -17,6 +17,7 @@ import {
 interface Row {
   report_id: string;
   submission_key: string | null;
+  calendar_event_player_id: string | null;
   deleted_at: string | null;
   legacy_report_id: string | null;
   goalkeeper: string;
@@ -36,6 +37,7 @@ function fakeDb(seed: Partial<Row>[] = []) {
   const rows: Row[] = seed.map((r) => ({
     report_id: "",
     submission_key: null,
+    calendar_event_player_id: null,
     deleted_at: null,
     legacy_report_id: null,
     goalkeeper: "",
@@ -112,7 +114,13 @@ function fakeDb(seed: Partial<Row>[] = []) {
         return { data: null, error: { code: "23505", message: "duplicate submission_key" } };
       }
       rows.push(row);
-      return { data: { report_id: row.report_id }, error: null };
+      return {
+        data: {
+          report_id: row.report_id,
+          calendar_event_player_id: row.calendar_event_player_id,
+        },
+        error: null,
+      };
     }
 
     function commitUpdate() {
@@ -170,6 +178,39 @@ describe("canonical match report store", () => {
     expect(first.ok && retry.ok).toBe(true);
     expect(retry).toEqual({ ok: true, report_id: "mr2_aaaa1111", created: false });
     expect(db.rows).toHaveLength(1);
+  });
+
+  it("writes and returns the event-player snapshot for a linked report", async () => {
+    const db = fakeDb();
+    const res = await insertCanonicalReport(db, {
+      ...base,
+      submissionKey: "linked-key",
+      calendarEventId: "event-1",
+      calendarEventPlayerId: "player-1",
+    });
+
+    expect(res).toEqual({
+      ok: true,
+      report_id: "mr2_aaaa1111",
+      created: true,
+      calendarEventPlayerId: "player-1",
+    });
+    expect(db.rows[0]).toMatchObject({
+      calendar_event_id: "event-1",
+      calendar_event_player_id: "player-1",
+    });
+
+    await expect(
+      insertCanonicalReport(db, {
+        ...base,
+        submissionKey: "linked-key",
+        calendarEventId: "event-1",
+        calendarEventPlayerId: "player-1",
+      }),
+    ).resolves.toMatchObject({
+      created: false,
+      calendarEventPlayerId: "player-1",
+    });
   });
 
   it("a confirmed duplicate fixture gets its own occurrence identity", async () => {
