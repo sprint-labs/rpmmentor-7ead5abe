@@ -40,9 +40,9 @@ import { formatRelative } from "@/lib/mock-data";
 import { visibleNotificationUnreadCount } from "@/lib/notification-visibility";
 import { listActiveAnnouncements, markAnnouncementRead } from "@/lib/support.functions";
 import {
-  isAnnouncementBannerVisible,
-  isAnnouncementInBell,
-} from "@/lib/support/announcement-visibility";
+  ANNOUNCEMENT_CLOCK_INTERVAL_MS,
+  useAnnouncementClock,
+} from "@/lib/support/announcement-clock";
 import { BrandMark } from "@/components/brand-mark";
 import { OfflineBanner } from "@/components/offline-banner";
 import { SyncManager } from "@/components/sync-manager";
@@ -125,6 +125,8 @@ export function AppShell() {
   const markInboxRead = useServerFn(markNotificationsRead);
   const fetchAnnouncements = useServerFn(listActiveAnnouncements);
   const markAnnouncementSeen = useServerFn(markAnnouncementRead);
+  const announcementNow = useAnnouncementClock(canSeeSupport);
+  const lastAnnouncementRefetchTick = useRef(announcementNow);
   const notificationQueryKey = notificationsQueryKey(user?.id ?? "anonymous");
   const announcementQueryKey = ["announcements", "active", user?.id ?? "anonymous"] as const;
   const {
@@ -141,26 +143,49 @@ export function AppShell() {
     data: announcements = [],
     isPending: announcementsPending,
     isError: announcementsError,
+    isFetching: announcementsFetching,
+    refetch: refetchAnnouncements,
   } = useQuery({
     queryKey: announcementQueryKey,
     queryFn: () => fetchAnnouncements(),
-    staleTime: 60_000,
-    refetchInterval: 120_000,
+    staleTime: ANNOUNCEMENT_CLOCK_INTERVAL_MS,
+    refetchOnWindowFocus: false,
     enabled: canSeeSupport,
   });
+
+  useEffect(() => {
+    if (!canSeeSupport || document.visibilityState !== "visible") {
+      lastAnnouncementRefetchTick.current = announcementNow;
+      return;
+    }
+    if (announcementNow === lastAnnouncementRefetchTick.current) return;
+    // Leave the tick unrecorded while a pre-boundary request is in flight.
+    // When it settles, isFetching changes and this effect issues a fresh,
+    // server-authoritative request for the same tick.
+    if (announcementsFetching) return;
+    lastAnnouncementRefetchTick.current = announcementNow;
+    void refetchAnnouncements({ cancelRefetch: true });
+  }, [announcementNow, announcementsFetching, canSeeSupport, refetchAnnouncements]);
+
   const inboxItems = inbox?.items ?? [];
   const inboxUnread = inboxItems.filter((item) => !item.readAt).length;
-  const updateAnnouncements = announcements.filter(
-    (announcement) => announcement.kind === "feature" || announcement.kind === "info",
-  );
-  const bellAnnouncements = announcements.filter(
+  // listActiveAnnouncements and its RLS policy authoritatively enforce active,
+  // starts_at and ends_at. Do not re-evaluate those boundaries with a possibly
+  // skewed device clock.
+  const updateAnnouncements = announcements;
+  const bellAnnouncements = updateAnnouncements.filter(
     (announcement) =>
       (announcement.kind === "incident" || announcement.kind === "downtime") &&
-      isAnnouncementInBell(announcement),
+      announcement.readAt == null,
   );
-  const bannerAnnouncements = announcements.filter((a) => isAnnouncementBannerVisible(a));
+  const bannerAnnouncements = updateAnnouncements.filter(
+    (announcement) => announcement.kind === "incident" || announcement.kind === "downtime",
+  );
   const bellAnnouncementUnread = bellAnnouncements.length;
-  const helpUnread = updateAnnouncements.filter((announcement) => !announcement.readAt).length;
+  const helpUnread = updateAnnouncements.filter(
+    (announcement) =>
+      (announcement.kind === "feature" || announcement.kind === "info") && !announcement.readAt,
+  ).length;
   const bellUnread = visibleNotificationUnreadCount(
     inboxUnread,
     notif.unread,

@@ -3,8 +3,8 @@
   "captured_on": "2026-09-04",
   "source": {
     "repository": "sprint-labs/rpmmentor-7ead5abe",
-    "origin_main_sha": "f752281d191f6dd60dc2921abd6db5d87d1d4945",
-    "active_migration_files_on_origin_main": 42
+    "origin_main_sha": "6dd5d6a075aff3f3ba7b80f90ca5f1ecfb8eedd2",
+    "active_migration_files_on_origin_main": 43
   },
   "production": {
     "project_ref": "zdxxezquhvpjmoxlecjp",
@@ -330,6 +330,20 @@
     ]
   },
   "reviewed_forward_migrations": [
+    {
+      "version": "20260901111130",
+      "name": "announcement_media_and_scheduling",
+      "statement_count": 1,
+      "sql_length": 2589,
+      "sql_md5": "97b7ed67dddeaae63ca348c2f0fe8fd9"
+    },
+    {
+      "version": "20260901111131",
+      "name": "secure_announcement_media_storage",
+      "statement_count": 1,
+      "sql_length": 10695,
+      "sql_md5": "8c88c98af5e9b1207ca2285cc48c1097"
+    },
     {
       "version": "20260901115505",
       "name": "match_event_participation",

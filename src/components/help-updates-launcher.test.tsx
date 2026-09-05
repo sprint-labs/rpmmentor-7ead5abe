@@ -23,6 +23,7 @@ function makeAnnouncement(index: number, readAt: string | null = null): Announce
     createdBy: "13cd4eca-982a-4c0a-80eb-62d0fc27ecb2",
     createdAt: `2026-08-26T12:0${index}:00.000Z`,
     readAt,
+    attachment: null,
   };
 }
 
