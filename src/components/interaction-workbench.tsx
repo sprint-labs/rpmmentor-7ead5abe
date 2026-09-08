@@ -2,23 +2,14 @@ import { Link } from "@tanstack/react-router";
 import { ArrowRight, Mic2, Search, X } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 import { Avatar } from "@/components/primitives";
+import { DetailFact } from "@/components/workbench-primitives";
+import { initialsOf } from "@/lib/initials";
 import { useInteractionAudioState } from "@/lib/interactions/use-interactions";
 import { formatDateOnly, type LoggedInteraction } from "@/lib/interactions/schema";
 
 interface InteractionWorkbenchProps {
   interactions: LoggedInteraction[];
   periodLabel: string;
-}
-
-function initialsOf(name: string): string {
-  return (
-    name
-      .trim()
-      .split(/\s+/)
-      .slice(0, 2)
-      .map((part) => part[0]?.toUpperCase() ?? "")
-      .join("") || "?"
-  );
 }
 
 function formatDateTime(value: string | null | undefined): string {
@@ -38,17 +29,6 @@ function sourceLabel(interaction: LoggedInteraction): string {
   if (interaction.matchReportId) return "Created from a Match Report";
   if (interaction.calendarEventId) return "Logged for a scheduled event";
   return "Logged directly";
-}
-
-function DetailFact({ label, value }: { label: string; value: React.ReactNode }) {
-  return (
-    <div className="min-w-0 border-b border-border pb-3">
-      <dt className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
-        {label}
-      </dt>
-      <dd className="mt-1 break-words text-sm text-foreground">{value}</dd>
-    </div>
-  );
 }
 
 export function InteractionWorkbench({ interactions, periodLabel }: InteractionWorkbenchProps) {

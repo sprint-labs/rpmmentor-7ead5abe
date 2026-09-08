@@ -5,6 +5,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { ArrowUpRight, CalendarClock, AlertTriangle } from "lucide-react";
 import { PageHeader, SectionTitle, TierBadge } from "@/components/primitives";
 import { InteractionWorkbench } from "@/components/interaction-workbench";
+import { MatchReportWorkbench } from "@/components/match-report-workbench";
 import { useAuth } from "@/lib/auth";
 import { useLoggedInteractions } from "@/lib/interactions/use-interactions";
 import { listPlayers } from "@/lib/players.functions";
@@ -425,51 +426,10 @@ function InsightDrilldown() {
             const rows = (reports.data?.reports ?? [])
               .filter((r) => isDateOnlyInPeriod(r.match_date, period.fromDate, period.toDate))
               .sort((a, b) => (b.match_date ?? "").localeCompare(a.match_date ?? ""));
-            return (
-              <>
-                <SectionTitle
-                  action={
-                    <span className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
-                      {periodLabel}
-                    </span>
-                  }
-                >{`Match reports (${availableCount(reports.isLoading, reports.isError, rows.length)})`}</SectionTitle>
-                <div className="divide-y divide-border">
-                  {reports.isLoading ? (
-                    <Empty label="Loading…" />
-                  ) : reports.isError ? (
-                    <Empty label="Reports unavailable" />
-                  ) : rows.length === 0 ? (
-                    <Empty label="No reports in this window" />
-                  ) : (
-                    rows.map((r) => (
-                      <Row
-                        key={r.report_id}
-                        right={
-                          <span className="text-[10px] font-mono tabular-nums text-muted-foreground">
-                            {r.average != null ? r.average.toFixed(2) : "—"}
-                          </span>
-                        }
-                      >
-                        <Link
-                          to="/reports/$reportId"
-                          params={{ reportId: r.report_id }}
-                          className="text-xs font-medium hover:text-primary"
-                        >
-                          {r.goalkeeper}
-                        </Link>
-                        <div className="text-[10px] text-muted-foreground truncate">
-                          {r.match_date ?? "No date"}
-                          {r.team ? ` · ${r.team}` : ""}
-                          {r.opponent ? ` v ${r.opponent}` : ""}
-                          {r.coach ? ` · ${r.coach}` : ""}
-                        </div>
-                      </Row>
-                    ))
-                  )}
-                </div>
-              </>
-            );
+            if (reports.isLoading) return <Empty label="Loading…" />;
+            if (reports.isError) return <Empty label="Reports unavailable" />;
+            if (rows.length === 0) return <Empty label="No reports in this window" />;
+            return <MatchReportWorkbench reports={rows} periodLabel={periodLabel} />;
           })()}
 
         {active === "mentors" &&
