@@ -112,6 +112,25 @@ describe("MatchReportWorkbench", () => {
     );
   });
 
+  it("yellows the mentor's verdict in the list and stays muted without one", () => {
+    render(<MatchReportWorkbench reports={reports} periodLabel="2026-08-26 → 2026-09-08" />);
+
+    const scored = screen.getByRole("button", {
+      name: "Show details for Lawrence Vigouroux on 05 Sept 2026",
+    });
+    expect(
+      within(scored).getByText("Commanded his box well and handled the long diagonal cleanly.")
+        .className,
+    ).toContain("text-warning");
+
+    const uncommented = screen.getByRole("button", {
+      name: "Show details for Alfie Smith on 05 Sept 2026",
+    });
+    expect(within(uncommented).getByText("No comments recorded").className).toContain(
+      "text-muted-foreground",
+    );
+  });
+
   it("shows every pillar score for the selected report", () => {
     render(<MatchReportWorkbench reports={reports} periodLabel="2026-08-26 → 2026-09-08" />);
 

@@ -2,23 +2,23 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { ArrowUpRight, CalendarClock, AlertTriangle } from "lucide-react";
-import { PageHeader, SectionTitle, TierBadge } from "@/components/primitives";
+import { ArrowUpRight, AlertTriangle } from "lucide-react";
+import { PageHeader, SectionTitle } from "@/components/primitives";
 import { InteractionWorkbench } from "@/components/interaction-workbench";
 import { MatchReportWorkbench } from "@/components/match-report-workbench";
+import {
+  ActiveMentorWorkbench,
+  DutyOfCareWorkbench,
+  PlayerRecordWorkbench,
+  ScheduledEventWorkbench,
+} from "@/components/insight-drilldowns";
 import { useAuth } from "@/lib/auth";
 import { useLoggedInteractions } from "@/lib/interactions/use-interactions";
 import { listPlayers } from "@/lib/players.functions";
 import { listUsersAndRoles } from "@/lib/users-and-roles.functions";
 import { listMatchReports } from "@/lib/match-reports/reports.functions";
 import { listAssignableMentors, listCalendarEvents } from "@/lib/calendar.functions";
-import {
-  alerts as systemAlerts,
-  goalkeepers,
-  dutyStatusForGk,
-  formatRelative,
-  type DutyLevel,
-} from "@/lib/mock-data";
+import { alerts as systemAlerts, goalkeepers, dutyStatusForGk } from "@/lib/mock-data";
 import { isDateOnlyInPeriod, lastNDaysPeriod } from "@/lib/dashboard-period";
 import { isDashboardInteractionType } from "@/lib/interactions/schema";
 import { buildActiveMentorInsightRows } from "@/lib/active-mentor-insights";
@@ -81,14 +81,6 @@ const META: Record<Metric, { title: string; description: string; to: string; lin
     },
   };
 
-const DUTY_LEVELS: { level: DutyLevel; label: string }[] = [
-  { level: "overdue", label: "Overdue" },
-  { level: "due_soon", label: "Due soon" },
-  { level: "up_to_date", label: "Up to date" },
-  { level: "not_required", label: "Not required" },
-  { level: "not_enough_data", label: "Not enough data" },
-];
-
 interface InsightSearch {
   from: string;
   to: string;
@@ -120,25 +112,12 @@ export const Route = createFileRoute("/insights/$metric")({
   component: InsightDrilldown,
 });
 
-function Row({ children, right }: { children: React.ReactNode; right?: React.ReactNode }) {
-  return (
-    <div className="flex items-start justify-between gap-3 py-3">
-      <div className="min-w-0 flex-1">{children}</div>
-      {right ? <div className="shrink-0 text-right">{right}</div> : null}
-    </div>
-  );
-}
-
 function Empty({ label }: { label: string }) {
   return (
     <div className="py-10 text-center text-[10px] font-mono uppercase tracking-widest text-muted-foreground/70">
       {label}
     </div>
   );
-}
-
-function availableCount(isLoading: boolean, isError: boolean, count: number): string | number {
-  return isLoading ? "…" : isError ? "—" : count;
 }
 
 function InsightDrilldown() {
@@ -293,43 +272,14 @@ function InsightDrilldown() {
       </nav>
 
       <div className="command-panel p-5">
-        {active === "goalkeepers" && (
-          <>
-            <SectionTitle>{`Player records (${availableCount(players.isLoading, players.isError, players.data?.length ?? 0)})`}</SectionTitle>
-            <div className="divide-y divide-border">
-              {players.isLoading ? (
-                <Empty label="Loading…" />
-              ) : players.isError ? (
-                <Empty label="Roster unavailable" />
-              ) : (players.data ?? []).length === 0 ? (
-                <Empty label="No player records" />
-              ) : (
-                (players.data ?? []).map((p) => (
-                  <Row
-                    key={p.id}
-                    right={
-                      <span className="text-[10px] font-mono text-muted-foreground">
-                        {p.league}
-                      </span>
-                    }
-                  >
-                    <Link
-                      to="/system/players/$playerId"
-                      params={{ playerId: p.id }}
-                      className="text-xs font-medium hover:text-primary"
-                    >
-                      {p.full_name}
-                    </Link>
-                    <div className="text-[10px] text-muted-foreground">
-                      {p.current_club}
-                      {p.on_loan && p.parent_club ? ` · on loan from ${p.parent_club}` : ""}
-                    </div>
-                  </Row>
-                ))
-              )}
-            </div>
-          </>
-        )}
+        {active === "goalkeepers" &&
+          (() => {
+            if (players.isLoading) return <Empty label="Loading…" />;
+            if (players.isError) return <Empty label="Roster unavailable" />;
+            const rows = players.data ?? [];
+            if (rows.length === 0) return <Empty label="No player records" />;
+            return <PlayerRecordWorkbench players={rows} />;
+          })()}
 
         {active === "interactions" &&
           (() => {
@@ -348,77 +298,14 @@ function InsightDrilldown() {
 
         {active === "duty" &&
           (() => {
-            const graded = goalkeepers.map((g) => ({
-              gk: g,
-              duty: dutyStatusForGk(g, dutySource),
+            if (interactions.isLoading) return <Empty label="Loading…" />;
+            if (interactions.isError) return <Empty label="Duty of Care unavailable" />;
+            const rows = goalkeepers.map((gk) => ({
+              gk,
+              duty: dutyStatusForGk(gk, dutySource),
             }));
-            const filtered = search.level
-              ? graded.filter((r) => r.duty.level === search.level)
-              : graded;
-            return (
-              <>
-                <SectionTitle>{`Reference Duty of Care (${availableCount(interactions.isLoading, interactions.isError, filtered.length)})`}</SectionTitle>
-                <div className="flex flex-wrap gap-2 mb-4">
-                  <Link
-                    to="/insights/$metric"
-                    params={{ metric: "duty" }}
-                    search={{ from: period.fromDate, to: period.toDate, level: "" }}
-                    className={`px-2.5 h-7 inline-flex items-center border text-[10px] font-mono uppercase tracking-widest ${!search.level ? "border-primary text-primary" : "border-border text-muted-foreground"}`}
-                  >
-                    All (
-                    {availableCount(interactions.isLoading, interactions.isError, graded.length)})
-                  </Link>
-                  {DUTY_LEVELS.map((l) => {
-                    const count = graded.filter((r) => r.duty.level === l.level).length;
-                    return (
-                      <Link
-                        key={l.level}
-                        to="/insights/$metric"
-                        params={{ metric: "duty" }}
-                        search={{ from: period.fromDate, to: period.toDate, level: l.level }}
-                        className={`px-2.5 h-7 inline-flex items-center border text-[10px] font-mono uppercase tracking-widest ${search.level === l.level ? "border-primary text-primary" : "border-border text-muted-foreground"}`}
-                      >
-                        {l.label} (
-                        {availableCount(interactions.isLoading, interactions.isError, count)})
-                      </Link>
-                    );
-                  })}
-                </div>
-                <div className="divide-y divide-border">
-                  {interactions.isLoading ? (
-                    <Empty label="Loading…" />
-                  ) : interactions.isError ? (
-                    <Empty label="Duty of Care unavailable" />
-                  ) : filtered.length === 0 ? (
-                    <Empty label="No goalkeepers in this band" />
-                  ) : (
-                    filtered.map(({ gk, duty }) => (
-                      <Row
-                        key={gk.id}
-                        right={
-                          <span
-                            className={`text-[10px] font-mono uppercase tracking-widest ${duty.level === "overdue" || duty.level === "due_soon" ? "text-warning" : duty.level === "up_to_date" ? "text-success" : "text-muted-foreground"}`}
-                          >
-                            {duty.label}
-                            {duty.days ? ` · ${duty.days}d` : ""}
-                          </span>
-                        }
-                      >
-                        <Link
-                          to="/goalkeepers/$gkId"
-                          params={{ gkId: gk.id }}
-                          className="text-xs font-medium hover:text-primary inline-flex items-center gap-2"
-                        >
-                          {gk.name}
-                          <TierBadge tier={gk.tier} />
-                        </Link>
-                        <div className="text-[10px] text-muted-foreground">{gk.club}</div>
-                      </Row>
-                    ))
-                  )}
-                </div>
-              </>
-            );
+            if (rows.length === 0) return <Empty label="No goalkeepers on the roster" />;
+            return <DutyOfCareWorkbench rows={rows} initialLevel={search.level} />;
           })()}
 
         {active === "reports" &&
@@ -434,81 +321,24 @@ function InsightDrilldown() {
 
         {active === "mentors" &&
           (() => {
+            if (users.isLoading || mentorDirectory.isLoading) return <Empty label="Loading…" />;
+            if (users.isError || mentorDirectory.isError)
+              return <Empty label="Directory unavailable" />;
             const rows = buildActiveMentorInsightRows(mentorDirectory.data ?? [], users.data ?? []);
-            const isLoading = users.isLoading || mentorDirectory.isLoading;
-            const isError = users.isError || mentorDirectory.isError;
-            return (
-              <>
-                <SectionTitle>{`Mentors (${availableCount(isLoading, isError, rows.length)})`}</SectionTitle>
-                <div className="divide-y divide-border">
-                  {isLoading ? (
-                    <Empty label="Loading…" />
-                  ) : isError ? (
-                    <Empty label="Directory unavailable" />
-                  ) : rows.length === 0 ? (
-                    <Empty label="No mentor accounts" />
-                  ) : (
-                    rows.map((u) => (
-                      <Row
-                        key={u.id}
-                        right={
-                          <span className="text-[10px] font-mono tabular-nums text-muted-foreground">
-                            {u.interactionsLogged} int · {u.matchReportsSubmitted} rep
-                          </span>
-                        }
-                      >
-                        <div className="text-xs font-medium">
-                          {u.firstName} {u.lastName}
-                        </div>
-                        <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
-                          {u.isManager ? "Mentor Manager" : "Mentor"}
-                        </div>
-                      </Row>
-                    ))
-                  )}
-                </div>
-              </>
-            );
+            if (rows.length === 0) return <Empty label="No mentor accounts" />;
+            return <ActiveMentorWorkbench mentors={rows} />;
           })()}
 
         {active === "events" &&
           (() => {
+            if (events.isLoading) return <Empty label="Loading…" />;
+            if (events.isError) return <Empty label="Calendar unavailable" />;
             const today = new Date().toISOString().slice(0, 10);
             const rows = (events.data ?? [])
               .filter((e) => e.event_date >= today)
               .sort((a, b) => a.event_date.localeCompare(b.event_date));
-            return (
-              <>
-                <SectionTitle>{`Scheduled events (${availableCount(events.isLoading, events.isError, rows.length)})`}</SectionTitle>
-                <div className="divide-y divide-border">
-                  {events.isLoading ? (
-                    <Empty label="Loading…" />
-                  ) : events.isError ? (
-                    <Empty label="Calendar unavailable" />
-                  ) : rows.length === 0 ? (
-                    <Empty label="No scheduled events" />
-                  ) : (
-                    rows.map((e) => (
-                      <Row
-                        key={e.id}
-                        right={<CalendarClock className="size-3.5 text-muted-foreground/60" />}
-                      >
-                        <div className="text-[10px] font-mono uppercase tracking-widest text-primary mb-1">
-                          {formatRelative(e.event_date)}
-                          {e.start_time ? ` · ${e.start_time.slice(0, 5)}` : ""}
-                        </div>
-                        <div className="text-xs font-medium truncate">{e.title}</div>
-                        <div className="text-[10px] text-muted-foreground truncate">
-                          {e.event_type}
-                          {e.goalkeeper_name ? ` · ${e.goalkeeper_name}` : ""}
-                          {e.location ? ` · ${e.location}` : ""}
-                        </div>
-                      </Row>
-                    ))
-                  )}
-                </div>
-              </>
-            );
+            if (rows.length === 0) return <Empty label="No scheduled events" />;
+            return <ScheduledEventWorkbench events={rows} />;
           })()}
 
         {active === "alerts" && (
