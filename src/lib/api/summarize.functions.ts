@@ -132,9 +132,18 @@ function coerceStringArray(value: unknown, limit = 6): string[] {
     .map((item) => (item.length > 300 ? `${item.slice(0, 297)}…` : item));
 }
 
+/** Kept in step with the same messages in `transcribe.functions.ts`. */
+const OPENAI_QUOTA_MESSAGE =
+  "OpenAI rate limit or quota reached — try again shortly, and check the OpenAI account's billing if it persists.";
+const MISSING_KEY_MESSAGE =
+  "AI service is not configured — OPENAI_API_KEY is not set for this environment.";
+
 async function callGateway(systemPrompt: string, userText: string) {
   const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) return { ok: false as const, error: "AI service is not configured." };
+  if (!apiKey) {
+    console.error("callGateway: OPENAI_API_KEY is not set in this environment");
+    return { ok: false as const, error: MISSING_KEY_MESSAGE };
+  }
 
   const response = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
@@ -153,13 +162,16 @@ async function callGateway(systemPrompt: string, userText: string) {
   });
 
   if (!response.ok) {
+    // Log before returning, so a 429 from an exhausted quota is visible in the
+    // runtime logs rather than only as a toast the mentor dismisses.
+    const detail = await response.text().catch(() => "");
+    console.error("AI OpenAI error", response.status, detail.slice(0, 500));
     if (response.status === 429) {
-      return { ok: false as const, error: "Rate limit reached — please try again in a moment." };
+      return { ok: false as const, error: OPENAI_QUOTA_MESSAGE };
     }
     if (response.status === 402) {
       return { ok: false as const, error: "AI credits exhausted — add credits in workspace settings." };
     }
-    console.error("AI OpenAI error", response.status);
     return { ok: false as const, error: `AI request failed (${response.status}).` };
   }
 
