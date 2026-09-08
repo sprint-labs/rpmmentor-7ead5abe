@@ -21,6 +21,9 @@ import { normalizeMatchParticipationStatus } from "./participation";
 export type NotificationKind =
   "event_assigned" | "event_updated" | "event_unassigned" | "event_cancelled" | "follow_up_overdue";
 
+/** Why a durable overdue row was eligible when it was created. */
+export type FollowUpNotificationBasis = "match_played" | "interaction";
+
 /** The event facts a notification is built from. */
 export interface NotifiableEvent {
   id: string;
@@ -98,7 +101,12 @@ export function followUpLinkPath(event: NotifiableEvent, kind: FollowUpKind | nu
   return "/calendar";
 }
 
-function describe(event: NotifiableEvent, kind: FollowUpKind | null, deadlineMs: number): string {
+function describe(
+  event: NotifiableEvent,
+  kind: FollowUpKind | null,
+  deadlineMs: number,
+  completedRecordId: string | null,
+): string {
   const gk = event.goalkeeperName || "an unnamed goalkeeper";
   const required = followUpRequirementLabel(kind);
   const lines = [`${event.eventType} with ${gk}`, `Scheduled: ${formatEventWhen(event)} (London)`];
@@ -106,18 +114,25 @@ function describe(event: NotifiableEvent, kind: FollowUpKind | null, deadlineMs:
     const participation = normalizeMatchParticipationStatus(event.participationStatus);
     if (participation === "not_confirmed") {
       lines.push(
-        "Participation: Not confirmed — a Mentor Manager or administrator needs to confirm who played; no Match Report is due unless this goalkeeper is marked Played",
+        completedRecordId
+          ? "Participation: Not confirmed; the existing linked Match Report is retained while participation is reviewed, and no further report is due"
+          : "Participation: Not confirmed; a Mentor Manager or administrator needs to confirm who played, and no Match Report is due unless this goalkeeper is marked Played",
       );
-      return lines.join("\n");
-    }
-    if (participation === "did_not_play") {
-      lines.push("Participation: Did not play — no Match Report is required");
-      return lines.join("\n");
+    } else if (participation === "did_not_play") {
+      lines.push(
+        completedRecordId
+          ? "Participation: Did not play; the existing linked Match Report is retained, and no further report is required"
+          : "Participation: Did not play; no Match Report is required",
+      );
     }
   }
   if (kind) {
-    lines.push(`You need to submit: ${required}`);
-    lines.push(`Due by: ${formatLondonInstant(deadlineMs)} (London)`);
+    if (completedRecordId) {
+      lines.push(`${required}: already submitted`);
+    } else {
+      lines.push(`You need to submit: ${required}`);
+      lines.push(`Due by: ${formatLondonInstant(deadlineMs)} (London)`);
+    }
   }
   return lines.join("\n");
 }
@@ -131,7 +146,7 @@ function describe(event: NotifiableEvent, kind: FollowUpKind | null, deadlineMs:
 export function buildEventNotification(
   kind: NotificationKind,
   event: NotifiableEvent,
-  options: { reason?: string; now?: number } = {},
+  options: { reason?: string; now?: number; completedRecordId?: string | null } = {},
 ): NotificationCopy {
   const followUp = resolveFollowUp(
     {
@@ -141,7 +156,7 @@ export function buildEventNotification(
       endTime: event.endTime ?? null,
       cancelled: kind === "event_cancelled",
       waived: false,
-      completedRecordId: null,
+      completedRecordId: options.completedRecordId ?? null,
       participationStatus: event.participationStatus,
     },
     options.now ?? Date.now(),
@@ -149,9 +164,11 @@ export function buildEventNotification(
 
   const gk = event.goalkeeperName || "an unnamed goalkeeper";
   const when = formatEventWhen(event);
-  const detail = describe(event, followUp.kind, followUp.deadlineMs);
+  const detail = describe(event, followUp.kind, followUp.deadlineMs, followUp.completedRecordId);
   const link =
-    event.eventType === "Match" && followUp.participationStatus !== "played"
+    followUp.completedRecordId && followUp.kind === "match_report"
+      ? `/reports/${encodeURIComponent(followUp.completedRecordId)}`
+      : event.eventType === "Match" && followUp.participationStatus !== "played"
       ? "/calendar"
       : followUpLinkPath(event, followUp.kind);
 

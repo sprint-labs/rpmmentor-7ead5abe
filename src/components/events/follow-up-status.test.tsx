@@ -50,6 +50,13 @@ describe("FollowUpActionLink participation permissions", () => {
     expect(route).toContain('data?.canManage && row.eventType === "Match"');
     expect(route).toContain("canConfirmParticipation={Boolean(data?.canManage)}");
   });
+
+  it("keeps the confirmation status visible on the calendar when no report kind exists", () => {
+    const route = readFileSync(resolve(process.cwd(), "src/routes/calendar.tsx"), "utf8");
+    expect(route).toContain(
+      '(!row.followUp.kind && row.followUp.status !== "confirmation_needed")',
+    );
+  });
 });
 
 describe("manager waiver presentation", () => {

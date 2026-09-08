@@ -35,6 +35,7 @@ import { useAuth } from "@/lib/auth";
 import { updateMatchParticipation } from "@/lib/calendar.functions";
 import { MatchParticipationControl } from "@/components/events/match-participation-control";
 import type { MatchParticipationStatus } from "@/lib/events/participation";
+import { isFollowUpListItem } from "@/lib/events/follow-up-list";
 
 export const Route = createFileRoute("/follow-ups")({
   component: withPermission(FollowUpsPage, "calendar.view"),
@@ -58,10 +59,6 @@ function matchesFilter(row: EventFollowUpRow, filter: Filter): boolean {
   if (filter === "all") return true;
   if (filter === "open") return OPEN_FOLLOW_UP_STATUSES.includes(row.followUp.status);
   return row.followUp.status === filter;
-}
-
-function isFollowUpListItem(row: EventFollowUpRow): boolean {
-  return row.followUp.kind !== null || row.followUp.status === "confirmation_needed";
 }
 
 function FollowUpsPage() {
@@ -104,8 +101,9 @@ function FollowUpsPage() {
   }, [data, syncOverdue, queryClient, user?.id]);
 
   const visible = useMemo(() => {
+    const canManage = Boolean(data?.canManage);
     const filtered = rows
-      .filter(isFollowUpListItem)
+      .filter((row) => isFollowUpListItem(row, canManage))
       .filter((r) => (mineOnly ? r.mine : true))
       .filter((r) => matchesFilter(r, filter));
     // Most urgent first: overdue, then the soonest deadline.
@@ -123,17 +121,20 @@ function FollowUpsPage() {
       if (byStatus !== 0) return byStatus;
       return a.followUp.deadlineMs - b.followUp.deadlineMs;
     });
-  }, [rows, filter, mineOnly]);
+  }, [rows, filter, mineOnly, data?.canManage]);
 
   const counts = useMemo(() => {
-    const scope = rows.filter((r) => isFollowUpListItem(r) && (mineOnly ? r.mine : true));
+    const canManage = Boolean(data?.canManage);
+    const scope = rows.filter(
+      (row) => isFollowUpListItem(row, canManage) && (mineOnly ? row.mine : true),
+    );
     return {
       overdue: scope.filter((r) => r.followUp.status === "overdue").length,
       confirmationNeeded: scope.filter((r) => r.followUp.status === "confirmation_needed").length,
       pending: scope.filter((r) => r.followUp.status === "pending").length,
       scheduled: scope.filter((r) => r.followUp.status === "scheduled").length,
     };
-  }, [rows, mineOnly]);
+  }, [rows, mineOnly, data?.canManage]);
 
   async function handleParticipation(eventId: string, status: MatchParticipationStatus) {
     setParticipationSaving(eventId);
@@ -207,7 +208,7 @@ function FollowUpsPage() {
 
       <Card>
         <div className="mb-3 flex flex-wrap items-center gap-2">
-          {FILTERS.map((f) => (
+          {FILTERS.filter((f) => data?.canManage || f.value !== "confirmation_needed").map((f) => (
             <button
               key={f.value}
               onClick={() => setFilter(f.value)}
@@ -237,9 +238,11 @@ function FollowUpsPage() {
           <span>
             Overdue <strong className="text-destructive">{counts.overdue}</strong>
           </span>
-          <span>
-            Confirm participation <strong className="text-warning">{counts.confirmationNeeded}</strong>
-          </span>
+          {data?.canManage && (
+            <span>
+              Confirm participation <strong className="text-warning">{counts.confirmationNeeded}</strong>
+            </span>
+          )}
           <span>
             Pending <strong className="text-warning">{counts.pending}</strong>
           </span>
