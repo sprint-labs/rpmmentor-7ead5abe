@@ -10,11 +10,11 @@ import {
   type StructuredSummary,
 } from "@/lib/api/summarize.functions";
 import { LatestRequestGate } from "@/lib/async/latest-request";
+import { transcriptionFailureMessage } from "@/lib/api/transcription-errors";
 import type { InteractionRecording } from "@/lib/interactions/audio";
 
 
 const MAX_SECONDS = 180;
-const TRANSCRIPTION_FAILURE_MESSAGE = "We could not process this audio recording. Your recording is still available. Please retry or save it without a transcript.";
 
 const AUDIO_EXTENSION_BY_MIME: Record<string, string> = {
   "audio/webm": "webm",
@@ -419,8 +419,9 @@ export function VoiceNoteField({
   const transcribe = async () => {
     const audioBlob = blobRef.current;
     if (!audioBlob) {
-      setErrorMsg(TRANSCRIPTION_FAILURE_MESSAGE);
-      logAttempt("error", TRANSCRIPTION_FAILURE_MESSAGE);
+      const message = transcriptionFailureMessage("No recording was found to transcribe.");
+      setErrorMsg(message);
+      logAttempt("error", message);
       return;
     }
     invalidateAiRequests();
@@ -457,8 +458,9 @@ export function VoiceNoteField({
       });
       if (controller.signal.aborted) return;
       if (!result.ok) {
-        setErrorMsg(TRANSCRIPTION_FAILURE_MESSAGE);
-        logAttempt("error", TRANSCRIPTION_FAILURE_MESSAGE);
+        const message = transcriptionFailureMessage(result.error);
+        setErrorMsg(message);
+        logAttempt("error", message);
       } else {
         setTranscript(result.text);
         setTokens(result.tokens ?? []);
@@ -487,8 +489,12 @@ export function VoiceNoteField({
         // Silent — user-initiated cancel.
         return;
       }
-      setErrorMsg(TRANSCRIPTION_FAILURE_MESSAGE);
-      logAttempt("error", TRANSCRIPTION_FAILURE_MESSAGE);
+      // A throw here is the transport failing (offline, an expired session
+      // rejected by the auth middleware) rather than a handled result, and its
+      // message names which — so surface it too.
+      const message = transcriptionFailureMessage(e instanceof Error ? e.message : null);
+      setErrorMsg(message);
+      logAttempt("error", message);
     } finally {
       clearTimeout(flipTimer);
       clearPhaseTimer();
