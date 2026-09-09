@@ -55,6 +55,7 @@ export type Permission =
    * only decides what the UI offers; the database decides what is allowed.
    */
   | "players.edit_club"
+  | "players.set_tier"
   /** Edit or safely delete any canonical player record. */
   | "players.manage"
   | "mentors.view"
@@ -103,6 +104,7 @@ const MENTOR_MANAGER: Permission[] = [
   ...MENTOR,
   "goalkeepers.edit", "goalkeepers.create",
   "players.edit_club",
+  "players.set_tier",
   "mentors.view",
   "interactions.manage",
   "reports.manage",
@@ -122,6 +124,7 @@ const MENTOR_MANAGER: Permission[] = [
 const ADMIN: Permission[] = [
   "goalkeepers.view", "goalkeepers.edit", "goalkeepers.create",
   "players.edit_club",
+  "players.set_tier",
   "mentors.view",
   "interactions.view", "interactions.manage",
   "reports.view", "reports.manage",

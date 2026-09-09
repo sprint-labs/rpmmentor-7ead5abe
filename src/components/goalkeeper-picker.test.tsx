@@ -17,6 +17,7 @@ const PLAYERS: PlayerRosterRow[] = [
     nationality: "England",
     instagram_url: null,
     contract_until: null,
+    tier: null,
   },
   {
     id: "22222222-2222-4222-8222-222222222222",
@@ -28,6 +29,7 @@ const PLAYERS: PlayerRosterRow[] = [
     nationality: "Wales",
     instagram_url: null,
     contract_until: null,
+    tier: null,
   },
 ];
 
