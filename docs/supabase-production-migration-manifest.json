@@ -1,16 +1,16 @@
 {
   "manifest_version": 1,
-  "captured_on": "2026-09-04",
+  "captured_on": "2026-09-09",
   "source": {
     "repository": "sprint-labs/rpmmentor-7ead5abe",
-    "origin_main_sha": "6dd5d6a075aff3f3ba7b80f90ca5f1ecfb8eedd2",
-    "active_migration_files_on_origin_main": 43
+    "origin_main_sha": "2f78aaa7ec8cbcb8dd5c1dc85caba33d040101ec",
+    "active_migration_files_on_origin_main": 50
   },
   "production": {
     "project_ref": "zdxxezquhvpjmoxlecjp",
     "project_name": "RPM Mentor Hub",
     "region": "eu-west-2",
-    "ledger_rows": 45,
+    "ledger_rows": 50,
     "migrations": [
       {
         "version": "20260811095729",
@@ -314,6 +314,34 @@
         "sql_md5": "f7627406d3b6b9609cc44e55adda32bf"
       },
       {
+        "version": "20260901111130",
+        "name": "announcement_media_and_scheduling",
+        "statement_count": 1,
+        "sql_length": 2589,
+        "sql_md5": "97b7ed67dddeaae63ca348c2f0fe8fd9"
+      },
+      {
+        "version": "20260901111131",
+        "name": "secure_announcement_media_storage",
+        "statement_count": 1,
+        "sql_length": 10695,
+        "sql_md5": "8c88c98af5e9b1207ca2285cc48c1097"
+      },
+      {
+        "version": "20260901115505",
+        "name": "match_event_participation",
+        "statement_count": 1,
+        "sql_length": 5585,
+        "sql_md5": "f341ca6d77c6aed04064eb386529d17d"
+      },
+      {
+        "version": "20260903153746",
+        "name": "match_report_event_snapshot_guard",
+        "statement_count": 1,
+        "sql_length": 12836,
+        "sql_md5": "289fdb6e17122ca403cfa82cb099d880"
+      },
+      {
         "version": "20260904140000",
         "name": "mentor_bulletin_team_access",
         "statement_count": 1,
@@ -326,46 +354,17 @@
         "statement_count": 1,
         "sql_length": 4278,
         "sql_md5": "b98678438ec6b0ecc3a8e0fa396a84bd"
+      },
+      {
+        "version": "20260909030000",
+        "name": "allow_management_to_set_player_tier",
+        "statement_count": 1,
+        "sql_length": 2115,
+        "sql_md5": "bbd62773141b91c38cb90eda2504e238"
       }
     ]
   },
-  "reviewed_forward_migrations": [
-    {
-      "version": "20260901111130",
-      "name": "announcement_media_and_scheduling",
-      "statement_count": 1,
-      "sql_length": 2589,
-      "sql_md5": "97b7ed67dddeaae63ca348c2f0fe8fd9"
-    },
-    {
-      "version": "20260901111131",
-      "name": "secure_announcement_media_storage",
-      "statement_count": 1,
-      "sql_length": 10695,
-      "sql_md5": "8c88c98af5e9b1207ca2285cc48c1097"
-    },
-    {
-      "version": "20260901115505",
-      "name": "match_event_participation",
-      "statement_count": 1,
-      "sql_length": 5585,
-      "sql_md5": "f341ca6d77c6aed04064eb386529d17d"
-    },
-    {
-      "version": "20260903153746",
-      "name": "match_report_event_snapshot_guard",
-      "statement_count": 1,
-      "sql_length": 12836,
-      "sql_md5": "289fdb6e17122ca403cfa82cb099d880"
-    },
-    {
-      "version": "20260909030000",
-      "name": "allow_management_to_set_player_tier",
-      "statement_count": 1,
-      "sql_length": 2115,
-      "sql_md5": "bbd62773141b91c38cb90eda2504e238"
-    }
-  ],
+  "reviewed_forward_migrations": [],
   "repository_comparison": {
     "live_rows_with_byte_exact_local_statement": 27,
     "live_rows_contained_inside_a_larger_local_file": 2,
