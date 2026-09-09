@@ -255,6 +255,7 @@ export const submitMatchReport = createServerFn({ method: "POST" })
       type ReplayedReport = {
         report_id: string;
         calendar_event_id: string | null;
+        calendar_event_player_id: string | null;
         goalkeeper: string;
         match_date: string | null;
         team: string | null;
@@ -274,7 +275,7 @@ export const submitMatchReport = createServerFn({ method: "POST" })
         const { data: savedReport, error: replayedReportError } = await supabaseAdmin
           .from("match_reports_cache")
           .select(
-            "report_id,calendar_event_id,goalkeeper,match_date,team,opponent,competition,average,comments,submitted_by,coach",
+            "report_id,calendar_event_id,calendar_event_player_id,goalkeeper,match_date,team,opponent,competition,average,comments,submitted_by,coach",
           )
           .eq("report_id", replayedReportId)
           .is("deleted_at", null)
@@ -311,7 +312,7 @@ export const submitMatchReport = createServerFn({ method: "POST" })
       // The unique index makes this a no-op if the interaction already exists.
       const link = await ensureMatchReportInteraction(supabase, {
         reportId: replayedReportId,
-        playerId: linkedMatchTarget?.playerId ?? null,
+        playerId: replayedReport?.calendar_event_player_id ?? linkedMatchTarget?.playerId ?? null,
         goalkeeperName:
           linkedMatchTarget?.goalkeeperName ?? replayedReport?.goalkeeper ?? payload.goalkeeper,
         club: replayedReport ? (replayedReport.team ?? "") : payload.team,
@@ -551,20 +552,27 @@ export const submitMatchReport = createServerFn({ method: "POST" })
         submittedBy: userId,
         submissionKey: submissionKey,
         calendarEventId: options.calendarEventId ?? null,
+        calendarEventPlayerId: linkedMatchTarget?.playerId ?? null,
       });
     } catch (err) {
       // The insert threw rather than returning an error — the write may or may
       // not have landed. `submission_key` is unique, so a read-back settles it
       // definitively instead of leaving an ambiguous lock behind.
       let verified: string | null = null;
+      let verifiedPlayerId: string | null = null;
       let verifiable = true;
       try {
         const { data: check } = await supabaseAdmin
           .from(CANONICAL_TABLE)
-          .select("report_id")
+          .select("report_id,calendar_event_player_id")
           .eq("submission_key", submissionKey)
           .maybeSingle();
-        verified = (check as { report_id: string } | null)?.report_id ?? null;
+        const verifiedRow = check as {
+          report_id: string;
+          calendar_event_player_id?: string | null;
+        } | null;
+        verified = verifiedRow?.report_id ?? null;
+        verifiedPlayerId = verifiedRow?.calendar_event_player_id ?? null;
       } catch {
         verifiable = false;
       }
@@ -583,7 +591,12 @@ export const submitMatchReport = createServerFn({ method: "POST" })
             "The database didn't confirm this report, so it may or may not have been saved. Check the reports list before submitting again — we won't retry automatically.",
         };
       }
-      written = { ok: true, report_id: verified, created: true };
+      written = {
+        ok: true,
+        report_id: verified,
+        created: true,
+        ...(options.calendarEventId ? { calendarEventPlayerId: verifiedPlayerId } : {}),
+      };
     }
 
     if (!written.ok) {
@@ -622,7 +635,7 @@ export const submitMatchReport = createServerFn({ method: "POST" })
     // interaction per report however many times submission is retried.
     const link = await ensureMatchReportInteraction(supabase, {
       reportId: finalReportId,
-      playerId: linkedMatchTarget?.playerId ?? null,
+      playerId: written.calendarEventPlayerId ?? linkedMatchTarget?.playerId ?? null,
       goalkeeperName: linkedMatchTarget?.goalkeeperName ?? payload.goalkeeper,
       club: payload.team,
       matchDate: linkedMatchTarget?.eventDate ?? payload.match_date,

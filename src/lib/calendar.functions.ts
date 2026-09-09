@@ -415,16 +415,22 @@ export const updateMatchParticipation = createServerFn({ method: "POST" })
     if (!before) throw new Error("That calendar event no longer exists.");
     assertMatchParticipationUpdatable(before);
 
-    const { data: row, error } = await context.supabase
+    let participationUpdate = context.supabase
       .from("calendar_events")
       .update({ participation_status: data.participation_status })
       .eq("id", data.id)
       .eq("event_type", "Match")
       // Repeat the cancellation condition on the write so a concurrent cancel
       // between the read above and this update still fails closed.
-      .neq("status", "cancelled")
-      .select(COLUMNS)
-      .maybeSingle();
+      .neq("status", "cancelled");
+    // Bind the write to the goalkeeper that was actually reviewed. If another
+    // manager replaces that association concurrently, their safe Not confirmed
+    // reset wins and this stale confirmation affects no row.
+    participationUpdate = before.player_id
+      ? participationUpdate.eq("player_id", before.player_id)
+      : participationUpdate.is("player_id", null);
+
+    const { data: row, error } = await participationUpdate.select(COLUMNS).maybeSingle();
     if (error) throw new Error(error.message);
     if (!row) throw new Error("That Match participation could not be updated.");
 
