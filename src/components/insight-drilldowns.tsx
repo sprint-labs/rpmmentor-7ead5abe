@@ -1,10 +1,17 @@
 import { Link } from "@tanstack/react-router";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { ArrowRight } from "lucide-react";
+import { useAuth } from "@/lib/auth";
 import { InsightWorkbench } from "@/components/insight-workbench";
 import { DetailFact } from "@/components/workbench-primitives";
 import { DutyBadge, TierBadge } from "@/components/primitives";
 import { initialsOf } from "@/lib/initials";
-import type { PlayerRosterRow } from "@/lib/players.functions";
+import {
+  PLAYER_TIER_VALUES,
+  updatePlayerTier,
+  type PlayerRosterRow,
+} from "@/lib/players.functions";
 import type { TeamCalendarEvent } from "@/lib/calendar.functions";
 import type { ActiveMentorInsightRow } from "@/lib/active-mentor-insights";
 import {
@@ -42,10 +49,90 @@ function loanLabel(player: PlayerRosterRow): string {
   return player.parent_club ? `On loan from ${player.parent_club}` : "On loan";
 }
 
-export function PlayerRecordWorkbench({ players }: { players: PlayerRosterRow[] }) {
+/** The option shown for, and filtered by, a player with no tier recorded. */
+export const NO_TIER_LABEL = "No tier";
+
+function tierLabel(player: PlayerRosterRow): string {
+  return player.tier?.trim() || NO_TIER_LABEL;
+}
+
+/**
+ * Assign or clear a player's tier in place. Rendered only for roles that hold
+ * `players.set_tier`; everyone else sees the tier as a read-only fact.
+ */
+function PlayerTierEditor({ player }: { player: PlayerRosterRow }) {
+  const queryClient = useQueryClient();
+  const saveTier = useServerFn(updatePlayerTier);
+  const mutation = useMutation({
+    mutationFn: (tier: string) => saveTier({ data: { id: player.id, tier } }),
+    onSuccess: () => {
+      // The roster list and the dashboard snapshot both count this column.
+      queryClient.invalidateQueries({ queryKey: ["players"] });
+      queryClient.invalidateQueries({ queryKey: ["roster-snapshot"] });
+    },
+  });
+
+  return (
+    <div className="mt-5 border-t border-border pt-4">
+      <label htmlFor="player-tier-select" className="block">
+        <span className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
+          Care cadence tier
+        </span>
+      </label>
+      <div className="mt-2 flex flex-wrap items-center gap-2">
+        <select
+          id="player-tier-select"
+          value={player.tier ?? ""}
+          disabled={mutation.isPending}
+          onChange={(event) => mutation.mutate(event.target.value)}
+          className="h-10 min-w-44 rounded-md border border-border bg-background px-3 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
+        >
+          <option value="">{NO_TIER_LABEL}</option>
+          {PLAYER_TIER_VALUES.map((tier) => (
+            <option key={tier} value={tier}>
+              {tier}
+            </option>
+          ))}
+        </select>
+        <span className="text-xs text-muted-foreground" role="status" aria-live="polite">
+          {mutation.isPending
+            ? "Saving…"
+            : mutation.isError
+              ? ""
+              : mutation.isSuccess
+                ? "Saved"
+                : ""}
+        </span>
+      </div>
+      {mutation.isError ? (
+        <p className="mt-2 text-xs text-destructive" role="alert">
+          {mutation.error instanceof Error
+            ? mutation.error.message
+            : "The tier could not be saved."}
+        </p>
+      ) : null}
+      <p className="mt-2 text-[10px] leading-relaxed text-muted-foreground">
+        The tier sets this goalkeeper&apos;s duty-of-care obligation. The date it took effect is
+        recorded automatically.
+      </p>
+    </div>
+  );
+}
+
+export function PlayerRecordWorkbench({
+  players,
+  initialTier,
+}: {
+  players: PlayerRosterRow[];
+  /** Tier deep-linked from the dashboard, e.g. the untiered callout. */
+  initialTier?: string;
+}) {
+  const { can } = useAuth();
+  const canSetTier = can("players.set_tier");
   return (
     <InsightWorkbench<PlayerRosterRow>
       items={players}
+      initialFilters={initialTier ? { tier: initialTier } : undefined}
       idOf={(player) => player.id}
       domId="selected-player-detail"
       headingId="selected-player-heading"
@@ -58,8 +145,21 @@ export function PlayerRecordWorkbench({ players }: { players: PlayerRosterRow[] 
         player.parent_club,
         player.league,
         player.nationality,
+        player.tier,
       ]}
       filters={[
+        {
+          id: "tier",
+          label: "Filter by tier",
+          allLabel: "All tiers",
+          // "No tier" is offered whenever the roster actually contains one, so
+          // the goalkeepers still needing a tier can be worked through.
+          optionsOf: (items) => {
+            const present = new Set(items.map((player) => tierLabel(player)));
+            return [...PLAYER_TIER_VALUES, NO_TIER_LABEL].filter((label) => present.has(label));
+          },
+          matches: (player, value) => tierLabel(player) === value,
+        },
         {
           id: "league",
           label: "Filter by league",
@@ -92,9 +192,10 @@ export function PlayerRecordWorkbench({ players }: { players: PlayerRosterRow[] 
           ),
         },
         {
-          label: "Clubs",
+          label: "No tier",
           mono: true,
-          value: new Set(visible.map((player) => player.current_club).filter(Boolean)).size,
+          valueClassName: visible.some((player) => !player.tier?.trim()) ? "text-warning" : "",
+          value: visible.filter((player) => !player.tier?.trim()).length,
         },
         {
           label: "Out on loan",
@@ -109,13 +210,24 @@ export function PlayerRecordWorkbench({ players }: { players: PlayerRosterRow[] 
         title: player.full_name,
         subtitle: player.current_club || "Club not recorded",
         middleTop: player.league || "League not recorded",
-        middleBottom: player.on_loan ? loanLabel(player) : player.nationality || "—",
-        middleBottomHighlighted: player.on_loan,
-        rightTop: player.contract_until ? `to ${player.contract_until}` : "—",
+        middleBottom: player.tier?.trim()
+          ? player.on_loan
+            ? loanLabel(player)
+            : player.nationality || "—"
+          : NO_TIER_LABEL,
+        // An untiered goalkeeper carries no duty-of-care obligation until one
+        // is assigned, so it outranks the loan flag for attention.
+        middleBottomHighlighted: !player.tier?.trim() || player.on_loan,
+        rightTop: tierLabel(player),
+        rightTopClassName: player.tier?.trim() ? "" : "text-warning",
+        rightBottom: player.contract_until ? `to ${player.contract_until}` : undefined,
       })}
       detailHeader={(player) => ({
         title: player.full_name,
         subtitle: `${player.current_club || "Club not recorded"}${player.league ? ` · ${player.league}` : ""}`,
+        rightValue: tierLabel(player),
+        rightValueClassName: `text-base ${player.tier?.trim() ? "" : "text-warning"}`,
+        rightLabel: "Tier",
       })}
       renderDetail={(player) => (
         <>
@@ -135,7 +247,19 @@ export function PlayerRecordWorkbench({ players }: { players: PlayerRosterRow[] 
             <DetailFact label="Parent club" value={player.parent_club || "Not recorded"} />
             <DetailFact label="Nationality" value={player.nationality || "Not recorded"} />
             <DetailFact label="Contract until" value={player.contract_until || "Not recorded"} />
+            <DetailFact
+              label="Care cadence tier"
+              value={
+                player.tier?.trim() ? (
+                  player.tier
+                ) : (
+                  <span className="text-warning">{NO_TIER_LABEL}</span>
+                )
+              }
+            />
           </dl>
+
+          {canSetTier ? <PlayerTierEditor key={player.id} player={player} /> : null}
 
           <Link
             to="/system/players/$playerId"

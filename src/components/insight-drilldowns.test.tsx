@@ -1,12 +1,44 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render as rtlRender,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ReactNode } from "react";
 import type { PlayerRosterRow } from "@/lib/players.functions";
 import type { TeamCalendarEvent } from "@/lib/calendar.functions";
 import type { ActiveMentorInsightRow } from "@/lib/active-mentor-insights";
 import { DUTY_LABELS, type Goalkeeper } from "@/lib/mock-data";
+
+const authState = vi.hoisted(() => ({ canSetTier: true }));
+
+vi.mock("@/lib/auth", () => ({
+  useAuth: () => ({
+    can: (permission: string) => (permission === "players.set_tier" ? authState.canSetTier : false),
+  }),
+}));
+
+const tierMutation = vi.hoisted(() => ({ calls: [] as Array<{ id: string; tier: string }> }));
+
+// Stub the server-function module so the middleware it registers never loads.
+vi.mock("@/lib/players.functions", () => ({
+  PLAYER_TIER_VALUES: ["Tier 1", "Tier 2", "Tier 3", "Tier 4", "Academy", "Free Agent"],
+  updatePlayerTier: "update-player-tier",
+}));
+
+vi.mock("@tanstack/react-start", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@tanstack/react-start")>()),
+  useServerFn: () => (payload: { data: { id: string; tier: string } }) => {
+    tierMutation.calls.push(payload.data);
+    return Promise.resolve({ ...payload.data });
+  },
+}));
 
 vi.mock("@tanstack/react-router", () => ({
   Link: ({
@@ -37,6 +69,11 @@ import {
   type DutyRow,
 } from "@/components/insight-drilldowns";
 
+function render(ui: ReactNode) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return rtlRender(<QueryClientProvider client={client}>{ui}</QueryClientProvider>);
+}
+
 function panel(domId: string): HTMLElement {
   const found = document.getElementById(domId);
   if (!found) throw new Error(`${domId} was not rendered`);
@@ -54,6 +91,7 @@ const players: PlayerRosterRow[] = [
     nationality: "England",
     instagram_url: null,
     contract_until: "2027-06-30",
+    tier: "Tier 1",
   },
   {
     id: "22222222-2222-4222-8222-222222222222",
@@ -65,6 +103,7 @@ const players: PlayerRosterRow[] = [
     nationality: "England",
     instagram_url: null,
     contract_until: null,
+    tier: null,
   },
 ];
 
@@ -155,6 +194,8 @@ function calendarEvent(overrides: Partial<TeamCalendarEvent>): TeamCalendarEvent
 
 afterEach(() => {
   cleanup();
+  authState.canSetTier = true;
+  tierMutation.calls = [];
   vi.clearAllMocks();
 });
 
@@ -183,6 +224,43 @@ describe("PlayerRecordWorkbench", () => {
     expect(
       within(panel("selected-player-detail")).getByRole("heading", { name: "James Beadle" }),
     ).toBeTruthy();
+  });
+
+  it("flags an untiered goalkeeper and can be opened filtered to them", () => {
+    render(<PlayerRecordWorkbench players={players} />);
+
+    const untiered = screen.getByRole("button", { name: "Show details for James Beadle" });
+    expect(within(untiered).getAllByText("No tier").length).toBeGreaterThan(0);
+
+    cleanup();
+    render(<PlayerRecordWorkbench players={players} initialTier="No tier" />);
+    expect(screen.getByRole("button", { name: "Show details for James Beadle" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /Christian Walton/ })).toBeNull();
+  });
+
+  it("saves a tier chosen for the selected goalkeeper", async () => {
+    render(<PlayerRecordWorkbench players={players} initialTier="No tier" />);
+
+    const select = screen.getByLabelText("Care cadence tier") as HTMLSelectElement;
+    expect(select.value).toBe("");
+
+    fireEvent.change(select, { target: { value: "Tier 2" } });
+
+    await waitFor(() => expect(screen.getByText("Saved")).toBeTruthy());
+    expect(tierMutation.calls).toEqual([
+      { id: "22222222-2222-4222-8222-222222222222", tier: "Tier 2" },
+    ]);
+  });
+
+  it("hides the tier control from roles without players.set_tier", () => {
+    authState.canSetTier = false;
+    render(<PlayerRecordWorkbench players={players} />);
+
+    expect(screen.queryByLabelText("Care cadence tier")).toBeNull();
+    // The tier is still reported, just not editable.
+    expect(within(panel("selected-player-detail")).getAllByText("Tier 1").length).toBeGreaterThan(
+      0,
+    );
   });
 });
 

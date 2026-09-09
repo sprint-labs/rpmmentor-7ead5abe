@@ -85,6 +85,8 @@ interface InsightSearch {
   from: string;
   to: string;
   level: string;
+  /** Care-cadence tier deep-linked into the Total Goalkeepers drilldown. */
+  tier: string;
 }
 
 export const Route = createFileRoute("/insights/$metric")({
@@ -92,6 +94,7 @@ export const Route = createFileRoute("/insights/$metric")({
     from: typeof search.from === "string" ? search.from : "",
     to: typeof search.to === "string" ? search.to : "",
     level: typeof search.level === "string" ? search.level : "",
+    tier: typeof search.tier === "string" ? search.tier : "",
   }),
   head: ({ params }) => {
     const meta =
@@ -259,7 +262,7 @@ function InsightDrilldown() {
             key={m}
             to="/insights/$metric"
             params={{ metric: m }}
-            search={{ from: period.fromDate, to: period.toDate, level: "" }}
+            search={{ from: period.fromDate, to: period.toDate, level: "", tier: "" }}
             className={`px-2.5 h-7 inline-flex items-center border text-[10px] font-mono uppercase tracking-widest ${
               m === active
                 ? "border-primary text-primary"
@@ -278,7 +281,7 @@ function InsightDrilldown() {
             if (players.isError) return <Empty label="Roster unavailable" />;
             const rows = players.data ?? [];
             if (rows.length === 0) return <Empty label="No player records" />;
-            return <PlayerRecordWorkbench players={rows} />;
+            return <PlayerRecordWorkbench players={rows} initialTier={search.tier} />;
           })()}
 
         {active === "interactions" &&

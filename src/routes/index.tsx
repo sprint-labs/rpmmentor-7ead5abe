@@ -36,6 +36,7 @@ import { isDateOnlyInPeriod, lastNDaysPeriod } from "@/lib/dashboard-period";
 import { getOverviewDashboardStats } from "@/lib/overview-dashboard.functions";
 import { getRosterSnapshot } from "@/lib/roster-snapshot.functions";
 import { ROSTER_STATUS_LABELS, ROSTER_TIER_LABELS } from "@/lib/roster-snapshot";
+import { NO_TIER_LABEL } from "@/components/insight-drilldowns";
 import { listCalendarEvents } from "@/lib/calendar.functions";
 import { BulletinDashboardCard } from "@/components/bulletins/dashboard-card";
 
@@ -250,7 +251,7 @@ function Dashboard() {
         <Link
           to="/insights/$metric"
           params={{ metric: "interactions" }}
-          search={{ from: period.fromDate, to: period.toDate, level: "" }}
+          search={{ from: period.fromDate, to: period.toDate, level: "", tier: "" }}
           className="block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-info"
           aria-label="Break down interactions logged"
         >
@@ -265,7 +266,7 @@ function Dashboard() {
         <Link
           to="/insights/$metric"
           params={{ metric: "duty" }}
-          search={{ from: period.fromDate, to: period.toDate, level: "overdue" }}
+          search={{ from: period.fromDate, to: period.toDate, level: "overdue", tier: "" }}
           className="block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-warning"
           aria-label="Break down duty of care cadence"
         >
@@ -286,7 +287,7 @@ function Dashboard() {
         <Link
           to="/insights/$metric"
           params={{ metric: "reports" }}
-          search={{ from: period.fromDate, to: period.toDate, level: "" }}
+          search={{ from: period.fromDate, to: period.toDate, level: "", tier: "" }}
           className="block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
           aria-label="Break down match reports by match date"
         >
@@ -307,7 +308,7 @@ function Dashboard() {
         <Link
           to="/insights/$metric"
           params={{ metric: "mentors" }}
-          search={{ from: period.fromDate, to: period.toDate, level: "" }}
+          search={{ from: period.fromDate, to: period.toDate, level: "", tier: "" }}
           className="block min-[390px]:col-span-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary md:col-span-1"
           aria-label="Break down active mentors"
         >
@@ -407,7 +408,7 @@ function Dashboard() {
                     key={b.level}
                     to="/insights/$metric"
                     params={{ metric: "duty" }}
-                    search={{ from: period.fromDate, to: period.toDate, level: b.level }}
+                    search={{ from: period.fromDate, to: period.toDate, level: b.level, tier: "" }}
                     aria-label={`View goalkeepers: ${b.label}`}
                     className="space-y-2 block -mx-2 px-2 py-1 hover:bg-accent/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                   >
@@ -518,10 +519,21 @@ function Dashboard() {
               </section>
 
               {roster && roster.unassigned > 0 ? (
-                <p className="mt-3 border-t border-border pt-3 text-[10px] text-warning">
+                <Link
+                  to="/insights/$metric"
+                  params={{ metric: "goalkeepers" }}
+                  search={{
+                    from: period.fromDate,
+                    to: period.toDate,
+                    level: "",
+                    tier: NO_TIER_LABEL,
+                  }}
+                  className="mt-3 flex items-center gap-1 border-t border-border pt-3 text-[10px] text-warning hover:underline"
+                >
                   {roster.unassigned} goalkeeper{roster.unassigned === 1 ? "" : "s"} have no tier
-                  recorded, so they are not counted in any band above.
-                </p>
+                  recorded — assign one
+                  <ArrowUpRight className="size-3 shrink-0" />
+                </Link>
               ) : null}
             </>
           )}
@@ -544,7 +556,7 @@ function Dashboard() {
                 <Link
                   to="/insights/$metric"
                   params={{ metric: "events" }}
-                  search={{ from: period.fromDate, to: period.toDate, level: "" }}
+                  search={{ from: period.fromDate, to: period.toDate, level: "", tier: "" }}
                   className="text-[10px] font-mono uppercase tracking-widest text-primary inline-flex items-center gap-1"
                 >
                   All events <ArrowUpRight className="size-3" />
@@ -730,7 +742,7 @@ function Dashboard() {
                 <Link
                   to="/insights/$metric"
                   params={{ metric: "alerts" }}
-                  search={{ from: period.fromDate, to: period.toDate, level: "" }}
+                  search={{ from: period.fromDate, to: period.toDate, level: "", tier: "" }}
                   className="text-[10px] font-mono uppercase tracking-widest text-primary inline-flex items-center gap-1"
                 >
                   All <ArrowUpRight className="size-3" />
