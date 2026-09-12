@@ -337,28 +337,19 @@ export function AppShell() {
           </Link>
           <div className="flex-1" />
 
-          {user.actualRole === "super_admin" || user.actualRole === "mentor_manager" ? (
+          {(user.actualRole === "super_admin" || user.actualRole === "mentor_manager") &&
+          user.role === user.actualRole ? (
             <div
               className="hidden md:inline-flex items-center gap-1.5 h-7 pl-2 pr-1 rounded-md bg-primary/10 border border-primary/30 text-primary text-[10px] font-medium uppercase tracking-wider"
               title="Interface only — server permissions are unchanged. This preview does not grant or restrict backend access."
             >
               <ShieldCheck className="size-3" />
-              {user.role !== user.actualRole ? (
-                <span className="hidden lg:inline">
-                  Viewing as {ROLE_LABEL[user.role]}
-                  <span className="mx-1.5 text-primary/60">·</span>
-                  <span className="text-primary/80 normal-case tracking-normal">
-                    interface only
-                  </span>
+              <span>
+                View as{" "}
+                <span className="text-primary/70 normal-case tracking-normal">
+                  (interface only)
                 </span>
-              ) : (
-                <span>
-                  View as{" "}
-                  <span className="text-primary/70 normal-case tracking-normal">
-                    (interface only)
-                  </span>
-                </span>
-              )}
+              </span>
               <label htmlFor="view-as-role" className="sr-only">
                 View interface as role
               </label>
@@ -382,27 +373,13 @@ export function AppShell() {
                   </>
                 )}
               </select>
-              {user.role !== user.actualRole && (
-                <button
-                  onClick={() => setViewAsRole(null)}
-                  title={
-                    user.actualRole === "super_admin"
-                      ? "Exit view as and return to Super Admin"
-                      : "Exit view as and return to Mentor Manager"
-                  }
-                  className="ml-1 inline-flex items-center gap-1 h-5 pl-1.5 pr-2 rounded bg-primary text-primary-foreground hover:opacity-90"
-                >
-                  <X className="size-3" />
-                  <span>Exit view as</span>
-                </button>
-              )}
             </div>
-          ) : (
+          ) : user.actualRole !== "super_admin" && user.actualRole !== "mentor_manager" ? (
             <div className="hidden md:inline-flex items-center gap-1.5 h-7 px-2 rounded-md bg-primary/10 border border-primary/30 text-primary text-[10px] font-medium uppercase tracking-wider">
               <ShieldCheck className="size-3" />
               {ROLE_LABEL[user.role]}
             </div>
-          )}
+          ) : null}
           <ThemeToggle className="hidden sm:grid" />
           {(canSeeDutyNotifications || canSeeEventInbox || canSeeSupport) && (
             <div ref={bellRef} className="relative shrink-0">
@@ -717,6 +694,55 @@ export function AppShell() {
           </button>
         </header>
         <main id="main-content" tabIndex={-1} className="flex-1 min-w-0 p-4 md:p-6">
+          {user.role !== user.actualRole && (
+            <div
+              role="status"
+              title="Interface only — server permissions are unchanged. This preview does not grant or restrict backend access."
+              className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-primary/40 bg-primary/10 px-4 py-3"
+            >
+              <div className="flex flex-wrap items-center gap-3">
+                <span className="inline-flex items-center gap-2 text-primary text-xs font-semibold uppercase tracking-wider">
+                  <ShieldCheck className="size-4" />
+                  Viewing as
+                </span>
+                <label htmlFor="view-as-role-banner" className="sr-only">
+                  View interface as role
+                </label>
+                <select
+                  id="view-as-role-banner"
+                  value={user.role}
+                  onChange={(e) => setViewAsRole(e.target.value as Role)}
+                  className="h-9 rounded-md border border-primary/40 bg-background px-3 text-sm font-medium text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
+                >
+                  {user.actualRole === "super_admin" ? (
+                    <>
+                      <option value="super_admin">Super Admin</option>
+                      <option value="admin">Admin</option>
+                      <option value="mentor_manager">Mentor Manager</option>
+                      <option value="mentor">Mentor</option>
+                    </>
+                  ) : (
+                    <>
+                      <option value="mentor_manager">Mentor Manager</option>
+                      <option value="mentor">Mentor</option>
+                    </>
+                  )}
+                </select>
+              </div>
+              <button
+                onClick={() => setViewAsRole(null)}
+                title={
+                  user.actualRole === "super_admin"
+                    ? "Exit view as and return to Super Admin"
+                    : "Exit view as and return to Mentor Manager"
+                }
+                className="inline-flex items-center gap-1.5 h-9 px-4 rounded-full bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              >
+                <X className="size-4" />
+                Exit view
+              </button>
+            </div>
+          )}
           {bannerAnnouncements.map((a) => (
             <div
               key={a.id}
