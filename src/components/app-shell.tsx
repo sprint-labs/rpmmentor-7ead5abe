@@ -344,7 +344,7 @@ export function AppShell() {
             >
               <ShieldCheck className="size-3" />
               {user.role !== user.actualRole ? (
-                <span className="hidden lg:inline">Viewing as {ROLE_LABEL[user.role]}</span>
+                <span className="hidden lg:inline">Viewing as</span>
               ) : (
                 <span>View as</span>
               )}
