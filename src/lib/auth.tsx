@@ -58,6 +58,12 @@ export type Permission =
   | "players.set_tier"
   /** Edit or safely delete any canonical player record. */
   | "players.manage"
+  /**
+   * Reset a goalkeeper's duty-of-care clock. Mirrors the
+   * `duty_of_care_resets_insert_managers` RLS policy and
+   * `DUTY_OF_CARE_RESET_ROLES` — this only decides what the UI offers.
+   */
+  | "duty_of_care.reset"
   | "mentors.view"
   | "interactions.view"
   | "interactions.log"
@@ -105,6 +111,7 @@ const MENTOR_MANAGER: Permission[] = [
   "goalkeepers.edit", "goalkeepers.create",
   "players.edit_club",
   "players.set_tier",
+  "duty_of_care.reset",
   "mentors.view",
   "interactions.manage",
   "reports.manage",
@@ -125,6 +132,7 @@ const ADMIN: Permission[] = [
   "goalkeepers.view", "goalkeepers.edit", "goalkeepers.create",
   "players.edit_club",
   "players.set_tier",
+  "duty_of_care.reset",
   "mentors.view",
   "interactions.view", "interactions.manage",
   "reports.view", "reports.manage",
