@@ -344,20 +344,9 @@ export function AppShell() {
             >
               <ShieldCheck className="size-3" />
               {user.role !== user.actualRole ? (
-                <span className="hidden lg:inline">
-                  Viewing as {ROLE_LABEL[user.role]}
-                  <span className="mx-1.5 text-primary/60">·</span>
-                  <span className="text-primary/80 normal-case tracking-normal">
-                    interface only
-                  </span>
-                </span>
+                <span className="hidden lg:inline">Viewing as</span>
               ) : (
-                <span>
-                  View as{" "}
-                  <span className="text-primary/70 normal-case tracking-normal">
-                    (interface only)
-                  </span>
-                </span>
+                <span>View as</span>
               )}
               <label htmlFor="view-as-role" className="sr-only">
                 View interface as role
@@ -393,7 +382,7 @@ export function AppShell() {
                   className="ml-1 inline-flex items-center gap-1 h-5 pl-1.5 pr-2 rounded bg-primary text-primary-foreground hover:opacity-90"
                 >
                   <X className="size-3" />
-                  <span>Exit view as</span>
+                  <span>Exit view</span>
                 </button>
               )}
             </div>
