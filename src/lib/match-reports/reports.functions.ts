@@ -203,9 +203,16 @@ export const submitMatchReport = createServerFn({ method: "POST" })
     // Checked here, before the ledger reserves anything, so an invalid link
     // fails cleanly with nothing to unwind. A Match Report may only close out a
     // Match event, and only for the mentor it was assigned to or a manager.
+    let linkedMatchTarget: import("@/lib/events/link-follow-up.server").VerifiedEventLink | null =
+      null;
     if (options.calendarEventId) {
       const { verifyFollowUpTarget } = await import("@/lib/events/link-follow-up.server");
-      await verifyFollowUpTarget(supabase, userId, options.calendarEventId, "match_report");
+      linkedMatchTarget = await verifyFollowUpTarget(
+        supabase,
+        userId,
+        options.calendarEventId,
+        "match_report",
+      );
     }
 
     const average = averageOfScores(payload);
@@ -245,27 +252,85 @@ export const submitMatchReport = createServerFn({ method: "POST" })
     const decision = decideForSubmissionKey(existingRow, now);
     if (decision.action === "return_success") {
       const replayedReportId = decision.report_id ?? report_id;
+      type ReplayedReport = {
+        report_id: string;
+        calendar_event_id: string | null;
+        calendar_event_player_id: string | null;
+        goalkeeper: string;
+        match_date: string | null;
+        team: string | null;
+        opponent: string | null;
+        competition: string | null;
+        average: number | string | null;
+        comments: string | null;
+        submitted_by: string | null;
+        coach: string | null;
+      };
+      let replayedReport: ReplayedReport | null = null;
+      if (linkedMatchTarget) {
+        // Re-read the canonical row instead of relying on the earlier event
+        // snapshot: another retry may have completed between those two reads.
+        // This preserves a legitimate race/idempotent retry while preventing a
+        // known submission key from being replayed against a different event.
+        const { data: savedReport, error: replayedReportError } = await supabaseAdmin
+          .from("match_reports_cache")
+          .select(
+            "report_id,calendar_event_id,calendar_event_player_id,goalkeeper,match_date,team,opponent,competition,average,comments,submitted_by,coach",
+          )
+          .eq("report_id", replayedReportId)
+          .is("deleted_at", null)
+          .maybeSingle();
+        if (
+          replayedReportError ||
+          !savedReport ||
+          savedReport.calendar_event_id !== linkedMatchTarget.eventId
+        ) {
+          throw new Error(
+            "That saved Match Report is not linked to this calendar event. Nothing was changed.",
+          );
+        }
+        replayedReport = savedReport as ReplayedReport;
+        const { assertMatchReportMatchesEvent } =
+          await import("@/lib/events/link-follow-up.server");
+        // The event may have been edited after this report was saved. Never
+        // combine the old report's facts with a different current player/date
+        // to manufacture new Duty of Care evidence during self-healing.
+        assertMatchReportMatchesEvent(linkedMatchTarget, {
+          goalkeeperName: replayedReport.goalkeeper,
+          matchDate: replayedReport.match_date ?? "",
+        });
+      }
+      const savedAverage = replayedReport ? Number(replayedReport.average) : Number.NaN;
+      const interactionAverage = replayedReport
+        ? Number.isFinite(savedAverage)
+          ? savedAverage
+          : null
+        : average;
       // Self-healing: a retry of an already-written report still guarantees the
-      // interaction exists. The unique index makes this a no-op if it does.
+      // interaction exists. For a linked report, evidence comes from the saved
+      // report and canonical event rather than an editable/restored retry form.
+      // The unique index makes this a no-op if the interaction already exists.
       const link = await ensureMatchReportInteraction(supabase, {
         reportId: replayedReportId,
-        goalkeeperName: payload.goalkeeper,
-        club: payload.team,
-        matchDate: payload.match_date,
-        mentorId: userId,
-        mentorName: resolvedCoach,
+        playerId: replayedReport?.calendar_event_player_id ?? linkedMatchTarget?.playerId ?? null,
+        goalkeeperName:
+          linkedMatchTarget?.goalkeeperName ?? replayedReport?.goalkeeper ?? payload.goalkeeper,
+        club: replayedReport ? (replayedReport.team ?? "") : payload.team,
+        matchDate: linkedMatchTarget?.eventDate ?? payload.match_date,
+        mentorId: replayedReport?.submitted_by ?? linkedMatchTarget?.assignedMentorId ?? userId,
+        mentorName: replayedReport ? (replayedReport.coach ?? "") : resolvedCoach,
         notes: matchReportInteractionNotes({
-          opponent: payload.opponent,
-          competition: payload.competition,
-          average,
-          comments,
+          opponent: replayedReport ? (replayedReport.opponent ?? "") : payload.opponent,
+          competition: replayedReport ? (replayedReport.competition ?? "") : payload.competition,
+          average: interactionAverage,
+          comments: replayedReport ? (replayedReport.comments ?? "") : comments,
         }),
       });
       return {
         status: "ok",
         report_id: replayedReportId,
         row_index: decision.row_index ?? -1,
-        average,
+        average: interactionAverage ?? average,
         idempotent: true,
         ...(link.ok ? {} : { interaction_error: link.message }),
       };
@@ -280,6 +345,17 @@ export const submitMatchReport = createServerFn({ method: "POST" })
     }
     if (decision.action === "ambiguous") {
       return { status: "ambiguous", submission_key: submissionKey, message: AMBIGUOUS_MSG };
+    }
+    // Only a confirmed idempotent success above may bypass editable draft
+    // fields that no longer match a historic report. Every path that could
+    // create a report is pinned to the event's canonical goalkeeper and date
+    // before a ledger reservation or canonical write occurs.
+    if (linkedMatchTarget) {
+      const { assertMatchReportMatchesEvent } = await import("@/lib/events/link-follow-up.server");
+      assertMatchReportMatchesEvent(linkedMatchTarget, {
+        goalkeeperName: payload.goalkeeper,
+        matchDate: payload.match_date,
+      });
     }
     /** Row id of a previously FAILED attempt with this key — reused, not re-inserted. */
     const reuseId = decision.action === "reuse_failed" ? (existingRow?.id ?? null) : null;
@@ -476,20 +552,27 @@ export const submitMatchReport = createServerFn({ method: "POST" })
         submittedBy: userId,
         submissionKey: submissionKey,
         calendarEventId: options.calendarEventId ?? null,
+        calendarEventPlayerId: linkedMatchTarget?.playerId ?? null,
       });
     } catch (err) {
       // The insert threw rather than returning an error — the write may or may
       // not have landed. `submission_key` is unique, so a read-back settles it
       // definitively instead of leaving an ambiguous lock behind.
       let verified: string | null = null;
+      let verifiedPlayerId: string | null = null;
       let verifiable = true;
       try {
         const { data: check } = await supabaseAdmin
           .from(CANONICAL_TABLE)
-          .select("report_id")
+          .select("report_id,calendar_event_player_id")
           .eq("submission_key", submissionKey)
           .maybeSingle();
-        verified = (check as { report_id: string } | null)?.report_id ?? null;
+        const verifiedRow = check as {
+          report_id: string;
+          calendar_event_player_id?: string | null;
+        } | null;
+        verified = verifiedRow?.report_id ?? null;
+        verifiedPlayerId = verifiedRow?.calendar_event_player_id ?? null;
       } catch {
         verifiable = false;
       }
@@ -508,7 +591,12 @@ export const submitMatchReport = createServerFn({ method: "POST" })
             "The database didn't confirm this report, so it may or may not have been saved. Check the reports list before submitting again — we won't retry automatically.",
         };
       }
-      written = { ok: true, report_id: verified, created: true };
+      written = {
+        ok: true,
+        report_id: verified,
+        created: true,
+        ...(options.calendarEventId ? { calendarEventPlayerId: verifiedPlayerId } : {}),
+      };
     }
 
     if (!written.ok) {
@@ -547,9 +635,10 @@ export const submitMatchReport = createServerFn({ method: "POST" })
     // interaction per report however many times submission is retried.
     const link = await ensureMatchReportInteraction(supabase, {
       reportId: finalReportId,
-      goalkeeperName: payload.goalkeeper,
+      playerId: written.calendarEventPlayerId ?? linkedMatchTarget?.playerId ?? null,
+      goalkeeperName: linkedMatchTarget?.goalkeeperName ?? payload.goalkeeper,
       club: payload.team,
-      matchDate: payload.match_date,
+      matchDate: linkedMatchTarget?.eventDate ?? payload.match_date,
       mentorId: userId,
       mentorName: resolvedCoach,
       notes: matchReportInteractionNotes({

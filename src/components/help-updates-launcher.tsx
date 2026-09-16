@@ -21,7 +21,6 @@ interface HelpUpdatesLauncherProps {
   onMarkAnnouncementRead: (announcementId: string) => void | Promise<void>;
 }
 
-
 export function HelpUpdatesLauncher({
   open,
   unreadCount,

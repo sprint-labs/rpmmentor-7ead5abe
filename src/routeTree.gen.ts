@@ -36,6 +36,7 @@ import { Route as SystemDataQualityRouteImport } from './routes/system.data-qual
 import { Route as ReportsReportIdRouteImport } from './routes/reports.$reportId'
 import { Route as InsightsMetricRouteImport } from './routes/insights.$metric'
 import { Route as GoalkeepersGkIdRouteImport } from './routes/goalkeepers.$gkId'
+import { Route as DesignAccentProposalRouteImport } from './routes/design.accent-proposal'
 import { Route as Char91DotwellKnownChar93OauthProtectedResourceRouteImport } from './routes/[.well-known]/oauth-protected-resource'
 import { Route as Char91DotmcpChar93ListToolsRouteImport } from './routes/[.mcp]/list-tools'
 import { Route as SystemPlayersIndexRouteImport } from './routes/system.players.index'
@@ -178,6 +179,11 @@ const GoalkeepersGkIdRoute = GoalkeepersGkIdRouteImport.update({
   path: '/$gkId',
   getParentRoute: () => GoalkeepersRoute,
 } as any)
+const DesignAccentProposalRoute = DesignAccentProposalRouteImport.update({
+  id: '/design/accent-proposal',
+  path: '/design/accent-proposal',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const Char91DotwellKnownChar93OauthProtectedResourceRoute =
   Char91DotwellKnownChar93OauthProtectedResourceRouteImport.update({
     id: '/.well-known/oauth-protected-resource',
@@ -232,6 +238,7 @@ export interface FileRoutesByFullPath {
   '/support': typeof SupportRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
+  '/design/accent-proposal': typeof DesignAccentProposalRoute
   '/goalkeepers/$gkId': typeof GoalkeepersGkIdRoute
   '/insights/$metric': typeof InsightsMetricRoute
   '/reports/$reportId': typeof ReportsReportIdRoute
@@ -267,6 +274,7 @@ export interface FileRoutesByTo {
   '/support': typeof SupportRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
+  '/design/accent-proposal': typeof DesignAccentProposalRoute
   '/goalkeepers/$gkId': typeof GoalkeepersGkIdRoute
   '/insights/$metric': typeof InsightsMetricRoute
   '/reports/$reportId': typeof ReportsReportIdRoute
@@ -303,6 +311,7 @@ export interface FileRoutesById {
   '/support': typeof SupportRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
+  '/design/accent-proposal': typeof DesignAccentProposalRoute
   '/goalkeepers/$gkId': typeof GoalkeepersGkIdRoute
   '/insights/$metric': typeof InsightsMetricRoute
   '/reports/$reportId': typeof ReportsReportIdRoute
@@ -340,6 +349,7 @@ export interface FileRouteTypes {
     | '/support'
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
+    | '/design/accent-proposal'
     | '/goalkeepers/$gkId'
     | '/insights/$metric'
     | '/reports/$reportId'
@@ -375,6 +385,7 @@ export interface FileRouteTypes {
     | '/support'
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
+    | '/design/accent-proposal'
     | '/goalkeepers/$gkId'
     | '/insights/$metric'
     | '/reports/$reportId'
@@ -410,6 +421,7 @@ export interface FileRouteTypes {
     | '/support'
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
+    | '/design/accent-proposal'
     | '/goalkeepers/$gkId'
     | '/insights/$metric'
     | '/reports/$reportId'
@@ -446,6 +458,7 @@ export interface RootRouteChildren {
   SupportRoute: typeof SupportRoute
   Char91DotmcpChar93ListToolsRoute: typeof Char91DotmcpChar93ListToolsRoute
   Char91DotwellKnownChar93OauthProtectedResourceRoute: typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
+  DesignAccentProposalRoute: typeof DesignAccentProposalRoute
   InsightsMetricRoute: typeof InsightsMetricRoute
   ReportsReportIdRoute: typeof ReportsReportIdRoute
   SystemDataQualityRoute: typeof SystemDataQualityRoute
@@ -652,6 +665,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof GoalkeepersGkIdRouteImport
       parentRoute: typeof GoalkeepersRoute
     }
+    '/design/accent-proposal': {
+      id: '/design/accent-proposal'
+      path: '/design/accent-proposal'
+      fullPath: '/design/accent-proposal'
+      preLoaderRoute: typeof DesignAccentProposalRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/.well-known/oauth-protected-resource': {
       id: '/.well-known/oauth-protected-resource'
       path: '/.well-known/oauth-protected-resource'
@@ -730,6 +750,7 @@ const rootRouteChildren: RootRouteChildren = {
   Char91DotmcpChar93ListToolsRoute: Char91DotmcpChar93ListToolsRoute,
   Char91DotwellKnownChar93OauthProtectedResourceRoute:
     Char91DotwellKnownChar93OauthProtectedResourceRoute,
+  DesignAccentProposalRoute: DesignAccentProposalRoute,
   InsightsMetricRoute: InsightsMetricRoute,
   ReportsReportIdRoute: ReportsReportIdRoute,
   SystemDataQualityRoute: SystemDataQualityRoute,

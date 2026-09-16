@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
 import * as XLSX from "xlsx";
 import {
   buildFixtureDuplicateKey,
@@ -34,6 +35,15 @@ const MENTORS = [
 const DEFAULT_MENTOR_ID = "22222222-2222-4222-8222-222222222222";
 
 describe("fixture spreadsheet parsing", () => {
+  it("commits imported fixture associations as Not confirmed, never Played", () => {
+    const source = readFileSync(
+      new URL("../fixture-import.functions.ts", import.meta.url),
+      "utf8",
+    );
+    expect(source).toContain("participation_status: DEFAULT_MATCH_PARTICIPATION_STATUS");
+    expect(source).not.toMatch(/participation_status:\s*["']played["']/);
+  });
+
   it("maps common headers including Home/Away, Competition and Mentor", () => {
     const rows = parseFixtureMatrix([
       ["Date", "Time", "Goalkeeper", "Club", "Opponent", "Competition", "Venue", "H/A", "Mentor"],

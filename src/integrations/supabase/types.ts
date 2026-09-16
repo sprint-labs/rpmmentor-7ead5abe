@@ -161,6 +161,7 @@ export type Database = {
           id: string
           location: string | null
           notes: string
+          participation_status: string
           player_id: string | null
           start_time: string | null
           status: string
@@ -186,6 +187,7 @@ export type Database = {
           id?: string
           location?: string | null
           notes?: string
+          participation_status?: string
           player_id?: string | null
           start_time?: string | null
           status?: string
@@ -211,6 +213,7 @@ export type Database = {
           id?: string
           location?: string | null
           notes?: string
+          participation_status?: string
           player_id?: string | null
           start_time?: string | null
           status?: string
@@ -654,6 +657,7 @@ export type Database = {
         Row: {
           average: number | null
           calendar_event_id: string | null
+          calendar_event_player_id: string | null
           change_play: number | null
           coach: string
           comments: string | null
@@ -684,6 +688,7 @@ export type Database = {
         Insert: {
           average?: number | null
           calendar_event_id?: string | null
+          calendar_event_player_id?: string | null
           change_play?: number | null
           coach: string
           comments?: string | null
@@ -714,6 +719,7 @@ export type Database = {
         Update: {
           average?: number | null
           calendar_event_id?: string | null
+          calendar_event_player_id?: string | null
           change_play?: number | null
           coach?: string
           comments?: string | null
@@ -850,6 +856,7 @@ export type Database = {
           calendar_event_id: string | null
           created_at: string
           created_by: string | null
+          follow_up_basis: string | null
           id: string
           kind: string
           link_path: string
@@ -862,6 +869,7 @@ export type Database = {
           calendar_event_id?: string | null
           created_at?: string
           created_by?: string | null
+          follow_up_basis?: string | null
           id?: string
           kind: string
           link_path?: string
@@ -874,6 +882,7 @@ export type Database = {
           calendar_event_id?: string | null
           created_at?: string
           created_by?: string | null
+          follow_up_basis?: string | null
           id?: string
           kind?: string
           link_path?: string
@@ -1262,6 +1271,7 @@ export type Database = {
       }
     }
     Functions: {
+      announcement_media_storage_ready_v2: { Args: never; Returns: boolean }
       duty_of_care_at: {
         Args: { as_of: string }
         Returns: {

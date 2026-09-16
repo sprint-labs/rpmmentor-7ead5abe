@@ -15,6 +15,7 @@ const matchEvent: NotifiableEvent = {
   startTime: "15:00",
   goalkeeperName: "James Beadle",
   playerId: "22222222-2222-4222-8222-222222222222",
+  participationStatus: "played",
 };
 
 const coffeeEvent: NotifiableEvent = {
@@ -77,6 +78,59 @@ describe("buildEventNotification", () => {
     expect(n.body).not.toContain("Match Report");
     expect(n.linkPath).toContain("/interactions");
   });
+
+  it("assigns participation confirmation to calendar management, not the attending mentor", () => {
+    const n = buildEventNotification(
+      "event_assigned",
+      { ...matchEvent, participationStatus: "not_confirmed" },
+      { now },
+    );
+    expect(n.body).toContain("a Mentor Manager or administrator needs to confirm who played");
+    expect(n.body).toContain("no Match Report is due unless this goalkeeper is marked Played");
+    expect(n.body).not.toContain("Action: confirm");
+    expect(n.body).not.toContain("You need to submit: Match Report");
+    expect(n.body).not.toContain("Due by:");
+    expect(n.linkPath).toBe("/calendar");
+  });
+
+  it("states that no Match Report is required when the goalkeeper did not play", () => {
+    const n = buildEventNotification(
+      "event_updated",
+      { ...matchEvent, participationStatus: "did_not_play" },
+      { now },
+    );
+    expect(n.body).toContain("Did not play");
+    expect(n.body).toContain("no Match Report is required");
+    expect(n.body).not.toContain("Due by:");
+    expect(n.linkPath).toBe("/calendar");
+  });
+
+  it("links to an existing report instead of asking for another submission", () => {
+    const n = buildEventNotification("event_updated", matchEvent, {
+      now,
+      completedRecordId: "report-1",
+    });
+
+    expect(n.body).toContain("Match Report: already submitted");
+    expect(n.body).not.toContain("You need to submit");
+    expect(n.body).not.toContain("Due by:");
+    expect(n.linkPath).toBe("/reports/report-1");
+  });
+
+  it.each(["not_confirmed", "did_not_play"] as const)(
+    "keeps an existing report visible when participation is %s",
+    (participationStatus) => {
+      const n = buildEventNotification(
+        "event_updated",
+        { ...matchEvent, participationStatus },
+        { now, completedRecordId: "report-1" },
+      );
+
+      expect(n.body).toContain("Match Report: already submitted");
+      expect(n.body).not.toContain("You need to submit");
+      expect(n.linkPath).toBe("/reports/report-1");
+    },
+  );
 
   it("states the deadline as 48 hours after the scheduled time", () => {
     const n = buildEventNotification("event_assigned", matchEvent, { now });

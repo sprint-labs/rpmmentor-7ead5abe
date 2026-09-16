@@ -14,7 +14,26 @@ import { londonToday } from "@/lib/time/london";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const PLAYER_COLUMNS =
-  "id, full_name, current_club, parent_club, on_loan, league, nationality, instagram_url, contract_until";
+  "id, full_name, current_club, parent_club, on_loan, league, nationality, instagram_url, contract_until, tier";
+
+/**
+ * The values `players_tier_check` accepts. A player holds exactly one of them,
+ * or none at all while management has yet to tier them.
+ */
+export const PLAYER_TIER_VALUES = [
+  "Tier 1",
+  "Tier 2",
+  "Tier 3",
+  "Tier 4",
+  "Academy",
+  "Free Agent",
+] as const;
+export type PlayerTier = (typeof PLAYER_TIER_VALUES)[number];
+
+/** "" from a <select> means "no tier recorded", which is stored as NULL. */
+const nullableTier = z
+  .union([z.enum(PLAYER_TIER_VALUES), z.literal("")])
+  .transform((value) => (value === "" ? null : value));
 
 const nullableText = (max: number) =>
   z
@@ -47,6 +66,12 @@ export const playerRecordUpdateSchema = z.object({
   nationality: z.string().trim().max(120),
   instagramUrl: nullableHttpUrl,
   contractUntil: nullableText(120),
+  tier: nullableTier,
+});
+
+export const playerTierUpdateSchema = z.object({
+  id: z.string().regex(UUID, "A canonical player id is required."),
+  tier: nullableTier,
 });
 
 const playerIdSchema = z.object({
@@ -63,6 +88,8 @@ export interface PlayerRosterRow {
   nationality: string;
   instagram_url: string | null;
   contract_until: string | null;
+  /** NULL until management assigns a care-cadence tier. */
+  tier: string | null;
 }
 
 export const listPlayers = createServerFn({ method: "GET" })
@@ -138,6 +165,50 @@ export const updatePlayerClub = createServerFn({ method: "POST" })
   });
 
 /**
+ * Set (or clear) `players.tier`, targeted strictly by `players.id`.
+ *
+ * The tier drives every duty-of-care obligation, so management needs to assign
+ * it without holding Super Admin. Authorisation is enforced in three places,
+ * matching the club-edit path:
+ *   1. the role check below, which produces a clear message;
+ *   2. the `players_update_club_authorised` RLS policy;
+ *   3. the `players_guard_club_only_update` trigger, which permits only
+ *      `current_club`, `tier` and `tier_effective_from` for these roles.
+ * Success additionally requires a read-back confirming the persisted value.
+ *
+ * `tier_effective_from` is deliberately not set here — the database stamps it
+ * whenever the tier actually changes.
+ */
+export const updatePlayerTier = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((data: unknown) => playerTierUpdateSchema.parse(data))
+  .handler(async ({ data, context }): Promise<PlayerRosterRow> => {
+    await requireRole(context.supabase, context.userId, CLUB_EDIT_ROLES, "set a player's tier");
+
+    const { error } = await context.supabase
+      .from("players")
+      .update({ tier: data.tier })
+      .eq("id", data.id)
+      .is("deleted_at", null);
+    if (error) throw new Error(error.message);
+
+    const { data: row, error: readError } = await context.supabase
+      .from("players")
+      .select(PLAYER_COLUMNS)
+      .eq("id", data.id)
+      .is("deleted_at", null)
+      .maybeSingle();
+    if (readError) throw new Error(readError.message);
+    if (!row) throw new Error("Tier was not saved — the player record could not be read back.");
+
+    const saved = row as PlayerRosterRow;
+    if (saved.tier !== data.tier) {
+      throw new Error("Tier was not saved — the stored value did not change.");
+    }
+    return saved;
+  });
+
+/**
  * Full non-identity player-record correction, reserved for Super Admins.
  *
  * `id` and `full_name` remain immutable in this first tranche: several legacy
@@ -159,6 +230,7 @@ export const updatePlayerRecord = createServerFn({ method: "POST" })
         nationality: data.nationality,
         instagram_url: data.instagramUrl,
         contract_until: data.contractUntil,
+        tier: data.tier,
       })
       .eq("id", data.id)
       .is("deleted_at", null)
@@ -175,7 +247,8 @@ export const updatePlayerRecord = createServerFn({ method: "POST" })
       row.league !== data.league ||
       row.nationality !== data.nationality ||
       row.instagram_url !== data.instagramUrl ||
-      row.contract_until !== data.contractUntil
+      row.contract_until !== data.contractUntil ||
+      row.tier !== data.tier
     ) {
       throw new Error("The saved player record could not be confirmed.");
     }

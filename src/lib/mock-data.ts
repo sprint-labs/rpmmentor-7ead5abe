@@ -649,22 +649,9 @@ export function computeDutyOverview(
 
 export const dutyOverview = computeDutyOverview();
 
-const ROSTER_TIERS: TierLevelLabel[] = ["Tier 1", "Tier 2", "Tier 3", "Tier 4"];
-const ROSTER_STATUS_TAGS: GoalkeeperTag[] = ["Academy", "Free Agent"];
-
-// Tiers and status tags are deliberately counted separately. Every goalkeeper
-// belongs to one duty-of-care tier, while Academy and Free Agent describe the
-// player's current situation and can coexist with any numbered tier.
-export const rosterCategoryCounts = {
-  tiers: ROSTER_TIERS.map((label) => ({
-    label,
-    count: goalkeepers.filter((goalkeeper) => goalkeeper.tier === label).length,
-  })),
-  statuses: ROSTER_STATUS_TAGS.map((label) => ({
-    label,
-    count: goalkeepers.filter((goalkeeper) => goalkeeper.tags.includes(label)).length,
-  })),
-};
+// The dashboard Roster Snapshot no longer counts this fixture. Its numbers come
+// from public.players via getRosterSnapshot, so an unreachable database reports
+// itself instead of leaving a stale count on screen.
 
 export const stats = {
   totalGks: goalkeepers.length,

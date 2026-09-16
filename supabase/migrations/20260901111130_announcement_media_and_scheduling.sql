@@ -71,7 +71,7 @@ END;
 $$;
 
 COMMENT ON COLUMN public.announcements.attachment_path IS
-  'Private gk-media object path for the optional broadcast attachment.';
+  'Private dedicated Storage object path for the optional broadcast attachment.';
 COMMENT ON COLUMN public.announcements.attachment_name IS
   'Original display name for the optional broadcast attachment.';
 COMMENT ON COLUMN public.announcements.attachment_mime IS

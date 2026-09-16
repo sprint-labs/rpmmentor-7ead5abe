@@ -11,7 +11,7 @@ afterEach(() => {
 });
 
 describe("BulletinEditorDialog", () => {
-  it("keeps mentor-created work Open and explains the rule", () => {
+  it("fails closed when mounted without management permission", () => {
     const onSubmit = vi.fn();
     render(
       <BulletinEditorDialog
@@ -24,27 +24,8 @@ describe("BulletinEditorDialog", () => {
         onSubmit={onSubmit}
       />,
     );
-
-    const status = screen.getByRole("combobox", { name: "Status" }) as HTMLSelectElement;
-    expect(status.value).toBe("open");
-    expect(status.disabled).toBe(true);
-    expect(
-      screen.getByText("New mentor items start Open. A manager can change the status later."),
-    ).toBeTruthy();
-
-    fireEvent.change(screen.getByLabelText(/Title/), { target: { value: "Club need" } });
-    fireEvent.change(screen.getByLabelText(/Subject \*/), { target: { value: "EFL club" } });
-    fireEvent.click(screen.getByRole("button", { name: "Create item" }));
-
-    expect(onSubmit).toHaveBeenCalledWith(
-      expect.objectContaining({
-        kind: "deal",
-        title: "Club need",
-        subjectName: "EFL club",
-        status: "open",
-        ownerId: null,
-      }),
-    );
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(onSubmit).not.toHaveBeenCalled();
   });
 
   it("lets management assign an owner and choose a status", () => {

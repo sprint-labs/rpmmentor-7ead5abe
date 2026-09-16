@@ -1,53 +1,35 @@
 import { supabase } from "@/integrations/supabase/client";
-import { MEDIA_BUCKET } from "@/lib/storage/bucket";
+import { getUploadAccessToken } from "@/lib/media-store";
 import {
+  describeUploadError,
+  formatFileLimit,
+  RESUMABLE_UPLOAD_THRESHOLD_BYTES,
+  uploadObjectBytes,
+} from "@/lib/media-upload-transport";
+import { ANNOUNCEMENT_MEDIA_BUCKET } from "@/lib/storage/bucket";
+import { requireAnnouncementMediaStorageReady } from "@/lib/support/announcement-media-capability";
+import {
+  ANNOUNCEMENT_ATTACHMENT_MIME_BY_EXTENSION,
   ANNOUNCEMENT_ATTACHMENT_MAX_BYTES,
+  isAnnouncementAttachmentPathAllowed,
+  isAnnouncementAttachmentTypeAllowed,
   type AnnouncementAttachment,
 } from "@/lib/support/schema";
 
-export const ANNOUNCEMENT_ATTACHMENT_ACCEPT =
-  "image/jpeg,image/png,image/webp,image/gif,video/mp4,video/quicktime,video/webm,audio/mpeg,audio/mp4,audio/wav,audio/webm,audio/x-m4a,audio/aac,application/pdf";
-
-const ACCEPTED_MIME_TYPES = new Set(ANNOUNCEMENT_ATTACHMENT_ACCEPT.split(","));
-const ACCEPTED_EXTENSIONS = new Set([
-  "jpg",
-  "jpeg",
-  "png",
-  "webp",
-  "gif",
-  "mp4",
-  "mov",
-  "webm",
-  "mp3",
-  "m4a",
-  "wav",
-  "aac",
-  "pdf",
-]);
+export { ANNOUNCEMENT_ATTACHMENT_ACCEPT } from "@/lib/support/schema";
 
 function fileExtension(name: string): string {
   return name.split(".").pop()?.toLowerCase() ?? "";
 }
 
-function inferMimeType(file: File): string {
+export function announcementAttachmentMime(file: File): string {
   if (file.type) return file.type;
   const extension = fileExtension(file.name);
-  const byExtension: Record<string, string> = {
-    jpg: "image/jpeg",
-    jpeg: "image/jpeg",
-    png: "image/png",
-    webp: "image/webp",
-    gif: "image/gif",
-    mp4: "video/mp4",
-    mov: "video/quicktime",
-    webm: "video/webm",
-    mp3: "audio/mpeg",
-    m4a: "audio/mp4",
-    wav: "audio/wav",
-    aac: "audio/aac",
-    pdf: "application/pdf",
-  };
-  return byExtension[extension] ?? "application/octet-stream";
+  const accepted =
+    ANNOUNCEMENT_ATTACHMENT_MIME_BY_EXTENSION[
+      extension as keyof typeof ANNOUNCEMENT_ATTACHMENT_MIME_BY_EXTENSION
+    ];
+  return accepted?.[0] ?? "application/octet-stream";
 }
 
 function safeFileName(name: string): string {
@@ -60,8 +42,7 @@ function safeFileName(name: string): string {
 }
 
 export function announcementAttachmentError(file: File): string | null {
-  const extension = fileExtension(file.name);
-  if (!ACCEPTED_MIME_TYPES.has(file.type) && !ACCEPTED_EXTENSIONS.has(extension)) {
+  if (!isAnnouncementAttachmentTypeAllowed(file.name, announcementAttachmentMime(file))) {
     return "Use an image, MP4, MOV, WebM, audio file or PDF.";
   }
   if (file.size > ANNOUNCEMENT_ATTACHMENT_MAX_BYTES) {
@@ -74,14 +55,54 @@ export async function uploadAnnouncementAttachment(file: File): Promise<Announce
   const validationError = announcementAttachmentError(file);
   if (validationError) throw new Error(validationError);
 
+  // Storage uses the caller's browser session. Positively confirm that the
+  // hardening migration has replaced the legacy broad policies before deriving
+  // a path, fetching an upload token or sending any bytes.
+  await requireAnnouncementMediaStorageReady((name) => supabase.rpc(name));
+
   const name = safeFileName(file.name);
   const path = `announcements/${new Date().getUTCFullYear()}/${crypto.randomUUID()}-${name}`;
-  const mime = inferMimeType(file);
-  const { error } = await supabase.storage.from(MEDIA_BUCKET).upload(path, file, {
-    contentType: mime,
-    upsert: false,
+  const mime = announcementAttachmentMime(file);
+  const url = import.meta.env["VITE_SUPABASE_URL"] as string | undefined;
+  const anonKey = import.meta.env["VITE_SUPABASE_PUBLISHABLE_KEY"] as string | undefined;
+  const limitLabel = formatFileLimit(ANNOUNCEMENT_ATTACHMENT_MAX_BYTES);
+
+  if (!url || !anonKey) {
+    throw new Error("Upload failed: storage is not configured.");
+  }
+
+  const token = await getUploadAccessToken(file.size > RESUMABLE_UPLOAD_THRESHOLD_BYTES);
+  if (!token) {
+    throw new Error("Your session has expired. Sign in again and retry this upload.");
+  }
+
+  const uploadFile = file.type ? file : new File([file], file.name, { type: mime });
+
+  await uploadObjectBytes({
+    path,
+    file: uploadFile,
+    accessToken: token,
+    getAccessToken: async () => {
+      const next = await getUploadAccessToken(false);
+      if (!next) {
+        throw new Error("Your session has expired. Sign in again and retry this upload.");
+      }
+      return next;
+    },
+    supabaseUrl: url,
+    anonKey,
+    bucket: ANNOUNCEMENT_MEDIA_BUCKET,
+    limitLabel,
+    standardUpload: async (objectPath, objectFile) => {
+      const { error } = await supabase.storage
+        .from(ANNOUNCEMENT_MEDIA_BUCKET)
+        .upload(objectPath, objectFile, {
+          contentType: mime,
+          upsert: false,
+        });
+      if (error) throw new Error(describeUploadError(error, limitLabel));
+    },
   });
-  if (error) throw new Error(`Could not upload attachment: ${error.message}`);
 
   return {
     path,
@@ -91,7 +112,13 @@ export async function uploadAnnouncementAttachment(file: File): Promise<Announce
   };
 }
 
-export async function removeAnnouncementAttachment(path: string): Promise<void> {
-  const { error } = await supabase.storage.from(MEDIA_BUCKET).remove([path]);
-  if (error) console.warn("Could not remove unused broadcast attachment", error);
+/** Remove a freshly uploaded object only while no create request has begun. */
+export async function removeUnlinkedAnnouncementAttachment(
+  attachment: AnnouncementAttachment,
+): Promise<void> {
+  if (!isAnnouncementAttachmentPathAllowed(attachment.path)) return;
+  const { error } = await supabase.storage
+    .from(ANNOUNCEMENT_MEDIA_BUCKET)
+    .remove([attachment.path]);
+  if (error) throw new Error(error.message);
 }
