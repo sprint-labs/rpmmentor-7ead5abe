@@ -8,7 +8,7 @@ import {
   BulletinBoardSelector,
   BulletinWorkspace,
 } from "@/components/bulletins/bulletin-workspace";
-import { bulletinOwnerLabel, clampBulletinPage } from "@/components/bulletins/bulletin-display";
+import { bulletinOwnerLabel, clampBulletinPage, preferredBulletinBoardWithWork, bulletinBoardsWithWork } from "@/components/bulletins/bulletin-display";
 import type { BulletinDetail, BulletinItem, BulletinSummary } from "@/lib/bulletins/schema";
 
 const items: BulletinItem[] = [
@@ -87,6 +87,7 @@ const summary: BulletinSummary = {
 function workspaceProps() {
   return {
     kind: "deal" as const,
+    canManage: true,
     rows: items,
     total: 22,
     page: 1,
@@ -120,6 +121,21 @@ describe("Bulletin Board operational workspace", () => {
     expect(bulletinOwnerLabel({ ownerId: null, ownerName: "Departed Mentor" })).toBe("Unassigned");
   });
 
+  it("prefers a populated board when Daily Updates is empty", () => {
+    const emptyDaily = {
+      boards: [
+        { kind: "daily_update" as const, total: 0, open: 0, blocked: 0 },
+        { kind: "deal" as const, total: 0, open: 0, blocked: 0 },
+        { kind: "lead" as const, total: 3, open: 1, blocked: 0 },
+        { kind: "mandate" as const, total: 0, open: 0, blocked: 0 },
+      ],
+    };
+    expect(preferredBulletinBoardWithWork(emptyDaily)).toBe("lead");
+    expect(bulletinBoardsWithWork(emptyDaily, "daily_update")).toEqual([
+      { kind: "lead", label: "Leads", total: 3 },
+    ]);
+  });
+
   it("presents four distinct boards and makes the Deals meaning explicit", () => {
     const onChange = vi.fn();
     render(<BulletinBoardSelector current="daily_update" summary={summary} onChange={onChange} />);
@@ -141,6 +157,13 @@ describe("Bulletin Board operational workspace", () => {
     expect(screen.getByText("Due soon").parentElement?.textContent).toContain("4");
     expect(screen.getByText("Unassigned").parentElement?.textContent).toContain("1");
     expect(container.querySelector("svg[role='img']")).toBeNull();
+  });
+
+  it("keeps unassigned team work out of a Mentor's personal attention strip", () => {
+    render(<BulletinAttentionStrip summary={{ ...summary, canManage: false }} />);
+    expect(screen.getByText("Overdue")).toBeTruthy();
+    expect(screen.getByText("Due soon")).toBeTruthy();
+    expect(screen.queryByText("Unassigned")).toBeNull();
   });
 
   it("keeps the list and complete selected record together, with manager edit and append-only updates", async () => {
@@ -178,6 +201,22 @@ describe("Bulletin Board operational workspace", () => {
     expect(within(timelinePages).getByText("1 / 2")).toBeTruthy();
     fireEvent.click(within(timelinePages).getByRole("button", { name: "Next" }));
     expect(props.onUpdatesPageChange).toHaveBeenCalledWith(2);
+  });
+
+  it("lets an assigned Mentor append progress without exposing edit or assignment controls", async () => {
+    const props = workspaceProps();
+    const mentorDetail = { ...detail, canManage: false };
+    render(<BulletinWorkspace {...props} canManage={false} detail={mentorDetail} />);
+
+    const detailPanel = screen.getByRole("region", { name: "Selected bulletin details" });
+    expect(within(detailPanel).queryByRole("button", { name: "Edit & assign" })).toBeNull();
+
+    const update = within(detailPanel).getByRole("textbox", { name: "Add an update" });
+    fireEvent.change(update, { target: { value: "  Shortlist reviewed with Rich.  " } });
+    fireEvent.click(within(detailPanel).getByRole("button", { name: "Add update" }));
+    await waitFor(() =>
+      expect(props.onAddUpdate).toHaveBeenCalledWith("Shortlist reviewed with Rich."),
+    );
   });
 
   it("moves mobile focus only after a newly selected detail has loaded", async () => {
@@ -257,5 +296,20 @@ describe("Bulletin Board operational workspace", () => {
     );
     expect(screen.getByRole("heading", { name: "No matching items" })).toBeTruthy();
     expect(screen.getByText("Try a broader search or a different status.")).toBeTruthy();
+
+    rerender(
+      <BulletinWorkspace
+        {...props}
+        canManage={false}
+        rows={[]}
+        total={0}
+        detail={undefined}
+        listError={null}
+        search=""
+      />,
+    );
+    expect(screen.getByRole("heading", { name: "No deals assigned to you" })).toBeTruthy();
+    expect(screen.getByText("Nothing is currently assigned to you on this board.")).toBeTruthy();
+    expect(screen.queryByText(/Create the first/i)).toBeNull();
   });
 });

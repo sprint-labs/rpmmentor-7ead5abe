@@ -105,6 +105,20 @@ describe("ensureMatchReportInteraction", () => {
     expect(captured.match_report_id).toBe(REPORT_ID);
   });
 
+  it("uses the calendar event's canonical player id without a name lookup", async () => {
+    let captured: Record<string, unknown> = {};
+    const db = makeDb({ existing: null, onInsert: (p) => (captured = p) });
+
+    const result = await ensureMatchReportInteraction(db, {
+      ...input,
+      playerId: "event-player-id",
+    });
+
+    expect(result.ok).toBe(true);
+    expect(captured.player_id).toBe("event-player-id");
+    expect(db.calls).not.toHaveBeenCalledWith("players");
+  });
+
   it("does not create a second interaction when one already exists for the report", async () => {
     const insert = vi.fn();
     const db = makeDb({ existing: row(), onInsert: insert });

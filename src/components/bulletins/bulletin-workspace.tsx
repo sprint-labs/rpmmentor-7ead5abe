@@ -92,11 +92,15 @@ export function BulletinAttentionStrip({
       value: summary.attention.dueSoon,
       className: summary.attention.dueSoon > 0 ? "text-warning" : "text-muted-foreground",
     },
-    {
-      label: "Unassigned",
-      value: summary.attention.unassigned,
-      className: summary.attention.unassigned > 0 ? "text-info" : "text-muted-foreground",
-    },
+    ...(summary.canManage
+      ? [
+          {
+            label: "Unassigned",
+            value: summary.attention.unassigned,
+            className: summary.attention.unassigned > 0 ? "text-info" : "text-muted-foreground",
+          },
+        ]
+      : []),
   ];
   const clear = cells.every((cell) => cell.value === 0);
 
@@ -123,7 +127,12 @@ export function BulletinAttentionStrip({
           As at {formatBulletinDate(summary.asOfDate)}
         </span>
       </div>
-      <div className="grid gap-px bg-border sm:grid-cols-3">
+      <div
+        className={cn(
+          "grid gap-px bg-border",
+          summary.canManage ? "sm:grid-cols-3" : "sm:grid-cols-2",
+        )}
+      >
         {cells.map((cell) => (
           <div key={cell.label} className="bg-card px-4 py-3">
             <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
@@ -204,6 +213,8 @@ export function BulletinBoardSelector({
 
 interface BulletinWorkspaceProps {
   kind: BulletinKind;
+  canManage: boolean;
+  boardsWithWork?: Array<{ kind: BulletinKind; label: string; total: number }>;
   rows: BulletinItem[];
   total: number;
   page: number;
@@ -228,10 +239,13 @@ interface BulletinWorkspaceProps {
   onEdit: (item: BulletinItem) => void;
   onAddUpdate: (body: string) => Promise<void>;
   onUpdatesPageChange: (page: number) => void;
+  onOpenBoard?: (kind: BulletinKind) => void;
 }
 
 export function BulletinWorkspace({
   kind,
+  canManage,
+  boardsWithWork = [],
   rows,
   total,
   page,
@@ -256,6 +270,7 @@ export function BulletinWorkspace({
   onEdit,
   onAddUpdate,
   onUpdatesPageChange,
+  onOpenBoard,
 }: BulletinWorkspaceProps) {
   const board = BULLETIN_BOARD_META.find((candidate) => candidate.kind === kind)!;
   const detailRef = useRef<HTMLElement>(null);
@@ -363,12 +378,28 @@ export function BulletinWorkspace({
                 title={
                   hasFilters
                     ? "No matching items"
-                    : `No ${board.label.toLocaleLowerCase("en-GB")} yet`
+                    : canManage
+                      ? `No ${board.label.toLocaleLowerCase("en-GB")} yet`
+                      : `No ${board.label.toLocaleLowerCase("en-GB")} assigned to you`
                 }
                 description={
                   hasFilters
                     ? "Try a broader search or a different status."
-                    : `Create the first ${board.singular.toLocaleLowerCase("en-GB")} when there is real work to record.`
+                    : boardsWithWork.length > 0
+                      ? "This board is empty. Open a board that already has team work."
+                      : canManage
+                        ? `Create the first ${board.singular.toLocaleLowerCase("en-GB")} when there is real work to record.`
+                        : "Nothing is currently assigned to you on this board."
+                }
+                actionLabel={
+                  !hasFilters && boardsWithWork[0] && onOpenBoard
+                    ? `Open ${boardsWithWork[0].label} (${boardsWithWork[0].total})`
+                    : undefined
+                }
+                onAction={
+                  !hasFilters && boardsWithWork[0] && onOpenBoard
+                    ? () => onOpenBoard(boardsWithWork[0]!.kind)
+                    : undefined
                 }
               />
             ) : (

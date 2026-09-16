@@ -9,9 +9,12 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { getUserRoles, hasAnyRole } from "@/lib/roles.server";
 import { FOLLOW_UP_MANAGE_ROLES } from "./follow-up.functions";
-import type { NotificationKind } from "./notification-copy";
+import type { FollowUpNotificationBasis, NotificationKind } from "./notification-copy";
+import type { QueryClient } from "./follow-up-query.server";
 
 const INBOX_LIMIT = 60;
+const INBOX_SCAN_LIMIT = 240;
+const EVENT_STATUS_BATCH = 100;
 
 export interface AppNotification {
   id: string;
@@ -22,6 +25,7 @@ export interface AppNotification {
   createdAt: string;
   readAt: string | null;
   eventId: string | null;
+  followUpBasis: FollowUpNotificationBasis | null;
 }
 
 export interface NotificationInbox {
@@ -29,16 +33,79 @@ export interface NotificationInbox {
   unread: number;
 }
 
+/** IDs the current inbox actually renders as unread. Hidden derived rows stay untouched. */
+export function visibleUnreadNotificationIds(items: readonly AppNotification[]): string[] {
+  return items.filter((item) => !item.readAt).map((item) => item.id);
+}
+
+/**
+ * Durable overdue messages describe a derived state that can later change.
+ * Keep the stored notification for audit/history, but only surface it while the
+ * linked event is still currently overdue. This closes historical false alerts
+ * without deleting or rewriting any notification rows.
+ */
+export function filterCurrentOverdueNotifications(
+  items: readonly AppNotification[],
+  currentOverdueBasisByEvent: ReadonlyMap<string, FollowUpNotificationBasis>,
+): AppNotification[] {
+  return items.filter(
+    (item) =>
+      item.kind !== "follow_up_overdue" ||
+      (Boolean(item.eventId) &&
+        item.followUpBasis === currentOverdueBasisByEvent.get(item.eventId as string)),
+  );
+}
+
+/**
+ * Assignment/update messages are actionable snapshots, so hide them once the
+ * linked event is cancelled. This read-time reconciliation closes the race where
+ * cancellation commits after an event update but before its notification insert,
+ * while retaining the stored notification row for audit/history.
+ */
+export function filterCancelledActiveEventNotifications(
+  items: readonly AppNotification[],
+  cancelledEventIds: ReadonlySet<string>,
+): AppNotification[] {
+  return items.filter(
+    (item) =>
+      (item.kind !== "event_assigned" && item.kind !== "event_updated") ||
+      !item.eventId ||
+      !cancelledEventIds.has(item.eventId),
+  );
+}
+
+async function loadCancelledEventIds(
+  supabase: QueryClient,
+  eventIds: readonly string[],
+): Promise<Set<string>> {
+  const cancelled = new Set<string>();
+  for (let start = 0; start < eventIds.length; start += EVENT_STATUS_BATCH) {
+    const { data, error } = await supabase
+      .from("calendar_events")
+      .select("id, status")
+      .in("id", eventIds.slice(start, start + EVENT_STATUS_BATCH));
+    if (error) throw new Error(error.message);
+    for (const row of data ?? []) {
+      if (row.status === "cancelled") cancelled.add(row.id as string);
+    }
+  }
+  return cancelled;
+}
+
 export const listNotifications = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<NotificationInbox> => {
     const { data, error } = await context.supabase
       .from("notifications")
-      .select("id, kind, title, body, link_path, created_at, read_at, calendar_event_id")
+      .select(
+        "id, kind, title, body, link_path, created_at, read_at, calendar_event_id, follow_up_basis",
+      )
       .order("created_at", { ascending: false })
-      .limit(INBOX_LIMIT);
+      // Scan beyond the visible page because stale derived overdue rows may be
+      // filtered below; they must not crowd older, still-valid messages out.
+      .limit(INBOX_SCAN_LIMIT);
     if (error) throw new Error(error.message);
-    const items = (data ?? []).map((row) => ({
+    const storedItems: AppNotification[] = (data ?? []).map((row) => ({
       id: row.id as string,
       kind: row.kind as string,
       title: row.title as string,
@@ -47,7 +114,49 @@ export const listNotifications = createServerFn({ method: "GET" })
       createdAt: row.created_at as string,
       readAt: (row.read_at as string | null) ?? null,
       eventId: (row.calendar_event_id as string | null) ?? null,
+      followUpBasis:
+        row.follow_up_basis === "match_played" || row.follow_up_basis === "interaction"
+          ? row.follow_up_basis
+          : null,
     }));
+    let items = storedItems;
+    const activeEventIds = [
+      ...new Set(
+        storedItems
+          .filter(
+            (item) =>
+              (item.kind === "event_assigned" || item.kind === "event_updated") && item.eventId,
+          )
+          .map((item) => item.eventId as string),
+      ),
+    ];
+    if (activeEventIds.length > 0) {
+      const cancelledIds = await loadCancelledEventIds(context.supabase, activeEventIds);
+      items = filterCancelledActiveEventNotifications(items, cancelledIds);
+    }
+    if (storedItems.some((item) => item.kind === "follow_up_overdue")) {
+      const { loadEventFollowUps } = await import("./follow-up-query.server");
+      // Notifications are already RLS-scoped to the caller. Resolve only their
+      // own assigned events here, even when the caller also has a manager role.
+      const current = await loadEventFollowUps(context.supabase, context.userId, false);
+      const overdueBasisByEvent = new Map<string, FollowUpNotificationBasis>(
+        current
+          .filter(
+            (row) =>
+              row.followUp.status === "overdue" &&
+              (row.followUp.kind === "match_report" || row.followUp.kind === "interaction"),
+          )
+          .map(
+            (row) =>
+              [
+                row.eventId,
+                row.followUp.kind === "match_report" ? "match_played" : "interaction",
+              ] as const,
+          ),
+      );
+      items = filterCurrentOverdueNotifications(items, overdueBasisByEvent);
+    }
+    items = items.slice(0, INBOX_LIMIT);
     return { items, unread: items.filter((i) => !i.readAt).length };
   });
 
@@ -61,12 +170,12 @@ export const markNotificationsRead = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((data: { ids?: string[] } | undefined) => ({ ids: data?.ids ?? [] }))
   .handler(async ({ data, context }): Promise<{ ok: true }> => {
-    let query = context.supabase
+    if (data.ids.length === 0) return { ok: true };
+    const { error } = await context.supabase
       .from("notifications")
       .update({ read_at: new Date().toISOString() })
-      .is("read_at", null);
-    if (data.ids.length > 0) query = query.in("id", data.ids);
-    const { error } = await query;
+      .is("read_at", null)
+      .in("id", data.ids);
     if (error) throw new Error(error.message);
     return { ok: true };
   });
@@ -94,7 +203,9 @@ export const syncOverdueFollowUpNotifications = createServerFn({ method: "POST" 
     const canSeeEveryone = hasAnyRole(roles, FOLLOW_UP_MANAGE_ROLES);
     const rows = await loadEventFollowUps(context.supabase, context.userId, canSeeEveryone);
 
-    const overdue = rows.filter((r) => r.followUp.status === "overdue" && r.assignedMentorId);
+    const overdue = rows.filter(
+      (r) => r.followUp.status === "overdue" && r.followUp.kind && r.assignedMentorId,
+    );
     let created = 0;
     for (const row of overdue) {
       const ok = await notifyFollowUpOverdue(context.supabase, context.userId, {
@@ -106,6 +217,7 @@ export const syncOverdueFollowUpNotifications = createServerFn({ method: "POST" 
         end_time: row.endTime,
         goalkeeper_name: row.goalkeeperName,
         player_id: row.playerId,
+        participation_status: row.participationStatus,
         assigned_mentor_id: row.assignedMentorId,
       });
       if (ok) created += 1;

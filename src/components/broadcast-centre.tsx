@@ -1,11 +1,4 @@
-import {
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type ChangeEvent,
-  type DragEvent,
-} from "react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type DragEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
@@ -36,8 +29,16 @@ import { cn } from "@/lib/utils";
 import {
   createAnnouncement,
   endAnnouncement,
+  getAdminAnnouncementClock,
   listAdminAnnouncements,
 } from "@/lib/support.functions";
+import { useAnnouncementClock } from "@/lib/support/announcement-clock";
+import {
+  advanceAdminServerNow,
+  estimateAdminServerNow,
+  nextAdminScheduleAt,
+  nextAdminScheduleInputMinAt,
+} from "@/lib/support/admin-announcements";
 import type {
   AnnouncementAttachment,
   AnnouncementKind,
@@ -46,24 +47,26 @@ import type {
 import {
   ANNOUNCEMENT_ATTACHMENT_ACCEPT,
   announcementAttachmentError,
-  removeAnnouncementAttachment,
+  announcementAttachmentMime,
+  removeUnlinkedAnnouncementAttachment,
   uploadAnnouncementAttachment,
 } from "@/lib/support/announcement-attachments";
+import {
+  readBroadcastDraft,
+  removeBroadcastDraft,
+  restoreBroadcastScheduleTime,
+  writeBroadcastDraft,
+  type BroadcastScheduleTimeSource,
+  type BroadcastDraft,
+} from "@/lib/support/broadcast-draft-storage";
+import { submitBroadcastAfterUpload } from "@/lib/support/broadcast-submit";
+import {
+  BROADCAST_SCHEDULE_MIN_LEAD_MS,
+  resolveBroadcastWindow,
+} from "@/lib/support/broadcast-window";
 
-const DRAFT_KEY = "rpm-broadcast-draft-v2";
-
-type PublishMode = "now" | "later";
-type ExpiryMode = "none" | "24h" | "7d" | "custom";
-
-type StoredDraft = {
-  kind: AnnouncementKind;
-  title: string;
-  body: string;
-  publishMode: PublishMode;
-  startsAt: string;
-  expiryMode: ExpiryMode;
-  endsAt: string;
-};
+type PublishMode = BroadcastDraft["publishMode"];
+type ExpiryMode = BroadcastDraft["expiryMode"];
 
 const KIND_META: Record<
   AnnouncementKind,
@@ -96,10 +99,8 @@ function toDateTimeLocal(date: Date): string {
   return new Date(date.getTime() - offset * 60_000).toISOString().slice(0, 16);
 }
 
-function defaultScheduledAt(): string {
-  const date = new Date(Date.now() + 60 * 60 * 1000);
-  date.setMinutes(0, 0, 0);
-  return toDateTimeLocal(date);
+function defaultScheduledAt(nowMs: number): string {
+  return toDateTimeLocal(new Date(nextAdminScheduleAt(nowMs)));
 }
 
 function formatDateTime(value: string): string {
@@ -109,10 +110,7 @@ function formatDateTime(value: string): string {
   }).format(new Date(value));
 }
 
-function statusOf(
-  announcement: AnnouncementRow,
-  now: number,
-): "live" | "scheduled" | "ended" {
+function statusOf(announcement: AnnouncementRow, now: number): "live" | "scheduled" | "ended" {
   if (!announcement.active) return "ended";
   if (announcement.endsAt && Date.parse(announcement.endsAt) <= now) return "ended";
   if (Date.parse(announcement.startsAt) > now) return "scheduled";
@@ -163,13 +161,15 @@ export function BroadcastCentre() {
   const list = useServerFn(listAdminAnnouncements);
   const create = useServerFn(createAnnouncement);
   const end = useServerFn(endAnnouncement);
+  const getAdminClock = useServerFn(getAdminAnnouncementClock);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const scheduleTimeSourceRef = useRef<BroadcastScheduleTimeSource>("auto");
 
   const [kind, setKind] = useState<AnnouncementKind>("feature");
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [publishMode, setPublishMode] = useState<PublishMode>("now");
-  const [startsAt, setStartsAt] = useState(defaultScheduledAt);
+  const [startsAt, setStartsAt] = useState("");
   const [expiryMode, setExpiryMode] = useState<ExpiryMode>("none");
   const [endsAt, setEndsAt] = useState("");
   const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
@@ -178,47 +178,45 @@ export function BroadcastCentre() {
   const [dragActive, setDragActive] = useState(false);
 
   useEffect(() => {
-    try {
-      const raw = window.localStorage.getItem(DRAFT_KEY);
-      if (raw) {
-        const draft = JSON.parse(raw) as Partial<StoredDraft>;
-        if (draft.kind && ["feature", "info", "incident", "downtime"].includes(draft.kind)) {
-          setKind(draft.kind);
-        }
-        if (typeof draft.title === "string") setTitle(draft.title);
-        if (typeof draft.body === "string") setBody(draft.body);
-        if (draft.publishMode === "now" || draft.publishMode === "later") {
-          setPublishMode(draft.publishMode);
-        }
-        if (typeof draft.startsAt === "string" && draft.startsAt) setStartsAt(draft.startsAt);
-        if (
-          draft.expiryMode === "none" ||
-          draft.expiryMode === "24h" ||
-          draft.expiryMode === "7d" ||
-          draft.expiryMode === "custom"
-        ) {
-          setExpiryMode(draft.expiryMode);
-        }
-        if (typeof draft.endsAt === "string") setEndsAt(draft.endsAt);
+    const draft = readBroadcastDraft();
+    if (draft) {
+      if (draft.kind && ["feature", "info", "incident", "downtime"].includes(draft.kind)) {
+        setKind(draft.kind);
       }
-    } catch {
-      window.localStorage.removeItem(DRAFT_KEY);
+      if (typeof draft.title === "string") setTitle(draft.title);
+      if (typeof draft.body === "string") setBody(draft.body);
+      if (draft.publishMode === "now" || draft.publishMode === "later") {
+        setPublishMode(draft.publishMode);
+      }
+      const restoredSchedule = restoreBroadcastScheduleTime(draft);
+      scheduleTimeSourceRef.current = restoredSchedule.source;
+      setStartsAt(restoredSchedule.startsAt);
+      if (
+        draft.expiryMode === "none" ||
+        draft.expiryMode === "24h" ||
+        draft.expiryMode === "7d" ||
+        draft.expiryMode === "custom"
+      ) {
+        setExpiryMode(draft.expiryMode);
+      }
+      if (typeof draft.endsAt === "string") setEndsAt(draft.endsAt);
     }
     setDraftReady(true);
   }, []);
 
   useEffect(() => {
     if (!draftReady) return;
-    const draft: StoredDraft = {
+    const draft: BroadcastDraft = {
       kind,
       title,
       body,
       publishMode,
       startsAt,
+      scheduleTimeSource: scheduleTimeSourceRef.current === "auto" ? "auto" : "user",
       expiryMode,
       endsAt,
     };
-    window.localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+    writeBroadcastDraft(draft);
   }, [body, draftReady, endsAt, expiryMode, kind, publishMode, startsAt, title]);
 
   useEffect(() => {
@@ -231,25 +229,63 @@ export function BroadcastCentre() {
     return () => URL.revokeObjectURL(url);
   }, [attachmentFile]);
 
-  const { data = [], isLoading, isError, refetch } = useQuery({
+  const {
+    data = [],
+    dataUpdatedAt,
+    isLoading,
+    isError,
+    refetch,
+  } = useQuery({
     queryKey: ["announcements", "admin", "all"],
     queryFn: () => list(),
     staleTime: 30_000,
+    refetchInterval: 30_000,
   });
 
-  const now = Date.now();
+  const {
+    data: adminClockSample,
+    isError: adminClockError,
+    isFetching: adminClockFetching,
+    refetch: refetchAdminClock,
+  } = useQuery({
+    queryKey: ["announcements", "admin", "clock"],
+    queryFn: async () => {
+      const monotonicStartedAt = performance.now();
+      const wallStartedAt = Date.now();
+      const sample = await getAdminClock();
+      // Treat a malformed response as a query failure instead of crashing a
+      // render while calculating native input bounds.
+      advanceAdminServerNow(sample.serverNow, 0);
+      return { ...sample, monotonicStartedAt, wallStartedAt };
+    },
+    enabled: draftReady,
+    staleTime: 25_000,
+    refetchInterval: 30_000,
+  });
+
+  // Older servers omit serverNow, so retain a workstation-clock fallback for
+  // rolling deployments while preventing skew once this response is present.
+  const serverNow = data[0]?.serverNow;
+  const clientNow = useAnnouncementClock();
+  const now = estimateAdminServerNow(serverNow, dataUpdatedAt, clientNow);
+  const adminServerNow =
+    draftReady && adminClockSample
+      ? advanceAdminServerNow(
+          adminClockSample.serverNow,
+          performance.now() - adminClockSample.monotonicStartedAt,
+          Date.now() - adminClockSample.wallStartedAt,
+        )
+      : null;
   const live = data.filter((announcement) => statusOf(announcement, now) === "live");
   const scheduled = data.filter((announcement) => statusOf(announcement, now) === "scheduled");
-  const recent = data
-    .filter((announcement) => statusOf(announcement, now) === "ended")
-    .slice(0, 8);
+  const recent = data.filter((announcement) => statusOf(announcement, now) === "ended").slice(0, 8);
 
   const previewAttachment = useMemo<AnnouncementAttachment | null>(() => {
     if (!attachmentFile) return null;
     return {
       path: "preview",
       name: attachmentFile.name,
-      mime: attachmentFile.type || "application/octet-stream",
+      mime: announcementAttachmentMime(attachmentFile),
       size: attachmentFile.size,
     };
   }, [attachmentFile]);
@@ -278,71 +314,61 @@ export function BroadcastCentre() {
     setAttachment(event.dataTransfer.files?.[0] ?? null);
   }
 
-  function resolvedStart(): Date {
-    if (publishMode === "now") return new Date();
-    const date = new Date(startsAt);
-    if (!startsAt || Number.isNaN(date.getTime())) throw new Error("Choose a valid publish time.");
-    if (date.getTime() <= Date.now() + 30_000) {
-      throw new Error("Scheduled broadcasts need a future publish time.");
-    }
-    return date;
-  }
-
-  function resolvedEnd(start: Date): string | null {
-    if (expiryMode === "none") return null;
-    if (expiryMode === "24h") return new Date(start.getTime() + 24 * 60 * 60 * 1000).toISOString();
-    if (expiryMode === "7d") return new Date(start.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString();
-
-    const date = new Date(endsAt);
-    if (!endsAt || Number.isNaN(date.getTime())) throw new Error("Choose a valid end time.");
-    if (date.getTime() <= start.getTime()) {
-      throw new Error("The end time must be after the publish time.");
-    }
-    return date.toISOString();
-  }
-
   function clearComposer() {
     setKind("feature");
     setTitle("");
     setBody("");
     setPublishMode("now");
-    setStartsAt(defaultScheduledAt());
+    scheduleTimeSourceRef.current = "auto";
+    setStartsAt(adminServerNow === null ? "" : defaultScheduledAt(adminServerNow));
     setExpiryMode("none");
     setEndsAt("");
     setAttachment(null);
-    window.localStorage.removeItem(DRAFT_KEY);
+    removeBroadcastDraft();
   }
 
   const createMutation = useMutation({
     mutationFn: async () => {
       if (!title.trim()) throw new Error("Add a title before publishing.");
-      const start = resolvedStart();
-      const endAt = resolvedEnd(start);
-      let uploaded: AnnouncementAttachment | null = null;
-
-      try {
-        if (attachmentFile) uploaded = await uploadAnnouncementAttachment(attachmentFile);
-        return await create({
-          data: {
-            kind,
-            title: title.trim(),
-            body: body.trim(),
-            startsAt: start.toISOString(),
-            endsAt: endAt,
-            attachment: uploaded,
-          },
-        });
-      } catch (error) {
-        if (uploaded) await removeAnnouncementAttachment(uploaded.path);
-        throw error;
-      }
+      const draftWindow = { publishMode, startsAt, expiryMode, endsAt };
+      const clockRequestStartedAt = performance.now();
+      const clockRequestWallStartedAt = Date.now();
+      const clockSample = await getAdminClock();
+      const currentAdminServerNow = () =>
+        advanceAdminServerNow(
+          clockSample.serverNow,
+          performance.now() - clockRequestStartedAt,
+          Date.now() - clockRequestWallStartedAt,
+        );
+      // Reject an invalid draft before uploading any bytes.
+      resolveBroadcastWindow(draftWindow, currentAdminServerNow());
+      const uploaded = attachmentFile ? await uploadAnnouncementAttachment(attachmentFile) : null;
+      // A large upload can outlast a near start or expiry. Revalidate while
+      // cleanup is still safe, then never delete after the create begins.
+      return submitBroadcastAfterUpload({
+        draft: draftWindow,
+        attachment: uploaded,
+        removeAttachment: removeUnlinkedAnnouncementAttachment,
+        nowMs: currentAdminServerNow(),
+        submit: (delivery) =>
+          create({
+            data: {
+              kind,
+              title: title.trim(),
+              body: body.trim(),
+              publishMode: delivery.scheduled ? "later" : "now",
+              expiryMode,
+              startsAt: delivery.scheduled ? delivery.startsAt : null,
+              // Retain the resolved absolute value for rollback/old-server
+              // compatibility. New servers use expiryMode as the authority.
+              endsAt: delivery.endsAt,
+              attachment: uploaded,
+            },
+          }),
+      });
     },
-    onSuccess: async (announcement) => {
-      toast.success(
-        Date.parse(announcement.startsAt) > Date.now()
-          ? "Broadcast scheduled"
-          : "Broadcast published",
-      );
+    onSuccess: async () => {
+      toast.success(publishMode === "later" ? "Broadcast scheduled" : "Broadcast published");
       clearComposer();
       await refetch();
       void queryClient.invalidateQueries({ queryKey: ["announcements"] });
@@ -360,12 +386,24 @@ export function BroadcastCentre() {
     onError: (error: Error) => toast.error(error.message),
   });
 
+  const composerLocked = createMutation.isPending;
+
+  useEffect(() => {
+    if (composerLocked || adminServerNow === null || scheduleTimeSourceRef.current !== "auto") {
+      return;
+    }
+    const next = defaultScheduledAt(adminServerNow);
+    setStartsAt((current) => (current === next ? current : next));
+  }, [adminServerNow, composerLocked]);
+
   function duplicateAnnouncement(announcement: AnnouncementRow) {
+    if (composerLocked) return;
     setKind(announcement.kind);
     setTitle(announcement.title);
     setBody(announcement.body);
     setPublishMode("now");
-    setStartsAt(defaultScheduledAt());
+    scheduleTimeSourceRef.current = "auto";
+    setStartsAt(adminServerNow === null ? "" : defaultScheduledAt(adminServerNow));
     setExpiryMode("none");
     setEndsAt("");
     setAttachment(null);
@@ -431,6 +469,7 @@ export function BroadcastCentre() {
             {(title || body || attachmentFile) && (
               <button
                 type="button"
+                disabled={composerLocked}
                 onClick={clearComposer}
                 className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border px-2.5 text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
               >
@@ -439,8 +478,10 @@ export function BroadcastCentre() {
             )}
           </div>
 
-          <fieldset>
-            <legend className="text-xs font-medium text-foreground">What kind of message is this?</legend>
+          <fieldset disabled={composerLocked}>
+            <legend className="text-xs font-medium text-foreground">
+              What kind of message is this?
+            </legend>
             <div className="mt-2 grid gap-2 sm:grid-cols-2">
               {(Object.keys(KIND_META) as AnnouncementKind[]).map((option) => {
                 const meta = KIND_META[option];
@@ -488,6 +529,7 @@ export function BroadcastCentre() {
                 <span className="font-normal text-muted-foreground">{title.length}/160</span>
               </span>
               <input
+                disabled={composerLocked}
                 value={title}
                 onChange={(event) => setTitle(event.target.value)}
                 maxLength={160}
@@ -508,6 +550,7 @@ export function BroadcastCentre() {
                 <span className="font-normal text-muted-foreground">{body.length}/4000</span>
               </span>
               <textarea
+                disabled={composerLocked}
                 value={body}
                 onChange={(event) => setBody(event.target.value)}
                 maxLength={4000}
@@ -529,6 +572,7 @@ export function BroadcastCentre() {
               {attachmentFile && (
                 <button
                   type="button"
+                  disabled={composerLocked}
                   onClick={() => setAttachment(null)}
                   className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border px-2.5 text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
                 >
@@ -539,6 +583,7 @@ export function BroadcastCentre() {
             <input
               ref={fileInputRef}
               type="file"
+              disabled={composerLocked}
               accept={ANNOUNCEMENT_ATTACHMENT_ACCEPT}
               onChange={handleFileChange}
               className="sr-only"
@@ -557,6 +602,7 @@ export function BroadcastCentre() {
                   </div>
                   <button
                     type="button"
+                    disabled={composerLocked}
                     onClick={() => fileInputRef.current?.click()}
                     className="h-8 rounded-md border border-border px-2.5 text-xs hover:bg-accent"
                   >
@@ -567,9 +613,13 @@ export function BroadcastCentre() {
             ) : (
               <div
                 role="button"
-                tabIndex={0}
-                onClick={() => fileInputRef.current?.click()}
+                aria-disabled={composerLocked}
+                tabIndex={composerLocked ? -1 : 0}
+                onClick={() => {
+                  if (!composerLocked) fileInputRef.current?.click();
+                }}
                 onKeyDown={(event) => {
+                  if (composerLocked) return;
                   if (event.key === "Enter" || event.key === " ") {
                     event.preventDefault();
                     fileInputRef.current?.click();
@@ -577,16 +627,23 @@ export function BroadcastCentre() {
                 }}
                 onDragEnter={(event) => {
                   event.preventDefault();
-                  setDragActive(true);
+                  if (!composerLocked) setDragActive(true);
                 }}
                 onDragOver={(event) => event.preventDefault()}
                 onDragLeave={(event) => {
                   event.preventDefault();
-                  setDragActive(false);
+                  if (!composerLocked) setDragActive(false);
                 }}
-                onDrop={handleDrop}
+                onDrop={(event) => {
+                  if (composerLocked) {
+                    event.preventDefault();
+                    return;
+                  }
+                  handleDrop(event);
+                }}
                 className={cn(
                   "mt-2 flex min-h-28 cursor-pointer flex-col items-center justify-center rounded-md border border-dashed px-4 py-5 text-center outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/15",
+                  composerLocked && "cursor-wait",
                   dragActive
                     ? "border-primary bg-primary/5"
                     : "border-border bg-muted/10 hover:border-foreground/30 hover:bg-muted/20",
@@ -609,6 +666,7 @@ export function BroadcastCentre() {
                   <button
                     key={mode}
                     type="button"
+                    disabled={composerLocked}
                     aria-pressed={publishMode === mode}
                     onClick={() => setPublishMode(mode)}
                     className={cn(
@@ -623,16 +681,51 @@ export function BroadcastCentre() {
                 ))}
               </div>
               {publishMode === "later" && (
-                <label className="mt-3 block text-[11px] text-muted-foreground">
-                  Publish date and time
-                  <input
-                    type="datetime-local"
-                    value={startsAt}
-                    min={toDateTimeLocal(new Date())}
-                    onChange={(event) => setStartsAt(event.target.value)}
-                    className="mt-1 h-9 w-full rounded-md border border-border bg-background px-2.5 text-xs text-foreground"
-                  />
-                </label>
+                <div className="mt-3">
+                  <label className="block text-[11px] text-muted-foreground">
+                    Publish date and time
+                    <input
+                      type="datetime-local"
+                      disabled={composerLocked || adminServerNow === null}
+                      value={startsAt}
+                      min={
+                        adminServerNow === null
+                          ? undefined
+                          : toDateTimeLocal(
+                              new Date(
+                                nextAdminScheduleInputMinAt(
+                                  adminServerNow,
+                                  BROADCAST_SCHEDULE_MIN_LEAD_MS,
+                                ),
+                              ),
+                            )
+                      }
+                      onChange={(event) => {
+                        scheduleTimeSourceRef.current = "user";
+                        setStartsAt(event.target.value);
+                      }}
+                      className="mt-1 h-9 w-full rounded-md border border-border bg-background px-2.5 text-xs text-foreground"
+                    />
+                  </label>
+                  {adminServerNow === null && (
+                    <div className="mt-1 flex items-center gap-2 text-[10px] text-muted-foreground">
+                      <span>
+                        {adminClockError
+                          ? "Scheduling clock unavailable."
+                          : "Checking server time…"}
+                      </span>
+                      {adminClockError && !adminClockFetching && (
+                        <button
+                          type="button"
+                          onClick={() => void refetchAdminClock()}
+                          className="font-medium text-foreground underline underline-offset-2"
+                        >
+                          Retry
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
               )}
             </div>
 
@@ -640,6 +733,7 @@ export function BroadcastCentre() {
               <label className="block text-xs font-medium">
                 End broadcast
                 <select
+                  disabled={composerLocked}
                   value={expiryMode}
                   onChange={(event) => setExpiryMode(event.target.value as ExpiryMode)}
                   className="mt-2 h-10 w-full rounded-md border border-border bg-background px-2.5 text-xs"
@@ -655,6 +749,7 @@ export function BroadcastCentre() {
                   End date and time
                   <input
                     type="datetime-local"
+                    disabled={composerLocked}
                     value={endsAt}
                     onChange={(event) => setEndsAt(event.target.value)}
                     className="mt-1 h-9 w-full rounded-md border border-border bg-background px-2.5 text-xs text-foreground"
@@ -671,11 +766,15 @@ export function BroadcastCentre() {
             </div>
             <button
               type="button"
-              disabled={createMutation.isPending || !title.trim()}
+              disabled={
+                composerLocked ||
+                !title.trim() ||
+                (publishMode === "later" && adminServerNow === null)
+              }
               onClick={() => createMutation.mutate()}
               className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {createMutation.isPending ? (
+              {composerLocked ? (
                 "Publishing…"
               ) : (
                 <>
@@ -757,7 +856,10 @@ export function BroadcastCentre() {
               </div>
               {(kind === "incident" || kind === "downtime") && (
                 <div className="flex items-start gap-2">
-                  <AlertTriangle className="mt-0.5 size-4 shrink-0 text-amber-500" aria-hidden="true" />
+                  <AlertTriangle
+                    className="mt-0.5 size-4 shrink-0 text-amber-500"
+                    aria-hidden="true"
+                  />
                   <div>
                     <div className="font-medium">Service alert</div>
                     <div className="mt-0.5 text-muted-foreground">
@@ -849,8 +951,9 @@ export function BroadcastCentre() {
                   <div className="flex items-center gap-2 pl-12 lg:pl-0">
                     <button
                       type="button"
+                      disabled={composerLocked}
                       onClick={() => duplicateAnnouncement(announcement)}
-                      className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border px-2.5 text-xs hover:bg-accent"
+                      className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border px-2.5 text-xs hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       <Copy className="size-3.5" aria-hidden="true" /> Duplicate
                     </button>
@@ -897,8 +1000,9 @@ export function BroadcastCentre() {
                 </div>
                 <button
                   type="button"
+                  disabled={composerLocked}
                   onClick={() => duplicateAnnouncement(announcement)}
-                  className="inline-flex h-8 items-center gap-1.5 self-start rounded-md border border-border px-2.5 text-xs hover:bg-accent sm:self-auto"
+                  className="inline-flex h-8 items-center gap-1.5 self-start rounded-md border border-border px-2.5 text-xs hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50 sm:self-auto"
                 >
                   <Copy className="size-3.5" aria-hidden="true" /> Reuse
                 </button>

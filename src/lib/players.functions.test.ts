@@ -13,6 +13,7 @@ function validPlayerUpdate(overrides: Record<string, unknown> = {}) {
     nationality: "Wales",
     instagramUrl: "https://www.instagram.com/example/",
     contractUntil: "June 2027",
+    tier: "Tier 2",
     ...overrides,
   };
 }
@@ -37,7 +38,16 @@ describe("playerRecordUpdateSchema", () => {
       nationality: "Wales",
       instagramUrl: "https://www.instagram.com/example/",
       contractUntil: null,
+      tier: "Tier 2",
     });
+  });
+
+  it("stores an empty tier selection as no tier rather than an empty string", () => {
+    expect(playerRecordUpdateSchema.parse(validPlayerUpdate({ tier: "" })).tier).toBeNull();
+  });
+
+  it("rejects a tier outside the database constraint", () => {
+    expect(() => playerRecordUpdateSchema.parse(validPlayerUpdate({ tier: "Tier 9" }))).toThrow();
   });
 
   it("strips attempted identity and tombstone changes", () => {

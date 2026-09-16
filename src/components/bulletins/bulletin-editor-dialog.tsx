@@ -102,6 +102,10 @@ export function BulletinEditorDialog({
     setValidationError(null);
   }, [defaultKind, item, open]);
 
+  // Creation and structured editing are management-only. The route, server
+  // functions and RLS repeat this boundary, but the dialog also fails closed.
+  if (!canManage) return null;
+
   const submit = (event: FormEvent) => {
     event.preventDefault();
     setValidationError(null);

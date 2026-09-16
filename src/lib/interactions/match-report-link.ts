@@ -20,6 +20,8 @@ const UNIQUE_VIOLATION = "23505";
 export interface MatchReportInteractionInput {
   /** Canonical Match Report identity, e.g. "mr2_ab12cd34" or "mr2_ab12cd34~2". */
   reportId: string;
+  /** Canonical calendar-event player. When present, no name lookup is used. */
+  playerId?: string | null;
   goalkeeperName: string;
   /** Club the goalkeeper played for — the report's Team column. */
   club: string;
@@ -66,15 +68,18 @@ export async function ensureMatchReportInteraction(
       return { ok: true, interaction: mapInteractionRow(existing.data), created: false };
     }
 
-    // Link to the canonical roster record when the report names a real player.
-    let playerId: string | null = null;
-    const { data: player } = await db
-      .from("players")
-      .select("id")
-      .ilike("full_name", input.goalkeeperName.trim())
-      .is("deleted_at", null)
-      .maybeSingle();
-    playerId = player?.id ?? null;
+    // A linked calendar Match already has a canonical players.id. Standalone
+    // reports keep the legacy exact-name lookup for backward compatibility.
+    let playerId = input.playerId ?? null;
+    if (!playerId) {
+      const { data: player } = await db
+        .from("players")
+        .select("id")
+        .ilike("full_name", input.goalkeeperName.trim())
+        .is("deleted_at", null)
+        .maybeSingle();
+      playerId = player?.id ?? null;
+    }
 
     const inserted = await db
       .from("interactions")

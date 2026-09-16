@@ -7,7 +7,6 @@ import { PageHeader, StatCard, SectionTitle, TierBadge } from "@/components/prim
 import {
   alerts,
   goalkeepers,
-  rosterCategoryCounts,
   formatRelative,
   computeDutyOverview,
   type Alert,
@@ -35,6 +34,9 @@ import { listMatchReports } from "@/lib/match-reports/reports.functions";
 
 import { isDateOnlyInPeriod, lastNDaysPeriod } from "@/lib/dashboard-period";
 import { getOverviewDashboardStats } from "@/lib/overview-dashboard.functions";
+import { getRosterSnapshot } from "@/lib/roster-snapshot.functions";
+import { ROSTER_STATUS_LABELS, ROSTER_TIER_LABELS } from "@/lib/roster-snapshot";
+import { NO_TIER_LABEL } from "@/components/insight-drilldowns";
 import { listCalendarEvents } from "@/lib/calendar.functions";
 import { BulletinDashboardCard } from "@/components/bulletins/dashboard-card";
 
@@ -86,9 +88,26 @@ function Dashboard() {
     enabled: Boolean(user && user.role !== "mentor"),
     staleTime: 30_000,
   });
+  // Roster Snapshot counts come from public.players, so an unreachable
+  // database reports itself instead of leaving stale numbers on screen.
+  const fetchRosterSnapshot = useServerFn(getRosterSnapshot);
+  const {
+    data: roster,
+    isPending: rosterPending,
+    isError: rosterError,
+  } = useQuery({
+    queryKey: ["roster-snapshot"],
+    queryFn: () => fetchRosterSnapshot(),
+    enabled: Boolean(user && user.role !== "mentor"),
+    staleTime: 30_000,
+  });
   // Upcoming Logs reads the shared team calendar (same cache as /calendar).
   const fetchCalendarEvents = useServerFn(listCalendarEvents);
-  const { data: teamEvents, isPending: calendarPending, isError: calendarError } = useQuery({
+  const {
+    data: teamEvents,
+    isPending: calendarPending,
+    isError: calendarError,
+  } = useQuery({
     queryKey: ["calendar-events"],
     queryFn: () => fetchCalendarEvents(),
     enabled: Boolean(user && user.role !== "mentor"),
@@ -232,7 +251,7 @@ function Dashboard() {
         <Link
           to="/insights/$metric"
           params={{ metric: "interactions" }}
-          search={{ from: period.fromDate, to: period.toDate, level: "" }}
+          search={{ from: period.fromDate, to: period.toDate, level: "", tier: "" }}
           className="block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-info"
           aria-label="Break down interactions logged"
         >
@@ -247,7 +266,7 @@ function Dashboard() {
         <Link
           to="/insights/$metric"
           params={{ metric: "duty" }}
-          search={{ from: period.fromDate, to: period.toDate, level: "overdue" }}
+          search={{ from: period.fromDate, to: period.toDate, level: "overdue", tier: "" }}
           className="block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-warning"
           aria-label="Break down duty of care cadence"
         >
@@ -268,7 +287,7 @@ function Dashboard() {
         <Link
           to="/insights/$metric"
           params={{ metric: "reports" }}
-          search={{ from: period.fromDate, to: period.toDate, level: "" }}
+          search={{ from: period.fromDate, to: period.toDate, level: "", tier: "" }}
           className="block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
           aria-label="Break down match reports by match date"
         >
@@ -289,7 +308,7 @@ function Dashboard() {
         <Link
           to="/insights/$metric"
           params={{ metric: "mentors" }}
-          search={{ from: period.fromDate, to: period.toDate, level: "" }}
+          search={{ from: period.fromDate, to: period.toDate, level: "", tier: "" }}
           className="block min-[390px]:col-span-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary md:col-span-1"
           aria-label="Break down active mentors"
         >
@@ -389,7 +408,7 @@ function Dashboard() {
                     key={b.level}
                     to="/insights/$metric"
                     params={{ metric: "duty" }}
-                    search={{ from: period.fromDate, to: period.toDate, level: b.level }}
+                    search={{ from: period.fromDate, to: period.toDate, level: b.level, tier: "" }}
                     aria-label={`View goalkeepers: ${b.label}`}
                     className="space-y-2 block -mx-2 px-2 py-1 hover:bg-accent/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                   >
@@ -413,62 +432,111 @@ function Dashboard() {
 
         {/* Roster categories */}
         <div className="col-span-12 self-start command-panel p-4 lg:col-span-4">
-          <SectionTitle>Roster Snapshot</SectionTitle>
-
-          <section className="mt-3" aria-labelledby="duty-tier-categories">
-            <h3
-              id="duty-tier-categories"
-              className="mb-2 text-[10px] font-mono uppercase tracking-[0.14em] text-muted-foreground"
-            >
-              Care cadence tiers
-            </h3>
-            <div className="grid grid-cols-2 gap-2">
-              {rosterCategoryCounts.tiers.map(({ label, count }) => (
-                <Link
-                  key={label}
-                  to="/goalkeepers"
-                  search={{ tiers: label }}
-                  aria-label={`View ${count} ${label} goalkeepers`}
-                  className="group flex min-h-12 items-center gap-2 rounded-md border border-border bg-background/40 px-2.5 py-2 hover:border-primary/50 hover:bg-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                >
-                  <TierBadge tier={label} />
-                  <span className="ml-auto font-mono text-lg font-bold tabular-nums text-foreground">
-                    {count}
-                  </span>
-                  <ArrowUpRight className="size-3 shrink-0 text-muted-foreground transition-colors group-hover:text-primary" />
-                </Link>
-              ))}
-            </div>
-          </section>
-
-          <section
-            className="mt-4 border-t border-border pt-3"
-            aria-labelledby="player-status-categories"
+          <SectionTitle
+            action={
+              rosterError ? null : (
+                <span className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
+                  {rosterPending ? "…" : `${roster?.total ?? 0} on roster`}
+                </span>
+              )
+            }
           >
-            <h3
-              id="player-status-categories"
-              className="mb-2 text-[10px] font-mono uppercase tracking-[0.14em] text-muted-foreground"
-            >
-              Status groups
-            </h3>
-            <div className="grid grid-cols-2 gap-2">
-              {rosterCategoryCounts.statuses.map(({ label, count }) => (
-                <Link
-                  key={label}
-                  to="/goalkeepers"
-                  search={{ cat: label === "Free Agent" ? "Free Agents" : label }}
-                  aria-label={`View ${count} ${label} goalkeepers`}
-                  className="group flex min-h-12 items-center gap-2 rounded-md border border-border bg-background/40 px-2.5 py-2 hover:border-primary/50 hover:bg-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            Roster Snapshot
+          </SectionTitle>
+
+          {rosterError ? (
+            <p className="mt-3 text-xs text-muted-foreground" role="status">
+              Roster snapshot unavailable. Refresh the page to try again.
+            </p>
+          ) : (
+            <>
+              <section className="mt-3" aria-labelledby="duty-tier-categories">
+                <h3
+                  id="duty-tier-categories"
+                  className="mb-2 text-[10px] font-mono uppercase tracking-[0.14em] text-muted-foreground"
                 >
-                  <TierBadge tier={label} />
-                  <span className="ml-auto font-mono text-lg font-bold tabular-nums text-foreground">
-                    {count}
-                  </span>
-                  <ArrowUpRight className="size-3 shrink-0 text-muted-foreground transition-colors group-hover:text-primary" />
+                  Care cadence tiers
+                </h3>
+                <div className="grid grid-cols-2 gap-2" aria-busy={rosterPending}>
+                  {(
+                    roster?.tiers ?? ROSTER_TIER_LABELS.map((label) => ({ label, count: null }))
+                  ).map(({ label, count }) => (
+                    <Link
+                      key={label}
+                      to="/goalkeepers"
+                      search={{ tiers: label }}
+                      aria-label={
+                        count == null
+                          ? `View ${label} goalkeepers`
+                          : `View ${count} ${label} goalkeepers`
+                      }
+                      className="group flex min-h-12 items-center gap-2 rounded-md border border-border bg-background/40 px-2.5 py-2 hover:border-primary/50 hover:bg-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                    >
+                      <TierBadge tier={label} />
+                      <span className="ml-auto font-mono text-lg font-bold tabular-nums text-foreground">
+                        {count ?? "…"}
+                      </span>
+                      <ArrowUpRight className="size-3 shrink-0 text-muted-foreground transition-colors group-hover:text-primary" />
+                    </Link>
+                  ))}
+                </div>
+              </section>
+
+              <section
+                className="mt-4 border-t border-border pt-3"
+                aria-labelledby="player-status-categories"
+              >
+                <h3
+                  id="player-status-categories"
+                  className="mb-2 text-[10px] font-mono uppercase tracking-[0.14em] text-muted-foreground"
+                >
+                  Status groups
+                </h3>
+                <div className="grid grid-cols-2 gap-2" aria-busy={rosterPending}>
+                  {(
+                    roster?.statuses ??
+                    ROSTER_STATUS_LABELS.map((label) => ({ label, count: null }))
+                  ).map(({ label, count }) => (
+                    <Link
+                      key={label}
+                      to="/goalkeepers"
+                      search={{ cat: label === "Free Agent" ? "Free Agents" : label }}
+                      aria-label={
+                        count == null
+                          ? `View ${label} goalkeepers`
+                          : `View ${count} ${label} goalkeepers`
+                      }
+                      className="group flex min-h-12 items-center gap-2 rounded-md border border-border bg-background/40 px-2.5 py-2 hover:border-primary/50 hover:bg-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                    >
+                      <TierBadge tier={label} />
+                      <span className="ml-auto font-mono text-lg font-bold tabular-nums text-foreground">
+                        {count ?? "…"}
+                      </span>
+                      <ArrowUpRight className="size-3 shrink-0 text-muted-foreground transition-colors group-hover:text-primary" />
+                    </Link>
+                  ))}
+                </div>
+              </section>
+
+              {roster && roster.unassigned > 0 ? (
+                <Link
+                  to="/insights/$metric"
+                  params={{ metric: "goalkeepers" }}
+                  search={{
+                    from: period.fromDate,
+                    to: period.toDate,
+                    level: "",
+                    tier: NO_TIER_LABEL,
+                  }}
+                  className="mt-3 flex items-center gap-1 border-t border-border pt-3 text-[10px] text-warning hover:underline"
+                >
+                  {roster.unassigned} goalkeeper{roster.unassigned === 1 ? "" : "s"} have no tier
+                  recorded — assign one
+                  <ArrowUpRight className="size-3 shrink-0" />
                 </Link>
-              ))}
-            </div>
-          </section>
+              ) : null}
+            </>
+          )}
         </div>
 
         {/* Upcoming interactions */}
@@ -488,7 +556,7 @@ function Dashboard() {
                 <Link
                   to="/insights/$metric"
                   params={{ metric: "events" }}
-                  search={{ from: period.fromDate, to: period.toDate, level: "" }}
+                  search={{ from: period.fromDate, to: period.toDate, level: "", tier: "" }}
                   className="text-[10px] font-mono uppercase tracking-widest text-primary inline-flex items-center gap-1"
                 >
                   All events <ArrowUpRight className="size-3" />
@@ -522,7 +590,8 @@ function Dashboard() {
                   No upcoming calendar events
                 </div>
                 <p className="text-[11px] text-muted-foreground px-2">
-                  This panel reads the shared team calendar. Schedule a visit or catch-up to populate it.
+                  This panel reads the shared team calendar. Schedule a visit or catch-up to
+                  populate it.
                 </p>
                 {can("calendar.manage") ? (
                   <Link
@@ -673,7 +742,7 @@ function Dashboard() {
                 <Link
                   to="/insights/$metric"
                   params={{ metric: "alerts" }}
-                  search={{ from: period.fromDate, to: period.toDate, level: "" }}
+                  search={{ from: period.fromDate, to: period.toDate, level: "", tier: "" }}
                   className="text-[10px] font-mono uppercase tracking-widest text-primary inline-flex items-center gap-1"
                 >
                   All <ArrowUpRight className="size-3" />
@@ -688,35 +757,40 @@ function Dashboard() {
                   Live alert feed not connected
                 </div>
               ) : (
-                [...alerts].sort(compareAlertSeverity).slice(0, 6).map((a) => {
-                  const tone =
-                    a.severity === "high"
-                      ? "border-destructive/30 bg-destructive/5 text-destructive"
-                      : a.severity === "medium"
-                        ? "border-warning/30 bg-warning/5 text-warning"
-                        : "border-info/30 bg-info/5 text-info";
-                  return (
-                    <div key={a.id} className={`border p-3 ${tone}`}>
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-[10px] font-mono font-bold uppercase tracking-widest">
-                          {a.kind}
-                        </span>
-                        <AlertTriangle className="size-3" />
+                [...alerts]
+                  .sort(compareAlertSeverity)
+                  .slice(0, 6)
+                  .map((a) => {
+                    const tone =
+                      a.severity === "high"
+                        ? "border-destructive/30 bg-destructive/5 text-destructive"
+                        : a.severity === "medium"
+                          ? "border-warning/30 bg-warning/5 text-warning"
+                          : "border-info/30 bg-info/5 text-info";
+                    return (
+                      <div key={a.id} className={`border p-3 ${tone}`}>
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-[10px] font-mono font-bold uppercase tracking-widest">
+                            {a.kind}
+                          </span>
+                          <AlertTriangle className="size-3" />
+                        </div>
+                        <p className="text-[11px] text-muted-foreground leading-snug">
+                          {a.message}
+                        </p>
+                        {can("calendar.manage") && (
+                          <button
+                            type="button"
+                            onClick={() => escalateAlert(a)}
+                            className="mt-2 inline-flex items-center gap-1 border border-current/40 px-2 py-1 text-[10px] font-mono uppercase tracking-widest hover:bg-current/10"
+                          >
+                            <ArrowUpRight className="size-3" />
+                            Escalate
+                          </button>
+                        )}
                       </div>
-                      <p className="text-[11px] text-muted-foreground leading-snug">{a.message}</p>
-                      {can("calendar.manage") && (
-                        <button
-                          type="button"
-                          onClick={() => escalateAlert(a)}
-                          className="mt-2 inline-flex items-center gap-1 border border-current/40 px-2 py-1 text-[10px] font-mono uppercase tracking-widest hover:bg-current/10"
-                        >
-                          <ArrowUpRight className="size-3" />
-                          Escalate
-                        </button>
-                      )}
-                    </div>
-                  );
-                })
+                    );
+                  })
               )}
             </div>
           </div>
