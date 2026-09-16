@@ -300,6 +300,36 @@ export type Database = {
         }
         Relationships: []
       }
+      duty_of_care_resets: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          created_by_name: string
+          id: string
+          player_id: string
+          reason: string
+          reset_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          created_by_name?: string
+          id?: string
+          player_id: string
+          reason?: string
+          reset_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          created_by_name?: string
+          id?: string
+          player_id?: string
+          reason?: string
+          reset_at?: string
+        }
+        Relationships: []
+      }
       install_prompt_events: {
         Row: {
           browser: string | null

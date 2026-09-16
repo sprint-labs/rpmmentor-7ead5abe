@@ -58,6 +58,28 @@ export async function refreshClubDependentViews(
 }
 
 /**
+ * Everything that reflects a goalkeeper's duty-of-care standing: the badge on
+ * the goalkeeper profile (prefix-invalidated so any open profile re-reads) and
+ * the dashboard roll-ups that count red / amber / green across the roster.
+ *
+ * Recording a reset changes what `duty_of_care_at()` returns immediately, so
+ * the badge must be re-read rather than left in cache.
+ */
+export async function refreshDutyOfCareViews(
+  queryClient: QueryClient,
+  playerId?: string,
+): Promise<void> {
+  await Promise.all([
+    queryClient.invalidateQueries({
+      queryKey: playerId ? ["duty-of-care", playerId] : ["duty-of-care"],
+    }),
+    queryClient.invalidateQueries({ queryKey: ["mentor-dashboard-stats"] }),
+    queryClient.invalidateQueries({ queryKey: ["overview-dashboard-stats"] }),
+    queryClient.invalidateQueries({ queryKey: ["executive-dashboard-stats"] }),
+  ]);
+}
+
+/**
  * Everything that counts or names people: the user directory, the mentor
  * pickers, every dashboard KPI (mentor counts, activity per mentor), the
  * interactions log and the shared calendar — all of which show mentor names

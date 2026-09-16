@@ -14,6 +14,7 @@ import { useAuth } from "@/lib/auth";
 import { listMedia, openAsset, formatBytes, type MediaAsset } from "@/lib/media-store";
 import { buildHighlightReelItems } from "@/lib/goalkeeper-highlight-reel";
 import { UpdateClubButton } from "@/components/update-club-dialog";
+import { DutyOfCarePanel } from "@/components/duty-of-care-panel";
 import { listPlayers } from "@/lib/players.functions";
 import { findPlayerByName, interactionBelongsToGoalkeeper } from "@/lib/goalkeeper-player-link";
 import { compareInteractionsByAlertThenDate, interactionOutcomeAlertRank } from "@/lib/interaction-alert-rank";
@@ -329,6 +330,8 @@ function GkDetail() {
           </div>
         )}
       </div>
+
+      <DutyOfCarePanel playerId={linkedPlayerId} playerName={gk.name} />
 
       {gk.bio && (
         <Card className="p-4">

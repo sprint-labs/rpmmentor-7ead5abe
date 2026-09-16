@@ -26,6 +26,16 @@ export const INTERACTION_MANAGE_ROLES: readonly AppRole[] = [
   "super_admin",
 ];
 
+/**
+ * Roles that may reset a goalkeeper's duty-of-care clock. Mirrors the
+ * `duty_of_care_resets_insert_managers` RLS policy — change both together.
+ */
+export const DUTY_OF_CARE_RESET_ROLES: readonly AppRole[] = [
+  "mentor_manager",
+  "admin",
+  "super_admin",
+];
+
 /** Destructive entity controls are deliberately reserved for Super Admins. */
 export const SUPER_ADMIN_ROLES: readonly AppRole[] = ["super_admin"];
 
