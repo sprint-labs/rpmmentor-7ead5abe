@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { Session } from "@supabase/supabase-js";
 import { hasAuthCallback, isRecoveryCallback } from "@/lib/password-recovery";
@@ -267,22 +267,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return isRecoveryCallback(window.location) || hasAuthCallback(window.location);
   });
 
+  // Read inside the auth callback, which closes over its first render.
+  const recoveryPendingRef = useRef(passwordRecoveryPending);
+  recoveryPendingRef.current = passwordRecoveryPending;
+
   useEffect(() => {
     let cancelled = false;
+
+    // A recovery or invite session is temporary and grants no application UI:
+    // `user` stays null and the app shell holds the caller on /reset-password.
+    // Tearing it down here would strand an invitee who has no role yet, so the
+    // session is left in place until the password is set or the page signs out.
+    const failClosed = async (session: Session | null) => {
+      if (session?.user && !recoveryPendingRef.current) await clearLocalAuthSession();
+    };
 
     const applySession = async (session: Session | null, finishLoading = false) => {
       try {
         const nextUser = await loadSessionUser(session);
-        if (session?.user && !nextUser) {
+        if (!nextUser) {
           // An Auth identity without an operational role is not an application
           // user. Clear its session so OAuth and restored sessions fail closed.
-          await clearLocalAuthSession();
+          await failClosed(session);
         }
         if (!cancelled) setUser(nextUser);
       } catch {
         // A failed role lookup must never leave either a default Mentor UI or a
         // browser-held JWT behind.
-        if (session?.user) await clearLocalAuthSession();
+        await failClosed(session);
         if (!cancelled) setUser(null);
       } finally {
         if (finishLoading && !cancelled) setLoading(false);
