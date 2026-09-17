@@ -27,7 +27,7 @@ import { Route as AlertsRouteImport } from './routes/alerts'
 import { Route as AccountRouteImport } from './routes/account'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ReportsIndexRouteImport } from './routes/reports.index'
-import { Route as TeamRouteImport } from './routes/team'
+import { Route as SystemUsersRouteImport } from './routes/system.users'
 import { Route as SystemSyncVerificationRouteImport } from './routes/system.sync-verification'
 import { Route as SystemPermissionsRouteImport } from './routes/system.permissions'
 import { Route as SystemIntegrationsRouteImport } from './routes/system.integrations'
@@ -134,9 +134,9 @@ const ReportsIndexRoute = ReportsIndexRouteImport.update({
   path: '/reports/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const TeamRoute = TeamRouteImport.update({
-  id: '/team',
-  path: '/team',
+const SystemUsersRoute = SystemUsersRouteImport.update({
+  id: '/system/users',
+  path: '/system/users',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SystemSyncVerificationRoute = SystemSyncVerificationRouteImport.update({
@@ -247,7 +247,7 @@ export interface FileRoutesByFullPath {
   '/system/integrations': typeof SystemIntegrationsRoute
   '/system/permissions': typeof SystemPermissionsRoute
   '/system/sync-verification': typeof SystemSyncVerificationRoute
-  '/team': typeof TeamRoute
+  '/system/users': typeof SystemUsersRoute
   '/reports/': typeof ReportsIndexRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
@@ -283,7 +283,7 @@ export interface FileRoutesByTo {
   '/system/integrations': typeof SystemIntegrationsRoute
   '/system/permissions': typeof SystemPermissionsRoute
   '/system/sync-verification': typeof SystemSyncVerificationRoute
-  '/team': typeof TeamRoute
+  '/system/users': typeof SystemUsersRoute
   '/reports': typeof ReportsIndexRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
@@ -320,7 +320,7 @@ export interface FileRoutesById {
   '/system/integrations': typeof SystemIntegrationsRoute
   '/system/permissions': typeof SystemPermissionsRoute
   '/system/sync-verification': typeof SystemSyncVerificationRoute
-  '/team': typeof TeamRoute
+  '/system/users': typeof SystemUsersRoute
   '/reports/': typeof ReportsIndexRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
@@ -358,7 +358,7 @@ export interface FileRouteTypes {
     | '/system/integrations'
     | '/system/permissions'
     | '/system/sync-verification'
-    | '/team'
+    | '/system/users'
     | '/reports/'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
@@ -394,7 +394,7 @@ export interface FileRouteTypes {
     | '/system/integrations'
     | '/system/permissions'
     | '/system/sync-verification'
-    | '/team'
+    | '/system/users'
     | '/reports'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
@@ -430,7 +430,7 @@ export interface FileRouteTypes {
     | '/system/integrations'
     | '/system/permissions'
     | '/system/sync-verification'
-    | '/team'
+    | '/system/users'
     | '/reports/'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
@@ -466,7 +466,7 @@ export interface RootRouteChildren {
   SystemIntegrationsRoute: typeof SystemIntegrationsRoute
   SystemPermissionsRoute: typeof SystemPermissionsRoute
   SystemSyncVerificationRoute: typeof SystemSyncVerificationRoute
-  TeamRoute: typeof TeamRoute
+  SystemUsersRoute: typeof SystemUsersRoute
   ReportsIndexRoute: typeof ReportsIndexRoute
   DotlovableOauthConsentRoute: typeof DotlovableOauthConsentRoute
   Char91DotmcpChar93InvokeToolToolRoute: typeof Char91DotmcpChar93InvokeToolToolRoute
@@ -602,11 +602,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ReportsIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/team': {
-      id: '/team'
-      path: '/team'
-      fullPath: '/team'
-      preLoaderRoute: typeof TeamRouteImport
+    '/system/users': {
+      id: '/system/users'
+      path: '/system/users'
+      fullPath: '/system/users'
+      preLoaderRoute: typeof SystemUsersRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/system/sync-verification': {
@@ -758,7 +758,7 @@ const rootRouteChildren: RootRouteChildren = {
   SystemIntegrationsRoute: SystemIntegrationsRoute,
   SystemPermissionsRoute: SystemPermissionsRoute,
   SystemSyncVerificationRoute: SystemSyncVerificationRoute,
-  TeamRoute: TeamRoute,
+  SystemUsersRoute: SystemUsersRoute,
   ReportsIndexRoute: ReportsIndexRoute,
   DotlovableOauthConsentRoute: DotlovableOauthConsentRoute,
   Char91DotmcpChar93InvokeToolToolRoute: Char91DotmcpChar93InvokeToolToolRoute,
