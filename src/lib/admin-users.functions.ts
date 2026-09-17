@@ -234,11 +234,20 @@ export const inviteManagedUser = createServerFn({ method: "POST" })
       if (insErr) throw new Error(insErr.message);
     }
 
+    // The invitee's browser holds no PKCE verifier, so Supabase's own
+    // `action_link` redirects with fragment tokens that the PKCE-mode client
+    // refuses. Hand out a link to our reset page carrying the one-time token
+    // hash instead, which it redeems with `verifyOtp`.
+    const hashedToken = link.properties?.hashed_token;
+    const inviteLink = hashedToken
+      ? `${data.redirectTo}?token_hash=${encodeURIComponent(hashedToken)}&type=invite`
+      : (link.properties?.action_link ?? "");
+
     return {
       ok: true as const,
       userId,
       email: data.email,
-      inviteLink: link.properties?.action_link ?? "",
+      inviteLink,
     };
   });
 
