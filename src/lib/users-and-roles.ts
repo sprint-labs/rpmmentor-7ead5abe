@@ -11,6 +11,8 @@ export interface UserActivityRow {
    * user's Match Report submissions — needed to link into /reports filtered
    * to just their reports, since that page filters by that string. */
   coachIdentity: string;
+  /** auth.users.last_sign_in_at — null if the account has never signed in. */
+  lastLoginAt: string | null;
 }
 
 /** Display-only split of the canonical profiles.name value. Never used as an identity join. */

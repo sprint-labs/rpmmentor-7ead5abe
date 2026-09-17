@@ -17,6 +17,7 @@ describe("active mentor insight rows", () => {
           matchReportsSubmitted: 7,
           interactionsLogged: 11,
           coachIdentity: "Multi Role",
+          lastLoginAt: null,
         },
         {
           id: "admin-only",
@@ -26,6 +27,7 @@ describe("active mentor insight rows", () => {
           matchReportsSubmitted: 99,
           interactionsLogged: 99,
           coachIdentity: "Admin Only",
+          lastLoginAt: null,
         },
       ],
     );

@@ -7,6 +7,8 @@ import { PageHeader } from "@/components/primitives";
 import { withPermission } from "@/components/require-permission";
 import { ROLE_LABEL } from "@/lib/auth";
 import { listUsersAndRoles } from "@/lib/users-and-roles.functions";
+import { cn } from "@/lib/utils";
+import { formatDate, formatRelative } from "@/lib/mock-data";
 
 export const Route = createFileRoute("/users")({
   component: withPermission(UsersAndRolesPage, "mentors.view"),
@@ -14,7 +16,17 @@ export const Route = createFileRoute("/users")({
 
 const QUERY_KEY = ["users-and-roles"] as const;
 
-const GRID_COLS = "md:grid-cols-[1fr_1fr_auto_auto_auto_auto]";
+const GRID_COLS = "md:grid-cols-[1fr_1fr_auto_auto_auto_auto_auto]";
+
+/** Accounts quiet this long are flagged as likely not using the platform. */
+const STALE_LOGIN_DAYS = 30;
+
+function lastLoginTone(lastLoginAt: string | null): string {
+  if (!lastLoginAt) return "text-destructive font-medium";
+  const days = (Date.now() - new Date(lastLoginAt).getTime()) / 86_400_000;
+  if (days > STALE_LOGIN_DAYS) return "text-warning font-medium";
+  return "text-foreground";
+}
 
 function copyUserId(id: string) {
   navigator.clipboard
@@ -44,6 +56,7 @@ function UsersAndRolesPage() {
           <div>Last name</div>
           <div>User ID</div>
           <div>Role</div>
+          <div>Last login</div>
           <div>Match reports</div>
           <div>Interactions</div>
         </div>
@@ -107,6 +120,15 @@ function UsersAndRolesPage() {
                     <div className="text-[10px] uppercase tracking-wider text-muted-foreground md:hidden">Role</div>
                     <span className="inline-flex rounded-full border border-border bg-accent px-2 py-1 text-xs font-medium">
                       {user.role ? ROLE_LABEL[user.role] : "No role"}
+                    </span>
+                  </div>
+                  <div>
+                    <div className="text-[10px] uppercase tracking-wider text-muted-foreground md:hidden">Last login</div>
+                    <span
+                      className={cn("whitespace-nowrap text-sm", lastLoginTone(user.lastLoginAt))}
+                      title={user.lastLoginAt ? formatDate(user.lastLoginAt) : "Never signed in"}
+                    >
+                      {user.lastLoginAt ? formatRelative(user.lastLoginAt) : "Never"}
                     </span>
                   </div>
                   <div>
