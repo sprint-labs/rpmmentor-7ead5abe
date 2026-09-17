@@ -16,7 +16,12 @@ export const Route = createFileRoute("/users")({
 
 const QUERY_KEY = ["users-and-roles"] as const;
 
-const GRID_COLS = "md:grid-cols-[1fr_1fr_auto_auto_auto_auto_auto]";
+// Every column is a fraction of the row, never content-sized: the header and
+// each row are separate grids, so content-sized columns would land at a
+// different width on every row and nothing would line up. Names get the
+// smallest shares — the data columns are what people come here to read.
+const GRID_COLS =
+  "md:grid-cols-[minmax(0,0.8fr)_minmax(0,0.9fr)_minmax(0,1fr)_minmax(0,1.1fr)_minmax(0,0.9fr)_minmax(0,0.7fr)_minmax(0,0.7fr)]";
 
 /** Accounts quiet this long are flagged as likely not using the platform. */
 const STALE_LOGIN_DAYS = 30;
@@ -44,7 +49,7 @@ function UsersAndRolesPage() {
   const users = query.data ?? [];
 
   return (
-    <div className="max-w-6xl mx-auto space-y-5">
+    <div className="max-w-7xl mx-auto space-y-5">
       <PageHeader
         title="Users & Roles"
         description="Real user accounts, their current role, and confirmed activity recorded through Mentor Hub."
@@ -98,11 +103,11 @@ function UsersAndRolesPage() {
                 >
                   <div>
                     <div className="text-[10px] uppercase tracking-wider text-muted-foreground md:hidden">First name</div>
-                    <div className="text-sm font-medium">{user.firstName}</div>
+                    <div className="text-sm font-medium truncate">{user.firstName}</div>
                   </div>
                   <div>
                     <div className="text-[10px] uppercase tracking-wider text-muted-foreground md:hidden">Last name</div>
-                    <div className="text-sm font-medium">{user.lastName}</div>
+                    <div className="text-sm font-medium truncate">{user.lastName}</div>
                   </div>
                   <div>
                     <div className="text-[10px] uppercase tracking-wider text-muted-foreground md:hidden">User ID</div>
