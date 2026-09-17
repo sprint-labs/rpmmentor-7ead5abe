@@ -12,7 +12,7 @@ export const listUsersAndRoles = createServerFn({ method: "GET" })
       context.supabase,
       context.userId,
       USER_DIRECTORY_VIEW_ROLES,
-      "view users and roles",
+      "view team members",
     );
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -45,7 +45,7 @@ export const listUsersAndRoles = createServerFn({ method: "GET" })
     ]);
 
     if (profilesError || rolesError) {
-      throw new Error("Could not load Users & Roles.");
+      throw new Error("Could not load Team Members.");
     }
 
     const rolesByUser = new Map<string, string[]>();

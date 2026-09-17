@@ -51,7 +51,7 @@ function UsersAndRolesPage() {
   return (
     <div className="max-w-7xl mx-auto space-y-5">
       <PageHeader
-        title="Users & Roles"
+        title="Team Members"
         description="Real user accounts, their current role, and confirmed activity recorded through Mentor Hub."
       />
 
@@ -73,7 +73,7 @@ function UsersAndRolesPage() {
         ) : query.isError ? (
           <div className="px-4 py-12 text-center text-sm">
             <AlertCircle className="mx-auto mb-2 size-6 text-destructive" />
-            <p className="font-medium text-destructive">Could not load Users & Roles</p>
+            <p className="font-medium text-destructive">Could not load Team Members</p>
             <p className="mt-1 text-xs text-muted-foreground">
               {query.error instanceof Error ? query.error.message : "The live source is unavailable."}
             </p>

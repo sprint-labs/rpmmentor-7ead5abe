@@ -19,9 +19,9 @@ const GROUPS: Group[] = [
     ],
   },
   {
-    title: "Users & roles",
+    title: "Team members",
     items: [
-      { perm: "mentors.view", label: "View users and roles", description: "Browse the read-only user directory and activity totals." },
+      { perm: "mentors.view", label: "View team members", description: "Browse the read-only user directory and activity totals." },
     ],
   },
   {
