@@ -3,6 +3,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { MANUAL_INTERACTION_TYPES } from "@/lib/interactions/schema";
 import { requireRole, USER_DIRECTORY_VIEW_ROLES } from "@/lib/roles.server";
 import { effectiveRole, splitPersonName, type UserActivityRow } from "@/lib/users-and-roles";
+import { resolveCoachIdentity } from "@/lib/mentor-dashboard-report-count";
 
 export const listUsersAndRoles = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
@@ -17,7 +18,7 @@ export const listUsersAndRoles = createServerFn({ method: "GET" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const [{ data: profiles, error: profilesError }, { data: roles, error: rolesError }] =
       await Promise.all([
-        supabaseAdmin.from("profiles").select("id,name").order("name"),
+        supabaseAdmin.from("profiles").select("id,name,email").order("name"),
         supabaseAdmin.from("user_roles").select("user_id,role"),
       ]);
 
@@ -63,6 +64,7 @@ export const listUsersAndRoles = createServerFn({ method: "GET" })
           role: effectiveRole(rolesByUser.get(profile.id) ?? []),
           matchReportsSubmitted: reportsResult.count,
           interactionsLogged: interactionsResult.count,
+          coachIdentity: resolveCoachIdentity({ name: profile.name, email: profile.email }),
         };
       }),
     );

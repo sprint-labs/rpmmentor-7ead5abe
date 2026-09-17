@@ -68,7 +68,7 @@ const NAV: NavItem[] = [
   { to: "/bulletins", label: "Bulletin Board", icon: Columns3, perm: "bulletins.view" },
   { to: "/goalkeepers", label: "Goalkeepers", icon: Users, perm: "goalkeepers.view" },
   { to: "/system/players", label: "Player Records", icon: Database, perm: "players.edit_club" },
-  { to: "/mentors", label: "Users & Roles", icon: UserCog, perm: "mentors.view" },
+  { to: "/users", label: "Users & Roles", icon: UserCog, perm: "mentors.view" },
   {
     to: "/interactions",
     label: "Interactions Log",

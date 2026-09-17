@@ -7,6 +7,10 @@ export interface UserActivityRow {
   role: Role | null;
   matchReportsSubmitted: number;
   interactionsLogged: number;
+  /** The exact coach identity (name, or email if no name) stamped on this
+   * user's Match Report submissions — needed to link into /reports filtered
+   * to just their reports, since that page filters by that string. */
+  coachIdentity: string;
 }
 
 /** Display-only split of the canonical profiles.name value. Never used as an identity join. */
