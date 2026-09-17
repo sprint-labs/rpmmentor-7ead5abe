@@ -84,7 +84,7 @@ const NAV: NavItem[] = [
   { to: "/follow-ups", label: "Follow-ups", icon: ClipboardCheck, perm: "calendar.view" },
   { to: "/support", label: "Help & Messages", icon: LifeBuoy, perm: "support.send" },
   { to: "/executive", label: "Executive", icon: BarChart3, perm: "executive.view" },
-  { to: "/system/users", label: "Manage Users", icon: ShieldCheck, perm: "system.manage" },
+  { to: "/team", label: "Team Members", icon: ShieldCheck, perm: "system.manage" },
   {
     to: "/system/permissions",
     label: "Permission Check",

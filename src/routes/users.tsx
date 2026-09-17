@@ -44,7 +44,7 @@ function UsersAndRolesPage() {
   const users = query.data ?? [];
 
   return (
-    <div className="space-y-5">
+    <div className="max-w-6xl mx-auto space-y-5">
       <PageHeader
         title="Users & Roles"
         description="Real user accounts, their current role, and confirmed activity recorded through Mentor Hub."

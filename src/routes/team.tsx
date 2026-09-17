@@ -22,7 +22,7 @@ import { refreshUserDirectoryViews } from "@/lib/query-refresh";
 
 
 
-export const Route = createFileRoute("/system/users")({ component: SystemUsersPage });
+export const Route = createFileRoute("/team")({ component: TeamMembersPage });
 
 const ROLES: Role[] = ["super_admin", "admin", "mentor_manager", "mentor"];
 type RoleOrNone = Role | "";
@@ -38,7 +38,7 @@ const QUERY_KEY = ["managed-users"] as const;
 const AUDIT_KEY = ["user-deletion-audit"] as const;
 
 
-function SystemUsersPage() {
+function TeamMembersPage() {
   const { user, can } = useAuth();
   const [q, setQ] = useState("");
   const [showAdd, setShowAdd] = useState(false);
@@ -255,7 +255,7 @@ function SystemUsersPage() {
               System · Super Admin
             </span>
           </div>
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight">Users &amp; Roles</h1>
+          <h1 className="mt-1 text-2xl font-semibold tracking-tight">Team Members</h1>
           <p className="text-sm text-muted-foreground mt-1">
             Add, remove, and assign roles. Changes take effect on the user's next sign-in.
           </p>
