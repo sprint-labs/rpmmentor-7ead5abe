@@ -24,7 +24,7 @@ describe("base Mentor dashboard metric cards", () => {
 describe("mentor home primary actions", () => {
   it("names match report, interaction, then calendar", () => {
     expect(mentorPrimaryActionLabels).toEqual({
-      logMatchReport: "Submit a Match report",
+      logMatchReport: "Submit a match report",
       logInteraction: "Log interaction",
       viewCalendar: "View calendar",
     });
