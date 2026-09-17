@@ -27,7 +27,6 @@ export type OutstandingActionKind = "missing_report" | "missing_clip";
 export interface OutstandingActionItem {
   id: string;
   kind: OutstandingActionKind;
-  label: string;
   observationId: string;
   observationDate: string;
   dueDate: string;
@@ -268,7 +267,6 @@ export const getMentorDashboardStats = createServerFn({ method: "GET" })
           ...base,
           id: `${obs.id}:report`,
           kind: "missing_report",
-          label: `Submit match report for ${gk?.name ?? obs.goalkeeper_name ?? "goalkeeper"}`,
         });
       }
       if (!hasClip) {
@@ -276,7 +274,6 @@ export const getMentorDashboardStats = createServerFn({ method: "GET" })
           ...base,
           id: `${obs.id}:clip`,
           kind: "missing_clip",
-          label: `Upload match clip for ${gk?.name ?? obs.goalkeeper_name ?? "goalkeeper"}`,
         });
       }
     }

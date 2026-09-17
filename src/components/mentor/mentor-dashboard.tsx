@@ -233,8 +233,8 @@ export function MentorDashboard({ user }: Props) {
           {isLoading
             ? "Loading your dashboard…"
             : isError
-              ? "Couldn't load your dashboard."
-              : "Match reports and interactions first"}
+              ? "Your dashboard didn't load."
+              : "Match reports and interactions come first"}
         </p>
         {isError && (
           <button
@@ -263,12 +263,12 @@ export function MentorDashboard({ user }: Props) {
             search={reportsSearch}
             onClick={() => trackClick("reports-submitted", "/reports")}
             className="block rounded-lg transition-transform hover:-translate-y-0.5 hover:ring-1 hover:ring-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-            aria-label="View match reports"
+            aria-label="View your match reports"
           >
             <StatCard
               label={mentorDashboardMetricCardLabels.matchReportsSubmitted}
               value={isLoading ? "…" : isError ? "—" : (data?.reportsLast14 ?? "—")}
-              hint={isError ? "Count unavailable" : `Match dates · ${period.toLowerCase()}`}
+              hint={isError ? "Count unavailable" : `${period} · by match date`}
               accent="primary"
               updatedAt={updatedAt}
             />
@@ -278,12 +278,12 @@ export function MentorDashboard({ user }: Props) {
             search={interactionsSearch}
             onClick={() => trackClick("interactions-logged", "/interactions")}
             className="block rounded-lg transition-transform hover:-translate-y-0.5 hover:ring-1 hover:ring-info/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-info"
-            aria-label="View interactions"
+            aria-label="View your logged interactions"
           >
             <StatCard
               label={mentorDashboardMetricCardLabels.interactionsLogged}
               value={isLoading ? "…" : isError ? "—" : (data?.interactionsLast14 ?? "—")}
-              hint={isError ? "Count unavailable" : period}
+              hint={isError ? "Count unavailable" : `${period} · by interaction date`}
               accent="info"
               updatedAt={updatedAt}
             />
@@ -304,7 +304,7 @@ export function MentorDashboard({ user }: Props) {
               <ChevronRight className="size-4 text-muted-foreground" />
             )}
             <h2 className="text-sm font-semibold tracking-tight uppercase text-muted-foreground">
-              Outstanding Actions Breakdown
+              Outstanding Actions
             </h2>
             <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium border bg-destructive/15 text-destructive border-destructive/40 tabular-nums font-mono">
               {isLoading ? "…" : isError || outstandingUnavailable ? "—" : outstanding.length}
@@ -322,7 +322,7 @@ export function MentorDashboard({ user }: Props) {
             </div>
           ) : isError || outstandingUnavailable ? (
             <div className="text-xs text-muted-foreground py-6 text-center">
-              Outstanding actions are unavailable right now.
+              Outstanding actions didn't load — try again shortly.
             </div>
           ) : outstanding.length === 0 ? (
             <div className="text-xs text-muted-foreground py-6 text-center">
@@ -365,7 +365,7 @@ export function MentorDashboard({ user }: Props) {
                           {isReport ? "Missing report" : "Missing clip"}
                         </span>
                         <span className="font-medium text-sm truncate">
-                          {item.gkName ?? "Unassigned"}
+                          {item.gkName ?? "No goalkeeper linked"}
                         </span>
                         {item.gkStatus && <TierBadge tier={item.gkStatus as Tier} />}
                         {item.gkTierLevel && <TierLevelBadge level={item.gkTierLevel} />}
@@ -376,13 +376,17 @@ export function MentorDashboard({ user }: Props) {
                           </Pill>
                         )}
                       </div>
-                      <div className="text-xs text-muted-foreground truncate mt-0.5">
-                        {item.label}
-                        {item.gkClub ? ` · ${item.gkClub}` : ""}
-                      </div>
+                      {item.gkClub && (
+                        <div className="text-xs text-muted-foreground truncate mt-0.5">
+                          {item.gkClub}
+                        </div>
+                      )}
                       <div className="text-[10px] text-muted-foreground/80 mt-0.5 font-mono tabular-nums">
                         Observed {formatEventDateTime(item.observationDate)} · Due{" "}
-                        {formatEventDateTime(item.dueDate)} · Actionable by {item.actionableBy}
+                        {formatEventDateTime(item.dueDate)} ·{" "}
+                        {item.actionableByRole === "self"
+                          ? "Yours to complete"
+                          : `${item.actionableBy} to complete`}
                       </div>
                     </div>
                     <Link
@@ -400,6 +404,11 @@ export function MentorDashboard({ user }: Props) {
                       <button
                         type="button"
                         onClick={() => openLog(item.gkId, item.gkName)}
+                        aria-label={
+                          item.gkName
+                            ? `Log an interaction for ${item.gkName}`
+                            : "Log an interaction"
+                        }
                         className="shrink-0 text-xs px-2.5 py-1.5 rounded-md border border-border hover:bg-accent/40 text-primary inline-flex items-center gap-1"
                       >
                         <Plus className="size-3" /> Log
@@ -424,7 +433,7 @@ export function MentorDashboard({ user }: Props) {
           </div>
           {isFollowUpsError ? (
             <div className="py-4 text-xs text-muted-foreground">
-              <p>Write-ups are unavailable right now.</p>
+              <p>Write-ups didn't load.</p>
               <button
                 type="button"
                 onClick={() => void refetchFollowUps()}
@@ -436,8 +445,8 @@ export function MentorDashboard({ user }: Props) {
           ) : (
             <>
               <p className="mt-1 text-xs text-muted-foreground">
-                Each of these events has happened. You have 48 hours from the scheduled time to
-                record what came out of it.
+                These events have already happened. You have 48 hours from the scheduled start to
+                record the outcome.
               </p>
               <div className="mt-3 divide-y divide-border">
                 {writeUpsDue.map((row) => (
@@ -446,7 +455,7 @@ export function MentorDashboard({ user }: Props) {
                       <div className="flex flex-wrap items-center gap-2">
                         <FollowUpStatusPill status={row.followUp.status} />
                         <span className="truncate text-sm font-medium">
-                          {row.goalkeeperName || "Unnamed goalkeeper"}
+                          {row.goalkeeperName || "No goalkeeper linked"}
                         </span>
                         <span className="text-xs text-muted-foreground">{row.eventType}</span>
                       </div>
@@ -487,12 +496,13 @@ export function MentorDashboard({ user }: Props) {
           <span className="text-xs text-muted-foreground">
             {isLoading ? "Loading…" : `Next ${rangeDays} days`}
           </span>
-          <div className="flex items-center gap-1" role="tablist" aria-label="Interaction range">
+          <div className="flex items-center gap-1" role="tablist" aria-label="Date range">
             {[7, 14, 30].map((d) => (
               <button
                 key={d}
                 role="tab"
                 aria-selected={rangeDays === d}
+                aria-label={`Next ${d} days`}
                 onClick={() => setRangeDays(d)}
                 className={cn(
                   "px-2.5 py-1 text-[11px] uppercase tracking-wider rounded-md border transition-colors",
@@ -507,7 +517,11 @@ export function MentorDashboard({ user }: Props) {
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-1 mb-3">
+        <div
+          className="flex flex-wrap items-center gap-1 mb-3"
+          role="group"
+          aria-label="Filter by interaction type"
+        >
           <button
             onClick={clearFilters}
             className={cn(
@@ -546,9 +560,9 @@ export function MentorDashboard({ user }: Props) {
               <CalendarPlus className="size-5 text-muted-foreground" />
             </div>
             <div className="max-w-xs">
-              <p className="text-sm font-medium text-foreground">Calendar figures unavailable</p>
+              <p className="text-sm font-medium text-foreground">Your schedule didn't load</p>
               <p className="text-xs text-muted-foreground mt-1">
-                Your report and interaction counts are still up to date.
+                The report and interaction counts above are still accurate.
               </p>
             </div>
             <button
@@ -566,14 +580,14 @@ export function MentorDashboard({ user }: Props) {
             </div>
             <div className="max-w-xs">
               <p className="text-sm font-medium text-foreground">
-                {isLoading ? "Loading your calendar…" : "No interactions scheduled"}
+                {isLoading ? "Loading your calendar…" : "Nothing scheduled"}
               </p>
               <p className="text-xs text-muted-foreground mt-1">
                 {isLoading
                   ? "This may take a moment."
                   : filters.length > 0
-                    ? "No upcoming interactions match the selected filters."
-                    : `There are no upcoming interactions in the next ${rangeDays} days.`}
+                    ? `Nothing in the next ${rangeDays} days matches these filters.`
+                    : `No interactions or matches in the next ${rangeDays} days.`}
               </p>
             </div>
             {filters.length > 0 ? (
@@ -589,7 +603,7 @@ export function MentorDashboard({ user }: Props) {
                 search={{ gkId: "", new: false }}
                 className="text-xs px-3 py-1.5 rounded-md border border-border hover:bg-accent/40 text-primary inline-flex items-center gap-1"
               >
-                View Calendar <ArrowUpRight className="size-3" />
+                View calendar <ArrowUpRight className="size-3" />
               </Link>
             )}
           </div>
@@ -615,7 +629,7 @@ export function MentorDashboard({ user }: Props) {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className="font-medium text-sm truncate">
-                              {e.gkName ?? "Unassigned"}
+                              {e.gkName ?? "No goalkeeper linked"}
                             </span>
                             {e.gkStatus && <TierBadge tier={e.gkStatus as Tier} />}
                             {e.gkFreeAgent && <Pill tone="warning">Free Agent</Pill>}
@@ -624,9 +638,7 @@ export function MentorDashboard({ user }: Props) {
                           <div className="text-xs text-muted-foreground truncate">
                             {e.gkClub
                               ? `${e.gkClub}${e.gkLeague ? ` — ${e.gkLeague}` : ""}`
-                              : e.gkFreeAgent
-                                ? "Free Agent"
-                                : e.title}
+                              : e.title}
                           </div>
                         </div>
                         <div className="hidden md:block text-sm font-medium text-foreground/90 truncate max-w-[240px]">
@@ -642,6 +654,9 @@ export function MentorDashboard({ user }: Props) {
                           <button
                             type="button"
                             onClick={() => openLog(e.gkId, e.gkName)}
+                            aria-label={
+                              e.gkName ? `Log an interaction for ${e.gkName}` : "Log an interaction"
+                            }
                             className="shrink-0 text-xs px-2.5 py-1.5 rounded-md border border-border hover:bg-accent/40 text-primary inline-flex items-center gap-1"
                           >
                             <Plus className="size-3" /> Log
