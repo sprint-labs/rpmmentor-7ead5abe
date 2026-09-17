@@ -64,7 +64,7 @@ const META: Record<Metric, { title: string; description: string; to: string; lin
     mentors: {
       title: "Active Mentors",
       description: "Accounts holding mentor access and their recorded output.",
-      to: "/mentors",
+      to: "/users",
       linkLabel: "Users & roles",
     },
     events: {
