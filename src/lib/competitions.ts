@@ -25,6 +25,11 @@ export const COMPETITIONS = [
   "FA Cup",
   "FA Trophy",
   "Community Shield",
+  "Scottish Cup",
+  "Scottish League Cup",
+  "Irish Cup",
+  "NIFL League Cup",
+  "FAI Cup",
   // Age-group competitions
   "Premier League Under 18s",
   "Premier League Under 16s",

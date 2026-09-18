@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { Mic, Square, Loader2, X, RotateCcw, Sparkles, CheckCircle2, AlertTriangle, History, XCircle } from "lucide-react";
+import { Square, Loader2, X, RotateCcw, Sparkles, CheckCircle2, AlertTriangle, History, XCircle } from "lucide-react";
+import { MicIcon, type MicIconHandle } from "@/components/ui/mic-icon";
 import { toast } from "sonner";
 import { transcribeVoiceNote } from "@/lib/api/transcribe.functions";
 import {
@@ -157,6 +158,7 @@ export function VoiceNoteField({
   const [nowTick, setNowTick] = useState<number>(() => Date.now());
   const [restoredFromDraft, setRestoredFromDraft] = useState<boolean>(!!draft?.transcript);
 
+  const micRef = useRef<MicIconHandle>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const chunksRef = useRef<BlobPart[]>([]);
@@ -780,8 +782,19 @@ export function VoiceNoteField({
 
       {!audioUrl && !recording && !busy && !transcript && (
         <div className="flex flex-wrap gap-2">
-          <button type="button" onClick={start} className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md bg-primary text-primary-foreground text-xs font-medium hover:opacity-90">
-            <Mic className="size-3.5" />Record voice note
+          <button
+            type="button"
+            onClick={start}
+            onMouseEnter={() => micRef.current?.startAnimation()}
+            onMouseLeave={() => micRef.current?.stopAnimation()}
+            onFocus={() => micRef.current?.startAnimation()}
+            onBlur={() => micRef.current?.stopAnimation()}
+            className="group inline-flex items-center gap-1.5 h-8 px-3 rounded-md bg-primary text-primary-foreground text-xs font-medium hover:opacity-90"
+          >
+            {/* Driven from the button, not the icon: the whole control is the
+                hover target, and it answers to keyboard focus too. */}
+            <MicIcon ref={micRef} size={14} aria-hidden="true" />
+            Record voice note
           </button>
         </div>
       )}

@@ -19,6 +19,7 @@ import { listPlayers, type PlayerRosterRow } from "@/lib/players.functions";
 import { COMPETITIONS } from "@/lib/competitions";
 import {
   EMPTY_CLUB_INDEX,
+  canonicalCompetition,
   clubsForCompetition,
   competitionsForClub,
   hasClubsForCompetition,
@@ -1801,7 +1802,9 @@ function ReportForm({
           ...clubIndex.competitions,
           ...players.map((p) => p.league),
           ...goalkeepers.map((g) => g.league),
-        ].filter(Boolean),
+        ]
+          .map((name) => canonicalCompetition(name))
+          .filter(Boolean),
       ),
     ).sort((a, b) => a.localeCompare(b));
   }, [clubIndex, competitionScopedToTeam, team, players]);

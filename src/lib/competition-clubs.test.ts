@@ -5,6 +5,7 @@ import {
   competitionKey,
   hasClubsForCompetition,
   competitionsForClub,
+  canonicalCompetition,
   hasCompetitionsForClub,
   EMPTY_CLUB_INDEX,
 } from "./competition-clubs";
@@ -172,5 +173,58 @@ describe("competitionsForClub", () => {
 
   it("falls back to every competition before a club is chosen", () => {
     expect(competitionsForClub(index, "")).toEqual(index.competitions);
+  });
+});
+
+describe("canonicalCompetition", () => {
+  it("folds the short forms a spreadsheet collects onto one spelling", () => {
+    expect(canonicalCompetition("championship")).toBe("EFL Championship");
+    expect(canonicalCompetition("Sky Bet Championship")).toBe("EFL Championship");
+    expect(canonicalCompetition("League Cup")).toBe("Carabao Cup");
+    expect(canonicalCompetition("Papa John's Trophy")).toBe("EFL Trophy");
+  });
+
+  it("takes the catalogue's spelling when the name matches apart from case", () => {
+    expect(canonicalCompetition("efl league one")).toBe("EFL League One");
+    expect(canonicalCompetition("  fa cup  ")).toBe("FA Cup");
+  });
+
+  it("leaves an uncatalogued competition exactly as typed", () => {
+    expect(canonicalCompetition("Kent Senior Cup")).toBe("Kent Senior Cup");
+  });
+
+  it("leaves genuinely ambiguous short forms alone", () => {
+    // Could be the SPFL or the Premier League; guessing would be worse.
+    expect(canonicalCompetition("Premiership")).toBe("Premiership");
+  });
+
+  it("treats a missing competition as empty", () => {
+    expect(canonicalCompetition(null)).toBe("");
+    expect(canonicalCompetition("   ")).toBe("");
+  });
+});
+
+describe("folding duplicate competition spellings", () => {
+  it("pools clubs that arrived under different spellings into one entry", () => {
+    const index = buildCompetitionClubIndex({
+      players: [{ league: "EFL Championship", current_club: "Birmingham City", parent_club: null }],
+      reports: [{ competition: "championship", team: "Watford", opponent: "Derby County" }],
+    });
+
+    expect(index.competitions).toEqual(["EFL Championship"]);
+    expect(clubsForCompetition(index, "championship")).toEqual([
+      "Birmingham City",
+      "Derby County",
+      "Watford",
+    ]);
+  });
+
+  it("does not let a competition alias rewrite a club's name", () => {
+    const index = buildCompetitionClubIndex({
+      players: [{ league: "EFL League One", current_club: "Bolton Wanderers", parent_club: null }],
+    });
+
+    expect(competitionsForClub(index, "bolton wanderers")).toContain("EFL League One");
+    expect(index.allClubs).toEqual(["Bolton Wanderers"]);
   });
 });

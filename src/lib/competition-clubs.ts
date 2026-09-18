@@ -16,6 +16,13 @@
  * club RPM has not met yet is typed once and known from then on.
  */
 
+import { COMPETITIONS } from "@/lib/competitions";
+
+/** Canonical spellings, indexed by their lowercase form. */
+const CANONICAL_BY_LOWER = new Map<string, string>(
+  COMPETITIONS.map((name) => [name.toLowerCase(), name]),
+);
+
 export interface ClubIndexPlayer {
   league: string;
   current_club: string;
@@ -74,12 +81,76 @@ const LEAGUE_CUPS: Record<string, readonly string[]> = {
 };
 
 /**
- * Lookup key for a competition name. Case and spacing vary between the roster,
- * the Sheet-era reports and what a mentor types, so "EFL  Championship" and
- * "efl championship" have to land on the same bucket.
+ * Short forms that mean an existing competition.
+ *
+ * Years of reports were typed by hand into a spreadsheet, so the same
+ * competition arrives spelled several ways — "championship" next to "EFL
+ * Championship", "League Cup" next to "Carabao Cup". Left alone they are
+ * separate entries in the picker, each holding half the clubs.
+ *
+ * Only unambiguous aliases belong here. "Premiership" is deliberately absent:
+ * in this roster it could be the SPFL or the Premier League, and folding it
+ * onto the wrong one is worse than leaving two entries visible.
+ */
+const COMPETITION_ALIASES: Record<string, string> = {
+  championship: "EFL Championship",
+  "the championship": "EFL Championship",
+  "sky bet championship": "EFL Championship",
+  "league one": "EFL League One",
+  "league 1": "EFL League One",
+  "sky bet league one": "EFL League One",
+  "league two": "EFL League Two",
+  "league 2": "EFL League Two",
+  "sky bet league two": "EFL League Two",
+  "efl cup": "Carabao Cup",
+  "league cup": "Carabao Cup",
+  "the fa cup": "FA Cup",
+  "papa john's trophy": "EFL Trophy",
+  "vertu trophy": "EFL Trophy",
+  "bristol street motors trophy": "EFL Trophy",
+  epl: "Premier League",
+  "english premier league": "Premier League",
+};
+
+/** Trimmed, whitespace-collapsed. The shared first step of both keys below. */
+function tidy(value: string | null | undefined): string {
+  return (value ?? "").trim().replace(/\s+/g, " ");
+}
+
+/**
+ * The spelling a competition should be shown and stored under.
+ *
+ * An alias resolves to its canonical name; anything else that matches a name in
+ * `COMPETITIONS`, ignoring case, takes that list's spelling, so "efl league one"
+ * from an old report displays as "EFL League One". A competition nobody has
+ * catalogued is left exactly as typed.
+ */
+export function canonicalCompetition(competition: string | null | undefined): string {
+  const name = tidy(competition);
+  if (!name) return "";
+  const lower = name.toLowerCase();
+  const alias = COMPETITION_ALIASES[lower];
+  if (alias) return alias;
+  const known = CANONICAL_BY_LOWER.get(lower);
+  return known ?? name;
+}
+
+/**
+ * Lookup key for a competition. Case, spacing and the short forms above all
+ * collapse onto one key, so "championship" and "EFL Championship" share a
+ * bucket instead of splitting its clubs between them.
  */
 export function competitionKey(competition: string | null | undefined): string {
-  return (competition ?? "").trim().replace(/\s+/g, " ").toLowerCase();
+  return canonicalCompetition(competition).toLowerCase();
+}
+
+/**
+ * Lookup key for a club. Clubs get case and spacing folded but never the
+ * competition aliases — those are about competitions and have no business
+ * rewriting a club's name.
+ */
+export function clubKey(club: string | null | undefined): string {
+  return tidy(club).toLowerCase();
 }
 
 /** Case-insensitive de-dupe that keeps the first spelling it saw. */
@@ -105,8 +176,11 @@ export function buildCompetitionClubIndex(source: ClubIndexSource): CompetitionC
   const byClub = new Map<string, Map<string, string>>();
   const allClubs = new Map<string, string>();
 
-  const place = (competition: string | null | undefined, club: string | null | undefined) => {
+  const place = (rawCompetition: string | null | undefined, club: string | null | undefined) => {
     addName(allClubs, club);
+    // Store the canonical spelling, so one competition is one entry however it
+    // was typed into the report it came from.
+    const competition = canonicalCompetition(rawCompetition);
     const key = competitionKey(competition);
     if (!key) return;
     addName(competitions, competition);
@@ -117,12 +191,12 @@ export function buildCompetitionClubIndex(source: ClubIndexSource): CompetitionC
     }
     addName(bucket, club);
 
-    const club_key = competitionKey(club);
-    if (!club_key) return;
-    let owned = byClub.get(club_key);
+    const forClub = clubKey(club);
+    if (!forClub) return;
+    let owned = byClub.get(forClub);
     if (!owned) {
       owned = new Map<string, string>();
-      byClub.set(club_key, owned);
+      byClub.set(forClub, owned);
     }
     addName(owned, competition);
     // The league a club plays in also entitles it to its domestic cups.
@@ -191,7 +265,7 @@ export function competitionsForClub(
   index: CompetitionClubIndex,
   club: string | null | undefined,
 ): string[] {
-  const key = competitionKey(club);
+  const key = clubKey(club);
   const known = key ? index.competitionsByClub[key] : undefined;
   return known && known.length > 0 ? known : index.competitions;
 }
@@ -201,6 +275,6 @@ export function hasCompetitionsForClub(
   index: CompetitionClubIndex,
   club: string | null | undefined,
 ): boolean {
-  const key = competitionKey(club);
+  const key = clubKey(club);
   return Boolean(key && (index.competitionsByClub[key]?.length ?? 0) > 0);
 }
