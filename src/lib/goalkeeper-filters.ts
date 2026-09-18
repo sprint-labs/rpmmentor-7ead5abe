@@ -104,6 +104,8 @@ export function filterGoalkeepers(
   filters: GoalkeeperFilterState,
   ratingsByGoalkeeper: ReadonlyMap<string, GoalkeeperRating>,
   now = Date.now(),
+  dutyLevelFor: (goalkeeper: Goalkeeper) => DutyLevel = (goalkeeper) =>
+    dutyStatusForGk(goalkeeper).level,
 ) {
   const selectedTiers = csv(filters.tiers);
   const selectedLeagues = csv(filters.leagues);
@@ -123,7 +125,7 @@ export function filterGoalkeepers(
     if (filters.cat === "Tier 3-4" && goalkeeper.tier !== "Tier 3" && goalkeeper.tier !== "Tier 4")
       return false;
 
-    if (filters.duty !== "all" && dutyStatusForGk(goalkeeper).level !== (filters.duty as DutyLevel))
+    if (filters.duty !== "all" && dutyLevelFor(goalkeeper) !== (filters.duty as DutyLevel))
       return false;
 
     if (

@@ -59,11 +59,14 @@ export async function refreshClubDependentViews(
 
 /**
  * Everything that reflects a goalkeeper's duty-of-care standing: the badge on
- * the goalkeeper profile (prefix-invalidated so any open profile re-reads) and
- * the dashboard roll-ups that count red / amber / green across the roster.
+ * the goalkeeper profile, the roster list and chip counts keyed
+ * `["duty-of-care", "roster"]`, and the dashboard roll-ups that count red /
+ * amber / green across the roster.
  *
  * Recording a reset changes what `duty_of_care_at()` returns immediately, so
- * the badge must be re-read rather than left in cache.
+ * every open duty consumer must be re-read rather than left in cache.
+ * `["duty-of-care", playerId]` does not prefix-match the roster key, so the
+ * roster is invalidated on its own key.
  */
 export async function refreshDutyOfCareViews(
   queryClient: QueryClient,
@@ -73,6 +76,7 @@ export async function refreshDutyOfCareViews(
     queryClient.invalidateQueries({
       queryKey: playerId ? ["duty-of-care", playerId] : ["duty-of-care"],
     }),
+    queryClient.invalidateQueries({ queryKey: ["duty-of-care", "roster"] }),
     queryClient.invalidateQueries({ queryKey: ["mentor-dashboard-stats"] }),
     queryClient.invalidateQueries({ queryKey: ["overview-dashboard-stats"] }),
     queryClient.invalidateQueries({ queryKey: ["executive-dashboard-stats"] }),

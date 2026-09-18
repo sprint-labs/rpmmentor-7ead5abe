@@ -74,6 +74,7 @@ describe("refreshDutyOfCareViews", () => {
     await refreshDutyOfCareViews(client);
 
     expect(keys).toContainEqual(["duty-of-care"]);
+    expect(keys).toContainEqual(["duty-of-care", "roster"]);
     expect(keys).toContainEqual(["mentor-dashboard-stats"]);
     expect(keys).toContainEqual(["overview-dashboard-stats"]);
     expect(keys).toContainEqual(["executive-dashboard-stats"]);
@@ -84,5 +85,8 @@ describe("refreshDutyOfCareViews", () => {
     await refreshDutyOfCareViews(client, "player-1");
 
     expect(keys).toContainEqual(["duty-of-care", "player-1"]);
+    // The roster list is keyed ["duty-of-care", "roster"], which the
+    // player-specific prefix does not match.
+    expect(keys).toContainEqual(["duty-of-care", "roster"]);
   });
 });

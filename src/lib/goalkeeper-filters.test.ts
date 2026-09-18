@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { dutyStatusForGk, goalkeepers } from "./mock-data";
+import { dutyStatusForGk, goalkeepers, type DutyLevel } from "./mock-data";
 import {
   canonicaliseLegacyTierCategory,
   clearGoalkeeperFilters,
@@ -150,5 +150,24 @@ describe("goalkeeper filter behaviour", () => {
     const after = goalkeepers.map((goalkeeper) => dutyStatusForGk(goalkeeper));
 
     expect(after).toEqual(before);
+  });
+
+  it("filters duty of care from the supplied live status, not the seed calculator", () => {
+    const target = goalkeepers[0];
+    const seedLevel = dutyStatusForGk(target).level;
+    const liveLevel: DutyLevel = seedLevel === "overdue" ? "up_to_date" : "overdue";
+
+    expect(
+      filterGoalkeepers(
+        [target],
+        { ...defaultFilters, duty: liveLevel },
+        noRatings,
+        Date.now(),
+        () => liveLevel,
+      ),
+    ).toEqual([target]);
+    expect(filterGoalkeepers([target], { ...defaultFilters, duty: liveLevel }, noRatings)).toEqual(
+      [],
+    );
   });
 });

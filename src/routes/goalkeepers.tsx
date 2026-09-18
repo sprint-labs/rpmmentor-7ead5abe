@@ -414,7 +414,13 @@ function GoalkeepersList() {
       : { key, direction: "asc" });
   };
 
-  const filtered = filterGoalkeepers(goalkeepers, search, ratingsByGoalkeeper);
+  const filtered = filterGoalkeepers(
+    goalkeepers,
+    search,
+    ratingsByGoalkeeper,
+    Date.now(),
+    (goalkeeper) => dutyFor(goalkeeper.name).level,
+  );
 
   const sorted = useMemo(() => {
     if (!sort) return filtered;
@@ -438,7 +444,7 @@ function GoalkeepersList() {
         case "rating": return compareNullable(aRating, bRating, sort.direction);
       }
     });
-  }, [filtered, ratingsByGoalkeeper, sort]);
+  }, [dutyFor, filtered, ratingsByGoalkeeper, sort]);
 
   const CATS_LIST = CATS;
   const dutyCounts = useMemo(
