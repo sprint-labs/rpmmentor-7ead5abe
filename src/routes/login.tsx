@@ -3,7 +3,7 @@ import { useAuth } from "@/lib/auth";
 import { useEffect, useState } from "react";
 import { ArrowLeft, CheckCircle2, Eye, EyeOff, Lock, Mail } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { LOGIN_LOCKUP_SRC } from "@/lib/brand";
+import { GkhqLockup } from "@/components/gkhq-lockup";
 import { passwordRecoveryRedirectUrl } from "@/lib/password-recovery";
 import { MAINTENANCE_MODE } from "@/lib/maintenance";
 
@@ -65,7 +65,12 @@ function LoginPage() {
     <main id="main-content" tabIndex={-1} className="min-h-screen flex items-center justify-center bg-background p-6">
       <div className="w-full max-w-md">
         <div className="mb-10">
-          <img src={LOGIN_LOCKUP_SRC} alt="Mentor Hub by RPM" className="h-40 w-auto" />
+          <GkhqLockup
+            stacked
+            markClassName="size-20"
+            wordmarkClassName="h-10 w-auto"
+            alt="GKHQ Mentor Hub"
+          />
         </div>
 
         {MAINTENANCE_MODE && (
