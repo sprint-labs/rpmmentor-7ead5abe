@@ -67,6 +67,22 @@ export const getPlayerDutyOfCare = createServerFn({ method: "GET" })
     return (row as PlayerDutyOfCareRow | null) ?? null;
   });
 
+/**
+ * Live duty-of-care rows for the whole roster, from the same view.
+ *
+ * The goalkeeper list used to compute this on the client from the illustrative
+ * seed interactions, which meant a keeper with real logged contact still read
+ * "Not enough data" in the list while his own profile — which has always read
+ * this view — said "Overdue". One source, one answer.
+ */
+export const listPlayerDutyOfCare = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<PlayerDutyOfCareRow[]> => {
+    const { data, error } = await context.supabase.from("player_duty_of_care").select(DUTY_COLUMNS);
+    if (error) throw new Error(error.message);
+    return (data ?? []) as PlayerDutyOfCareRow[];
+  });
+
 export interface DutyOfCareResetResult {
   id: string;
   player_id: string;

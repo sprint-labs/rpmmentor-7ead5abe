@@ -4,10 +4,17 @@ import { useQuery } from "@tanstack/react-query";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
 import { PageHeader, Card, TierBadge, Avatar, TrafficLight, DutyBadge, Pill } from "@/components/primitives";
-import { goalkeepers, dutyStatusForGk, dutyOverview, DUTY_LABELS, type DutyLevel, type Goalkeeper, type TierLevelLabel } from "@/lib/mock-data";
+import { goalkeepers, DUTY_LABELS, type DutyLevel, type Goalkeeper, type TierLevelLabel } from "@/lib/mock-data";
+import { listPlayerDutyOfCare } from "@/lib/duty-of-care.functions";
+import {
+  buildRosterDutyIndex,
+  countRosterDuty,
+  rosterDutyFor,
+  type RosterDutyStatus,
+} from "@/lib/duty-of-care-roster";
 import { listMatchReports } from "@/lib/match-reports/reports.functions";
 import { canonicaliseLegacyTierCategory, clampRating, clearGoalkeeperFilters, countActiveGoalkeeperFilters, csv, filterGoalkeepers, normaliseGoalkeeperName, toCsv, toggleFrom, type GoalkeeperFilterState } from "@/lib/goalkeeper-filters";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { withPermission } from "@/components/require-permission";
 import { Drawer, DrawerClose, DrawerContent, DrawerDescription, DrawerFooter, DrawerHeader, DrawerTitle, DrawerTrigger } from "@/components/ui/drawer";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -143,11 +150,12 @@ function SortableHeader({
 function MobileGoalkeeperCard({
   gk,
   rating,
+  duty,
 }: {
   gk: Goalkeeper;
   rating: { average: number; reportCount: number } | undefined;
+  duty: RosterDutyStatus;
 }) {
-  const duty = dutyStatusForGk(gk);
   const club = gk.tags.includes("Free Agent") ? "Free Agent" : gk.club || "Not recorded";
   const league = gk.tags.includes("Free Agent") ? "—" : gk.league || "Not recorded";
 
@@ -322,6 +330,28 @@ function GoalkeepersList() {
     staleTime: 60_000,
   });
 
+  // Duty of care comes from the same database view the profile page reads, so
+  // the list and the profile cannot disagree about a goalkeeper.
+  const dutyListFn = useServerFn(listPlayerDutyOfCare);
+  const {
+    data: dutyRows,
+    isPending: dutyPending,
+    isError: dutyUnavailable,
+  } = useQuery({
+    queryKey: ["duty-of-care", "roster"],
+    queryFn: () => dutyListFn(),
+    staleTime: 60_000,
+  });
+  const dutyIndex = useMemo(() => buildRosterDutyIndex(dutyRows ?? []), [dutyRows]);
+  const dutyQueryState = useMemo(
+    () => ({ pending: dutyPending, error: dutyUnavailable }),
+    [dutyPending, dutyUnavailable],
+  );
+  const dutyFor = useCallback(
+    (name: string) => rosterDutyFor(dutyIndex, name, dutyQueryState),
+    [dutyIndex, dutyQueryState],
+  );
+
   // Distinct dropdown options derived from the live roster.
   const { allLeagues, allNats, contractYears } = useMemo(() => {
     const leagues = new Set<string>();
@@ -392,8 +422,8 @@ function GoalkeepersList() {
     return [...filtered].sort((a, b) => {
       const aRating = ratingsByGoalkeeper.get(normaliseGoalkeeperName(a.name))?.average ?? null;
       const bRating = ratingsByGoalkeeper.get(normaliseGoalkeeperName(b.name))?.average ?? null;
-      const aDuty = dutyStatusForGk(a).label;
-      const bDuty = dutyStatusForGk(b).label;
+      const aDuty = dutyFor(a.name).label;
+      const bDuty = dutyFor(b.name).label;
 
       switch (sort.key) {
         case "goalkeeper": return compareNullable(a.name, b.name, sort.direction);
@@ -411,13 +441,17 @@ function GoalkeepersList() {
   }, [filtered, ratingsByGoalkeeper, sort]);
 
   const CATS_LIST = CATS;
+  const dutyCounts = useMemo(
+    () => countRosterDuty(dutyIndex, goalkeepers.map((g) => g.name), dutyQueryState),
+    [dutyIndex, dutyQueryState],
+  );
   const DUTIES: { id: "all" | DutyLevel; label: string; count: number }[] = [
-    { id: "all", label: "All", count: dutyOverview.total },
-    { id: "up_to_date", label: DUTY_LABELS.up_to_date, count: dutyOverview.up_to_date },
-    { id: "due_soon", label: DUTY_LABELS.due_soon, count: dutyOverview.due_soon },
-    { id: "overdue", label: DUTY_LABELS.overdue, count: dutyOverview.overdue },
-    { id: "not_required", label: DUTY_LABELS.not_required, count: dutyOverview.not_required },
-    { id: "not_enough_data", label: DUTY_LABELS.not_enough_data, count: dutyOverview.not_enough_data },
+    { id: "all", label: "All", count: dutyCounts.total },
+    { id: "up_to_date", label: DUTY_LABELS.up_to_date, count: dutyCounts.up_to_date },
+    { id: "due_soon", label: DUTY_LABELS.due_soon, count: dutyCounts.due_soon },
+    { id: "overdue", label: DUTY_LABELS.overdue, count: dutyCounts.overdue },
+    { id: "not_required", label: DUTY_LABELS.not_required, count: dutyCounts.not_required },
+    { id: "not_enough_data", label: DUTY_LABELS.not_enough_data, count: dutyCounts.not_enough_data },
   ];
 
   // Count active advanced filters for badge
@@ -605,6 +639,7 @@ function GoalkeepersList() {
             key={gk.id}
             gk={gk}
             rating={ratingsByGoalkeeper.get(normaliseGoalkeeperName(gk.name))}
+            duty={dutyFor(gk.name)}
           />
         ))}
       </Card>
@@ -635,7 +670,7 @@ function GoalkeepersList() {
                 </td>
               </tr>
             ) : sorted.map((gk) => {
-              const d = dutyStatusForGk(gk);
+              const d = dutyFor(gk.name);
               const rating = ratingsByGoalkeeper.get(normaliseGoalkeeperName(gk.name));
               return (
                 <tr key={gk.id} className="border-b border-border/60 last:border-0 hover:bg-accent/20 transition-colors">
