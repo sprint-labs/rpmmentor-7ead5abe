@@ -9,12 +9,19 @@
  * `players_guard_club_only_update` trigger enforce it a third time. These tests
  * guard the promise the UI makes, not the security boundary.
  */
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { roleHasPermission, type Role } from "@/lib/auth";
 
 const authState = vi.hoisted(() => ({ role: "mentor_manager" as Role }));
+const saveMocks = vi.hoisted(() => ({
+  saveClub: vi.fn(),
+  saveTier: vi.fn(),
+  saveRecord: vi.fn(),
+  refreshClub: vi.fn(),
+  refreshDuty: vi.fn(),
+}));
 
 vi.mock("@/lib/auth", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/auth")>();
@@ -26,6 +33,33 @@ vi.mock("@/lib/auth", async (importOriginal) => {
     }),
   };
 });
+
+vi.mock("@/lib/players.functions", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/players.functions")>();
+  return {
+    ...actual,
+    updatePlayerClub: "update-player-club",
+    updatePlayerTier: "update-player-tier",
+    updatePlayerRecord: "update-player-record",
+  };
+});
+
+vi.mock("@tanstack/react-start", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@tanstack/react-start")>()),
+  useServerFn: (fn: unknown) => {
+    if (fn === "update-player-club") return saveMocks.saveClub;
+    if (fn === "update-player-tier") return saveMocks.saveTier;
+    if (fn === "update-player-record") return saveMocks.saveRecord;
+    return vi.fn();
+  },
+}));
+
+vi.mock("@/lib/query-refresh", () => ({
+  refreshClubDependentViews: (...args: unknown[]) => saveMocks.refreshClub(...args),
+  refreshDutyOfCareViews: (...args: unknown[]) => saveMocks.refreshDuty(...args),
+}));
+
+vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 const { EditDetailsButton } = await import("./edit-player-details-dialog");
 
@@ -56,7 +90,14 @@ function renderButton() {
   );
 }
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  saveMocks.saveClub.mockReset();
+  saveMocks.saveTier.mockReset();
+  saveMocks.saveRecord.mockReset();
+  saveMocks.refreshClub.mockReset();
+  saveMocks.refreshDuty.mockReset();
+});
 
 describe("who is offered Edit Details", () => {
   it.each(["mentor_manager", "admin", "super_admin"] as const)("offers it to %s", (role) => {
@@ -127,5 +168,26 @@ describe("what the form lets each role change", () => {
     expect(((await screen.findByLabelText("Citizenship")) as HTMLInputElement).value).toBe(
       "New Zealand",
     );
+  });
+});
+
+describe("what a successful save refreshes", () => {
+  it("re-reads duty of care after a tier change, not only the roster", async () => {
+    authState.role = "mentor_manager";
+    saveMocks.saveTier.mockResolvedValue({ ...PLAYER, tier: "Tier 4" });
+    saveMocks.refreshClub.mockResolvedValue(undefined);
+    saveMocks.refreshDuty.mockResolvedValue(undefined);
+    renderButton();
+    screen.getByRole("button", { name: /edit details/i }).click();
+
+    fireEvent.change(await screen.findByLabelText("Tier"), { target: { value: "Tier 4" } });
+    fireEvent.click(screen.getByRole("button", { name: /save details/i }));
+
+    await waitFor(() => {
+      expect(saveMocks.saveTier).toHaveBeenCalled();
+      expect(saveMocks.refreshDuty).toHaveBeenCalled();
+    });
+    expect(saveMocks.refreshDuty.mock.calls[0][1]).toBe(PLAYER.id);
+    expect(saveMocks.refreshClub).toHaveBeenCalled();
   });
 });

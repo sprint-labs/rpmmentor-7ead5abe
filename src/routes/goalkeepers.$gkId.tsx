@@ -32,7 +32,11 @@ import { buildHighlightReelItems } from "@/lib/goalkeeper-highlight-reel";
 import { EditDetailsButton } from "@/components/edit-player-details-dialog";
 import { DutyOfCarePanel } from "@/components/duty-of-care-panel";
 import { listPlayers } from "@/lib/players.functions";
-import { findPlayerByName, interactionBelongsToGoalkeeper } from "@/lib/goalkeeper-player-link";
+import {
+  findPlayerByName,
+  goalkeeperProfileFields,
+  interactionBelongsToGoalkeeper,
+} from "@/lib/goalkeeper-player-link";
 import {
   compareInteractionsByAlertThenDate,
   interactionOutcomeAlertRank,
@@ -131,14 +135,18 @@ function GkDetail() {
     () => Array.from(new Set([gk.id, linkedPlayerId].filter((id): id is string => !!id))),
     [gk.id, linkedPlayerId],
   );
-  const displayClub = linkedPlayer?.current_club || gk.club;
-  const displayLeague = linkedPlayer?.league || gk.league;
-  /**
-   * Citizenship is `players.nationality` — the canonical roster row first, the
-   * legacy profile only as a fallback. It is shown in exactly one place on this
-   * page: its own stat box below.
-   */
-  const displayNationality = linkedPlayer?.nationality || gk.nationality;
+  // Live `players` values win (club, league, citizenship, tier, loan, Instagram,
+  // contract). The mock roster is only the fallback when no row is linked.
+  const {
+    club: displayClub,
+    league: displayLeague,
+    nationality: displayNationality,
+    tier: displayTier,
+    onLoan: displayOnLoan,
+    parentClub: displayParentClub,
+    instagram: displayInstagram,
+    contractUntil: displayContractUntil,
+  } = goalkeeperProfileFields(linkedPlayer, gk);
   const profileSummary = [
     gk.tags.includes("Free Agent") ? "Free Agent" : displayClub || "Club not recorded",
     !gk.tags.includes("Free Agent") ? displayLeague : null,
@@ -354,12 +362,14 @@ function GkDetail() {
           <div className="min-w-0">
             <div className="flex items-center gap-2.5 flex-wrap">
               <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">{gk.name}</h1>
-              <TierBadge tier={gk.tier} />
+              {displayTier ? <TierBadge tier={displayTier as Tier} /> : null}
               {gk.tags.map((tag: string) => (
                 <TierBadge key={tag} tier={tag as Tier} />
               ))}
-              {gk.onLoan && (
-                <Pill tone="info">On loan{gk.parentClub ? ` from ${gk.parentClub}` : ""}</Pill>
+              {displayOnLoan && (
+                <Pill tone="info">
+                  On loan{displayParentClub ? ` from ${displayParentClub}` : ""}
+                </Pill>
               )}
             </div>
             <div className="mt-1 text-sm leading-snug text-muted-foreground">
@@ -382,17 +392,17 @@ function GkDetail() {
               </div>
             )}
 
-            {gk.instagram && (
+            {displayInstagram && (
               <div className="mt-1 text-xs">
                 <a
-                  href={gk.instagram}
+                  href={displayInstagram}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-primary hover:underline inline-flex items-center gap-1"
                   aria-label={`${gk.name} on Instagram (opens in new tab)`}
                 >
                   @
-                  {gk.instagram
+                  {displayInstagram
                     .replace(/^https?:\/\/(www\.)?instagram\.com\//i, "")
                     .replace(/\/$/, "") || "instagram"}
                 </a>
@@ -446,7 +456,7 @@ function GkDetail() {
                   ? `${ratingContributors.length} report${ratingContributors.length === 1 ? "" : "s"}`
                   : undefined,
             },
-            { label: "Contract expiry", value: formatContractExpiry(gk.contractUntil) },
+            { label: "Contract expiry", value: formatContractExpiry(displayContractUntil) },
             { label: "DOB", value: formatDob(gk.dob) },
             { label: "Age", value: String(gk.age) },
             { label: "Citizenship", value: displayNationality || "—" },

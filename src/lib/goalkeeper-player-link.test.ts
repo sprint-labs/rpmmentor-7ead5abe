@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   findPlayerByName,
+  goalkeeperProfileFields,
   interactionBelongsToGoalkeeper,
   legacyGkSlugForName,
   normalisePersonName,
@@ -55,6 +56,61 @@ describe("goalkeeper-player-link", () => {
         "p2",
       ),
     ).toBe(false);
+  });
+});
+
+describe("goalkeeperProfileFields", () => {
+  const gk = {
+    club: "Burton Albion",
+    league: "League One",
+    nationality: "England",
+    tier: "Tier 1",
+    onLoan: true,
+    parentClub: "Brighton",
+    instagram: "https://instagram.com/mock",
+    contractUntil: "2027-06-30",
+  };
+
+  it("keeps the mock profile when no players row is linked", () => {
+    expect(goalkeeperProfileFields(null, gk)).toEqual({
+      club: "Burton Albion",
+      league: "League One",
+      nationality: "England",
+      tier: "Tier 1",
+      onLoan: true,
+      parentClub: "Brighton",
+      instagram: "https://instagram.com/mock",
+      contractUntil: "2027-06-30",
+    });
+  });
+
+  it("prefers the linked players row, including empty and false values", () => {
+    // A successful Edit Details save writes these columns; falling back to the
+    // mock roster would leave the badge, loan pill, Instagram and contract stale.
+    expect(
+      goalkeeperProfileFields(
+        {
+          current_club: "Portsmouth",
+          league: "Championship",
+          nationality: "New Zealand",
+          tier: "Tier 4",
+          on_loan: false,
+          parent_club: null,
+          instagram_url: null,
+          contract_until: "2029-12-31",
+        },
+        gk,
+      ),
+    ).toEqual({
+      club: "Portsmouth",
+      league: "Championship",
+      nationality: "New Zealand",
+      tier: "Tier 4",
+      onLoan: false,
+      parentClub: "",
+      instagram: "",
+      contractUntil: "2029-12-31",
+    });
   });
 });
 

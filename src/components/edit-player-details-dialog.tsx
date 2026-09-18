@@ -34,7 +34,7 @@ import {
   updatePlayerTier,
   type PlayerRosterRow,
 } from "@/lib/players.functions";
-import { refreshClubDependentViews } from "@/lib/query-refresh";
+import { refreshClubDependentViews, refreshDutyOfCareViews } from "@/lib/query-refresh";
 
 /** The editable shape of a player record, as strings the form can hold. */
 interface DetailsForm {
@@ -181,6 +181,9 @@ function EditDetailsDialog({
         queryClient.setQueryData(["player", playerId], confirmed);
       }
       await refreshClubDependentViews(queryClient, playerId);
+      // Cadence is tier-driven; the profile's DutyOfCarePanel sits beside this
+      // dialog and keeps a 60s cache unless we evict it here.
+      await refreshDutyOfCareViews(queryClient, playerId);
       toast.success("Details updated", { description: `${playerName}'s record has been saved.` });
       onClose();
     } catch (err) {
