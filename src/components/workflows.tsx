@@ -20,7 +20,9 @@ import { COMPETITIONS } from "@/lib/competitions";
 import {
   EMPTY_CLUB_INDEX,
   clubsForCompetition,
+  competitionsForClub,
   hasClubsForCompetition,
+  hasCompetitionsForClub,
 } from "@/lib/competition-clubs";
 import { getCompetitionClubIndex } from "@/lib/competition-clubs.functions";
 import {
@@ -1784,20 +1786,28 @@ function ReportForm({
         : goalkeepers.map((g) => g.name),
     [players],
   );
-  const competitionOptions = useMemo(
-    () =>
-      Array.from(
-        new Set(
-          [
-            ...COMPETITIONS,
-            ...clubIndex.competitions,
-            ...players.map((p) => p.league),
-            ...goalkeepers.map((g) => g.league),
-          ].filter(Boolean),
-        ),
-      ).sort((a, b) => a.localeCompare(b)),
-    [clubIndex.competitions, players],
-  );
+  // Once the keeper is picked, Team is known, and a club plays a knowable set of
+  // competitions — its league plus the cups that league enters. A Birmingham
+  // report should not have to scroll past the Allsvenskan to reach the
+  // Championship. With no club yet, or one Mentor Hub has never seen, the full
+  // list stands.
+  const competitionScopedToTeam = hasCompetitionsForClub(clubIndex, team);
+  const competitionOptions = useMemo(() => {
+    if (competitionScopedToTeam) return competitionsForClub(clubIndex, team);
+    return Array.from(
+      new Set(
+        [
+          ...COMPETITIONS,
+          ...clubIndex.competitions,
+          ...players.map((p) => p.league),
+          ...goalkeepers.map((g) => g.league),
+        ].filter(Boolean),
+      ),
+    ).sort((a, b) => a.localeCompare(b));
+  }, [clubIndex, competitionScopedToTeam, team, players]);
+  const competitionHint = competitionScopedToTeam
+    ? `${team.trim()} competitions · type any other`
+    : undefined;
   // Team and Opponent narrow to the chosen competition; a cup or an unrecognised
   // competition falls back to every club Mentor Hub knows.
   const clubOptions = useMemo(
@@ -2463,6 +2473,7 @@ function ReportForm({
             options={competitionOptions}
             ariaLabel="Competition"
             placeholder="e.g. EFL Championship"
+            hint={competitionHint}
             required
           />
         </Field>

@@ -4,6 +4,8 @@ import {
   clubsForCompetition,
   competitionKey,
   hasClubsForCompetition,
+  competitionsForClub,
+  hasCompetitionsForClub,
   EMPTY_CLUB_INDEX,
 } from "./competition-clubs";
 
@@ -113,5 +115,62 @@ describe("clubsForCompetition", () => {
 
   it("returns nothing at all when the index is empty", () => {
     expect(clubsForCompetition(EMPTY_CLUB_INDEX, "EFL Championship")).toEqual([]);
+  });
+});
+
+describe("competitionsForClub", () => {
+  const index = buildCompetitionClubIndex({
+    players: [
+      { league: "EFL Championship", current_club: "Birmingham City", parent_club: null },
+      { league: "Allsvenskan", current_club: "Hammarby", parent_club: null },
+      { league: "EFL League One", current_club: "Bolton Wanderers", parent_club: null },
+    ],
+  });
+
+  it("offers a club its own league, not every league on the roster", () => {
+    const birmingham = competitionsForClub(index, "Birmingham City");
+
+    expect(birmingham).toContain("EFL Championship");
+    expect(birmingham).not.toContain("Allsvenskan");
+    expect(hasCompetitionsForClub(index, "Birmingham City")).toBe(true);
+  });
+
+  it("adds the domestic cups that league enters, before any have been played", () => {
+    expect(competitionsForClub(index, "Birmingham City")).toEqual([
+      "Carabao Cup",
+      "EFL Championship",
+      "FA Cup",
+    ]);
+  });
+
+  it("gives League One clubs the EFL Trophy that Championship clubs do not enter", () => {
+    expect(competitionsForClub(index, "Bolton Wanderers")).toContain("EFL Trophy");
+    expect(competitionsForClub(index, "Birmingham City")).not.toContain("EFL Trophy");
+  });
+
+  it("does not invent English cups for a club outside the English pyramid", () => {
+    expect(competitionsForClub(index, "Hammarby")).toEqual(["Allsvenskan"]);
+  });
+
+  it("learns a cup a club has actually played in", () => {
+    const withCupTie = buildCompetitionClubIndex({
+      players: [{ league: "EFL Championship", current_club: "Birmingham City", parent_club: null }],
+      reports: [{ competition: "Community Shield", team: "Birmingham City", opponent: "Arsenal" }],
+    });
+
+    expect(competitionsForClub(withCupTie, "Birmingham City")).toContain("Community Shield");
+  });
+
+  it("matches the club regardless of case or spacing", () => {
+    expect(competitionsForClub(index, "  birmingham  city ")).toContain("EFL Championship");
+  });
+
+  it("falls back to every competition for a club it has never seen", () => {
+    expect(competitionsForClub(index, "Hashtag United")).toEqual(index.competitions);
+    expect(hasCompetitionsForClub(index, "Hashtag United")).toBe(false);
+  });
+
+  it("falls back to every competition before a club is chosen", () => {
+    expect(competitionsForClub(index, "")).toEqual(index.competitions);
   });
 });

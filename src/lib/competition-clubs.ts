@@ -38,6 +38,8 @@ export interface CompetitionClubIndex {
   competitions: string[];
   /** Lookup key (see `competitionKey`) → clubs in that competition. */
   clubsByCompetition: Record<string, string[]>;
+  /** The reverse: club key → the competitions that club has been seen in. */
+  competitionsByClub: Record<string, string[]>;
   /** Every club seen anywhere, for cups and unknown competitions. */
   allClubs: string[];
 }
@@ -45,7 +47,30 @@ export interface CompetitionClubIndex {
 export const EMPTY_CLUB_INDEX: CompetitionClubIndex = {
   competitions: [],
   clubsByCompetition: {},
+  competitionsByClub: {},
   allClubs: [],
+};
+
+/**
+ * Domestic cups a club is eligible for by virtue of its league.
+ *
+ * Unlike a league's membership, which changes every summer, this structure is
+ * stable: a Championship club enters the FA Cup and the Carabao Cup whether or
+ * not it has played one yet this season. Without it, a keeper's first cup tie of
+ * the season would find no suggestion at all.
+ */
+const LEAGUE_CUPS: Record<string, readonly string[]> = {
+  "premier league": ["FA Cup", "Carabao Cup"],
+  "efl championship": ["FA Cup", "Carabao Cup"],
+  "efl league one": ["FA Cup", "Carabao Cup", "EFL Trophy"],
+  "efl league two": ["FA Cup", "Carabao Cup", "EFL Trophy"],
+  "national league": ["FA Cup", "FA Trophy"],
+  "national league north": ["FA Cup", "FA Trophy"],
+  "national league south": ["FA Cup", "FA Trophy"],
+  "spfl premiership": ["Scottish Cup", "Scottish League Cup"],
+  "spfl championship": ["Scottish Cup", "Scottish League Cup"],
+  "nifl premiership": ["Irish Cup", "NIFL League Cup"],
+  "league of ireland premier division": ["FAI Cup"],
 };
 
 /**
@@ -77,6 +102,7 @@ function sortedValues(map: Map<string, string>): string[] {
 export function buildCompetitionClubIndex(source: ClubIndexSource): CompetitionClubIndex {
   const competitions = new Map<string, string>();
   const clubs = new Map<string, Map<string, string>>();
+  const byClub = new Map<string, Map<string, string>>();
   const allClubs = new Map<string, string>();
 
   const place = (competition: string | null | undefined, club: string | null | undefined) => {
@@ -90,6 +116,17 @@ export function buildCompetitionClubIndex(source: ClubIndexSource): CompetitionC
       clubs.set(key, bucket);
     }
     addName(bucket, club);
+
+    const club_key = competitionKey(club);
+    if (!club_key) return;
+    let owned = byClub.get(club_key);
+    if (!owned) {
+      owned = new Map<string, string>();
+      byClub.set(club_key, owned);
+    }
+    addName(owned, competition);
+    // The league a club plays in also entitles it to its domestic cups.
+    for (const cup of LEAGUE_CUPS[key] ?? []) addName(owned, cup);
   };
 
   for (const player of source.players ?? []) {
@@ -105,9 +142,13 @@ export function buildCompetitionClubIndex(source: ClubIndexSource): CompetitionC
   const clubsByCompetition: Record<string, string[]> = {};
   for (const [key, bucket] of clubs) clubsByCompetition[key] = sortedValues(bucket);
 
+  const competitionsByClub: Record<string, string[]> = {};
+  for (const [key, bucket] of byClub) competitionsByClub[key] = sortedValues(bucket);
+
   return {
     competitions: sortedValues(competitions),
     clubsByCompetition,
+    competitionsByClub,
     allClubs: sortedValues(allClubs),
   };
 }
@@ -135,4 +176,31 @@ export function hasClubsForCompetition(
 ): boolean {
   const key = competitionKey(competition);
   return Boolean(key && (index.clubsByCompetition[key]?.length ?? 0) > 0);
+}
+
+/**
+ * Competitions to offer once a club is known.
+ *
+ * Birmingham City play in the Championship, the FA Cup and the Carabao Cup.
+ * They do not play in the Allsvenskan, and a mentor filing a Birmingham report
+ * should not have to scroll past it. An unknown club — one typed by hand, or a
+ * roster entry with no league — falls back to the full list rather than
+ * offering nothing.
+ */
+export function competitionsForClub(
+  index: CompetitionClubIndex,
+  club: string | null | undefined,
+): string[] {
+  const key = competitionKey(club);
+  const known = key ? index.competitionsByClub[key] : undefined;
+  return known && known.length > 0 ? known : index.competitions;
+}
+
+/** True when the club has its own competition list, rather than the fallback. */
+export function hasCompetitionsForClub(
+  index: CompetitionClubIndex,
+  club: string | null | undefined,
+): boolean {
+  const key = competitionKey(club);
+  return Boolean(key && (index.competitionsByClub[key]?.length ?? 0) > 0);
 }
