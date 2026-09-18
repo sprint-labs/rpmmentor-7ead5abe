@@ -111,6 +111,12 @@ interface Props {
    * change it.
    */
   autoApply?: boolean;
+  /**
+   * Where the transcript lands, in the words the surrounding form uses for it.
+   * The Match Report calls the field Comments; the interaction form calls it
+   * Notes. Only the copy changes.
+   */
+  destinationLabel?: string;
   className?: string;
 }
 
@@ -126,6 +132,7 @@ export function VoiceNoteField({
   aiMode = "structured-summary",
   allowReplace = true,
   autoApply = false,
+  destinationLabel = "Notes",
   className,
 }: Props) {
   const [recording, setRecording] = useState(false);
@@ -478,7 +485,7 @@ export function VoiceNoteField({
           // will actually be submitted. Holding it here is what caused spoken
           // notes to be lost.
           onTranscribed(result.text, "append");
-          toast.success("Voice note added to Notes — edit it there if needed");
+          toast.success(`Voice note added to ${destinationLabel} — edit it there if needed`);
         } else {
           toast.success("Voice note transcribed — review before applying");
         }
@@ -1060,7 +1067,9 @@ export function VoiceNoteField({
             <>
               <div className="flex items-center justify-between gap-2 flex-wrap">
                 <div className="text-[11px] uppercase tracking-wider text-muted-foreground">
-                  {autoApply ? "Transcript preview — already in Notes" : "Transcript preview — edit before applying"}
+                  {autoApply
+                    ? `Transcript preview — already in ${destinationLabel}`
+                    : "Transcript preview — edit before applying"}
                 </div>
                 <div className="flex items-center gap-1.5">
                   {overallLabel && (
@@ -1264,7 +1273,8 @@ export function VoiceNoteField({
               ) : autoApply ? (
                 <div className="flex flex-wrap items-center gap-1.5">
                   <p className="text-[11px] text-muted-foreground" role="status">
-                    Added to Notes — edit there if needed. Use Retry to transcribe again.
+                    Added to {destinationLabel} — edit there if needed. Use Retry to transcribe
+                    again.
                   </p>
                   <button type="button" onClick={() => { navigator.clipboard?.writeText(transcript); toast.success("Copied"); }} className="inline-flex items-center gap-1 h-7 px-2 rounded-md border border-border text-[11px] font-medium hover:bg-accent">
                     Copy
@@ -1272,6 +1282,18 @@ export function VoiceNoteField({
                   <button type="button" onClick={retry} className="inline-flex items-center gap-1 h-7 px-2 rounded-md border border-border text-[11px] font-medium hover:bg-accent">
                     <RotateCcw className="size-3" />Retry
                   </button>
+                  {aiMode === "report-rewrite" && (
+                    <button
+                      type="button"
+                      disabled={rewriting || !transcript || transcript.trim().length < 20}
+                      onClick={() => void requestRewrite()}
+                      className="inline-flex items-center gap-1 h-7 px-2 rounded-md border border-primary/40 text-primary text-[11px] font-medium hover:bg-primary/10 disabled:opacity-40 disabled:cursor-not-allowed"
+                      title="Create a faithful, polished rewrite using the selected fixture details"
+                    >
+                      {rewriting ? <Loader2 className="size-3 animate-spin" /> : <Sparkles className="size-3" />}
+                      {rewrite ? "Regenerate AI rewrite" : "Generate AI rewrite"}
+                    </button>
+                  )}
                 </div>
               ) : (
                 <div className="flex flex-wrap gap-1.5">
@@ -1315,7 +1337,7 @@ export function VoiceNoteField({
                 </div>
               )}
 
-              {!autoApply && aiMode === "report-rewrite" && rewriting && !rewrite && (
+              {aiMode === "report-rewrite" && rewriting && !rewrite && (
                 <div className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground" role="status">
                   <Loader2 className="size-3 animate-spin" />
                   Preparing an editable AI rewrite…
