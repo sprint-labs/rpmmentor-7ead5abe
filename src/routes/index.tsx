@@ -101,7 +101,7 @@ function Dashboard() {
     enabled: Boolean(user && user.role !== "mentor"),
     staleTime: 30_000,
   });
-  // Upcoming Logs reads the shared team calendar (same cache as /calendar).
+  // Upcoming Events reads the shared team calendar (same cache as /calendar).
   const fetchCalendarEvents = useServerFn(listCalendarEvents);
   const {
     data: teamEvents,
@@ -258,7 +258,11 @@ function Dashboard() {
           <StatCard
             label="Interactions Logged"
             value={overviewError ? "—" : (overview?.interactionsInPeriod ?? "…")}
-            hint={overviewError ? "Count unavailable" : `Last ${OVERVIEW_PERIOD_DAYS} days`}
+            hint={
+              overviewError
+                ? "Count unavailable"
+                : `Last ${OVERVIEW_PERIOD_DAYS} days · by interaction date`
+            }
             accent="info"
             emptyMessage="None logged"
           />
@@ -298,8 +302,8 @@ function Dashboard() {
             }
             hint={
               reportsError
-                ? "Report count unavailable"
-                : `Match dates · last ${OVERVIEW_PERIOD_DAYS} days`
+                ? "Count unavailable"
+                : `Last ${OVERVIEW_PERIOD_DAYS} days · by match date`
             }
             accent="primary"
             emptyMessage="None in period"
@@ -330,14 +334,6 @@ function Dashboard() {
             className="flex-col items-start gap-2 sm:flex-row sm:items-center sm:gap-3"
             action={
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] font-mono uppercase tracking-[0.12em] text-muted-foreground">
-                <span className="inline-flex items-center gap-1.5">
-                  <span className="size-1.5 rounded-full bg-success shadow-[0_0_6px_var(--success)]" />
-                  Nominal
-                </span>
-                <span className="inline-flex items-center gap-1.5">
-                  <span className="size-1.5 rounded-full bg-warning shadow-[0_0_6px_var(--warning)]" />
-                  Warning
-                </span>
                 <Link
                   to="/goalkeepers"
                   className="text-primary inline-flex items-center gap-1 normal-case tracking-normal"
@@ -355,7 +351,7 @@ function Dashboard() {
           {interactionsPending ? (
             <p className="text-sm text-muted-foreground">Loading duty-of-care figures…</p>
           ) : interactionsError ? (
-            <p className="text-sm text-muted-foreground">Duty-of-care figures are unavailable.</p>
+            <p className="text-sm text-muted-foreground">Duty-of-care figures didn't load.</p>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-5">
               {(
@@ -446,7 +442,7 @@ function Dashboard() {
 
           {rosterError ? (
             <p className="mt-3 text-xs text-muted-foreground" role="status">
-              Roster snapshot unavailable. Refresh the page to try again.
+              Roster snapshot didn't load. Refresh the page to try again.
             </p>
           ) : (
             <>
@@ -564,7 +560,7 @@ function Dashboard() {
               </span>
             }
           >
-            Upcoming Logs
+            Upcoming Events
           </SectionTitle>
           <div className="divide-y divide-border">
             {calendarPending ? (
@@ -574,7 +570,7 @@ function Dashboard() {
             ) : calendarError ? (
               <div className="space-y-2 py-6 text-center">
                 <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground/70">
-                  Calendar unavailable
+                  Calendar didn't load
                 </div>
                 <Link
                   to="/calendar"
@@ -587,11 +583,10 @@ function Dashboard() {
             ) : upcoming.length === 0 ? (
               <div className="space-y-2 py-6 text-center">
                 <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground/70">
-                  No upcoming calendar events
+                  Nothing scheduled
                 </div>
                 <p className="text-[11px] text-muted-foreground px-2">
-                  This panel reads the shared team calendar. Schedule a visit or catch-up to
-                  populate it.
+                  This reads the shared team calendar. Schedule a visit or catch-up to fill it.
                 </p>
                 {can("calendar.manage") ? (
                   <Link
@@ -663,11 +658,11 @@ function Dashboard() {
             <div
               className={`col-span-12 ${canViewSystemAlerts ? "lg:col-span-4" : "lg:col-span-8"} command-panel p-5`}
             >
-              <SectionTitle>Recent Events</SectionTitle>
+              <SectionTitle>Recent Logged Interactions</SectionTitle>
               <div className="border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive flex items-start gap-2">
                 <AlertTriangle className="size-4 shrink-0" />
                 <div className="flex-1 min-w-0">
-                  <p className="font-medium">Recent activity unavailable</p>
+                  <p className="font-medium">Recent interactions didn't load</p>
                   <p className="text-destructive/80">
                     Something went wrong loading the latest interactions.
                   </p>
@@ -704,15 +699,15 @@ function Dashboard() {
             <div className="space-y-3">
               {interactionsPending ? (
                 <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground/70 py-6 text-center">
-                  Loading…
+                  Loading interactions…
                 </div>
               ) : interactionsError ? (
                 <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground/70 py-6 text-center">
-                  Activity unavailable
+                  Interactions didn't load
                 </div>
               ) : recentActivity.length === 0 ? (
                 <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground/70 py-6 text-center">
-                  No recent events
+                  No interactions logged recently
                 </div>
               ) : (
                 recentActivity.map((a) => (

@@ -118,7 +118,7 @@ function Executive() {
             accent="primary"
           />
         </Link>
-        <Link to="/mentors" className="block rounded-lg" aria-label="View mentors">
+        <Link to="/users" className="block rounded-lg" aria-label="View mentors">
           <StatCard
             label="Active Mentors"
             value={data?.activeMentors ?? placeholder}

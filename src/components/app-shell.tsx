@@ -42,12 +42,17 @@ import {
 import { notificationsQueryKey } from "@/lib/events/query-keys";
 import { formatRelative } from "@/lib/mock-data";
 import { visibleNotificationUnreadCount } from "@/lib/notification-visibility";
+import {
+  loadResolvedInboxIds,
+  pruneResolvedInboxIds,
+  saveResolvedInboxIds,
+} from "@/lib/inbox-dismissals";
 import { listActiveAnnouncements, markAnnouncementRead } from "@/lib/support.functions";
 import {
   ANNOUNCEMENT_CLOCK_INTERVAL_MS,
   useAnnouncementClock,
 } from "@/lib/support/announcement-clock";
-import { BrandMark } from "@/components/brand-mark";
+import { GkhqMark, GkhqWordmark } from "@/components/gkhq-lockup";
 import { OfflineBanner } from "@/components/offline-banner";
 import { SyncManager } from "@/components/sync-manager";
 import { InstallPrompt } from "@/components/install-prompt";
@@ -68,7 +73,7 @@ const NAV: NavItem[] = [
   { to: "/bulletins", label: "Bulletin Board", icon: Columns3, perm: "bulletins.view" },
   { to: "/goalkeepers", label: "Goalkeepers", icon: Users, perm: "goalkeepers.view" },
   { to: "/system/players", label: "Player Records", icon: Database, perm: "players.edit_club" },
-  { to: "/mentors", label: "Users & Roles", icon: UserCog, perm: "mentors.view" },
+  { to: "/users", label: "Team Members", icon: UserCog, perm: "mentors.view" },
   {
     to: "/interactions",
     label: "Interactions Log",
@@ -107,6 +112,8 @@ export function AppShell() {
   const navigate = useNavigate();
   const [navOpen, setNavOpen] = useState(false);
   const [bellOpen, setBellOpen] = useState(false);
+  const [newSinceOpen, setNewSinceOpen] = useState<ReadonlySet<string>>(() => new Set());
+  const [resolvedInboxIds, setResolvedInboxIds] = useState<readonly string[]>([]);
   const [helpOpen, setHelpOpen] = useState(false);
   const [workflow, setWorkflow] = useState<WorkflowKind | null>(null);
   const bellRef = useRef<HTMLDivElement>(null);
@@ -171,7 +178,10 @@ export function AppShell() {
     void refetchAnnouncements({ cancelRefetch: true });
   }, [announcementNow, announcementsFetching, canSeeSupport, refetchAnnouncements]);
 
-  const inboxItems = inbox?.items ?? [];
+  const storedInboxItems = inbox?.items ?? [];
+  // Resolved messages are hidden from the bell only. The notification row is
+  // audit history and is never deleted or rewritten.
+  const inboxItems = storedInboxItems.filter((item) => !resolvedInboxIds.includes(item.id));
   const inboxUnread = inboxItems.filter((item) => !item.readAt).length;
   // listActiveAnnouncements and its RLS policy authoritatively enforce active,
   // starts_at and ends_at. Do not re-evaluate those boundaries with a possibly
@@ -196,6 +206,72 @@ export function AppShell() {
     canSeeDutyNotifications,
     bellAnnouncementUnread,
   );
+
+  /**
+   * Opening the bell is the act of reading it.
+   *
+   * Everything on display is marked read as soon as the panel opens, so the
+   * badge reflects what has actually been seen rather than what has been
+   * replied to. The ids that were unread at that moment are kept for the life
+   * of the panel so the reader can still see which entries were new.
+   */
+  useEffect(() => {
+    if (!bellOpen) {
+      setNewSinceOpen(new Set());
+      return;
+    }
+    const unreadNow = new Set<string>([
+      ...visibleUnreadNotificationIds(inboxItems),
+      ...(canSeeDutyNotifications ? notif.items.filter((n) => !n.read).map((n) => n.id) : []),
+    ]);
+    setNewSinceOpen(unreadNow);
+    if (canSeeEventInbox) void markInboxAllRead();
+    if (canSeeDutyNotifications && notif.unread > 0) notif.markAllRead();
+    // Reading is a one-shot effect of opening the panel; re-running it as the
+    // list settles would wipe the "new" highlight out from under the reader.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bellOpen]);
+
+  const inboxUserKey = user?.id ?? "anonymous";
+  useEffect(() => {
+    setResolvedInboxIds(loadResolvedInboxIds(inboxUserKey));
+  }, [inboxUserKey]);
+
+  // Forget resolutions whose notification has aged out of the inbox, so the
+  // stored list cannot grow without bound.
+  const storedInboxIdKey = storedInboxItems.map((item) => item.id).join("|");
+  useEffect(() => {
+    if (inboxPending || storedInboxItems.length === 0) return;
+    setResolvedInboxIds((previous) => {
+      const kept = pruneResolvedInboxIds(
+        previous,
+        storedInboxItems.map((item) => item.id),
+      );
+      if (kept.length === previous.length) return previous;
+      saveResolvedInboxIds(inboxUserKey, kept);
+      return kept;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storedInboxIdKey, inboxPending, inboxUserKey]);
+
+  /**
+   * Fail-safe for a message that needs no reply: mark it read on the server and
+   * take it off the bell, without opening the thread it points at.
+   */
+  async function resolveInboxNotification(id: string) {
+    setResolvedInboxIds((previous) => {
+      if (previous.includes(id)) return previous;
+      const next = [...previous, id];
+      saveResolvedInboxIds(inboxUserKey, next);
+      return next;
+    });
+    try {
+      await markInboxRead({ data: { ids: [id] } });
+      await queryClient.invalidateQueries({ queryKey: notificationQueryKey });
+    } catch {
+      // The message is already off the bell; read state retries on next open.
+    }
+  }
 
   async function markInboxAllRead() {
     try {
@@ -327,9 +403,10 @@ export function AppShell() {
             aria-label="Mentor Hub"
             className="size-11 md:w-auto md:h-auto flex items-center justify-center md:justify-start gap-2.5 shrink-0 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           >
-            <BrandMark className="size-9 shrink-0" alt="" />
+            <GkhqMark className="size-9 shrink-0" />
+            <GkhqWordmark className="hidden h-5 w-auto shrink-0 sm:block" alt="GKHQ" />
             <span
-              className="hidden sm:inline font-semibold text-foreground tracking-tight"
+              className="hidden font-medium tracking-tight text-muted-foreground md:inline"
               aria-hidden="true"
             >
               Mentor Hub
@@ -344,20 +421,9 @@ export function AppShell() {
             >
               <ShieldCheck className="size-3" />
               {user.role !== user.actualRole ? (
-                <span className="hidden lg:inline">
-                  Viewing as {ROLE_LABEL[user.role]}
-                  <span className="mx-1.5 text-primary/60">·</span>
-                  <span className="text-primary/80 normal-case tracking-normal">
-                    interface only
-                  </span>
-                </span>
+                <span className="hidden lg:inline">Viewing as</span>
               ) : (
-                <span>
-                  View as{" "}
-                  <span className="text-primary/70 normal-case tracking-normal">
-                    (interface only)
-                  </span>
-                </span>
+                <span>View as</span>
               )}
               <label htmlFor="view-as-role" className="sr-only">
                 View interface as role
@@ -393,7 +459,7 @@ export function AppShell() {
                   className="ml-1 inline-flex items-center gap-1 h-5 pl-1.5 pr-2 rounded bg-primary text-primary-foreground hover:opacity-90"
                 >
                   <X className="size-3" />
-                  <span>Exit view as</span>
+                  <span>Exit view</span>
                 </button>
               )}
             </div>
@@ -474,26 +540,28 @@ export function AppShell() {
                             </div>
                           ) : (
                             inboxItems.map((n) => (
-                              <Link
+                              <div
                                 key={n.id}
-                                to={n.linkPath.split("?")[0] || "/calendar"}
-                                search={Object.fromEntries(
-                                  new URLSearchParams(n.linkPath.split("?")[1] ?? ""),
-                                )}
-                                onClick={() => {
-                                  void markInboxRead({ data: { ids: [n.id] } }).then(() =>
-                                    queryClient.invalidateQueries({
-                                      queryKey: notificationQueryKey,
-                                    }),
-                                  );
-                                  setBellOpen(false);
-                                }}
                                 className={cn(
-                                  "block px-3 py-2.5 border-b border-border/60 last:border-0 hover:bg-accent/40",
-                                  !n.readAt && "bg-accent/20",
+                                  "flex items-start border-b border-border/60 last:border-0",
+                                  newSinceOpen.has(n.id) && "bg-accent/20",
                                 )}
                               >
-                                <div className="flex items-start gap-2">
+                                <Link
+                                  to={n.linkPath.split("?")[0] || "/calendar"}
+                                  search={Object.fromEntries(
+                                    new URLSearchParams(n.linkPath.split("?")[1] ?? ""),
+                                  )}
+                                  onClick={() => {
+                                    void markInboxRead({ data: { ids: [n.id] } }).then(() =>
+                                      queryClient.invalidateQueries({
+                                        queryKey: notificationQueryKey,
+                                      }),
+                                    );
+                                    setBellOpen(false);
+                                  }}
+                                  className="flex min-w-0 flex-1 items-start gap-2 px-3 py-2.5 hover:bg-accent/40"
+                                >
                                   <span
                                     className={cn(
                                       "mt-1.5 size-2 rounded-full shrink-0",
@@ -513,8 +581,16 @@ export function AppShell() {
                                       {n.body}
                                     </div>
                                   </div>
-                                </div>
-                              </Link>
+                                </Link>
+                                <button
+                                  type="button"
+                                  aria-label={`Resolve notification: ${n.title}`}
+                                  onClick={() => void resolveInboxNotification(n.id)}
+                                  className="shrink-0 self-center mr-2 rounded px-2 py-1 text-[11px] text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                >
+                                  Resolve
+                                </button>
+                              </div>
                             ))
                           )}
                         </div>
@@ -612,38 +688,50 @@ export function AppShell() {
                                       ? "bg-success"
                                       : "bg-muted-foreground/50";
                               return (
-                                <Link
+                                <div
                                   key={n.id}
-                                  to="/goalkeepers/$gkId"
-                                  params={{ gkId: n.gkId }}
-                                  onClick={() => {
-                                    notif.markRead(n.id);
-                                    setBellOpen(false);
-                                  }}
                                   className={cn(
-                                    "flex gap-2.5 px-3 py-2.5 border-b border-border/60 last:border-0 hover:bg-accent/40",
-                                    !n.read && "bg-accent/20",
+                                    "flex items-start border-b border-border/60 last:border-0",
+                                    newSinceOpen.has(n.id) && "bg-accent/20",
                                   )}
                                 >
-                                  <span
-                                    className={cn("mt-1.5 size-2 rounded-full shrink-0", tone)}
-                                  />
-                                  <div className="flex-1 min-w-0">
-                                    <div className="text-sm font-medium truncate">{n.gkName}</div>
-                                    <div className="text-[11px] text-muted-foreground">
-                                      Duty moved <span className="uppercase">{n.from}</span> →{" "}
-                                      <span className="uppercase font-medium text-foreground/80">
-                                        {n.to}
-                                      </span>
+                                  <Link
+                                    to="/goalkeepers/$gkId"
+                                    params={{ gkId: n.gkId }}
+                                    onClick={() => {
+                                      notif.markRead(n.id);
+                                      setBellOpen(false);
+                                    }}
+                                    className="flex min-w-0 flex-1 gap-2.5 px-3 py-2.5 hover:bg-accent/40"
+                                  >
+                                    <span
+                                      className={cn("mt-1.5 size-2 rounded-full shrink-0", tone)}
+                                    />
+                                    <div className="flex-1 min-w-0">
+                                      <div className="text-sm font-medium truncate">{n.gkName}</div>
+                                      <div className="text-[11px] text-muted-foreground">
+                                        Duty moved <span className="uppercase">{n.from}</span> →{" "}
+                                        <span className="uppercase font-medium text-foreground/80">
+                                          {n.to}
+                                        </span>
+                                      </div>
+                                      <div className="text-[10px] text-muted-foreground mt-0.5">
+                                        {formatRelative(n.date)}
+                                      </div>
                                     </div>
-                                    <div className="text-[10px] text-muted-foreground mt-0.5">
-                                      {formatRelative(n.date)}
-                                    </div>
-                                  </div>
-                                  {!n.read && (
-                                    <span className="mt-1 size-1.5 rounded-full bg-primary shrink-0" />
-                                  )}
-                                </Link>
+                                    {newSinceOpen.has(n.id) && (
+                                      <span className="mt-1 size-1.5 rounded-full bg-primary shrink-0" />
+                                    )}
+                                  </Link>
+                                  <button
+                                    type="button"
+                                    aria-label={`Resolve duty notification: ${n.gkName}`}
+                                    onClick={() => notif.resolve(n.id)}
+                                    className="shrink-0 self-center mr-2 rounded px-2 py-1 text-[11px] text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                  >
+                                    Resolve
+                                  </button>
+                                </div>
                               );
                             })
                           )}
@@ -761,7 +849,7 @@ export function AppShell() {
             className="fixed inset-y-0 right-0 z-50 w-[min(22rem,calc(100vw-1rem))] md:w-72 flex flex-col border-l border-sidebar-border bg-sidebar shadow-2xl"
           >
             <div className="flex items-center gap-2.5 px-4 min-h-16 md:h-14 border-b border-sidebar-border">
-              <BrandMark className="size-7 shrink-0" alt="Mentor Hub" />
+              <GkhqMark className="size-7 shrink-0" alt="Mentor Hub" />
               <div className="flex flex-col leading-tight min-w-0 flex-1">
                 <h2 id="menu-title" className="text-sm font-semibold tracking-tight truncate">
                   {user.name}

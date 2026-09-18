@@ -9,7 +9,7 @@ export const mentorDashboardMetricCardLabels = {
 
 /** Primary mentor-home actions. Match report and interaction come first; calendar is next. */
 export const mentorPrimaryActionLabels = {
-  logMatchReport: "Submit a Match report",
+  logMatchReport: "Submit a match report",
   logInteraction: "Log interaction",
   viewCalendar: "View calendar",
 } as const;

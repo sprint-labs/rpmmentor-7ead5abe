@@ -1,14 +1,15 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { useState } from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import type { AnnouncementRow } from "@/lib/support/schema";
-import { HelpUpdatesLauncher } from "./help-updates-launcher";
+import { HELP_UPDATES_HINT_DWELL_MS, HelpUpdatesLauncher } from "./help-updates-launcher";
 
 afterEach(() => {
   cleanup();
+  window.localStorage.clear();
 });
 
 function makeAnnouncement(index: number, readAt: string | null = null): AnnouncementRow {
@@ -248,5 +249,46 @@ describe("HelpUpdatesLauncher", () => {
     const seen = await screen.findByRole("button", { name: "Seen" });
     expect(document.activeElement).toBe(seen);
     expect(screen.getAllByText(/Product update/)).toHaveLength(4);
+  });
+});
+
+describe("HelpUpdatesLauncher introduction dwell", () => {
+  it("retires the introduction once it has been on screen long enough to read", async () => {
+    vi.useFakeTimers();
+    try {
+      render(<LauncherHarness introVisible />);
+
+      // Effects run on mount; the hint appears and the dwell begins.
+      await act(async () => {
+        await Promise.resolve();
+      });
+      expect(screen.getByText("Help and product news now live here")).toBeTruthy();
+      expect(window.localStorage.getItem("rpm-help-updates-intro-v1")).toBeNull();
+
+      act(() => {
+        vi.advanceTimersByTime(HELP_UPDATES_HINT_DWELL_MS);
+      });
+      expect(window.localStorage.getItem("rpm-help-updates-intro-v1")).toBe("seen");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("does not spend the introduction while a competing surface hides it", async () => {
+    vi.useFakeTimers();
+    try {
+      render(<LauncherHarness introVisible={false} />);
+
+      await act(async () => {
+        await Promise.resolve();
+      });
+      act(() => {
+        vi.advanceTimersByTime(HELP_UPDATES_HINT_DWELL_MS * 2);
+      });
+
+      expect(window.localStorage.getItem("rpm-help-updates-intro-v1")).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

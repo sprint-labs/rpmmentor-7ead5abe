@@ -4,12 +4,8 @@ import { ArrowLeft, CheckCircle2, Eye, EyeOff, Lock } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { recordPasswordRecovery } from "@/lib/account.functions";
-import { LOGIN_LOCKUP_SRC } from "@/lib/brand";
-import {
-  hasAuthCallback,
-  isRecoveryCallback,
-  parseAuthCallbackParams,
-} from "@/lib/password-recovery";
+import { GkhqLockup } from "@/components/gkhq-lockup";
+import { parseRecoveryCallback, stripAuthCallbackFromUrl } from "@/lib/password-recovery";
 
 export const Route = createFileRoute("/reset-password")({
   component: ResetPasswordPage,
@@ -50,30 +46,34 @@ function ResetPasswordPage() {
     });
 
     (async () => {
-      const location = window.location;
-      const recoveryLanding = isRecoveryCallback(location) || hasAuthCallback(location);
-      if (!recoveryLanding) {
+      const callback = parseRecoveryCallback(window.location);
+      if (callback.kind === "none") {
         finish("invalid");
         return;
       }
 
-      const { queryParams } = parseAuthCallbackParams(location);
-      const code = queryParams.get("code");
-      if (code) {
-        const { error: exchangeErr } = await supabase.auth.exchangeCodeForSession(code);
-        if (cancelled) return;
-        if (exchangeErr) {
-          finish("invalid");
-          return;
-        }
+      // Every landing establishes its session here. Automatic detection cannot
+      // be relied on: the client runs in PKCE mode and rejects the fragment
+      // tokens that an admin-generated invite or recovery link redirects with.
+      if (callback.kind === "token_hash") {
+        await supabase.auth.verifyOtp({ type: callback.type, token_hash: callback.tokenHash });
+      } else if (callback.kind === "implicit") {
+        await supabase.auth.setSession({
+          access_token: callback.accessToken,
+          refresh_token: callback.refreshToken,
+        });
+      } else {
+        await supabase.auth.exchangeCodeForSession(callback.code);
       }
+      if (cancelled) return;
 
-      // Give detectSessionInUrl / PASSWORD_RECOVERY a moment after hash or PKCE exchange.
-      await new Promise((resolve) => setTimeout(resolve, code ? 0 : 250));
-      if (cancelled || settled) return;
-
+      // A failure here is not decisive: the client's own URL detection may have
+      // already spent the token and opened the session. The session itself is
+      // the only thing that decides whether the form can be shown.
       const { data } = await supabase.auth.getSession();
+      if (cancelled || settled) return;
       if (data.session) {
+        stripAuthCallbackFromUrl();
         finish("ready");
         return;
       }
@@ -123,7 +123,7 @@ function ResetPasswordPage() {
     <main id="main-content" tabIndex={-1} className="min-h-screen flex items-center justify-center bg-background p-6">
       <div className="w-full max-w-md">
         <div className="mb-10">
-          <img src={LOGIN_LOCKUP_SRC} alt="Mentor Hub by RPM" className="h-40 w-auto" />
+          <GkhqLockup stacked markClassName="size-20" wordmarkClassName="h-10 w-auto" alt="GKHQ Mentor Hub" />
         </div>
 
         {status === "checking" && (

@@ -19,12 +19,46 @@ export interface EmailPrefs { frequency: EmailFrequency; recipients: string[]; l
 const STORAGE_KEY = "rpm.notifications.v1";
 const PREFS_KEY = "rpm.notif.prefs.v1";
 const SNAPSHOT_KEY = "rpm.duty.snapshot.v1";
+const RESOLVED_KEY = "rpm.duty.resolved.v1";
+
+/**
+ * Levels a user has explicitly resolved, keyed by goalkeeper.
+ *
+ * Duty alerts are derived from the current roster on every load, so an
+ * unresolved condition re-announces itself with a fresh id and reads as brand
+ * new even after it has been seen. Resolving records the level that was
+ * acknowledged; the same level stays silent until that goalkeeper's duty status
+ * actually moves, which is the only point a new alert carries new information.
+ */
+export type ResolvedDutyLevels = Record<string, DutyLevel>;
+
+/** Drop acknowledgements whose goalkeeper has since moved to a different level. */
+export function pruneResolvedDutyLevels(
+  resolved: ResolvedDutyLevels,
+  currentLevels: Readonly<Record<string, DutyLevel>>,
+): ResolvedDutyLevels {
+  const next: ResolvedDutyLevels = {};
+  for (const [gkId, level] of Object.entries(resolved)) {
+    if (currentLevels[gkId] === level) next[gkId] = level;
+  }
+  return next;
+}
+
+/** True when this goalkeeper's arrival at `level` has already been resolved. */
+export function isDutyLevelResolved(
+  resolved: ResolvedDutyLevels,
+  gkId: string,
+  level: DutyLevel,
+): boolean {
+  return resolved[gkId] === level;
+}
 
 interface Ctx {
   items: DutyNotif[];
   unread: number;
   markAllRead: () => void;
   markRead: (id: string) => void;
+  resolve: (id: string) => void;
   clearAll: () => void;
   prefs: EmailPrefs;
   setPrefs: (p: EmailPrefs) => void;
@@ -75,6 +109,9 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
   const [prefs, setPrefsState] = useState<EmailPrefs>(() =>
     load(PREFS_KEY, { frequency: "weekly", recipients: ["operations@refuelpm.com"] } as EmailPrefs),
   );
+  const [resolved, setResolved] = useState<ResolvedDutyLevels>(() =>
+    load(RESOLVED_KEY, {} as ResolvedDutyLevels),
+  );
 
   useEffect(() => {
     if (!canViewDutyNotifications) return;
@@ -83,11 +120,12 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
     const current: Record<string, DutyLevel> = {};
     const fresh: DutyNotif[] = [];
     const first = Object.keys(snap).length === 0;
+    const acknowledged = load<ResolvedDutyLevels>(RESOLVED_KEY, {});
     goalkeepers.forEach((gk) => {
       const lvl = dutyStatusForGk(gk).level;
       current[gk.id] = lvl;
       const prev = snap[gk.id];
-      if (prev && prev !== lvl) {
+      if (prev && prev !== lvl && !isDutyLevelResolved(acknowledged, gk.id, lvl)) {
         fresh.push({
           id: `${gk.id}-${Date.now()}-${lvl}`,
           gkId: gk.id,
@@ -101,8 +139,16 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
     });
     persist(SNAPSHOT_KEY, current);
 
+    // A resolution only silences the level it acknowledged. Once a goalkeeper
+    // moves, the stale entry is dropped so the next change is announced.
+    const stillResolved = pruneResolvedDutyLevels(acknowledged, current);
+    setResolved(stillResolved);
+    persist(RESOLVED_KEY, stillResolved);
+
     if (first && items.length === 0) {
-      const seeded = seedFromCurrent();
+      const seeded = seedFromCurrent().filter(
+        (n) => !isDutyLevelResolved(stillResolved, n.gkId, n.to),
+      );
       setItems(seeded);
       persist(STORAGE_KEY, seeded);
     } else if (fresh.length) {
@@ -124,6 +170,23 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
   const setPrefs = (p: EmailPrefs) => { setPrefsState(p); persist(PREFS_KEY, p); };
   const markAllRead = () => setItems((p) => { const n = p.map((x) => ({ ...x, read: true })); persist(STORAGE_KEY, n); return n; });
   const markRead = (id: string) => setItems((p) => { const n = p.map((x) => (x.id === id ? { ...x, read: true } : x)); persist(STORAGE_KEY, n); return n; });
+
+  /**
+   * Fail-safe dismissal. Removes every copy of this goalkeeper's current duty
+   * level from the list and records the acknowledgement, so a derived alert
+   * that would otherwise be regenerated on the next load stays gone.
+   */
+  const resolve = (id: string) => {
+    const target = items.find((x) => x.id === id);
+    if (!target) return;
+    const nextResolved = { ...resolved, [target.gkId]: target.to };
+    setResolved(nextResolved);
+    persist(RESOLVED_KEY, nextResolved);
+    const next = items.filter((x) => !(x.gkId === target.gkId && x.to === target.to));
+    setItems(next);
+    persist(STORAGE_KEY, next);
+  };
+
   const clearAll = () => { setItems([]); persist(STORAGE_KEY, []); };
 
   const sendSummaryNow = () => {
@@ -149,6 +212,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
         unread,
         markAllRead,
         markRead,
+        resolve,
         clearAll,
         prefs,
         setPrefs,

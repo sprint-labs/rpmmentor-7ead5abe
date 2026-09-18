@@ -34,7 +34,7 @@ export function MentorPrimaryActions({
                 {mentorPrimaryActionLabels.logMatchReport}
               </span>
               <span className="mt-1 block text-xs text-primary-foreground/80">
-                Score a live match
+                Score a goalkeeper you watched
               </span>
             </span>
           </button>
@@ -51,7 +51,7 @@ export function MentorPrimaryActions({
                 {mentorPrimaryActionLabels.logInteraction}
               </span>
               <span className="mt-1 block text-xs text-muted-foreground">
-                Record a touchpoint
+                Log a call, visit or catch-up
               </span>
             </span>
           </button>

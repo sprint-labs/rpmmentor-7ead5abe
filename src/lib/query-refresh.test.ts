@@ -1,6 +1,10 @@
 import { describe, it, expect } from "vitest";
 import type { QueryClient } from "@tanstack/react-query";
-import { refreshClubDependentViews, refreshInteractionViews } from "./query-refresh";
+import {
+  refreshClubDependentViews,
+  refreshDutyOfCareViews,
+  refreshInteractionViews,
+} from "./query-refresh";
 
 /** Captures the query keys a refresh helper invalidates. */
 function recordingClient() {
@@ -59,5 +63,26 @@ describe("refreshClubDependentViews", () => {
     await refreshClubDependentViews(client, "player-1");
 
     expect(keys).toContainEqual(["player", "player-1"]);
+  });
+});
+
+describe("refreshDutyOfCareViews", () => {
+  it("re-reads the duty-of-care badge and the roll-ups that count it", async () => {
+    // A recorded reset changes duty_of_care_at() immediately; without this the
+    // badge keeps showing the pre-reset status until a manual reload.
+    const { client, keys } = recordingClient();
+    await refreshDutyOfCareViews(client);
+
+    expect(keys).toContainEqual(["duty-of-care"]);
+    expect(keys).toContainEqual(["mentor-dashboard-stats"]);
+    expect(keys).toContainEqual(["overview-dashboard-stats"]);
+    expect(keys).toContainEqual(["executive-dashboard-stats"]);
+  });
+
+  it("can target the one goalkeeper whose clock was reset", async () => {
+    const { client, keys } = recordingClient();
+    await refreshDutyOfCareViews(client, "player-1");
+
+    expect(keys).toContainEqual(["duty-of-care", "player-1"]);
   });
 });

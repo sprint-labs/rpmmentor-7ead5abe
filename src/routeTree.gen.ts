@@ -9,9 +9,9 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as UsersRouteImport } from './routes/users'
 import { Route as SupportRouteImport } from './routes/support'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
-import { Route as MentorsRouteImport } from './routes/mentors'
 import { Route as MediaRouteImport } from './routes/media'
 import { Route as McpRouteImport } from './routes/mcp'
 import { Route as LoginRouteImport } from './routes/login'
@@ -36,6 +36,7 @@ import { Route as SystemDataQualityRouteImport } from './routes/system.data-qual
 import { Route as ReportsReportIdRouteImport } from './routes/reports.$reportId'
 import { Route as InsightsMetricRouteImport } from './routes/insights.$metric'
 import { Route as GoalkeepersGkIdRouteImport } from './routes/goalkeepers.$gkId'
+import { Route as DesignGkhqRouteImport } from './routes/design.gkhq'
 import { Route as DesignAccentProposalRouteImport } from './routes/design.accent-proposal'
 import { Route as Char91DotwellKnownChar93OauthProtectedResourceRouteImport } from './routes/[.well-known]/oauth-protected-resource'
 import { Route as Char91DotmcpChar93ListToolsRouteImport } from './routes/[.mcp]/list-tools'
@@ -44,6 +45,11 @@ import { Route as SystemPlayersPlayerIdRouteImport } from './routes/system.playe
 import { Route as Char91DotmcpChar93InvokeToolToolRouteImport } from './routes/[.mcp]/invoke-tool/$tool'
 import { Route as DotlovableOauthConsentRouteImport } from './routes/[.]lovable.oauth.consent'
 
+const UsersRoute = UsersRouteImport.update({
+  id: '/users',
+  path: '/users',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SupportRoute = SupportRouteImport.update({
   id: '/support',
   path: '/support',
@@ -52,11 +58,6 @@ const SupportRoute = SupportRouteImport.update({
 const ResetPasswordRoute = ResetPasswordRouteImport.update({
   id: '/reset-password',
   path: '/reset-password',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const MentorsRoute = MentorsRouteImport.update({
-  id: '/mentors',
-  path: '/mentors',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MediaRoute = MediaRouteImport.update({
@@ -179,6 +180,11 @@ const GoalkeepersGkIdRoute = GoalkeepersGkIdRouteImport.update({
   path: '/$gkId',
   getParentRoute: () => GoalkeepersRoute,
 } as any)
+const DesignGkhqRoute = DesignGkhqRouteImport.update({
+  id: '/design/gkhq',
+  path: '/design/gkhq',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DesignAccentProposalRoute = DesignAccentProposalRouteImport.update({
   id: '/design/accent-proposal',
   path: '/design/accent-proposal',
@@ -233,12 +239,13 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/mcp': typeof McpRoute
   '/media': typeof MediaRoute
-  '/mentors': typeof MentorsRoute
   '/reset-password': typeof ResetPasswordRoute
   '/support': typeof SupportRoute
+  '/users': typeof UsersRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/design/accent-proposal': typeof DesignAccentProposalRoute
+  '/design/gkhq': typeof DesignGkhqRoute
   '/goalkeepers/$gkId': typeof GoalkeepersGkIdRoute
   '/insights/$metric': typeof InsightsMetricRoute
   '/reports/$reportId': typeof ReportsReportIdRoute
@@ -269,12 +276,13 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/mcp': typeof McpRoute
   '/media': typeof MediaRoute
-  '/mentors': typeof MentorsRoute
   '/reset-password': typeof ResetPasswordRoute
   '/support': typeof SupportRoute
+  '/users': typeof UsersRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/design/accent-proposal': typeof DesignAccentProposalRoute
+  '/design/gkhq': typeof DesignGkhqRoute
   '/goalkeepers/$gkId': typeof GoalkeepersGkIdRoute
   '/insights/$metric': typeof InsightsMetricRoute
   '/reports/$reportId': typeof ReportsReportIdRoute
@@ -306,12 +314,13 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/mcp': typeof McpRoute
   '/media': typeof MediaRoute
-  '/mentors': typeof MentorsRoute
   '/reset-password': typeof ResetPasswordRoute
   '/support': typeof SupportRoute
+  '/users': typeof UsersRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/design/accent-proposal': typeof DesignAccentProposalRoute
+  '/design/gkhq': typeof DesignGkhqRoute
   '/goalkeepers/$gkId': typeof GoalkeepersGkIdRoute
   '/insights/$metric': typeof InsightsMetricRoute
   '/reports/$reportId': typeof ReportsReportIdRoute
@@ -344,12 +353,13 @@ export interface FileRouteTypes {
     | '/login'
     | '/mcp'
     | '/media'
-    | '/mentors'
     | '/reset-password'
     | '/support'
+    | '/users'
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
     | '/design/accent-proposal'
+    | '/design/gkhq'
     | '/goalkeepers/$gkId'
     | '/insights/$metric'
     | '/reports/$reportId'
@@ -380,12 +390,13 @@ export interface FileRouteTypes {
     | '/login'
     | '/mcp'
     | '/media'
-    | '/mentors'
     | '/reset-password'
     | '/support'
+    | '/users'
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
     | '/design/accent-proposal'
+    | '/design/gkhq'
     | '/goalkeepers/$gkId'
     | '/insights/$metric'
     | '/reports/$reportId'
@@ -416,12 +427,13 @@ export interface FileRouteTypes {
     | '/login'
     | '/mcp'
     | '/media'
-    | '/mentors'
     | '/reset-password'
     | '/support'
+    | '/users'
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
     | '/design/accent-proposal'
+    | '/design/gkhq'
     | '/goalkeepers/$gkId'
     | '/insights/$metric'
     | '/reports/$reportId'
@@ -453,12 +465,13 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   McpRoute: typeof McpRoute
   MediaRoute: typeof MediaRoute
-  MentorsRoute: typeof MentorsRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   SupportRoute: typeof SupportRoute
+  UsersRoute: typeof UsersRoute
   Char91DotmcpChar93ListToolsRoute: typeof Char91DotmcpChar93ListToolsRoute
   Char91DotwellKnownChar93OauthProtectedResourceRoute: typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   DesignAccentProposalRoute: typeof DesignAccentProposalRoute
+  DesignGkhqRoute: typeof DesignGkhqRoute
   InsightsMetricRoute: typeof InsightsMetricRoute
   ReportsReportIdRoute: typeof ReportsReportIdRoute
   SystemDataQualityRoute: typeof SystemDataQualityRoute
@@ -476,6 +489,13 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/users': {
+      id: '/users'
+      path: '/users'
+      fullPath: '/users'
+      preLoaderRoute: typeof UsersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/support': {
       id: '/support'
       path: '/support'
@@ -488,13 +508,6 @@ declare module '@tanstack/react-router' {
       path: '/reset-password'
       fullPath: '/reset-password'
       preLoaderRoute: typeof ResetPasswordRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/mentors': {
-      id: '/mentors'
-      path: '/mentors'
-      fullPath: '/mentors'
-      preLoaderRoute: typeof MentorsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/media': {
@@ -665,6 +678,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof GoalkeepersGkIdRouteImport
       parentRoute: typeof GoalkeepersRoute
     }
+    '/design/gkhq': {
+      id: '/design/gkhq'
+      path: '/design/gkhq'
+      fullPath: '/design/gkhq'
+      preLoaderRoute: typeof DesignGkhqRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/design/accent-proposal': {
       id: '/design/accent-proposal'
       path: '/design/accent-proposal'
@@ -744,13 +764,14 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   McpRoute: McpRoute,
   MediaRoute: MediaRoute,
-  MentorsRoute: MentorsRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   SupportRoute: SupportRoute,
+  UsersRoute: UsersRoute,
   Char91DotmcpChar93ListToolsRoute: Char91DotmcpChar93ListToolsRoute,
   Char91DotwellKnownChar93OauthProtectedResourceRoute:
     Char91DotwellKnownChar93OauthProtectedResourceRoute,
   DesignAccentProposalRoute: DesignAccentProposalRoute,
+  DesignGkhqRoute: DesignGkhqRoute,
   InsightsMetricRoute: InsightsMetricRoute,
   ReportsReportIdRoute: ReportsReportIdRoute,
   SystemDataQualityRoute: SystemDataQualityRoute,

@@ -71,11 +71,29 @@ vi.mock("sonner", () => ({ toast: vi.fn() }));
 
 vi.mock("@/lib/match-reports/reports.functions", () => ({ listMatchReports: vi.fn() }));
 
+const { listPlayerDutyOfCareMock, DUTY_ROWS } = vi.hoisted(() => ({
+  listPlayerDutyOfCareMock: vi.fn(),
+  // Empty on purpose: these cases are about the page's layout and filters, and
+  // an empty view keeps every duty label confined to the filter chips, which is
+  // exactly what the first case asserts. The mapping itself is covered by
+  // src/lib/duty-of-care-roster.test.ts.
+  DUTY_ROWS: [] as unknown[],
+}));
+vi.mock("@/lib/duty-of-care.functions", () => ({
+  listPlayerDutyOfCare: listPlayerDutyOfCareMock,
+}));
+
+// The page calls more than one server function and they answer with different
+// shapes, so the stub dispatches on which one it was handed rather than giving
+// everything the match-reports envelope.
 vi.mock("@tanstack/react-start", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@tanstack/react-start")>();
   return {
     ...actual,
-    useServerFn: () => vi.fn().mockResolvedValue({ reports: [] }),
+    useServerFn: (fn: unknown) =>
+      fn === listPlayerDutyOfCareMock
+        ? vi.fn().mockResolvedValue(DUTY_ROWS)
+        : vi.fn().mockResolvedValue({ reports: [] }),
   };
 });
 

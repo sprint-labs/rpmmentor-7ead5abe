@@ -335,7 +335,7 @@ function SystemUsersPage() {
                       </div>
                       <div className="text-xs text-muted-foreground truncate">
                         {u.email}
-                        {u.title ? ` · ${u.title}` : ""}
+                        {u.role ? ` · ${ROLE_LABEL[u.role]}` : ""}
                       </div>
                     </div>
                   </div>

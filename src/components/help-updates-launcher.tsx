@@ -7,6 +7,14 @@ import { cn } from "@/lib/utils";
 
 const HELP_UPDATES_HINT_STORAGE_KEY = "rpm-help-updates-intro-v1";
 
+/**
+ * How long the introduction must stay on screen before it counts as seen.
+ *
+ * Long enough that a hint flashed up during a redirect is not silently spent,
+ * short enough that reading it is all it takes to retire it.
+ */
+export const HELP_UPDATES_HINT_DWELL_MS = 5000;
+
 interface HelpUpdatesLauncherProps {
   open: boolean;
   unreadCount: number;
@@ -71,6 +79,26 @@ export function HelpUpdatesLauncher({
       // Do not block support access when storage is unavailable.
     }
   }
+
+  /**
+   * Seeing the introduction is what retires it.
+   *
+   * It used to persist only on an explicit dismissal or on opening the
+   * launcher, so a reader who took it in and carried on was shown the same
+   * "New" hint on every page load indefinitely. Once it has been on screen
+   * long enough to read, it is spent.
+   */
+  useEffect(() => {
+    if (!introVisible || !showIntro || open) return;
+    const timer = window.setTimeout(() => {
+      try {
+        window.localStorage.setItem(HELP_UPDATES_HINT_STORAGE_KEY, "seen");
+      } catch {
+        // Do not block support access when storage is unavailable.
+      }
+    }, HELP_UPDATES_HINT_DWELL_MS);
+    return () => window.clearTimeout(timer);
+  }, [introVisible, showIntro, open]);
 
   function handleOpenChange(next: boolean) {
     if (next) rememberIntro();

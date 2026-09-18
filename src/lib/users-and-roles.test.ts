@@ -9,7 +9,7 @@ import { effectiveRole, splitPersonName } from "@/lib/users-and-roles";
 
 const ROLES: Role[] = ["super_admin", "admin", "mentor_manager", "mentor"];
 
-describe("Users & Roles", () => {
+describe("Team Members", () => {
   it("splits the canonical display name without using it as an identity", () => {
     expect(splitPersonName("Rich Lee")).toEqual({ firstName: "Rich", lastName: "Lee" });
     expect(splitPersonName("Madonna")).toEqual({ firstName: "Madonna", lastName: "—" });

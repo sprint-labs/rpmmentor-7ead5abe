@@ -69,7 +69,7 @@ The checked-in `.env` is a legacy, tracked file containing configuration names f
 
 - **Framework:** React 19, TanStack Start, TanStack Router and React Query.
 - **Build tool:** Vite 7 with the Lovable TanStack configuration.
-- **Styling/UI:** Tailwind 4, Radix primitives, Lucide icons and the custom dark football-operations design system.
+- **Styling/UI:** Tailwind 4, Radix primitives, Lucide icons and the **GKHQ design system** — the carbon/GK Green token set shared with GKHQ Scouting Hub. Tokens live in `src/styles.css`; `/design/gkhq` renders them live and grades their contrast in whichever theme you are previewing. Add a token rather than a loose hex.
 - **PWA:** `vite-plugin-pwa` with a hand-authored `public/manifest.webmanifest`; service-worker caching is deliberate. Login, password reset, server APIs, MCP endpoints and well-known routes are excluded from navigation fallback.
 - **Routes:** file-based pages live in `src/routes/`; `src/routeTree.gen.ts` is generated. Do not hand-edit the generated tree.
 

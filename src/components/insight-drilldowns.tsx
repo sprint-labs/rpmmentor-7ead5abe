@@ -543,10 +543,10 @@ export function ActiveMentorWorkbench({ mentors }: { mentors: ActiveMentorInsigh
           </p>
 
           <Link
-            to="/mentors"
+            to="/users"
             className="mt-5 inline-flex min-h-10 items-center gap-1.5 rounded-md border border-border px-3 text-xs font-medium hover:bg-accent/40"
           >
-            Open users &amp; roles <ArrowRight className="size-3.5" aria-hidden="true" />
+            Open team members <ArrowRight className="size-3.5" aria-hidden="true" />
           </Link>
         </>
       )}

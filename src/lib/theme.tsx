@@ -14,8 +14,8 @@ export const themeInitScript = `
 try {
   var t = localStorage.getItem(${JSON.stringify(STORAGE_KEY)});
   var d = document.documentElement;
-  if (t === "light") { d.classList.remove("dark"); }
-  else { d.classList.add("dark"); }
+  if (t === "light") { d.classList.remove("dark"); d.setAttribute("data-theme", "light"); }
+  else { d.classList.add("dark"); d.setAttribute("data-theme", "dark"); }
 } catch (e) {}
 `;
 
@@ -36,6 +36,9 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     const d = document.documentElement;
     if (next === "dark") d.classList.add("dark");
     else d.classList.remove("dark");
+    // The GKHQ token blocks key off `data-theme` as well as `.dark`, and
+    // reserve `[data-theme="print"]` for dossier output.
+    d.setAttribute("data-theme", next);
     try { localStorage.setItem(STORAGE_KEY, next); } catch {}
     startTransition(() => setThemeState(next));
   }, []);
