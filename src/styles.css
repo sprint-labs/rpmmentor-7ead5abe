@@ -20,9 +20,12 @@
 
    GK Green #12C400 carries BLACK text (8.2:1), never white.
 
-   Deviation from the GKHQ source, deliberate: dark `--muted-foreground`
-   stays #8A8A85 (5.6:1) rather than GKHQ's #71716B (3.9:1). Mentor Hub puts
-   real sentences in muted text, so it has to clear WCAG AA body contrast. */
+   Two deliberate deviations from the GKHQ source:
+   - dark `--muted-foreground` stays #8A8A85 (5.6:1) rather than GKHQ's #71716B
+     (3.9:1); Mentor Hub puts real sentences in muted text, so it has to clear
+     WCAG AA body contrast.
+   - light and print `--warning` are gold rather than rust, so traffic-light
+     amber and red are told apart on a white surface. See the tokens. */
 
 @theme inline {
   --radius-sm: 5px; /* badges, pills, chips */
@@ -187,7 +190,11 @@
   --success-fill: #e4f5e9;
   --success-line: #c6e8d2;
   --success-foreground: #ffffff;
-  --warning: #a43c00;
+  /* Gold, not rust. GKHQ's light warning (#A43C00) sits about 20° of hue from
+     its destructive red, so "due soon" and "overdue" read as the same colour on
+     a white duty-of-care panel. This keeps AA on white (5.9:1) while landing
+     clearly in amber. */
+  --warning: #8a5b12;
   --warning-fill: #fcf2e2;
   --warning-line: #efddbe;
   --warning-foreground: #ffffff;
@@ -404,7 +411,9 @@
   --success-fill: #e8f5e4;
   --success-line: #a9d69c;
   --success-foreground: #ffffff;
-  --warning: #8a3200;
+  /* Same separation as light: a printed dossier has to show due-soon and
+     overdue apart too. */
+  --warning: #7a5200;
   --warning-fill: #fbf0e0;
   --warning-line: #e0c79a;
   --warning-foreground: #ffffff;
@@ -491,7 +500,7 @@
     --primary-fill: #e8f5e4;
     --primary-line: #a9d69c;
     --success: #0a7a00;
-    --warning: #8a3200;
+    --warning: #7a5200;
     --destructive: #96190f;
     --info: #005e92;
     --rating-elite: #0a7a00;

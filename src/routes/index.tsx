@@ -334,14 +334,6 @@ function Dashboard() {
             className="flex-col items-start gap-2 sm:flex-row sm:items-center sm:gap-3"
             action={
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] font-mono uppercase tracking-[0.12em] text-muted-foreground">
-                <span className="inline-flex items-center gap-1.5">
-                  <span className="size-1.5 rounded-full bg-success shadow-[0_0_6px_var(--success)]" />
-                  Nominal
-                </span>
-                <span className="inline-flex items-center gap-1.5">
-                  <span className="size-1.5 rounded-full bg-warning shadow-[0_0_6px_var(--warning)]" />
-                  Warning
-                </span>
                 <Link
                   to="/goalkeepers"
                   className="text-primary inline-flex items-center gap-1 normal-case tracking-normal"
