@@ -5,6 +5,8 @@
 // src/lib/data-classification.tsx.
 
 
+import { LONDON_TIME_ZONE, londonToday } from "@/lib/time/london";
+
 export type TierLevelLabel = "Tier 1" | "Tier 2" | "Tier 3" | "Tier 4";
 export type GoalkeeperTag = "Academy" | "Free Agent";
 // Status is retained for older surfaces that still present a goalkeeper's
@@ -539,18 +541,72 @@ export function formatDate(iso: string) {
   if (isNaN(d.getTime())) return iso;
   return d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
 }
-export function formatRelative(iso: string) {
+const RELATIVE_WEEKDAY = new Intl.DateTimeFormat("en-GB", {
+  timeZone: LONDON_TIME_ZONE,
+  weekday: "long",
+});
+const RELATIVE_DATE = new Intl.DateTimeFormat("en-GB", {
+  timeZone: LONDON_TIME_ZONE,
+  day: "numeric",
+  month: "short",
+});
+const RELATIVE_DATE_WITH_YEAR = new Intl.DateTimeFormat("en-GB", {
+  timeZone: LONDON_TIME_ZONE,
+  day: "numeric",
+  month: "short",
+  year: "numeric",
+});
+
+/**
+ * Whole calendar days from today to `iso`, counted in London.
+ *
+ * Counting in calendar days rather than elapsed milliseconds is what makes
+ * "Tomorrow" mean the next date on the wall calendar: a 15:00 fixture the day
+ * after a 09:00 visit is one day ahead, not 0.75 of one.
+ */
+function londonDayOffset(iso: string, now: number = Date.now()): number | null {
+  const parsed = new Date(iso);
+  if (isNaN(parsed.getTime())) return null;
+  const target = Date.parse(`${londonToday(parsed.getTime())}T00:00:00Z`);
+  const today = Date.parse(`${londonToday(now)}T00:00:00Z`);
+  if (isNaN(target) || isNaN(today)) return null;
+  return Math.round((target - today) / 86400000);
+}
+
+/**
+ * How a date reads next to an event or an entry in a log.
+ *
+ * Forward-looking dates are named the way people say them out loud — "Tomorrow",
+ * "Friday" — because a mentor scanning their week wants to know which day to
+ * clear, and "in 4d" makes them do the arithmetic. Past dates keep their
+ * existing shorthand; nothing reads a backlog by weekday.
+ *
+ * "This week" is the next seven days rather than the calendar week, so a fixture
+ * six days out is still "Thursday" instead of flipping to a date because a
+ * Sunday fell in between.
+ */
+export function formatRelative(iso: string, now: number = Date.now()) {
   if (!iso || iso === "—") return "—";
-  const diff = (Date.now() - new Date(iso).getTime()) / 86400000;
-  if (diff < 0) {
-    const ahead = Math.abs(Math.floor(diff));
-    return ahead === 0 ? "Today" : `in ${ahead}d`;
+  const offset = londonDayOffset(iso, now);
+  if (offset === null) return iso;
+
+  if (offset === 0) return "Today";
+  if (offset === 1) return "Tomorrow";
+
+  if (offset > 1) {
+    const when = new Date(iso);
+    // Inside the next week, the weekday is the useful handle.
+    if (offset < 7) return RELATIVE_WEEKDAY.format(when);
+    // Beyond that, name the date. The year only earns its place once the event
+    // is not in the current one.
+    const sameYear = londonToday(when.getTime()).slice(0, 4) === londonToday(now).slice(0, 4);
+    return (sameYear ? RELATIVE_DATE : RELATIVE_DATE_WITH_YEAR).format(when);
   }
-  const d = Math.floor(diff);
-  if (d === 0) return "Today";
-  if (d === 1) return "Yesterday";
-  if (d < 30) return `${d}d ago`;
-  return `${Math.floor(d / 30)}mo ago`;
+
+  const ago = Math.abs(offset);
+  if (ago === 1) return "Yesterday";
+  if (ago < 30) return `${ago}d ago`;
+  return `${Math.floor(ago / 30)}mo ago`;
 }
 
 // ---------- Duty-of-care status ----------
