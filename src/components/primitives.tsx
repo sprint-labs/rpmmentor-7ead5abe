@@ -206,11 +206,13 @@ export function StatCard({
 
 export function TierBadge({ tier }: { tier: Tier }) {
   const styles: Record<Tier, string> = {
-    "Tier 1": "bg-warning/15 text-warning border-warning/40",
-    "Tier 2": "bg-info/15 text-info border-info/30",
-    "Tier 3": "bg-primary/15 text-primary border-primary/30",
+    "Tier 1": "bg-tier-1/15 text-tier-1 border-tier-1/40",
+    "Tier 2": "bg-tier-2/15 text-tier-2 border-tier-2/40",
+    "Tier 3": "bg-tier-3/15 text-tier-3 border-tier-3/40",
     "Tier 4": "bg-muted text-muted-foreground border-border",
-    Academy: "bg-tier-3/20 text-tier-3 border-tier-3/40",
+    // Academy is a tag, not a rung on the care ladder, so it takes a tag hue
+    // rather than borrowing a tier's green.
+    Academy: "bg-info/15 text-info border-info/30",
     "Free Agent": "bg-muted text-muted-foreground border-border",
   };
   return (
@@ -228,9 +230,9 @@ export const StatusBadge = TierBadge;
 
 export function TierLevelBadge({ level }: { level: 1 | 2 | 3 | 4 }) {
   const styles: Record<1 | 2 | 3 | 4, string> = {
-    1: "bg-warning/15 text-warning border-warning/40",
-    2: "bg-info/15 text-info border-info/30",
-    3: "bg-primary/15 text-primary border-primary/30",
+    1: "bg-tier-1/15 text-tier-1 border-tier-1/40",
+    2: "bg-tier-2/15 text-tier-2 border-tier-2/40",
+    3: "bg-tier-3/15 text-tier-3 border-tier-3/40",
     4: "bg-muted text-muted-foreground border-border",
   };
   return (

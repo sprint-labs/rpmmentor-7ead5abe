@@ -210,9 +210,11 @@
   --neutral-fill: #f1f0eb;
   --neutral-line: #dad8d2;
 
-  --tier-1: #8a5b12;
-  --tier-2: #0077b6;
-  --tier-3: #0a7a00;
+  /* Care cadence reads as one green ramp: the brighter and more saturated the
+     tier, the more contact it demands. Tier 4 is neutral — no formal duty. */
+  --tier-1: #0a7a00;
+  --tier-2: #3e7d57;
+  --tier-3: #5c7a63;
   --tier-4: #6b756b;
 
   --rating-elite: #0a7a00;
@@ -323,9 +325,9 @@
   --neutral-fill: rgba(138, 150, 138, 0.1);
   --neutral-line: rgba(138, 150, 138, 0.24);
 
-  --tier-1: #f0b429;
-  --tier-2: #238aff;
-  --tier-3: #12c400;
+  --tier-1: #12c400;
+  --tier-2: #4fb86e;
+  --tier-3: #6e9a78;
   --tier-4: #8a968a;
 
   --rating-elite: #12c400;
@@ -429,9 +431,9 @@
   --neutral-fill: #f2f1ed;
   --neutral-line: #c9c6bf;
 
-  --tier-1: #8a3200;
-  --tier-2: #005e92;
-  --tier-3: #0a7a00;
+  --tier-1: #0a7a00;
+  --tier-2: #2f6448;
+  --tier-3: #4d6552;
   --tier-4: #55554f;
 
   --rating-elite: #0a7a00;
