@@ -1,5 +1,7 @@
 import { useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
+import { useQuery } from "@tanstack/react-query";
 import {
   AlertTriangle,
   AlertCircle,
@@ -10,12 +12,15 @@ import {
   Wrench,
 } from "lucide-react";
 import { RequirePermission } from "@/components/require-permission";
-import { goalkeepers } from "@/lib/mock-data";
+import { listPlayers } from "@/lib/players.functions";
+import { toGoalkeepers } from "@/lib/roster/live-goalkeepers";
+import { countWithoutPresentation } from "@/lib/roster/seed-presentation";
 import {
   auditRoster,
   summarise,
   ISSUE_LABEL,
   ISSUE_REMEDIATION,
+  NOT_CAPTURED_FIELDS,
   type IssueSeverity,
   type IssueCode,
   type GoalkeeperQualityReport,
@@ -42,6 +47,11 @@ export const Route = createFileRoute("/system/data-quality")({
     ],
   }),
 });
+
+/** "date of birth, age, height, shirt number, preferred foot or portrait". */
+const NOT_CAPTURED_SENTENCE = `${NOT_CAPTURED_FIELDS.slice(0, -1).join(", ")} or ${
+  NOT_CAPTURED_FIELDS[NOT_CAPTURED_FIELDS.length - 1]
+}`;
 
 const SEVERITY_STYLE: Record<
   IssueSeverity,
@@ -76,8 +86,33 @@ function DataQualityPage() {
 }
 
 function DataQualityInner() {
-  const reports = useMemo(() => auditRoster(goalkeepers), []);
+  // The same query key and mapping `/goalkeepers` uses, so this page and the
+  // roster cannot disagree about who is on it. Auditing the frozen seed array
+  // meant checking records nobody sees: it missed every goalkeeper signed since
+  // the snapshot and reported issues on values the app no longer renders.
+  const listPlayersFn = useServerFn(listPlayers);
+  const {
+    data: playerRows,
+    isPending: rosterPending,
+    isError: rosterUnavailable,
+  } = useQuery({
+    queryKey: ["players", "roster"],
+    queryFn: () => listPlayersFn(),
+    staleTime: 5 * 60_000,
+  });
+  const roster = useMemo(() => toGoalkeepers(playerRows), [playerRows]);
+
+  // Only the checks `public.players` can answer. The rest are counted below
+  // rather than flagged per goalkeeper — see `NOT_CAPTURED_CODES`.
+  const reports = useMemo(
+    () => auditRoster(roster, new Date(), { databaseBackedOnly: true }),
+    [roster],
+  );
   const summary = useMemo(() => summarise(reports), [reports]);
+  const notCaptured = useMemo(
+    () => countWithoutPresentation(roster.map((gk) => gk.name)),
+    [roster],
+  );
 
   const [severity, setSeverity] = useState<"all" | IssueSeverity>("all");
   const [code, setCode] = useState<"all" | IssueCode>("all");
@@ -134,23 +169,49 @@ function DataQualityInner() {
     URL.revokeObjectURL(url);
   };
 
-  return (
-    <div className="space-y-6">
-      <header className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Roster data quality</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Automated checks for missing or inconsistent goalkeeper fields — nationality, parent
-            club, contract status and more.
+  // The roster is a database read now, so the page says which of the three it
+  // is — loading, unreachable, or here — rather than rendering empty tiles that
+  // read as "the roster is clean".
+  if (rosterUnavailable) {
+    return (
+      <div className="space-y-6">
+        <PageIntro description="Roster unavailable." />
+        <div className="rounded-lg border border-border bg-card p-10 text-center">
+          <AlertCircle className="size-8 mx-auto text-destructive" />
+          <p className="mt-3 text-sm text-muted-foreground" role="status">
+            The roster could not be loaded, so nothing has been audited. Refresh the page to try
+            again.
           </p>
         </div>
+      </div>
+    );
+  }
+
+  if (rosterPending) {
+    return (
+      <div className="space-y-6">
+        <PageIntro description="Loading the roster…" />
+        <div className="rounded-lg border border-border bg-card p-10 text-center">
+          <p className="text-sm text-muted-foreground" role="status">
+            Reading the roster from the database…
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <PageIntro
+        description={`Automated checks across the ${summary.totalGoalkeepers} goalkeepers on the live roster — nationality, club, league, tier, contract and parent club.`}
+      >
         <button
           onClick={exportCsv}
           className="inline-flex items-center gap-2 h-9 rounded-md border border-border bg-card px-3 text-sm font-medium hover:bg-accent"
         >
           <Download className="size-4" /> Export CSV
         </button>
-      </header>
+      </PageIntro>
 
       {/* Summary tiles */}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -179,6 +240,32 @@ function DataQualityInner() {
           icon={AlertTriangle}
         />
       </div>
+
+      {/* The checks this audit deliberately does not run. */}
+      <section className="rounded-lg border border-border bg-card p-4">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="min-w-[240px] flex-1">
+            <h2 className="text-sm font-semibold">Not captured in the database yet</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              <code className="rounded bg-muted px-1 py-0.5 font-mono text-[11px] text-foreground">
+                public.players
+              </code>{" "}
+              has no column for {NOT_CAPTURED_SENTENCE}, so the audit above does not check them.
+              Flagging them per goalkeeper would be true and unfixable — there is no field to go and
+              fill in.
+            </p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {notCaptured === 0
+                ? "Every goalkeeper on the roster still carries these from the last seed snapshot."
+                : `${notCaptured} of ${summary.totalGoalkeepers} goalkeepers have none of them on file — they joined the roster after that snapshot was taken.`}
+            </p>
+          </div>
+          <div className="shrink-0 text-right">
+            <div className="text-2xl font-semibold text-muted-foreground">{notCaptured}</div>
+            <div className="text-xs uppercase tracking-wide text-muted-foreground">Without any</div>
+          </div>
+        </div>
+      </section>
 
       {/* Filters */}
       <section className="rounded-lg border border-border bg-card p-4 space-y-3">
@@ -228,6 +315,19 @@ function DataQualityInner() {
         </ul>
       )}
     </div>
+  );
+}
+
+/** The title block, shared by the loading, error and loaded states. */
+function PageIntro({ description, children }: { description: string; children?: React.ReactNode }) {
+  return (
+    <header className="flex flex-wrap items-start justify-between gap-4">
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight">Roster data quality</h1>
+        <p className="text-sm text-muted-foreground mt-1">{description}</p>
+      </div>
+      {children}
+    </header>
   );
 }
 
