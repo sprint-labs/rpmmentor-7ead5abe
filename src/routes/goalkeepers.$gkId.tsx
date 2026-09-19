@@ -32,7 +32,7 @@ import { buildHighlightReelItems } from "@/lib/goalkeeper-highlight-reel";
 import { EditDetailsButton } from "@/components/edit-player-details-dialog";
 import { DutyOfCarePanel } from "@/components/duty-of-care-panel";
 import { listPlayers, type PlayerRosterRow } from "@/lib/players.functions";
-import { interactionBelongsToGoalkeeper } from "@/lib/goalkeeper-player-link";
+import { interactionBelongsToGoalkeeper, normalisePersonName } from "@/lib/goalkeeper-player-link";
 import { rosterRowForLegacySlug, toGoalkeeper } from "@/lib/roster/live-goalkeepers";
 import { withSeedNarrative } from "@/lib/roster/goalkeeper-profile";
 import {
@@ -77,10 +77,6 @@ const PILLAR_SHORT_LABELS: Record<PillarId, string> = {
   psych: "Psychological",
   physical: "Physical",
 };
-
-function normaliseName(s: string): string {
-  return s.trim().toLowerCase().replace(/\s+/g, " ");
-}
 
 function formatDob(iso: string): string {
   if (!iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return "Not recorded";
@@ -154,7 +150,11 @@ function GkDetail() {
     );
   }
 
-  if (rosterUnavailable) {
+  // `isError` stays true after a failed background refetch — including the one
+  // Edit Details triggers by invalidating ["players"] — even though the rows
+  // are still in cache. Only call the roster unavailable when there is nothing
+  // to resolve against, or a working profile flips to the failure copy.
+  if (rosterUnavailable && !players) {
     return (
       <div className="p-8 text-sm text-destructive" role="status">
         The roster could not be loaded. Refresh the page to try again.
@@ -250,11 +250,16 @@ function GkProfile({ gk, player }: { gk: Goalkeeper; player: PlayerRosterRow }) 
     return () => window.removeEventListener("rpm:report-submitted", h);
   }, [queryClient]);
 
+  // `normalisePersonName`, not a local lowercase: `gk.name` is
+  // `players.full_name` and the two tables disagree about apostrophes —
+  // `Rich O'Donnell` is stored straight on the roster, `Max O’Leary` curly on
+  // his reports. Interactions already fold both; matching reports any other
+  // way silently loses a goalkeeper's whole history.
   const gkReports = useMemo<MatchReportRow[]>(() => {
-    const target = normaliseName(gk.name);
+    const target = normalisePersonName(gk.name);
     const all = data?.reports ?? [];
     return all
-      .filter((r) => normaliseName(r.goalkeeper) === target)
+      .filter((r) => normalisePersonName(r.goalkeeper) === target)
       .sort((a, b) => compareMatchDatesNewestFirst(a.match_date, b.match_date));
   }, [data, gk.name]);
 

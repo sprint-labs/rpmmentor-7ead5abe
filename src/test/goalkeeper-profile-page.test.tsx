@@ -71,19 +71,23 @@ vi.mock("@/lib/media-store", async (importOriginal) => ({
 vi.mock("@/lib/match-reports/reports.functions", () => ({
   deleteMatchReport: vi.fn(),
   getMatchReport: vi.fn(),
-  listMatchReports: vi.fn(),
+  listMatchReports: listMatchReportsMock,
   submitMatchReport: vi.fn(),
   updateMatchReport: vi.fn(),
 }));
 
 const {
   getPlayerDutyOfCareMock,
+  listMatchReportsMock,
   listPlayerDutyOfCareMock,
   listPlayersMock,
   resetDutyOfCareMock,
+  APOSTROPHE_PLAYER,
+  CURLY_REPORT,
   LIVE_ONLY_PLAYER,
 } = vi.hoisted(() => ({
   getPlayerDutyOfCareMock: vi.fn(),
+  listMatchReportsMock: vi.fn(),
   listPlayerDutyOfCareMock: vi.fn(),
   listPlayersMock: vi.fn(),
   resetDutyOfCareMock: vi.fn(),
@@ -107,6 +111,46 @@ const {
     is_academy: false,
     is_free_agent: false,
   },
+  /**
+   * The apostrophe hazard, as the live database actually holds it:
+   * `public.players` stores a straight `'`, `match_reports_cache` a curly one.
+   */
+  APOSTROPHE_PLAYER: {
+    id: "00000000-0000-4000-8000-0000000000bb",
+    full_name: "Rich O'Donnell",
+    current_club: "Rotherham United",
+    parent_club: null,
+    on_loan: false,
+    league: "EFL League One",
+    nationality: "England",
+    instagram_url: null,
+    contract_until: "June 2027",
+    tier: "Tier 3",
+    is_academy: false,
+    is_free_agent: false,
+  },
+  CURLY_REPORT: {
+    report_id: "mr2_curly_1",
+    legacy_report_id: "mr_curly_1",
+    row_index: 1,
+    goalkeeper: "Rich O\u2019Donnell",
+    coach: "A Coach",
+    team: null,
+    opponent: "Barnsley",
+    competition: "EFL League One",
+    match_date: "2026-09-01",
+    scores: {
+      protect_goal: 4,
+      protect_space: 4,
+      protect_air: 4,
+      control_play: 4,
+      change_play: 4,
+      psych: 4,
+      physical: 4,
+    },
+    average: 4,
+    comments: "",
+  },
 }));
 
 vi.mock("@/lib/duty-of-care.functions", () => ({
@@ -127,16 +171,19 @@ vi.mock("@tanstack/react-start", async (importOriginal) => {
     useServerFn: (fn: unknown) =>
       fn === listPlayersMock
         ? () => listPlayersMock()
-        : fn === listPlayerDutyOfCareMock
-          ? vi.fn().mockResolvedValue([])
-          : fn === getPlayerDutyOfCareMock
-            ? vi.fn().mockResolvedValue({ state: "green" })
-            : vi.fn().mockResolvedValue({ reports: [] }),
+        : fn === listMatchReportsMock
+          ? () => listMatchReportsMock()
+          : fn === listPlayerDutyOfCareMock
+            ? vi.fn().mockResolvedValue([])
+            : fn === getPlayerDutyOfCareMock
+              ? vi.fn().mockResolvedValue({ state: "green" })
+              : vi.fn().mockResolvedValue({ reports: [] }),
   };
 });
 
-async function renderProfile(initialEntry: string) {
+async function renderProfile(initialEntry: string, seed?: (queryClient: QueryClient) => void) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  seed?.(queryClient);
   const router = createRouter({
     context: { queryClient },
     history: createMemoryHistory({ initialEntries: [initialEntry] }),
@@ -174,6 +221,7 @@ beforeAll(() => {
 
 beforeEach(() => {
   listPlayersMock.mockResolvedValue([LIVE_ONLY_PLAYER]);
+  listMatchReportsMock.mockResolvedValue({ reports: [] });
 });
 
 afterEach(() => {
@@ -203,6 +251,34 @@ describe("Goalkeeper profile page", () => {
     await renderProfile("/goalkeepers/gk-kwame-asante");
 
     expect(await screen.findByText("Loading goalkeeper…")).toBeTruthy();
+    expect(screen.queryByText("Goalkeeper not found.")).toBeNull();
+  });
+
+  it("matches match reports across the two apostrophe spellings", async () => {
+    listPlayersMock.mockResolvedValue([APOSTROPHE_PLAYER]);
+    listMatchReportsMock.mockResolvedValue({ reports: [CURLY_REPORT] });
+
+    await renderProfile("/goalkeepers/gk-rich-o-donnell");
+
+    expect(await screen.findByRole("heading", { name: "Rich O'Donnell" })).toBeTruthy();
+    // The roster spells him with a straight apostrophe and the report with a
+    // curly one. Folding only case would drop his whole history here.
+    expect(await screen.findByText("Match Reports (1)")).toBeTruthy();
+    expect(screen.getAllByText(/Barnsley/).length).toBeGreaterThan(0);
+  });
+
+  it("keeps a resolved profile when a later roster refetch fails", async () => {
+    // Rows already in cache, but stale, so mounting triggers a refetch — the
+    // one Edit Details causes by invalidating ["players"]. That refetch fails.
+    listPlayersMock.mockRejectedValue(new Error("roster refetch failed"));
+
+    await renderProfile("/goalkeepers/gk-kwame-asante", (queryClient) => {
+      queryClient.setQueryData(["players", "roster"], [LIVE_ONLY_PLAYER], { updatedAt: 0 });
+    });
+
+    expect(await screen.findByRole("heading", { name: "Kwame Asante" })).toBeTruthy();
+    await waitFor(() => expect(listPlayersMock).toHaveBeenCalled());
+    expect(screen.queryByText(/The roster could not be loaded/)).toBeNull();
     expect(screen.queryByText("Goalkeeper not found.")).toBeNull();
   });
 
