@@ -46,24 +46,25 @@ export function SyncStatusChip({ className = "" }: { className?: string }) {
 
   let label: string;
   let Icon = WifiOff;
-  let tone = "border-border/60 bg-muted/40 text-muted-foreground";
+  // Theme tokens, outlined — same reasoning as DataFreshnessChip.
+  let tone = "border-border text-muted-foreground";
 
   if (!online && pending > 0) {
     label = `Offline · ${pending} unsent`;
     Icon = WifiOff;
-    tone = "border-amber-500/40 bg-amber-500/10 text-amber-200";
+    tone = "border-warning/40 text-warning";
   } else if (!online) {
     label = "Offline";
     Icon = WifiOff;
-    tone = "border-amber-500/40 bg-amber-500/10 text-amber-200";
+    tone = "border-warning/40 text-warning";
   } else if (pending > 0 && anyFailed) {
     label = `Retrying · ${pending} unsent`;
     Icon = AlertTriangle;
-    tone = "border-amber-500/40 bg-amber-500/10 text-amber-200";
+    tone = "border-warning/40 text-warning";
   } else if (pending > 0) {
     label = `Uploading · ${pending} unsent`;
     Icon = RefreshCw;
-    tone = "border-sky-500/40 bg-sky-500/10 text-sky-200";
+    tone = "border-info/40 text-info";
   } else {
     // Online with an empty queue is the normal state for almost everyone, and
     // it is not news: there is nothing for the reader to do about it and no

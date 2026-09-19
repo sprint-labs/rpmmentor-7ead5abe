@@ -160,17 +160,21 @@ export function StatCard({
         : accent === "info"
           ? "before:bg-info"
           : "before:bg-primary";
-  // The default is `--primary-ink`, not `--primary`: the brand volt is
-  // graphic-grade and reads at 2.35:1 on the light theme's white card, which
-  // even a 30px headline number fails. The ink grade is the text-safe one.
+  // The display grade, not the ink grade. These numerals are 30px bold, which
+  // WCAG counts as large text and holds to 3:1 rather than 4.5:1 — so they can
+  // carry a more saturated hue than body copy, which is what stops the light
+  // theme's deep ink reading as muddy at headline size. The raw `--primary`
+  // volt is still not an option: at 2.35:1 on a white card it fails even the
+  // large-text floor. `--destructive` has no display grade because no KPI card
+  // uses it; it keeps the ink value.
   const valueTone =
     accent === "warning"
-      ? "text-warning"
+      ? "text-warning-display"
       : accent === "destructive"
         ? "text-destructive"
         : accent === "info"
-          ? "text-info"
-          : "text-primary-ink";
+          ? "text-info-display"
+          : "text-primary-display";
   // Blur and spread come from the theme, not from here: the same halo that
   // reads as a crisp edge on white blooms into the gutter on carbon. See
   // `--stat-glow-blur` / `--stat-glow-spread` in styles.css.
@@ -394,11 +398,20 @@ export function SectionTitle({
 export function ProgressBar({
   value,
   tone = "primary",
+  barClassName,
 }: {
   value: number;
   tone?: "primary" | "warning" | "info";
+  /**
+   * Explicit fill class, for callers whose colour comes from a scale rather
+   * than a fixed tone — the skill-score ramp in `@/lib/score-band`. Wins over
+   * `tone` when both are given.
+   */
+  barClassName?: string;
 }) {
-  const c = tone === "warning" ? "bg-warning" : tone === "info" ? "bg-info" : "bg-primary";
+  const c =
+    barClassName ??
+    (tone === "warning" ? "bg-warning" : tone === "info" ? "bg-info" : "bg-primary");
   return (
     <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
       <div

@@ -404,7 +404,11 @@ export function AppShell() {
             className="size-11 md:w-auto md:h-auto flex items-center justify-center md:justify-start gap-2.5 shrink-0 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           >
             <GkhqMark className="size-9 shrink-0" />
-            <GkhqWordmark className="hidden h-5 w-auto shrink-0 sm:block" alt="GKHQ" />
+            <GkhqWordmark
+              wrapperClassName="hidden shrink-0 sm:inline-flex"
+              className="h-5 w-auto"
+              alt="GKHQ"
+            />
             <span
               className="hidden font-medium tracking-tight text-muted-foreground md:inline"
               aria-hidden="true"

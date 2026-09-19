@@ -12,9 +12,28 @@ import { BRAND_MARK_SRC, BRAND_WORDMARK_DARK_SRC, BRAND_WORDMARK_LIGHT_SRC } fro
  *
  * Only one is announced; the other is decorative to a screen reader.
  */
-export function GkhqWordmark({ className, alt = "GKHQ" }: { className?: string; alt?: string }) {
+export function GkhqWordmark({
+  className,
+  wrapperClassName,
+  alt = "GKHQ",
+}: {
+  className?: string;
+  /**
+   * Layout and responsive visibility for the pair — anything that decides
+   * whether the wordmark shows at all.
+   *
+   * It is separate from `className` on purpose. `className` reaches both
+   * `<img>`s, and a display utility passed there fights the theme switch
+   * below: the header passed `hidden sm:block`, tailwind-merge kept that
+   * `sm:block` over each image's own `hidden`, and from `sm` up BOTH cuts
+   * rendered — the black-on-light one beside the white-on-dark one, which is
+   * the ghosted second wordmark seen in light mode.
+   */
+  wrapperClassName?: string;
+  alt?: string;
+}) {
   return (
-    <>
+    <span className={cn("inline-flex", wrapperClassName)}>
       <img
         src={BRAND_WORDMARK_LIGHT_SRC}
         alt={alt}
@@ -28,7 +47,7 @@ export function GkhqWordmark({ className, alt = "GKHQ" }: { className?: string; 
         draggable={false}
         className={cn("hidden dark:block", className)}
       />
-    </>
+    </span>
   );
 }
 

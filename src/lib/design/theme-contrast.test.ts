@@ -79,6 +79,13 @@ const ACCENT_TOKENS = [
   "--tier-2",
   "--tier-3",
   "--tier-4",
+  // The skill-score ramp. These are numerals on a card, not just bar fills, so
+  // they carry the same floor as every other text token. Two of them failed it
+  // when the profile's skill scores first used them.
+  "--rating-elite",
+  "--rating-strong",
+  "--rating-average",
+  "--rating-poor",
 ];
 
 const ALL_SURFACES = ["--card", "--background", "--muted"];
@@ -104,6 +111,36 @@ describe.each(Object.keys(THEMES) as (keyof typeof THEMES)[])("%s theme", (theme
 
   it.each(ACCENT_TOKENS)("%s clears AA on the panels badges sit on", (token) => {
     expectAA(theme, token, PANEL_SURFACES);
+  });
+});
+
+/**
+ * The KPI numerals are 30px bold, which WCAG counts as large text and holds to
+ * 3:1 rather than 4.5:1. The display grade exists to use that allowance — the
+ * light theme's ink grade is deep enough to read as muddy at headline size —
+ * and is held to the large-text floor here so it cannot drift below it.
+ *
+ * These tokens are for large bold numerals only. Anything smaller must use the
+ * ink grade, which the block above holds to the full 4.5:1.
+ */
+const DISPLAY_TOKENS = ["--primary-display", "--warning-display", "--info-display"];
+const LARGE_TEXT_FLOOR = 3;
+
+describe.each(Object.keys(THEMES) as (keyof typeof THEMES)[])("%s theme display grade", (theme) => {
+  it.each(DISPLAY_TOKENS)("%s clears the 3:1 large-text floor on panels", (token) => {
+    const fg = resolve(theme, token);
+    for (const surface of PANEL_SURFACES) {
+      const bg = resolve(theme, surface);
+      const ratio = contrastRatio(fg, bg);
+      expect(
+        ratio,
+        `${theme} ${token} (${fg}) on ${surface} (${bg}) is unparseable`,
+      ).not.toBeNull();
+      expect(
+        ratio!,
+        `${theme}: ${token} ${fg} on ${surface} ${bg} is ${formatRatio(ratio!)}, below the ${LARGE_TEXT_FLOOR}:1 large-text floor`,
+      ).toBeGreaterThanOrEqual(LARGE_TEXT_FLOOR);
+    }
   });
 });
 

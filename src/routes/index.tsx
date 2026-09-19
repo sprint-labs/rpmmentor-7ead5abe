@@ -4,8 +4,8 @@ import { WorkflowDialog, type WorkflowKind } from "@/components/workflows";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { PageHeader, StatCard, SectionTitle, TierBadge } from "@/components/primitives";
-import { alerts, formatRelative, type Alert } from "@/lib/mock-data";
-import { compareAlertSeverity } from "@/lib/interaction-alert-rank";
+// Helpers only — no seeded roster or activity data reaches this page.
+import { formatRelative } from "@/lib/mock-data";
 import { useLoggedInteractions } from "@/lib/interactions/use-interactions";
 import { ErrorBoundary } from "@/components/error-boundary";
 
@@ -51,20 +51,6 @@ function Dashboard() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [workflow, setWorkflow] = useState<WorkflowKind | null>(null);
-
-  /**
-   * Opens the calendar's add-event form with the alert's wording carried over.
-   * A follow-up now has to name the goalkeeper and the attending mentor, and
-   * neither can be derived from an alert: its goalkeeper reference cannot be
-   * resolved to a canonical roster id without matching on names, and an alert
-   * says nothing about who should attend. So the manager confirms both.
-   */
-  function escalateAlert(a: Alert) {
-    navigate({
-      to: "/calendar",
-      search: { new: true, title: `Escalation: ${a.kind}`, notes: a.message },
-    });
-  }
 
   const listReports = useServerFn(listMatchReports);
   const {
@@ -232,7 +218,6 @@ function Dashboard() {
     return <MentorDashboard user={user} mentorProfileId={user.mentorId ?? ""} />;
   }
 
-  const canViewSystemAlerts = can("alerts.view");
   const dutyOverview = countDutyRows(dutyRows);
   // The five duty bands are mutually exclusive and cover the whole roster, so
   // this is a distribution and has to total 100%. Rounding each band on its own
@@ -702,9 +687,7 @@ function Dashboard() {
         {/* Recent activity */}
         <ErrorBoundary
           fallback={(reset) => (
-            <div
-              className={`col-span-12 ${canViewSystemAlerts ? "lg:col-span-4" : "lg:col-span-8"} command-panel p-5`}
-            >
+            <div className="col-span-12 self-start lg:col-span-8 command-panel p-5">
               <SectionTitle>Recent Logged Interactions</SectionTitle>
               <div className="border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive flex items-start gap-2">
                 <AlertTriangle className="size-4 shrink-0" />
@@ -725,9 +708,7 @@ function Dashboard() {
             </div>
           )}
         >
-          <div
-            className={`col-span-12 ${canViewSystemAlerts ? "lg:col-span-4" : "lg:col-span-8"} command-panel p-5`}
-          >
+          <div className="col-span-12 self-start lg:col-span-8 command-panel p-5">
             <SectionTitle
               action={
                 can("interactions.log") ? (
@@ -783,68 +764,6 @@ function Dashboard() {
             </div>
           </div>
         </ErrorBoundary>
-
-        {/* Alerts */}
-        {canViewSystemAlerts && (
-          <div className="col-span-12 lg:col-span-4 command-panel p-5">
-            <SectionTitle
-              action={
-                <Link
-                  to="/insights/$metric"
-                  params={{ metric: "alerts" }}
-                  search={{ from: period.fromDate, to: period.toDate, level: "", tier: "" }}
-                  className="text-[10px] font-mono uppercase tracking-widest text-primary inline-flex items-center gap-1"
-                >
-                  All <ArrowUpRight className="size-3" />
-                </Link>
-              }
-            >
-              System Alerts
-            </SectionTitle>
-            <div className="space-y-2">
-              {alerts.length === 0 ? (
-                <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground py-6 text-center">
-                  Live alert feed not connected
-                </div>
-              ) : (
-                [...alerts]
-                  .sort(compareAlertSeverity)
-                  .slice(0, 6)
-                  .map((a) => {
-                    const tone =
-                      a.severity === "high"
-                        ? "border-destructive/30 bg-destructive/5 text-destructive"
-                        : a.severity === "medium"
-                          ? "border-warning/30 bg-warning/5 text-warning"
-                          : "border-info/30 bg-info/5 text-info";
-                    return (
-                      <div key={a.id} className={`border p-3 ${tone}`}>
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="text-[10px] font-mono font-bold uppercase tracking-widest">
-                            {a.kind}
-                          </span>
-                          <AlertTriangle className="size-3" />
-                        </div>
-                        <p className="text-[11px] text-muted-foreground leading-snug">
-                          {a.message}
-                        </p>
-                        {can("calendar.manage") && (
-                          <button
-                            type="button"
-                            onClick={() => escalateAlert(a)}
-                            className="mt-2 inline-flex items-center gap-1 border border-current/40 px-2 py-1 text-[10px] font-mono uppercase tracking-widest hover:bg-current/10"
-                          >
-                            <ArrowUpRight className="size-3" />
-                            Escalate
-                          </button>
-                        )}
-                      </div>
-                    );
-                  })
-              )}
-            </div>
-          </div>
-        )}
       </div>
 
       <WorkflowDialog kind={workflow} onClose={() => setWorkflow(null)} />

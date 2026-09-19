@@ -42,6 +42,10 @@
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
   --color-primary-ink: var(--primary-ink);
+  /* Display grade: large bold numerals only. See the theme-contrast test. */
+  --color-primary-display: var(--primary-display);
+  --color-warning-display: var(--warning-display);
+  --color-info-display: var(--info-display);
   --color-primary-fill: var(--primary-fill);
   --color-primary-line: var(--primary-line);
   --color-secondary: var(--secondary);
@@ -181,6 +185,9 @@
   --primary-foreground: #0a0a0a;
   --primary-hover: var(--gk-green-deep);
   --primary-press: #086200;
+  --primary-display: #0fa400;
+  --warning-display: #bd7c00;
+  --info-display: #0d8fe0;
   --primary-ink: var(--gk-green-deep);
   --primary-fill: rgba(18, 196, 0, 0.14);
   --primary-line: rgba(18, 196, 0, 0.38);
@@ -222,7 +229,7 @@
   --tier-4: #6b756b;
 
   --rating-elite: #0a7a00;
-  --rating-strong: #4e8c00;
+  --rating-strong: #477d00;
   --rating-average: #8a5b12;
   --rating-developing: #a4430a;
   --rating-poor: #b02219;
@@ -304,6 +311,9 @@
   --primary-foreground: #0a0a0a;
   --primary-hover: var(--gk-green-bright);
   --primary-press: var(--gk-green-press);
+  --primary-display: var(--gk-green);
+  --warning-display: var(--warning);
+  --info-display: var(--info);
   --primary-ink: var(--gk-green);
   --primary-fill: rgba(18, 196, 0, 0.13);
   --primary-line: rgba(18, 196, 0, 0.32);
@@ -349,7 +359,7 @@
   --rating-strong: #8acf2e;
   --rating-average: #f0b429;
   --rating-developing: #e8791a;
-  --rating-poor: #ff1105;
+  --rating-poor: #ff5a4f;
   --rating-none: #8a968a;
   --rating-ink: #0a0a0a;
 
@@ -420,6 +430,9 @@
   --primary-hover: var(--gk-green-deep);
   --primary-press: var(--gk-green-deep);
   --primary-ink: var(--gk-green-deep);
+  --primary-display: var(--gk-green-deep);
+  --warning-display: var(--warning);
+  --info-display: var(--info);
   --primary-fill: #e8f5e4;
   --primary-line: #a9d69c;
   --ring: var(--gk-green-deep);
@@ -518,6 +531,9 @@
     --primary: var(--gk-green-deep);
     --primary-foreground: #ffffff;
     --primary-ink: var(--gk-green-deep);
+    --primary-display: var(--gk-green-deep);
+    --warning-display: var(--warning);
+    --info-display: var(--info);
     --primary-fill: #e8f5e4;
     --primary-line: #a9d69c;
     --success: #0a7a00;

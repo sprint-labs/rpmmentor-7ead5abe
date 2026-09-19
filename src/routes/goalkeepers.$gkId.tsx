@@ -33,6 +33,9 @@ import { EditDetailsButton } from "@/components/edit-player-details-dialog";
 import { DutyOfCarePanel } from "@/components/duty-of-care-panel";
 import { listPlayers, type PlayerRosterRow } from "@/lib/players.functions";
 import { interactionBelongsToGoalkeeper, normalisePersonName } from "@/lib/goalkeeper-player-link";
+import { cn } from "@/lib/utils";
+import { scoreTone } from "@/lib/score-band";
+import { flagFor } from "@/lib/nationality-flag";
 import { rosterRowForLegacySlug, toGoalkeeper } from "@/lib/roster/live-goalkeepers";
 import { withSeedNarrative } from "@/lib/roster/goalkeeper-profile";
 import {
@@ -184,12 +187,12 @@ function GkProfile({ gk, player }: { gk: Goalkeeper; player: PlayerRosterRow }) 
   const displayClub = player.current_club;
   const displayLeague = player.league;
   const displayNationality = player.nationality;
+  // Club and league only. Age, height and preferred foot each have their own
+  // stat box a few rows below, and repeating them here pushed the two facts
+  // that are not shown anywhere else to the end of a long line.
   const profileSummary = [
     gk.tags.includes("Free Agent") ? "Free Agent" : displayClub || "Club not recorded",
     !gk.tags.includes("Free Agent") ? displayLeague : null,
-    gk.age != null ? `${gk.age} yrs` : null,
-    gk.height,
-    gk.foot ? `${gk.foot} foot` : null,
   ].filter((value): value is string => Boolean(value));
   const gkInteractions = useMemo(
     () =>
@@ -477,7 +480,11 @@ function GkProfile({ gk, player }: { gk: Goalkeeper; player: PlayerRosterRow }) 
         {(
           [
             {
-              label: "Rating",
+              // "Av." because it is the mean of the reports behind it, not a
+              // single verdict. The report count that used to sit under it is
+              // gone: it made this one box taller than the seven beside it,
+              // and the same figure is on the reports panel below.
+              label: "Av. Rating",
               value: isLoading
                 ? "…"
                 : isError
@@ -485,30 +492,34 @@ function GkProfile({ gk, player }: { gk: Goalkeeper; player: PlayerRosterRow }) 
                   : averageRating != null
                     ? `${averageRating.toFixed(1)}/5`
                     : "—",
-              hint:
-                !isLoading && !isError && averageRating != null
-                  ? `${ratingContributors.length} report${ratingContributors.length === 1 ? "" : "s"}`
-                  : undefined,
             },
             { label: "Contract expiry", value: formatContractExpiry(gk.contractUntil) },
             { label: "DOB", value: formatDob(gk.dob) },
             { label: "Age", value: gk.age != null ? String(gk.age) : "Not recorded" },
-            { label: "Citizenship", value: displayNationality || "—" },
+            {
+              label: "Citizenship",
+              value: displayNationality || "—",
+              // Decorative: the country name beside it already carries the
+              // meaning, and not every nationality has a flag to show.
+              flag: flagFor(displayNationality),
+            },
             { label: "Height", value: gk.height || "—" },
             { label: "Shirt number", value: gk.shirtNumber != null ? String(gk.shirtNumber) : "—" },
             { label: "Preferred foot", value: gk.foot || "—" },
           ] as const
         ).map((metric) => (
-          <Card key={metric.label} className="px-3 py-2.5">
+          <Card key={metric.label} className="px-3 py-2">
             <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
               {metric.label}
             </div>
-            <div className="mt-0.5 text-sm font-semibold tabular-nums leading-tight">
-              {metric.value}
+            <div className="mt-0.5 flex items-center gap-1.5 text-sm font-semibold tabular-nums leading-tight">
+              {"flag" in metric && metric.flag ? (
+                <span aria-hidden="true" className="text-base leading-none">
+                  {metric.flag}
+                </span>
+              ) : null}
+              <span>{metric.value}</span>
             </div>
-            {"hint" in metric && metric.hint ? (
-              <div className="mt-0.5 text-[10px] text-muted-foreground">{metric.hint}</div>
-            ) : null}
           </Card>
         ))}
       </div>
@@ -527,6 +538,8 @@ function GkProfile({ gk, player }: { gk: Goalkeeper; player: PlayerRosterRow }) 
           {PILLAR_IDS.map((id) => {
             const v = pillarAverages[id];
             const contributors = pillarContributors[id];
+            // 4+ elite green, 3–4 yellow-green, 2–3 amber, below 2 red.
+            const tone = scoreTone(isLoading || isError ? null : v);
             return (
               <Card key={id} className="px-3 py-2.5">
                 <div
@@ -535,14 +548,22 @@ function GkProfile({ gk, player }: { gk: Goalkeeper; player: PlayerRosterRow }) 
                 >
                   {PILLAR_SHORT_LABELS[id]}
                 </div>
-                <div className="mt-0.5 text-xl font-semibold tabular-nums font-mono leading-tight">
+                <div
+                  className={cn(
+                    "mt-0.5 text-xl font-semibold tabular-nums font-mono leading-tight",
+                    isLoading || isError ? "text-foreground" : tone.ink,
+                  )}
+                >
                   {isLoading ? "…" : isError || v == null ? "—" : v.toFixed(1)}
                   {!isLoading && !isError && v != null && (
                     <span className="ml-0.5 text-xs font-normal text-muted-foreground">/5</span>
                   )}
                 </div>
                 <div className="mt-1">
-                  <ProgressBar value={v != null ? (v / 5) * 100 : 0} />
+                  <ProgressBar
+                    value={v != null ? (v / 5) * 100 : 0}
+                    barClassName={isLoading || isError ? undefined : tone.bar}
+                  />
                 </div>
                 <div className="mt-1 text-[10px] text-muted-foreground">
                   {isLoading

@@ -2,23 +2,23 @@ import { useEffect, useRef, useState } from "react";
 import { AlertTriangle, Check, Clock, Info, RefreshCw } from "lucide-react";
 import type { DataFreshness } from "@/lib/data-freshness";
 
+/**
+ * Theme tokens, not raw palette steps, and outlined rather than washed.
+ *
+ * The first cut used `text-emerald-200` on `bg-emerald-500/10`. Those are
+ * fixed Tailwind palette values with no idea which theme is on, so on the
+ * light theme's near-white page the label was pale green on pale green and
+ * effectively unreadable. The tokens below are defined per theme and proved
+ * against every surface by the contrast test.
+ *
+ * No background wash either: a 10% wash of a label's own hue costs about a
+ * point of contrast, which is why every other badge in this app is outlined.
+ */
 const TONE = {
-  fresh: {
-    className: "border-emerald-500/40 bg-emerald-500/10 text-emerald-200",
-    Icon: Check,
-  },
-  stale: {
-    className: "border-amber-500/40 bg-amber-500/10 text-amber-200",
-    Icon: Clock,
-  },
-  degraded: {
-    className: "border-destructive/40 bg-destructive/10 text-destructive",
-    Icon: AlertTriangle,
-  },
-  unknown: {
-    className: "border-border/60 bg-muted/40 text-muted-foreground",
-    Icon: RefreshCw,
-  },
+  fresh: { className: "border-success/40 text-success", Icon: Check },
+  stale: { className: "border-warning/40 text-warning", Icon: Clock },
+  degraded: { className: "border-destructive/40 text-destructive", Icon: AlertTriangle },
+  unknown: { className: "border-border text-muted-foreground", Icon: RefreshCw },
 } as const;
 
 /**
