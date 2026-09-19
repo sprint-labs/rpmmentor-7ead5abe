@@ -6,7 +6,9 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { PageHeader, Card, Pill, SectionTitle, EmptyState } from "@/components/primitives";
 import { useEffect, useMemo, useState } from "react";
 import { FileText, ChevronRight, RefreshCw, X, FilePlus2, NotebookPen } from "lucide-react";
-import { goalkeepers as roster } from "@/lib/mock-data";
+import { goalkeepers as roster, type Goalkeeper } from "@/lib/mock-data";
+import { listPlayers } from "@/lib/players.functions";
+import { toGoalkeepers } from "@/lib/roster/live-goalkeepers";
 import { useAuth } from "@/lib/auth";
 import { WorkflowDialog, type WorkflowKind } from "@/components/workflows";
 import { withPermission } from "@/components/require-permission";
@@ -74,6 +76,16 @@ function ReportsPage() {
     queryKey: ["match-reports"],
     queryFn: () => listFn(),
     staleTime: 30_000,
+  });
+
+  // The live roster, for resolving a report's goalkeeper name to a profile.
+  // Shares the key `/goalkeepers` and every profile page already use, so this
+  // is a cache read rather than a second fetch.
+  const listPlayersFn = useServerFn(listPlayers);
+  const { data: rosterRows } = useQuery({
+    queryKey: ["players", "roster"],
+    queryFn: () => listPlayersFn(),
+    staleTime: 5 * 60_000,
   });
 
   const reports: MatchReportRow[] = data?.reports ?? [];
@@ -150,12 +162,21 @@ function ReportsPage() {
     return list;
   }, [reports, coachFilter, from, to, last5Ids]);
 
-  /** Report goalkeeper names resolved to roster ids so rows can link and prefill. */
+  /**
+   * Report goalkeeper names resolved to roster ids so rows can link and prefill.
+   *
+   * Built from the live roster, so a report filed on a goalkeeper signed since
+   * the seed was captured still links to their profile instead of rendering as
+   * plain text.
+   */
   const rosterByName = useMemo(() => {
-    const m = new Map<string, (typeof roster)[number]>();
-    for (const g of roster) m.set(normaliseName(g.name), g);
+    const m = new Map<string, Goalkeeper>();
+    for (const g of toGoalkeepers(rosterRows)) m.set(normaliseName(g.name), g);
+    // Fallback only: while the roster query is in flight, keep the links the
+    // page had before rather than showing none.
+    for (const g of roster) if (!m.has(normaliseName(g.name))) m.set(normaliseName(g.name), g);
     return m;
-  }, []);
+  }, [rosterRows]);
 
   function openLog(prefill: { gkId?: string; date?: string } = {}) {
     setLogPrefill(prefill);

@@ -4,7 +4,7 @@ import { WorkflowDialog, type WorkflowKind } from "@/components/workflows";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { PageHeader, StatCard, SectionTitle, TierBadge } from "@/components/primitives";
-import { alerts, goalkeepers, formatRelative, type Alert } from "@/lib/mock-data";
+import { alerts, formatRelative, type Alert } from "@/lib/mock-data";
 import { compareAlertSeverity } from "@/lib/interaction-alert-rank";
 import { useLoggedInteractions } from "@/lib/interactions/use-interactions";
 import { ErrorBoundary } from "@/components/error-boundary";
@@ -29,6 +29,8 @@ import { listMatchReports } from "@/lib/match-reports/reports.functions";
 import { isDateOnlyInPeriod, lastNDaysPeriod } from "@/lib/dashboard-period";
 import { getOverviewDashboardStats } from "@/lib/overview-dashboard.functions";
 import { getRosterSnapshot } from "@/lib/roster-snapshot.functions";
+import { listPlayers } from "@/lib/players.functions";
+import { goalkeeperByName } from "@/lib/roster/goalkeeper-profile";
 import { GoalkeeperDistribution, MIN_VISIBLE_BAR } from "@/components/goalkeeper-distribution";
 import { wholePercentsSummingTo100 } from "@/lib/roster-snapshot";
 import { listCalendarEvents } from "@/lib/calendar.functions";
@@ -97,6 +99,17 @@ function Dashboard() {
     enabled: Boolean(user && user.role !== "mentor"),
     staleTime: 30_000,
   });
+  // The roster rows themselves, for resolving a calendar event's goalkeeper
+  // name to a profile. Shares the key `/goalkeepers` and every profile page
+  // already use, so this is a cache read rather than a second fetch.
+  const listPlayersFn = useServerFn(listPlayers);
+  const { data: rosterRows } = useQuery({
+    queryKey: ["players", "roster"],
+    queryFn: () => listPlayersFn(),
+    enabled: Boolean(user),
+    staleTime: 5 * 60_000,
+  });
+
   // Duty of Care comes from `public.player_duty_of_care` — the `duty_of_care_at()`
   // projection — so this headline, the roster chips and each profile badge are
   // three views of one answer. It used to be recomputed here from logged
@@ -523,11 +536,12 @@ function Dashboard() {
               </div>
             ) : (
               upcoming.map((e) => {
+                // Resolved against the live roster, so an event for a
+                // goalkeeper signed since the seed was captured still links to
+                // their profile and still shows their real tier.
                 const gk = e.goalkeeper_name
-                  ? goalkeepers.find(
-                      (g) => g.name.toLowerCase() === e.goalkeeper_name!.toLowerCase(),
-                    )
-                  : undefined;
+                  ? goalkeeperByName(e.goalkeeper_name, rosterRows)
+                  : null;
                 const content = (
                   <>
                     <div className="flex-1 min-w-0">

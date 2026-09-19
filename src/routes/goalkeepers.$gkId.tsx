@@ -1,9 +1,9 @@
-import { createFileRoute, Link, notFound } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Card, TierBadge, Avatar, Pill, SectionTitle, ProgressBar } from "@/components/primitives";
-import { goalkeepers, formatDate, formatRelative, type Tier } from "@/lib/mock-data";
+import { formatDate, formatRelative, type Goalkeeper, type Tier } from "@/lib/mock-data";
 import { useLoggedInteractions } from "@/lib/interactions/use-interactions";
 import {
   ArrowLeft,
@@ -31,7 +31,8 @@ import { listMedia, openAsset, formatBytes, type MediaAsset } from "@/lib/media-
 import { buildHighlightReelItems } from "@/lib/goalkeeper-highlight-reel";
 import { EditDetailsButton } from "@/components/edit-player-details-dialog";
 import { DutyOfCarePanel } from "@/components/duty-of-care-panel";
-import { listPlayers } from "@/lib/players.functions";
+import { listPlayers, type PlayerRosterRow } from "@/lib/players.functions";
+import { resolveGoalkeeperProfile } from "@/lib/roster/goalkeeper-profile";
 import { findPlayerByName, interactionBelongsToGoalkeeper } from "@/lib/goalkeeper-player-link";
 import {
   compareInteractionsByAlertThenDate,
@@ -44,11 +45,12 @@ function isValidScore(v: unknown): v is number {
 }
 
 export const Route = createFileRoute("/goalkeepers/$gkId")({
-  loader: ({ params }) => {
-    const gk = goalkeepers.find((g) => g.id === params.gkId);
-    if (!gk) throw notFound();
-    return { gk };
-  },
+  // Deliberately does NOT decide whether this goalkeeper exists. It used to
+  // resolve against the seed array and throw `notFound()`, which was fine while
+  // the roster was that same array. Now the roster is `public.players`, and a
+  // goalkeeper who joined since the seed was captured would be listed on
+  // /goalkeepers and then told their own profile does not exist.
+  loader: ({ params }) => ({ gkId: params.gkId }),
   component: GkDetail,
   notFoundComponent: () => (
     <div className="p-8 text-sm text-muted-foreground">Goalkeeper not found.</div>
@@ -116,17 +118,64 @@ function compareMatchDatesNewestFirst(a: string | null, b: string | null): numbe
 }
 
 function GkDetail() {
-  const { gk } = Route.useLoaderData();
-  const { can, user } = useAuth();
-  const { data: loggedInteractions } = useLoggedInteractions();
+  const { gkId } = Route.useLoaderData();
   const listPlayersFn = useServerFn(listPlayers);
-  const { data: players } = useQuery({
+  const {
+    data: players,
+    isPending: rosterPending,
+    isError: rosterUnavailable,
+  } = useQuery({
     queryKey: ["players", "roster"],
     queryFn: () => listPlayersFn(),
     staleTime: 5 * 60_000,
   });
-  const linkedPlayer = useMemo(() => findPlayerByName(players, gk.name), [players, gk.name]);
-  const linkedPlayerId = linkedPlayer?.id ?? (gk as { playerId?: string | null }).playerId ?? null;
+
+  /**
+   * Live row first, seed second. See `resolveGoalkeeperProfile` — the database
+   * is the source of truth for everything it holds, so the tier, tags, club and
+   * contract shown here cannot disagree with the roster row that was clicked to
+   * reach this page.
+   */
+  const { gk, livePlayer, seedGk } = useMemo(
+    () => resolveGoalkeeperProfile(players, gkId),
+    [players, gkId],
+  );
+
+  // A seed-only goalkeeper can still have a live player record under a slightly
+  // different spelling, which is what carries Duty of Care and Edit Details.
+  const linkedPlayer = livePlayer ?? findPlayerByName(players, seedGk?.name ?? "");
+  if (!gk) {
+    // Only claim a goalkeeper does not exist once the roster has been read.
+    if (rosterPending) {
+      return <div className="p-8 text-sm text-muted-foreground">Loading goalkeeper…</div>;
+    }
+    if (rosterUnavailable) {
+      return (
+        <div className="p-8 text-sm text-destructive" role="status">
+          The roster could not be loaded, so this profile is unavailable. Refresh to try again.
+        </div>
+      );
+    }
+    return <div className="p-8 text-sm text-muted-foreground">Goalkeeper not found.</div>;
+  }
+
+  // Keyed by slug so nothing from the previous goalkeeper — an open report
+  // preview, a loaded media list — survives a move between profiles.
+  return <GkProfile key={gk.id} gk={gk} linkedPlayer={linkedPlayer} />;
+}
+
+/**
+ * The profile itself, rendered only once a goalkeeper has been resolved.
+ *
+ * Kept apart from `GkDetail` so the loading, unavailable and not-found states
+ * can return early: every hook below belongs to a goalkeeper already known to
+ * exist, which is what the rules of hooks require.
+ */
+function GkProfile({ gk, linkedPlayer }: { gk: Goalkeeper; linkedPlayer: PlayerRosterRow | null }) {
+  const { can, user } = useAuth();
+  const { data: loggedInteractions } = useLoggedInteractions();
+
+  const linkedPlayerId = linkedPlayer?.id ?? null;
   const mediaGoalkeeperIds = useMemo(
     () => Array.from(new Set([gk.id, linkedPlayerId].filter((id): id is string => !!id))),
     [gk.id, linkedPlayerId],
