@@ -4,13 +4,7 @@ import { WorkflowDialog, type WorkflowKind } from "@/components/workflows";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { PageHeader, StatCard, SectionTitle, TierBadge } from "@/components/primitives";
-import {
-  alerts,
-  goalkeepers,
-  formatRelative,
-  computeDutyOverview,
-  type Alert,
-} from "@/lib/mock-data";
+import { alerts, formatRelative, type Alert } from "@/lib/mock-data";
 import { compareAlertSeverity } from "@/lib/interaction-alert-rank";
 import { useLoggedInteractions } from "@/lib/interactions/use-interactions";
 import { ErrorBoundary } from "@/components/error-boundary";
@@ -30,14 +24,22 @@ import { ArrowUpRight, AlertTriangle, CalendarClock, FileText, Plus } from "luci
 import { useAuth, ROLE_LABEL } from "@/lib/auth";
 import { MentorDashboard } from "@/components/mentor/mentor-dashboard";
 import { SyncStatusChip } from "@/components/sync-status-chip";
+import { DataFreshnessChip } from "@/components/data-freshness-chip";
+import { CalendarMonthCard } from "@/components/calendar/month-card";
+import { describeDataFreshness } from "@/lib/data-freshness";
+import { localDateIso } from "@/lib/calendar/month";
 import { listMatchReports } from "@/lib/match-reports/reports.functions";
 
 import { isDateOnlyInPeriod, lastNDaysPeriod } from "@/lib/dashboard-period";
 import { getOverviewDashboardStats } from "@/lib/overview-dashboard.functions";
 import { getRosterSnapshot } from "@/lib/roster-snapshot.functions";
-import { ROSTER_STATUS_LABELS, ROSTER_TIER_LABELS } from "@/lib/roster-snapshot";
-import { NO_TIER_LABEL } from "@/components/insight-drilldowns";
+import { listPlayers } from "@/lib/players.functions";
+import { goalkeeperByName } from "@/lib/roster/goalkeeper-profile";
+import { GoalkeeperDistribution, MIN_VISIBLE_BAR } from "@/components/goalkeeper-distribution";
+import { wholePercentsSummingTo100 } from "@/lib/roster-snapshot";
 import { listCalendarEvents } from "@/lib/calendar.functions";
+import { listPlayerDutyOfCare } from "@/lib/duty-of-care.functions";
+import { countDutyRows } from "@/lib/duty-of-care-roster";
 import { BulletinDashboardCard } from "@/components/bulletins/dashboard-card";
 
 const OVERVIEW_PERIOD_DAYS = 14;
@@ -69,6 +71,7 @@ function Dashboard() {
     data: reportsData,
     isLoading: reportsLoading,
     isError: reportsError,
+    dataUpdatedAt: reportsFetchedAt,
   } = useQuery({
     // Share the Reports page cache so the dashboard number and the
     // destination list are based on the same canonical Supabase read.
@@ -82,7 +85,11 @@ function Dashboard() {
   // the window used by the mentor Interactions card.
   const period = useMemo(() => lastNDaysPeriod(OVERVIEW_PERIOD_DAYS), []);
   const fetchOverview = useServerFn(getOverviewDashboardStats);
-  const { data: overview, isError: overviewError } = useQuery({
+  const {
+    data: overview,
+    isError: overviewError,
+    dataUpdatedAt: overviewFetchedAt,
+  } = useQuery({
     queryKey: ["overview-dashboard-stats", period.fromDate, period.toDate],
     queryFn: () => fetchOverview({ data: { fromDate: period.fromDate, toDate: period.toDate } }),
     enabled: Boolean(user && user.role !== "mentor"),
@@ -95,18 +102,49 @@ function Dashboard() {
     data: roster,
     isPending: rosterPending,
     isError: rosterError,
+    dataUpdatedAt: rosterFetchedAt,
   } = useQuery({
     queryKey: ["roster-snapshot"],
     queryFn: () => fetchRosterSnapshot(),
     enabled: Boolean(user && user.role !== "mentor"),
     staleTime: 30_000,
   });
+  // The roster rows themselves, for resolving a calendar event's goalkeeper
+  // name to a profile. Shares the key `/goalkeepers` and every profile page
+  // already use, so this is a cache read rather than a second fetch.
+  const listPlayersFn = useServerFn(listPlayers);
+  const { data: rosterRows } = useQuery({
+    queryKey: ["players", "roster"],
+    queryFn: () => listPlayersFn(),
+    enabled: Boolean(user),
+    staleTime: 5 * 60_000,
+  });
+
+  // Duty of Care comes from `public.player_duty_of_care` — the `duty_of_care_at()`
+  // projection — so this headline, the roster chips and each profile badge are
+  // three views of one answer. It used to be recomputed here from logged
+  // interactions keyed by legacy slug, which quietly undercounted: the card
+  // said 10 while the roster said 15.
+  const dutyListFn = useServerFn(listPlayerDutyOfCare);
+  const {
+    data: dutyRows,
+    isPending: dutyPending,
+    isError: dutyUnavailable,
+    dataUpdatedAt: dutyFetchedAt,
+  } = useQuery({
+    queryKey: ["duty-of-care", "roster"],
+    queryFn: () => dutyListFn(),
+    enabled: Boolean(user && user.role !== "mentor"),
+    staleTime: 60_000,
+  });
+
   // Upcoming Events reads the shared team calendar (same cache as /calendar).
   const fetchCalendarEvents = useServerFn(listCalendarEvents);
   const {
     data: teamEvents,
     isPending: calendarPending,
     isError: calendarError,
+    dataUpdatedAt: calendarFetchedAt,
   } = useQuery({
     queryKey: ["calendar-events"],
     queryFn: () => fetchCalendarEvents(),
@@ -154,31 +192,34 @@ function Dashboard() {
     data: loggedInteractions,
     isPending: interactionsPending,
     isError: interactionsError,
+    dataUpdatedAt: interactionsFetchedAt,
   } = useLoggedInteractions(Boolean(user) && user?.role !== "mentor");
-  const dutySource = useMemo(
-    () =>
-      (loggedInteractions ?? []).map((i) => ({
-        gkId: i.gkSlug,
-        type: i.interactionType,
-        date: i.occurredAt,
-      })),
-    [loggedInteractions],
-  );
-
   // Show only durable interactions here; sample activity must never be mixed
   // into a live operational dashboard.
   const recentActivity = useMemo(
     () =>
       (loggedInteractions ?? [])
-        .map((i) => ({
-          id: `interaction-${i.id}`,
-          actor: i.mentorName || "Mentor",
-          actorInitials: initialsOf(i.mentorName || "Mentor"),
-          action: `logged a ${i.interactionType.toLowerCase()} with`,
-          target: i.goalkeeperName,
-          gkId: i.gkSlug,
-          date: i.occurredAt,
-        }))
+        .map((i) => {
+          const name = (i.mentorName ?? "").trim();
+          // An email address is not a display name. When a profile carries no
+          // name, say so plainly rather than rendering the word "Mentor", or a
+          // login address, in the styling a real person's name gets.
+          const named = name.length > 0 && !name.includes("@");
+          return {
+            id: `interaction-${i.id}`,
+            actor: named ? name : "A mentor",
+            actorNamed: named,
+            actorInitials: named ? initialsOf(name) : "?",
+            action: `logged a ${i.interactionType.toLowerCase()} with`,
+            target: i.goalkeeperName,
+            gkId: i.gkSlug,
+            // Ordered and stamped by when it was LOGGED, which is what this
+            // panel is titled. Ordering by when the interaction happened meant
+            // a catch-up entered this morning about last week could be pushed
+            // off the list on the very day it was entered.
+            date: i.createdAt || i.occurredAt,
+          };
+        })
         .sort((a, b) => +new Date(b.date) - +new Date(a.date))
         .slice(0, 8),
     [loggedInteractions],
@@ -192,26 +233,141 @@ function Dashboard() {
   }
 
   const canViewSystemAlerts = can("alerts.view");
-  const dutyOverview = computeDutyOverview(dutySource);
+  const dutyOverview = countDutyRows(dutyRows);
+  // The five duty bands are mutually exclusive and cover the whole roster, so
+  // this is a distribution and has to total 100%. Rounding each band on its own
+  // does not: 116 goalkeepers split 39/32/15/28/2 round to
+  // 34 + 28 + 13 + 24 + 2 = 101%. Largest remainder, same as the Goalkeeper
+  // Distribution panel, so the column totals what a distribution claims.
+  const dutyBandCounts = [
+    dutyOverview.up_to_date,
+    dutyOverview.due_soon,
+    dutyOverview.overdue,
+    dutyOverview.not_required,
+    dutyOverview.not_enough_data,
+  ];
+  const dutyBandPercents = wholePercentsSummingTo100(dutyBandCounts);
+  const dutyBands = (
+    [
+      {
+        level: "up_to_date",
+        label: "Up to date",
+        hint: "On cadence for tier",
+        bar: "bg-success",
+        value: "text-success",
+      },
+      {
+        level: "due_soon",
+        label: "Due soon",
+        hint: "Approaching cadence",
+        bar: "bg-warning",
+        value: "text-warning",
+      },
+      {
+        level: "overdue",
+        label: "Overdue",
+        hint: "Past required cadence",
+        bar: "bg-warning",
+        value: "text-warning",
+      },
+      {
+        level: "not_required",
+        label: "Not required",
+        // Not only Tier 4: goalkeepers with no tier recorded land here too, and
+        // "Tier 4" told a manager they had no formal duty for someone who is
+        // simply untiered — which this same page flags for assignment. Verified
+        // against live data: 15 Tier 4 plus 2 with no tier.
+        hint: "Tier 4 or no tier recorded",
+        bar: "bg-muted-foreground/50",
+        value: "text-foreground",
+      },
+      {
+        level: "not_enough_data",
+        label: "Never contacted",
+        // Not a missing tier — an untiered goalkeeper is counted as "Not
+        // required" above. Verified against live data: every goalkeeper in this
+        // band holds Tier 1 or Tier 2 and none has any qualifying contact on
+        // record. That is a gap to close, not an absence of information.
+        hint: "Tiered, no qualifying contact recorded",
+        bar: "bg-muted-foreground/50",
+        value: "text-foreground",
+      },
+    ] as const
+  ).map((band, index) => ({
+    ...band,
+    count: dutyBandCounts[index],
+    pct: dutyBandPercents[index],
+    // A band with someone in it always draws something. One of 116 is 1% of
+    // the track, which is no visible pixels at all.
+    barWidth: dutyBandCounts[index] === 0 ? 0 : Math.max(MIN_VISIBLE_BAR, dutyBandPercents[index]),
+  }));
 
   // Upcoming interactions come from the shared team calendar only. There is
   // no sample/placeholder fallback — an empty schedule shows an empty state.
-  const todayIso = new Date().toISOString().slice(0, 10);
-  const upcoming = (teamEvents ?? [])
+  // Local calendar date, not `toISOString()`. The ISO form is UTC, so between
+  // midnight and 01:00 BST it still reads as yesterday and today's fixtures
+  // reappear in this list under a "Yesterday" label — worse still for a viewer
+  // in a timezone behind UTC.
+  const todayIso = localDateIso(new Date());
+  const upcomingAll = (teamEvents ?? [])
     .filter((e) => e.event_date >= todayIso && e.status !== "cancelled")
-    .sort((a, b) => a.event_date.localeCompare(b.event_date))
-    .slice(0, 6);
+    .sort(
+      (a, b) =>
+        a.event_date.localeCompare(b.event_date) ||
+        (a.start_time ?? "").localeCompare(b.start_time ?? ""),
+    );
+  const UPCOMING_SHOWN = 6;
+  const upcoming = upcomingAll.slice(0, UPCOMING_SHOWN);
+
+  /**
+   * When this screen's figures were last read from the database.
+   *
+   * Every panel's fetch time is included, so the label is bounded by the most
+   * stale of them. The outbound sync queue is deliberately not consulted: it
+   * measures whether this device has finished uploading its own work, which
+   * says nothing about whether the numbers here are current.
+   */
+  const freshness = describeDataFreshness({
+    fetchedAt: [
+      reportsFetchedAt,
+      overviewFetchedAt,
+      rosterFetchedAt,
+      dutyFetchedAt,
+      calendarFetchedAt,
+      interactionsFetchedAt,
+    ],
+    anyError:
+      reportsError ||
+      overviewError ||
+      rosterError ||
+      dutyUnavailable ||
+      calendarError ||
+      interactionsError,
+    reportsSyncedAt: overview?.reportsSyncedAt ?? null,
+  });
 
   const greeting = `Good ${new Date().getHours() < 12 ? "morning" : new Date().getHours() < 18 ? "afternoon" : "evening"}, ${user.name.split(" ")[0]}`;
 
   return (
-    <div className="space-y-4">
+    // `pt-2` is the half-line of air the header was missing: the greeting sat
+    // hard against the app bar above it.
+    <div className="space-y-4 pt-2">
       <PageHeader
         title={greeting}
         titleClassName="break-words text-2xl leading-tight min-[390px]:text-[1.625rem] sm:text-3xl"
         description={`${ROLE_LABEL[user.role]} view · overview of goalkeeper coverage and outstanding actions.`}
         action={
           <div className="grid w-full grid-cols-1 gap-2 min-[390px]:grid-cols-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center">
+            {/* Two different questions, so two indicators:
+                  - freshness: are the figures on this page current?
+                  - SyncStatusChip: has MY unsent work finished uploading?
+                The chip used to answer the second while being read as the
+                first, falling back to a hardcoded "Up to date" whenever the
+                queue was empty — which is its normal state. */}
+            <DataFreshnessChip
+              freshness={freshness}
+              className="w-fit justify-self-start whitespace-nowrap min-[390px]:col-span-2 sm:col-auto"
+            />
             <SyncStatusChip className="w-fit justify-self-start whitespace-nowrap min-[390px]:col-span-2 sm:col-auto" />
             {can("reports.submit") && (
               <button
@@ -239,9 +395,9 @@ function Dashboard() {
       <div className="grid grid-cols-1 gap-3 min-[390px]:grid-cols-2 sm:gap-4 md:grid-cols-3 lg:grid-cols-5 [&>a]:h-full [&>a]:min-w-0 [&>a>div]:h-full">
         <Link
           to="/goalkeepers"
-          className="block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-          aria-label="View all goalkeepers"
+          className="group block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
         >
+          <span className="sr-only">View all goalkeepers: </span>
           <StatCard
             label="Total Goalkeepers"
             value={overviewError ? "—" : (overview?.totalGoalkeepers ?? "…")}
@@ -252,9 +408,9 @@ function Dashboard() {
           to="/insights/$metric"
           params={{ metric: "interactions" }}
           search={{ from: period.fromDate, to: period.toDate, level: "", tier: "" }}
-          className="block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-info"
-          aria-label="Break down interactions logged"
+          className="group block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-info"
         >
+          <span className="sr-only">Break down: </span>
           <StatCard
             label="Interactions Logged"
             value={overviewError ? "—" : (overview?.interactionsInPeriod ?? "…")}
@@ -271,18 +427,24 @@ function Dashboard() {
           to="/insights/$metric"
           params={{ metric: "duty" }}
           search={{ from: period.fromDate, to: period.toDate, level: "overdue", tier: "" }}
-          className="block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-warning"
-          aria-label="Break down duty of care cadence"
+          className="group block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-warning"
         >
+          <span className="sr-only">Break down: </span>
           <StatCard
             label="Duty of Care"
-            value={interactionsPending ? "…" : interactionsError ? "—" : dutyOverview.overdue}
+            value={dutyPending ? "…" : dutyUnavailable ? "—" : dutyOverview.overdue}
             hint={
-              interactionsError
-                ? "Count unavailable"
-                : dutyOverview.overdue > 0
-                  ? "Players past required cadence"
-                  : "Nothing overdue on the reference roster"
+              // "Nothing overdue" is an all-clear on a safeguarding metric, so
+              // it must never appear before the roster has actually been read.
+              // While loading the count is 0, which fell straight through to
+              // that reassurance.
+              dutyPending
+                ? "Checking the roster…"
+                : dutyUnavailable
+                  ? "Count unavailable"
+                  : dutyOverview.overdue > 0
+                    ? `Goalkeepers past required cadence · of ${dutyOverview.total}`
+                    : "Nothing overdue"
             }
             accent="warning"
             emptyMessage="Nothing overdue"
@@ -292,9 +454,9 @@ function Dashboard() {
           to="/insights/$metric"
           params={{ metric: "reports" }}
           search={{ from: period.fromDate, to: period.toDate, level: "", tier: "" }}
-          className="block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-          aria-label="Break down match reports by match date"
+          className="group block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
         >
+          <span className="sr-only">Break down: </span>
           <StatCard
             label="Match Reports"
             value={
@@ -313,9 +475,9 @@ function Dashboard() {
           to="/insights/$metric"
           params={{ metric: "mentors" }}
           search={{ from: period.fromDate, to: period.toDate, level: "", tier: "" }}
-          className="block min-[390px]:col-span-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary md:col-span-1"
-          aria-label="Break down active mentors"
+          className="group block min-[390px]:col-span-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary md:col-span-1"
         >
+          <span className="sr-only">Break down: </span>
           <StatCard
             label="Active Mentors"
             value={overviewError ? "—" : (overview?.activeMentors ?? "…")}
@@ -329,19 +491,11 @@ function Dashboard() {
       {/* Operational grid */}
       <div className="grid grid-cols-12 gap-4">
         {/* Duty of Care monitor */}
-        <div className="col-span-12 self-start command-panel p-4 sm:p-5 lg:col-span-8">
+        <div className="col-span-12 self-start command-panel p-4 sm:p-5 lg:col-span-4">
           <SectionTitle
             className="flex-col items-start gap-2 sm:flex-row sm:items-center sm:gap-3"
             action={
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] font-mono uppercase tracking-[0.12em] text-muted-foreground">
-                <span className="inline-flex items-center gap-1.5">
-                  <span className="size-1.5 rounded-full bg-success shadow-[0_0_6px_var(--success)]" />
-                  Nominal
-                </span>
-                <span className="inline-flex items-center gap-1.5">
-                  <span className="size-1.5 rounded-full bg-warning shadow-[0_0_6px_var(--warning)]" />
-                  Warning
-                </span>
                 <Link
                   to="/goalkeepers"
                   className="text-primary inline-flex items-center gap-1 normal-case tracking-normal"
@@ -351,197 +505,73 @@ function Dashboard() {
               </div>
             }
           >
-            Duty of Care Monitor · Reference
+            Duty of Care
           </SectionTitle>
+          {/* The title said "· Reference" and the subtitle described the
+              client-side calculation that combined a seed roster with logged
+              interactions. That calculation was removed when this moved to
+              `public.player_duty_of_care`; the wording stayed behind, telling
+              a manager to distrust the one canonical number on the page. */}
           <p className="mb-4 text-xs leading-relaxed text-muted-foreground">
-            Reference tier roster combined with live logged interactions.
+            {dutyPending || dutyUnavailable
+              ? "Live cadence status from the goalkeeper roster."
+              : `Live cadence status for all ${dutyOverview.total} goalkeepers. Percentages are of that roster.`}
           </p>
-          {interactionsPending ? (
+          {/* Gated on the duty read, which is where every number below comes
+              from. Gating on the interactions read instead drew five bands of
+              "0" while the card above this one still said "…". */}
+          {dutyPending ? (
             <p className="text-sm text-muted-foreground">Loading duty-of-care figures…</p>
-          ) : interactionsError ? (
+          ) : dutyUnavailable ? (
             <p className="text-sm text-muted-foreground">Duty-of-care figures didn't load.</p>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-5">
-              {(
-                [
-                  {
-                    level: "up_to_date",
-                    label: "Up to date",
-                    count: dutyOverview.up_to_date,
-                    hint: "On cadence for tier",
-                    bar: "bg-success",
-                    value: "text-success",
-                  },
-                  {
-                    level: "due_soon",
-                    label: "Due soon",
-                    count: dutyOverview.due_soon,
-                    hint: "Approaching cadence",
-                    bar: "bg-warning",
-                    value: "text-warning",
-                  },
-                  {
-                    level: "overdue",
-                    label: "Overdue",
-                    count: dutyOverview.overdue,
-                    hint: "Past required cadence",
-                    bar: "bg-warning",
-                    value: "text-warning",
-                  },
-                  {
-                    level: "not_required",
-                    label: "Not required",
-                    count: dutyOverview.not_required,
-                    hint: "Tier 4 — no formal duty",
-                    bar: "bg-muted-foreground/50",
-                    value: "text-foreground",
-                  },
-                  {
-                    level: "not_enough_data",
-                    label: "Not enough data",
-                    count: dutyOverview.not_enough_data,
-                    hint: "Missing tier or interactions",
-                    bar: "bg-muted-foreground/50",
-                    value: "text-foreground",
-                  },
-                ] as const
-              ).map((b) => {
-                const pct = Math.round((b.count / Math.max(1, dutyOverview.total)) * 100);
-                return (
-                  <Link
-                    key={b.level}
-                    to="/insights/$metric"
-                    params={{ metric: "duty" }}
-                    search={{ from: period.fromDate, to: period.toDate, level: b.level, tier: "" }}
-                    aria-label={`View goalkeepers: ${b.label}`}
-                    className="space-y-2 block -mx-2 px-2 py-1 hover:bg-accent/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                  >
-                    <div className="h-1.5 w-full bg-background overflow-hidden">
-                      <div className={`h-full bar-grow ${b.bar}`} style={{ width: `${pct}%` }} />
-                    </div>
-                    <div className="flex items-baseline justify-between font-mono text-xs">
-                      <span className="text-muted-foreground">{b.label}</span>
-                      <span className={`tabular-nums font-bold ${b.value}`}>{b.count}</span>
-                    </div>
-                    <div className="flex items-center justify-between text-[10px] text-muted-foreground/70">
-                      <span>{b.hint}</span>
-                      <span className="font-mono tabular-nums">{pct}%</span>
-                    </div>
-                  </Link>
-                );
-              })}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-x-6 gap-y-4">
+              {dutyBands.map((b) => (
+                <Link
+                  key={b.level}
+                  to="/insights/$metric"
+                  params={{ metric: "duty" }}
+                  search={{ from: period.fromDate, to: period.toDate, level: b.level, tier: "" }}
+                  className="space-y-2 block -mx-2 px-2 py-1 hover:bg-accent/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                >
+                  {/* Named by its own content. An aria-label that paraphrases
+                      the band reads as a different string from the one on
+                      screen, which breaks voice control — the visible words
+                      have to be part of the name. */}
+                  <span className="sr-only">View goalkeepers: </span>
+                  <div className="h-1.5 w-full bg-background overflow-hidden">
+                    <div
+                      className={`h-full bar-grow ${b.bar}`}
+                      style={{ width: `${b.barWidth}%` }}
+                    />
+                  </div>
+                  <div className="flex items-baseline justify-between font-mono text-xs">
+                    <span className="text-muted-foreground">{b.label}</span>
+                    <span className={`tabular-nums font-bold ${b.value}`}>{b.count}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-[10px] text-muted-foreground">
+                    <span>{b.hint}</span>
+                    <span className="font-mono tabular-nums">{b.pct}%</span>
+                  </div>
+                </Link>
+              ))}
             </div>
           )}
         </div>
 
-        {/* Roster categories */}
-        <div className="col-span-12 self-start command-panel p-4 lg:col-span-4">
-          <SectionTitle
-            action={
-              rosterError ? null : (
-                <span className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
-                  {rosterPending ? "…" : `${roster?.total ?? 0} on roster`}
-                </span>
-              )
-            }
-          >
-            Roster Snapshot
-          </SectionTitle>
+        <GoalkeeperDistribution roster={roster} pending={rosterPending} error={rosterError} />
 
-          {rosterError ? (
-            <p className="mt-3 text-xs text-muted-foreground" role="status">
-              Roster snapshot didn't load. Refresh the page to try again.
-            </p>
-          ) : (
-            <>
-              <section className="mt-3" aria-labelledby="duty-tier-categories">
-                <h3
-                  id="duty-tier-categories"
-                  className="mb-2 text-[10px] font-mono uppercase tracking-[0.14em] text-muted-foreground"
-                >
-                  Care cadence tiers
-                </h3>
-                <div className="grid grid-cols-2 gap-2" aria-busy={rosterPending}>
-                  {(
-                    roster?.tiers ?? ROSTER_TIER_LABELS.map((label) => ({ label, count: null }))
-                  ).map(({ label, count }) => (
-                    <Link
-                      key={label}
-                      to="/goalkeepers"
-                      search={{ tiers: label }}
-                      aria-label={
-                        count == null
-                          ? `View ${label} goalkeepers`
-                          : `View ${count} ${label} goalkeepers`
-                      }
-                      className="group flex min-h-12 items-center gap-2 rounded-md border border-border bg-background/40 px-2.5 py-2 hover:border-primary/50 hover:bg-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                    >
-                      <TierBadge tier={label} />
-                      <span className="ml-auto font-mono text-lg font-bold tabular-nums text-foreground">
-                        {count ?? "…"}
-                      </span>
-                      <ArrowUpRight className="size-3 shrink-0 text-muted-foreground transition-colors group-hover:text-primary" />
-                    </Link>
-                  ))}
-                </div>
-              </section>
-
-              <section
-                className="mt-4 border-t border-border pt-3"
-                aria-labelledby="player-status-categories"
-              >
-                <h3
-                  id="player-status-categories"
-                  className="mb-2 text-[10px] font-mono uppercase tracking-[0.14em] text-muted-foreground"
-                >
-                  Status groups
-                </h3>
-                <div className="grid grid-cols-2 gap-2" aria-busy={rosterPending}>
-                  {(
-                    roster?.statuses ??
-                    ROSTER_STATUS_LABELS.map((label) => ({ label, count: null }))
-                  ).map(({ label, count }) => (
-                    <Link
-                      key={label}
-                      to="/goalkeepers"
-                      search={{ cat: label === "Free Agent" ? "Free Agents" : label }}
-                      aria-label={
-                        count == null
-                          ? `View ${label} goalkeepers`
-                          : `View ${count} ${label} goalkeepers`
-                      }
-                      className="group flex min-h-12 items-center gap-2 rounded-md border border-border bg-background/40 px-2.5 py-2 hover:border-primary/50 hover:bg-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                    >
-                      <TierBadge tier={label} />
-                      <span className="ml-auto font-mono text-lg font-bold tabular-nums text-foreground">
-                        {count ?? "…"}
-                      </span>
-                      <ArrowUpRight className="size-3 shrink-0 text-muted-foreground transition-colors group-hover:text-primary" />
-                    </Link>
-                  ))}
-                </div>
-              </section>
-
-              {roster && roster.unassigned > 0 ? (
-                <Link
-                  to="/insights/$metric"
-                  params={{ metric: "goalkeepers" }}
-                  search={{
-                    from: period.fromDate,
-                    to: period.toDate,
-                    level: "",
-                    tier: NO_TIER_LABEL,
-                  }}
-                  className="mt-3 flex items-center gap-1 border-t border-border pt-3 text-[10px] text-warning hover:underline"
-                >
-                  {roster.unassigned} goalkeeper{roster.unassigned === 1 ? "" : "s"} have no tier
-                  recorded — assign one
-                  <ArrowUpRight className="size-3 shrink-0" />
-                </Link>
-              ) : null}
-            </>
-          )}
-        </div>
+        {/* Month calendar. Reads the same `["calendar-events"]` cache as the
+            Upcoming Events panel beside it, so the two cannot disagree and the
+            card costs no extra request. */}
+        <CalendarMonthCard
+          className="col-span-12 self-start lg:col-span-4"
+          events={teamEvents}
+          interactions={loggedInteractions}
+          pending={calendarPending}
+          error={calendarError}
+          today={todayIso}
+        />
 
         {/* Upcoming interactions */}
         <div className="col-span-12 lg:col-span-4 command-panel p-5">
@@ -570,14 +600,22 @@ function Dashboard() {
           >
             Upcoming Events
           </SectionTitle>
+          {/* An undisclosed cap on a list like this reads as "there are only
+              six". Live data regularly has several times that in the next week
+              alone, so the count says what is being withheld. */}
+          {!calendarPending && !calendarError && upcomingAll.length > upcoming.length ? (
+            <p className="-mt-2 mb-2 text-[10px] text-muted-foreground">
+              Showing the next {upcoming.length} of {upcomingAll.length} scheduled.
+            </p>
+          ) : null}
           <div className="divide-y divide-border">
             {calendarPending ? (
-              <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground/70 py-6 text-center">
+              <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground py-6 text-center">
                 Loading calendar…
               </div>
             ) : calendarError ? (
               <div className="space-y-2 py-6 text-center">
-                <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground/70">
+                <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
                   Calendar didn't load
                 </div>
                 <Link
@@ -590,7 +628,7 @@ function Dashboard() {
               </div>
             ) : upcoming.length === 0 ? (
               <div className="space-y-2 py-6 text-center">
-                <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground/70">
+                <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
                   Nothing scheduled
                 </div>
                 <p className="text-[11px] text-muted-foreground px-2">
@@ -616,11 +654,12 @@ function Dashboard() {
               </div>
             ) : (
               upcoming.map((e) => {
+                // Resolved against the live roster, so an event for a
+                // goalkeeper signed since the seed was captured still links to
+                // their profile and still shows their real tier.
                 const gk = e.goalkeeper_name
-                  ? goalkeepers.find(
-                      (g) => g.name.toLowerCase() === e.goalkeeper_name!.toLowerCase(),
-                    )
-                  : undefined;
+                  ? goalkeeperByName(e.goalkeeper_name, rosterRows)
+                  : null;
                 const content = (
                   <>
                     <div className="flex-1 min-w-0">
@@ -638,7 +677,7 @@ function Dashboard() {
                         {e.location ? ` · ${e.location}` : ""}
                       </div>
                     </div>
-                    <CalendarClock className="size-3.5 text-muted-foreground/60 shrink-0" />
+                    <CalendarClock className="size-3.5 text-muted-foreground shrink-0" />
                   </>
                 );
                 return gk ? (
@@ -706,27 +745,35 @@ function Dashboard() {
             </SectionTitle>
             <div className="space-y-3">
               {interactionsPending ? (
-                <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground/70 py-6 text-center">
+                <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground py-6 text-center">
                   Loading interactions…
                 </div>
               ) : interactionsError ? (
-                <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground/70 py-6 text-center">
+                <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground py-6 text-center">
                   Interactions didn't load
                 </div>
               ) : recentActivity.length === 0 ? (
-                <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground/70 py-6 text-center">
+                <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground py-6 text-center">
                   No interactions logged recently
                 </div>
               ) : (
                 recentActivity.map((a) => (
                   <div key={a.id} className="flex items-start gap-3 text-xs">
-                    <div className="w-0.5 self-stretch min-h-8 bg-primary shrink-0" />
+                    <div className="w-0.5 self-stretch min-h-8 bg-info shrink-0" />
                     <div className="flex-1 min-w-0">
                       <p className="text-muted-foreground leading-snug">
-                        <span className="text-foreground font-semibold">{a.actor}</span> {a.action}{" "}
-                        <span className="text-foreground font-semibold">{a.target}</span>
+                        <span
+                          className={
+                            a.actorNamed
+                              ? "text-foreground font-semibold"
+                              : "italic text-muted-foreground"
+                          }
+                        >
+                          {a.actor}
+                        </span>{" "}
+                        {a.action} <span className="text-foreground font-semibold">{a.target}</span>
                       </p>
-                      <span className="text-[10px] text-muted-foreground/70 font-mono">
+                      <span className="text-[10px] text-muted-foreground font-mono">
                         {formatRelative(a.date)}
                       </span>
                     </div>
@@ -756,7 +803,7 @@ function Dashboard() {
             </SectionTitle>
             <div className="space-y-2">
               {alerts.length === 0 ? (
-                <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground/70 py-6 text-center">
+                <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground py-6 text-center">
                   Live alert feed not connected
                 </div>
               ) : (

@@ -1,18 +1,23 @@
 import { useEffect, useState } from "react";
-import { Check, CloudUpload, RefreshCw, AlertTriangle, WifiOff } from "lucide-react";
+import { RefreshCw, AlertTriangle, WifiOff } from "lucide-react";
 import { getLastSyncedAt, listJobs, subscribe, type SyncJob } from "@/lib/sync/queue";
 
 /**
- * Compact sync-state chip. Reflects, in order of priority:
- *   Offline → Syncing → Queued (n) → Failed → Synced <time> ago → Up to date
- * Meant for page headers and status bars.
+ * Compact state of THIS DEVICE'S OUTBOUND WRITE QUEUE — work created here that
+ * has not reached the server yet. In priority order:
+ *   Offline → Uploading → Retrying → Uploaded <time> ago → No unsent changes
+ *
+ * It is NOT a data-freshness indicator and must not be read as one. The value
+ * behind it is written only when a queued job drains (`setLastSyncedAt` in
+ * `@/lib/sync/queue`), so it stays empty for every user who has never
+ * submitted while offline, and a value here says nothing about when the
+ * figures on the page were last read. For that, use `DataFreshnessChip`, which
+ * is driven by the page's own query fetch times.
  */
 export function SyncStatusChip({ className = "" }: { className?: string }) {
   const [jobs, setJobs] = useState<SyncJob[]>([]);
   const [lastSynced, setLastSynced] = useState<number | null>(null);
-  const [online, setOnline] = useState(
-    typeof navigator === "undefined" ? true : navigator.onLine,
-  );
+  const [online, setOnline] = useState(typeof navigator === "undefined" ? true : navigator.onLine);
   const [, forceTick] = useState(0);
 
   useEffect(() => {
@@ -40,11 +45,11 @@ export function SyncStatusChip({ className = "" }: { className?: string }) {
   const pending = jobs.length;
 
   let label: string;
-  let Icon = Check;
+  let Icon = WifiOff;
   let tone = "border-border/60 bg-muted/40 text-muted-foreground";
 
   if (!online && pending > 0) {
-    label = `Offline · ${pending} queued`;
+    label = `Offline · ${pending} unsent`;
     Icon = WifiOff;
     tone = "border-amber-500/40 bg-amber-500/10 text-amber-200";
   } else if (!online) {
@@ -52,20 +57,21 @@ export function SyncStatusChip({ className = "" }: { className?: string }) {
     Icon = WifiOff;
     tone = "border-amber-500/40 bg-amber-500/10 text-amber-200";
   } else if (pending > 0 && anyFailed) {
-    label = `Retrying · ${pending} queued`;
+    label = `Retrying · ${pending} unsent`;
     Icon = AlertTriangle;
     tone = "border-amber-500/40 bg-amber-500/10 text-amber-200";
   } else if (pending > 0) {
-    label = `Syncing · ${pending} queued`;
+    label = `Uploading · ${pending} unsent`;
     Icon = RefreshCw;
     tone = "border-sky-500/40 bg-sky-500/10 text-sky-200";
-  } else if (lastSynced) {
-    label = `Synced ${formatAgo(lastSynced)}`;
-    Icon = Check;
-    tone = "border-emerald-500/40 bg-emerald-500/10 text-emerald-200";
   } else {
-    label = "Up to date";
-    Icon = CloudUpload;
+    // Online with an empty queue is the normal state for almost everyone, and
+    // it is not news: there is nothing for the reader to do about it and no
+    // number it explains. Saying so anyway put a permanent chip in the header
+    // that people read as a status for the figures on the page — which it is
+    // not. It renders nothing, and reappears the moment there is something
+    // genuinely unsent.
+    return null;
   }
 
   const spinning = pending > 0 && !anyFailed && online;
@@ -74,7 +80,11 @@ export function SyncStatusChip({ className = "" }: { className?: string }) {
     <span
       role="status"
       aria-live="polite"
-      title={lastSynced ? `Last successful sync: ${new Date(lastSynced).toLocaleString()}` : undefined}
+      title={
+        lastSynced
+          ? `Last upload from this device: ${new Date(lastSynced).toLocaleString()}`
+          : "Nothing created on this device is waiting to upload."
+      }
       className={`inline-flex items-center gap-1.5 h-6 px-2 rounded border text-[10px] uppercase tracking-[0.08em] font-semibold ${tone} ${className}`}
     >
       <Icon className={`size-3 ${spinning ? "animate-spin" : ""}`} />

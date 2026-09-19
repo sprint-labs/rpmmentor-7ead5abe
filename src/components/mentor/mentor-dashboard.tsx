@@ -381,7 +381,7 @@ export function MentorDashboard({ user }: Props) {
                           {item.gkClub}
                         </div>
                       )}
-                      <div className="text-[10px] text-muted-foreground/80 mt-0.5 font-mono tabular-nums">
+                      <div className="text-[10px] text-muted-foreground mt-0.5 font-mono tabular-nums">
                         Observed {formatEventDateTime(item.observationDate)} · Due{" "}
                         {formatEventDateTime(item.dueDate)} ·{" "}
                         {item.actionableByRole === "self"
@@ -618,7 +618,7 @@ export function MentorDashboard({ user }: Props) {
                     <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                       {label}
                     </h3>
-                    <span className="text-[10px] tabular-nums text-muted-foreground/70">
+                    <span className="text-[10px] tabular-nums text-muted-foreground">
                       {list.length}
                     </span>
                   </div>

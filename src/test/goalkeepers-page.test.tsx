@@ -71,11 +71,89 @@ vi.mock("sonner", () => ({ toast: vi.fn() }));
 
 vi.mock("@/lib/match-reports/reports.functions", () => ({ listMatchReports: vi.fn() }));
 
+const { listPlayerDutyOfCareMock, listPlayersMock, DUTY_ROWS, PLAYER_ROWS } = vi.hoisted(() => ({
+  listPlayerDutyOfCareMock: vi.fn(),
+  listPlayersMock: vi.fn(),
+  // The roster is a database read now, so these cases need rows to render.
+  // A handful is enough: they are about layout, search and the filter chips.
+  PLAYER_ROWS: [
+    {
+      id: "00000000-0000-4000-8000-000000000001",
+      full_name: "James Beadle",
+      current_club: "Birmingham City",
+      parent_club: "Brighton & Hove Albion",
+      on_loan: true,
+      league: "EFL Championship",
+      nationality: "England",
+      instagram_url: null,
+      contract_until: "June 2028",
+      tier: "Tier 1",
+      is_academy: false,
+      is_free_agent: false,
+    },
+    {
+      id: "00000000-0000-4000-8000-000000000002",
+      full_name: "Max Crocombe",
+      current_club: "Millwall",
+      parent_club: null,
+      on_loan: false,
+      league: "EFL Championship",
+      nationality: "New Zealand",
+      instagram_url: null,
+      contract_until: "June 2027",
+      tier: "Tier 1",
+      is_academy: false,
+      is_free_agent: false,
+    },
+    {
+      id: "00000000-0000-4000-8000-000000000003",
+      full_name: "Toby Bell",
+      current_club: "Chelsea",
+      parent_club: "Chelsea",
+      on_loan: false,
+      league: "Premier League",
+      nationality: "England",
+      instagram_url: null,
+      contract_until: "June 2027",
+      // Tiered AND Academy: the pairing the old single column could not hold.
+      tier: "Tier 1",
+      is_academy: true,
+      is_free_agent: false,
+    },
+  ],
+  // Empty on purpose: these cases are about the page's layout and filters, and
+  // an empty view keeps every duty label confined to the filter chips, which is
+  // exactly what the first case asserts. The mapping itself is covered by
+  // src/lib/duty-of-care-roster.test.ts.
+  DUTY_ROWS: [] as unknown[],
+}));
+vi.mock("@/lib/duty-of-care.functions", () => ({
+  listPlayerDutyOfCare: listPlayerDutyOfCareMock,
+}));
+vi.mock("@/lib/players.functions", () => ({ listPlayers: listPlayersMock }));
+
+// The page calls more than one server function and they answer with different
+// shapes, so the stub dispatches on which one it was handed rather than giving
+// everything the match-reports envelope.
 vi.mock("@tanstack/react-start", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@tanstack/react-start")>();
   return {
     ...actual,
-    useServerFn: () => vi.fn().mockResolvedValue({ reports: [] }),
+    useServerFn: (fn: unknown) =>
+      fn === listPlayerDutyOfCareMock
+        ? vi.fn().mockResolvedValue(DUTY_ROWS)
+        : fn === listPlayersMock
+          ? // The roster deliberately lands AFTER duty of care, which is the
+            // order production sees. Anything derived from the roster has to
+            // recompute on its arrival; resolving both together would let a
+            // memo with a missing roster dependency pass by luck.
+            vi.fn().mockImplementation(
+              () =>
+                new Promise((resolve) => {
+                  setTimeout(() => resolve(PLAYER_ROWS), 20);
+                }),
+            )
+          : vi.fn().mockResolvedValue({ reports: [] }),
   };
 });
 
@@ -168,6 +246,50 @@ describe("Goalkeepers page", () => {
     60_000,
   );
 
+  it("counts the duty chips over the roster once it has loaded", async () => {
+    // The roster used to be a module constant, so the memo that counts these
+    // chips was written without it in its dependency list. When the roster
+    // became a database read that starts empty, every chip rendered 0 beside a
+    // full list of results — a number the page contradicted on the same screen.
+    //
+    // This asserts the behaviour, not the cause: `useMemo` is a performance
+    // hint that React may recompute anyway, so no component test can force the
+    // stale-cache condition reliably. The dependency array is what makes it
+    // correct; this is here to catch a chip that stops counting the roster for
+    // any reason.
+    await renderGoalkeepers();
+
+    await waitFor(() => {
+      expect(screen.getAllByText("3 results").length).toBeGreaterThan(0);
+    });
+
+    // The chip reads as its label followed by its count, e.g. "All3".
+    const chipTexts = screen
+      .getAllByRole("button")
+      .map((button) => button.textContent ?? "")
+      .filter((text) => /^All\s*\d+$/.test(text));
+
+    expect(chipTexts.length).toBeGreaterThan(0);
+    for (const text of chipTexts) {
+      expect(text).toBe(`All${PLAYER_ROWS.length}`);
+    }
+  });
+
+  it("fills the advanced filter dropdowns from the loaded roster", async () => {
+    // Same class of bug: these options were derived once, from an empty roster.
+    await renderGoalkeepers();
+
+    await waitFor(() => {
+      expect(screen.getAllByText("3 results").length).toBeGreaterThan(0);
+    });
+
+    // Every league the fixture rows carry should be offerable as an option.
+    const leagues = new Set(PLAYER_ROWS.map((row) => row.league));
+    for (const league of leagues) {
+      expect(screen.getAllByText(league).length).toBeGreaterThan(0);
+    }
+  });
+
   it("keeps search visible and updates the URL-backed result query", async () => {
     const { router } = await renderGoalkeepers();
     const search = screen.getByRole("textbox", { name: "Search goalkeepers" });
@@ -178,6 +300,80 @@ describe("Goalkeepers page", () => {
       expect(router.state.location.search.q).toBe("beadle");
     });
     expect(screen.getAllByText("1 results").length).toBeGreaterThan(0);
+  });
+
+  it("does not navigate once per keystroke", async () => {
+    // `update()` is a router navigation, and calling it per character re-ran
+    // the route, the filter and the sort over the whole roster before the
+    // character appeared — the slowest interaction on the page. The box now
+    // types into local state and the URL catches up.
+    const { router } = await renderGoalkeepers();
+    const search = screen.getByRole("textbox", {
+      name: "Search goalkeepers",
+    }) as HTMLInputElement;
+
+    for (const value of ["b", "be", "bea", "bead", "beadl", "beadle"]) {
+      fireEvent.change(search, { target: { value } });
+    }
+
+    // Responsive immediately, and the URL has not moved yet.
+    expect(search.value).toBe("beadle");
+    expect(router.state.location.search.q).toBe("");
+
+    // It still lands, so a shared or bookmarked link is unaffected.
+    await waitFor(() => {
+      expect(router.state.location.search.q).toBe("beadle");
+    });
+    expect(screen.getAllByText("1 results").length).toBeGreaterThan(0);
+  });
+
+  it("does not navigate once per tick of a rating slider drag", async () => {
+    // The interaction the Vercel toolbar measured at 373ms per event: a range
+    // slider fires `input` continuously while dragged, and each one was a
+    // router navigation that re-filtered and re-sorted the whole roster.
+    const { router } = await renderGoalkeepers();
+    fireEvent.click(screen.getByRole("button", { name: "Filters" }));
+    const drawer = await screen.findByRole("dialog");
+    fireEvent.click(within(drawer).getByRole("button", { name: /Advanced filters/ }));
+    const slider = (await within(drawer).findByLabelText("Minimum rating")) as HTMLInputElement;
+
+    for (const value of ["1.4", "1.9", "2.3", "2.8", "3.2"]) {
+      fireEvent.change(slider, { target: { value } });
+    }
+
+    // The thumb and the readout have already moved; the URL has not.
+    expect(slider.value).toBe("3.2");
+    expect(within(drawer).getAllByText("3.2–5.0").length).toBeGreaterThan(0);
+    expect(router.state.location.search.ratingMin).toBe(1);
+
+    await waitFor(() => {
+      expect(router.state.location.search.ratingMin).toBe(3.2);
+    });
+  });
+
+  it("adopts a query set from outside the box", async () => {
+    // Back/forward and Clear filters move the URL without touching the input,
+    // so the draft has to follow — otherwise the box keeps showing a search
+    // the page is no longer running.
+    const { router } = await renderGoalkeepers();
+    const search = screen.getByRole("textbox", {
+      name: "Search goalkeepers",
+    }) as HTMLInputElement;
+
+    fireEvent.change(search, { target: { value: "beadle" } });
+    await waitFor(() => {
+      expect(router.state.location.search.q).toBe("beadle");
+    });
+
+    await router.navigate({
+      to: "/goalkeepers",
+      search: (prev: Record<string, unknown>) => ({ ...prev, q: "" }),
+      replace: true,
+    });
+
+    await waitFor(() => {
+      expect(search.value).toBe("");
+    });
   });
 
   it("opens and closes mobile Filters while preserving selected tiers", async () => {

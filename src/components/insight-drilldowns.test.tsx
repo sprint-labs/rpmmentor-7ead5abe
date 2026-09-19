@@ -92,6 +92,8 @@ const players: PlayerRosterRow[] = [
     instagram_url: null,
     contract_until: "2027-06-30",
     tier: "Tier 1",
+    is_academy: false,
+    is_free_agent: false,
   },
   {
     id: "22222222-2222-4222-8222-222222222222",
@@ -104,6 +106,8 @@ const players: PlayerRosterRow[] = [
     instagram_url: null,
     contract_until: null,
     tier: null,
+    is_academy: false,
+    is_free_agent: false,
   },
 ];
 

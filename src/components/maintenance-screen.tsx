@@ -1,5 +1,5 @@
 import { Clock3, LogOut, RefreshCw, Wrench } from "lucide-react";
-import { BrandMark } from "@/components/brand-mark";
+import { GkhqMark } from "@/components/gkhq-lockup";
 
 interface MaintenanceScreenProps {
   onSignOut: () => void | Promise<void>;
@@ -26,7 +26,7 @@ export function MaintenanceScreen({ onSignOut, onCheckAgain }: MaintenanceScreen
           className="w-full rounded-2xl border border-border bg-card/90 p-6 shadow-2xl backdrop-blur sm:p-10"
         >
           <div className="flex items-center justify-between gap-4">
-            <BrandMark className="size-12 shrink-0" alt="Mentor Hub" />
+            <GkhqMark className="size-12 shrink-0" alt="Mentor Hub" />
             <div className="inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3 py-1.5 font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-primary">
               <span
                 className="size-2 rounded-full bg-primary motion-safe:animate-pulse"

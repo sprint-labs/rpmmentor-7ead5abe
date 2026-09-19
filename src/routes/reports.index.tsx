@@ -6,7 +6,10 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { PageHeader, Card, Pill, SectionTitle, EmptyState } from "@/components/primitives";
 import { useEffect, useMemo, useState } from "react";
 import { FileText, ChevronRight, RefreshCw, X, FilePlus2, NotebookPen } from "lucide-react";
-import { goalkeepers as roster } from "@/lib/mock-data";
+import { goalkeepers as roster, type Goalkeeper } from "@/lib/mock-data";
+import { listPlayers } from "@/lib/players.functions";
+import { toGoalkeepers } from "@/lib/roster/live-goalkeepers";
+import { normalisePersonName } from "@/lib/goalkeeper-player-link";
 import { useAuth } from "@/lib/auth";
 import { WorkflowDialog, type WorkflowKind } from "@/components/workflows";
 import { withPermission } from "@/components/require-permission";
@@ -29,10 +32,6 @@ const reportsSearchSchema = z.object({
   matchDate: fallback(z.string(), "").default(""),
   opponent: fallback(z.string(), "").default(""),
 });
-
-function normaliseName(s: string): string {
-  return s.trim().toLowerCase().replace(/\s+/g, " ");
-}
 
 function compareMatchDatesNewestFirst(a: string | null, b: string | null): number {
   if (!a && !b) return 0;
@@ -74,6 +73,16 @@ function ReportsPage() {
     queryKey: ["match-reports"],
     queryFn: () => listFn(),
     staleTime: 30_000,
+  });
+
+  // The live roster, for resolving a report's goalkeeper name to a profile.
+  // Shares the key `/goalkeepers` and every profile page already use, so this
+  // is a cache read rather than a second fetch.
+  const listPlayersFn = useServerFn(listPlayers);
+  const { data: rosterRows } = useQuery({
+    queryKey: ["players", "roster"],
+    queryFn: () => listPlayersFn(),
+    staleTime: 5 * 60_000,
   });
 
   const reports: MatchReportRow[] = data?.reports ?? [];
@@ -126,9 +135,9 @@ function ReportsPage() {
   // the selected goalkeeper — matches the logic on the goalkeeper profile.
   const last5Ids = useMemo(() => {
     if (!last5Gk) return null;
-    const target = normaliseName(last5Gk);
+    const target = normalisePersonName(last5Gk);
     const ids = reports
-      .filter((r) => normaliseName(r.goalkeeper) === target)
+      .filter((r) => normalisePersonName(r.goalkeeper) === target)
       .sort((a, b) => compareMatchDatesNewestFirst(a.match_date, b.match_date))
       .slice(0, 5)
       .map((r) => r.report_id);
@@ -150,12 +159,21 @@ function ReportsPage() {
     return list;
   }, [reports, coachFilter, from, to, last5Ids]);
 
-  /** Report goalkeeper names resolved to roster ids so rows can link and prefill. */
+  /**
+   * Report goalkeeper names resolved to roster ids so rows can link and prefill.
+   *
+   * Built from the live roster, so a report filed on a goalkeeper signed since
+   * the seed was captured still links to their profile instead of rendering as
+   * plain text.
+   */
   const rosterByName = useMemo(() => {
-    const m = new Map<string, (typeof roster)[number]>();
-    for (const g of roster) m.set(normaliseName(g.name), g);
+    const m = new Map<string, Goalkeeper>();
+    for (const g of toGoalkeepers(rosterRows)) m.set(normalisePersonName(g.name), g);
+    // Fallback only: while the roster query is in flight, keep the links the
+    // page had before rather than showing none.
+    for (const g of roster) if (!m.has(normalisePersonName(g.name))) m.set(normalisePersonName(g.name), g);
     return m;
-  }, []);
+  }, [rosterRows]);
 
   function openLog(prefill: { gkId?: string; date?: string } = {}) {
     setLogPrefill(prefill);
@@ -339,10 +357,10 @@ function ReportsPage() {
                 <tr key={r.report_id} className="border-b border-border/60 last:border-0 hover:bg-accent/20">
                   <td className="px-4 py-2.5 text-muted-foreground tabular-nums font-mono whitespace-nowrap">{formatDate(r.match_date)}</td>
                   <td className="px-2 font-medium">
-                    {rosterByName.get(normaliseName(r.goalkeeper)) ? (
+                    {rosterByName.get(normalisePersonName(r.goalkeeper)) ? (
                       <Link
                         to="/goalkeepers/$gkId"
-                        params={{ gkId: rosterByName.get(normaliseName(r.goalkeeper))!.id }}
+                        params={{ gkId: rosterByName.get(normalisePersonName(r.goalkeeper))!.id }}
                         className="hover:underline"
                       >
                         {r.goalkeeper}
@@ -362,7 +380,7 @@ function ReportsPage() {
                         <button
                           onClick={() =>
                             openLog({
-                              gkId: rosterByName.get(normaliseName(r.goalkeeper))?.id,
+                              gkId: rosterByName.get(normalisePersonName(r.goalkeeper))?.id,
                               date: r.match_date ?? undefined,
                             })
                           }

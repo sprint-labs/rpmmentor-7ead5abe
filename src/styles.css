@@ -2,13 +2,37 @@
 @source "../src";
 @import "tw-animate-css";
 
-@custom-variant dark (&:is(.dark *));
+@custom-variant dark (&:is(.dark *, [data-theme="dark"] *));
+
+/* ═══ GKHQ DESIGN SYSTEM ═══
+   Ported from the GKHQ Scouting Hub token set so RPM's two products read as
+   one family. Carbon dark is the product default; light serves daylight work;
+   print serves dossiers, match reports and PDFs.
+
+     dark  → .dark or [data-theme="dark"] on <html>   (default — see src/lib/theme.tsx)
+     light → :root with no .dark class, or [data-theme="light"]
+     print → [data-theme="print"], and automatically inside @media print
+
+   TWO COLOUR FAMILIES, NEVER MIXED
+   success / warning / destructive (green / amber / red) = traffic light:
+   health and urgency only. info (signal blue), flux-magenta and ember-orange
+   = tags: category and classification, never a state.
+
+   GK Green #12C400 carries BLACK text (8.2:1), never white.
+
+   Two deliberate deviations from the GKHQ source:
+   - dark `--muted-foreground` stays #8A8A85 (5.6:1) rather than GKHQ's #71716B
+     (3.9:1); Mentor Hub puts real sentences in muted text, so it has to clear
+     WCAG AA body contrast.
+   - light and print `--warning` are gold rather than rust, so traffic-light
+     amber and red are told apart on a white surface. See the tokens. */
 
 @theme inline {
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
+  --radius-sm: 5px; /* badges, pills, chips */
+  --radius-md: 7px; /* buttons, inputs */
+  --radius-lg: 12px; /* nav items, panels */
+  --radius-xl: 16px; /* cards, dialogs, sheets */
+
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -17,6 +41,9 @@
   --color-popover-foreground: var(--popover-foreground);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
+  --color-primary-ink: var(--primary-ink);
+  --color-primary-fill: var(--primary-fill);
+  --color-primary-line: var(--primary-line);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
   --color-muted: var(--muted);
@@ -25,18 +52,70 @@
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
-  --color-success: var(--success);
-  --color-success-foreground: var(--success-foreground);
-  --color-warning: var(--warning);
-  --color-warning-foreground: var(--warning-foreground);
-  --color-info: var(--info);
-  --color-info-foreground: var(--info-foreground);
-  --color-tier-1: var(--tier-1);
-  --color-tier-2: var(--tier-2);
-  --color-tier-3: var(--tier-3);
+  --color-destructive-fill: var(--destructive-fill);
+  --color-destructive-line: var(--destructive-line);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  --color-panel: var(--panel);
+
+  /* Traffic light — health and urgency ONLY */
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-success-fill: var(--success-fill);
+  --color-success-line: var(--success-line);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-warning-fill: var(--warning-fill);
+  --color-warning-line: var(--warning-line);
+
+  /* Tags — category and classification, never a state */
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
+  --color-info-fill: var(--info-fill);
+  --color-info-line: var(--info-line);
+  --color-flux: var(--flux-magenta);
+  --color-ember: var(--ember-orange);
+  --color-neutral: var(--neutral);
+  --color-neutral-fill: var(--neutral-fill);
+  --color-neutral-line: var(--neutral-line);
+
+  /* Tier scale */
+  --color-tier-1: var(--tier-1);
+  --color-tier-2: var(--tier-2);
+  --color-tier-3: var(--tier-3);
+  --color-tier-4: var(--tier-4);
+
+  /* Rating heat */
+  --color-rating-elite: var(--rating-elite);
+  --color-rating-strong: var(--rating-strong);
+  --color-rating-average: var(--rating-average);
+  --color-rating-developing: var(--rating-developing);
+  --color-rating-poor: var(--rating-poor);
+  --color-rating-none: var(--rating-none);
+  --color-rating-ink: var(--rating-ink);
+  --color-rating-good: var(--rating-good);
+  --color-rating-danger: var(--rating-danger);
+
+  /* Carbon surfaces */
+  --color-carbon-bg: var(--carbon-bg);
+  --color-carbon-section: var(--carbon-section);
+  --color-carbon-panel: var(--carbon-panel);
+  --color-carbon-card: var(--carbon-card);
+  --color-carbon-raised: var(--carbon-raised);
+  --color-carbon-border: var(--carbon-border);
+  --color-cloud-dancer: var(--cloud-dancer);
+  --color-gk-green: var(--gk-green-ink);
+  --color-signal-blue: var(--signal-blue);
+  --color-flux-magenta: var(--flux-magenta);
+  --color-ember-orange: var(--ember-orange);
+
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-primary: var(--sidebar-primary);
@@ -45,93 +124,153 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
-  --color-carbon-bg: var(--carbon-bg);
-  --color-carbon-section: var(--carbon-section);
-  --color-carbon-panel: var(--carbon-panel);
-  --color-carbon-card: var(--carbon-card);
-  --color-carbon-raised: var(--carbon-raised);
-  --color-carbon-border: var(--carbon-border);
-  --color-cloud-dancer: var(--cloud-dancer);
-  --color-gk-green: var(--gk-green);
-  --color-signal-blue: var(--signal-blue);
-  --color-flux-magenta: var(--flux-magenta);
-  --color-ember-orange: var(--ember-orange);
-  --color-rating-good: var(--rating-good);
-  --color-rating-danger: var(--rating-danger);
+
+  /* Volt Signal aliases (see /design/accent-proposal) now resolve to the
+     GKHQ primary family, so the older accent utilities keep working. */
   --color-accent-volt: var(--accent-volt);
   --color-accent-ink: var(--accent-ink);
   --color-accent-soft: var(--accent-soft);
   --color-accent-edge: var(--accent-edge);
-  --font-sans: "Work Sans", ui-sans-serif, system-ui, sans-serif;
-  --font-display: "JetBrains Mono", ui-monospace, monospace;
+
+  --font-display: "Be Vietnam Pro", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Saira", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
 }
 
-
-
+/* ── LIGHT (opt-in) ── */
 :root {
-  --radius: 0.375rem;
+  --radius: 0.25rem;
   --install-prompt-space: 14rem;
-  /* Light mode (opt-in) */
-  --background: #F7F6F2;
-  --foreground: #0A0A0A;
-  --card: #FFFFFF;
-  --card-foreground: #0A0A0A;
-  --popover: #FFFFFF;
-  --popover-foreground: #0A0A0A;
-  --primary: #087A00;
-  --primary-foreground: #FFFFFF;
-  --secondary: #EDEBE6;
-  --secondary-foreground: #0A0A0A;
-  --muted: #EFEDE8;
-  --muted-foreground: #55554F;
-  --accent: #E4E2DC;
-  --accent-foreground: #0A0A0A;
-  --destructive: #B91C1C;
-  --destructive-foreground: #FFFFFF;
-  --success: #087A00;
-  --success-foreground: #FFFFFF;
-  --warning: #A43C00;
-  --warning-foreground: #FFFFFF;
-  --info: #0077B6;
-  --info-foreground: #FFFFFF;
-  --tier-1: #087A00;
-  --tier-2: #0077B6;
-  --tier-3: #B412D4;
-  --border: #DAD8D2;
-  --input: #FFFFFF;
-  --ring: #12C400;
-  --sidebar: #EFEDE8;
-  --sidebar-foreground: #2A2A28;
-  --sidebar-primary: #12C400;
-  --sidebar-primary-foreground: #FFFFFF;
-  --sidebar-accent: #E4E2DC;
-  --sidebar-accent-foreground: #0A0A0A;
-  --sidebar-border: #DAD8D2;
-  --sidebar-ring: #12C400;
-  /* Carbon palette aliases (light surfaces) */
-  --carbon-bg: #F7F6F2;
-  --carbon-section: #EFEDE8;
-  --carbon-panel: #FFFFFF;
-  --carbon-card: #FFFFFF;
-  --carbon-raised: #E4E2DC;
-  --carbon-border: #DAD8D2;
-  --cloud-dancer: #0A0A0A;
-  --gk-green: #087A00;
-  --signal-blue: #0077B6;
-  --flux-magenta: #B412D4;
-  --ember-orange: #A43C00;
-  --rating-good: #087A00;
-  --rating-danger: #B91C1C;
-  /* Volt Signal accent family (see /design/accent-proposal).
-     Two grades: `volt` is graphic-grade (rails, bars, dots — ≥3:1 non-text
-     contrast), `ink` is text-grade (≥4.5:1 AA on --background). Never set
-     body text in `volt` on light surfaces. */
-  --accent-volt: #0D9500;
-  --accent-ink: #087A00;
-  --accent-soft: color-mix(in oklab, var(--accent-volt) 12%, transparent);
-  --accent-edge: color-mix(in oklab, var(--accent-volt) 36%, var(--border));
-  --accent-glow: color-mix(in oklab, var(--accent-volt) 45%, transparent);
+
+  /* Brand constants — identical in every theme */
+  --gk-green: #12c400;
+  --gk-green-bright: #38ff5a;
+  --gk-green-deep: #0a7a00;
+  --gk-green-press: #0e9e00;
+  --cloud-dancer-brand: #f0eee9;
+  --carbon-black: #0d0d0d;
+
+  /* Elevation, motion, layout — shared by every theme */
+  --focus-ring: 3px solid var(--ring);
+  --focus-offset: 3px;
+  --dur-fast: 140ms;
+  --dur-med: 220ms;
+  --ease-panel: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-bar: cubic-bezier(0.16, 1, 0.3, 1);
+  --touch-min: 44px;
+  --header-h: 56px;
+  --rail-w: 208px;
+
+  --background: #f0eee9;
+  --foreground: #0a0a0a;
+  --card: #ffffff;
+  --card-foreground: #0a0a0a;
+  --panel: #ffffff;
+  --popover: #ffffff;
+  --popover-foreground: #0a0a0a;
+  --secondary: #edebe6;
+  --secondary-foreground: #0a0a0a;
+  --muted: #efede8;
+  --muted-foreground: #4a564a;
+  --accent: #e4e2dc;
+  --accent-foreground: #0a0a0a;
+  --border: #e2e0d9;
+  --input: #ffffff;
+
+  --primary: var(--gk-green);
+  --primary-foreground: #0a0a0a;
+  --primary-hover: var(--gk-green-deep);
+  --primary-press: #086200;
+  --primary-ink: var(--gk-green-deep);
+  --primary-fill: rgba(18, 196, 0, 0.14);
+  --primary-line: rgba(18, 196, 0, 0.38);
+  --ring: var(--gk-green);
+
+  /* Accent halo on a KPI tile. See the dark block for why it differs. */
+  --stat-glow-blur: 18px;
+  --stat-glow-spread: -6px;
+
+  --success: #087a00;
+  --success-fill: #e4f5e9;
+  --success-line: #c6e8d2;
+  --success-foreground: #ffffff;
+  /* Gold, not rust. GKHQ's light warning (#A43C00) sits about 20° of hue from
+     its destructive red, so "due soon" and "overdue" read as the same colour on
+     a white duty-of-care panel. This keeps AA on white (5.9:1) while landing
+     clearly in amber. */
+  --warning: #8a5b12;
+  --warning-fill: #fcf2e2;
+  --warning-line: #efddbe;
+  --warning-foreground: #ffffff;
+  --destructive: #b02219;
+  --destructive-fill: #fdefee;
+  --destructive-line: #f2d2cf;
+  --destructive-foreground: #ffffff;
+  --info: #0077b6;
+  --info-fill: #e8f1fc;
+  --info-line: #cfe2f7;
+  --info-foreground: #ffffff;
+  --neutral: #6b756b;
+  --neutral-fill: #f1f0eb;
+  --neutral-line: #dad8d2;
+
+  /* Care cadence reads as one green ramp: the brighter and more saturated the
+     tier, the more contact it demands. Tier 4 is neutral — no formal duty. */
+  --tier-1: #0a7a00;
+  --tier-2: #3e7d57;
+  --tier-3: #8a5b12;
+  --tier-4: #6b756b;
+
+  --rating-elite: #0a7a00;
+  --rating-strong: #4e8c00;
+  --rating-average: #8a5b12;
+  --rating-developing: #a4430a;
+  --rating-poor: #b02219;
+  --rating-none: #6b756b;
+  --rating-ink: #ffffff;
+
+  --sidebar: #efede8;
+  --sidebar-foreground: #2a2a28;
+  --sidebar-primary: var(--gk-green);
+  --sidebar-primary-foreground: #0a0a0a;
+  --sidebar-accent: #e4e2dc;
+  --sidebar-accent-foreground: #0a0a0a;
+  --sidebar-border: #dad8d2;
+  --sidebar-ring: var(--gk-green);
+
+  --carbon-bg: #f7f6f2;
+  --carbon-section: #efede8;
+  --carbon-panel: #ffffff;
+  --carbon-card: #ffffff;
+  --carbon-raised: #e4e2dc;
+  --carbon-border: #dad8d2;
+  --signal-blue: #0077b6;
+  --flux-magenta: #b412d4;
+  --ember-orange: #a43c00;
+
+  --chart-1: var(--gk-green-deep);
+  --chart-2: #0077b6;
+  --chart-3: #b412d4;
+  --chart-4: #a43c00;
+  --chart-5: #4e8c00;
+
+  --ring-soft: 0 0 0 1px var(--border);
+  --shadow-popover: 0 12px 32px rgba(12, 20, 12, 0.1);
+  --shadow-sheet: 0 25px 50px -12px rgba(12, 20, 12, 0.18);
+  --glow-primary: 0 0 18px -6px var(--primary);
+
+  /* Legacy aliases kept so existing components stay on the system.
+     `--gk-green-ink` is the text-safe grade; `--gk-green` is the brand
+     constant and is graphic-grade on light surfaces. */
+  --gk-green-ink: var(--gk-green-deep);
+  --cloud-dancer: #0a0a0a;
+  --rating-good: var(--rating-elite);
+  --rating-danger: var(--rating-poor);
+  --accent-volt: var(--gk-green);
+  --accent-ink: var(--gk-green-deep);
+  --accent-soft: var(--primary-fill);
+  --accent-edge: color-mix(in oklab, var(--gk-green) 36%, var(--border));
+  --accent-glow: color-mix(in oklab, var(--gk-green) 45%, transparent);
 }
 
 @supports (height: 100dvh) {
@@ -140,80 +279,306 @@
   }
 }
 
-.dark {
-  --background: #0D0D0D;
-  --foreground: #F0EEE9;
-  --card: #1C1C1C;
-  --card-foreground: #F0EEE9;
+/* ── DARK (product default) ── */
+.dark,
+[data-theme="dark"] {
+  --background: #0d0d0d;
+  --foreground: #f0eee9;
+  --card: #1c1c1c;
+  --card-foreground: #f0eee9;
+  --panel: #232323;
   --popover: #161616;
-  --popover-foreground: #F0EEE9;
-  --primary: #38FF5A;
-  --primary-foreground: #0A0A0A;
+  --popover-foreground: #f0eee9;
   --secondary: #161616;
-  --secondary-foreground: #F0EEE9;
+  --secondary-foreground: #f0eee9;
   --muted: #121212;
-  --muted-foreground: #8A8A85;
+  /* GKHQ ships #71716B here; Mentor Hub sets body copy in muted, so it
+     holds the AA-passing #8A8A85 instead. */
+  --muted-foreground: #8a8a85;
   --accent: #232323;
-  --accent-foreground: #F0EEE9;
-  --destructive: #FF7070;
-  --destructive-foreground: #0D0D0D;
-  --success: #38FF5A;
-  --success-foreground: #0A0A0A;
-  --warning: #F0B429;
-  --warning-foreground: #0A0A0A;
-  --info: #14AEFF;
-  --info-foreground: #0A0A0A;
-  --tier-1: #F0B429;
-  --tier-2: #14AEFF;
-  --tier-3: #DA14FF;
-  --border: #2A2A2A;
+  --accent-foreground: #f0eee9;
+  --border: #2a2a2a;
   --input: #161616;
-  --ring: #38FF5A;
+
+  --primary: var(--gk-green);
+  --primary-foreground: #0a0a0a;
+  --primary-hover: var(--gk-green-bright);
+  --primary-press: var(--gk-green-press);
+  --primary-ink: var(--gk-green);
+  --primary-fill: rgba(18, 196, 0, 0.13);
+  --primary-line: rgba(18, 196, 0, 0.32);
+  --ring: var(--gk-green);
+
+  /* Carbon makes a glow carry much further than white does: the same halo
+     that reads as a crisp edge on the light theme blooms into the gutter
+     here. Dark keeps the cue, at roughly half the reach. */
+  --stat-glow-blur: 11px;
+  --stat-glow-spread: -9px;
+
+  --success: #38ff5a;
+  --success-fill: rgba(56, 255, 90, 0.11);
+  --success-line: rgba(56, 255, 90, 0.26);
+  --success-foreground: #0a0a0a;
+  --warning: #f0b429;
+  --warning-fill: rgba(240, 180, 41, 0.11);
+  --warning-line: rgba(240, 180, 41, 0.26);
+  --warning-foreground: #0a0a0a;
+  /* #FF1105 reads at only 4.33:1 on the card, so every "3 overdue" chip and
+     error line set in it failed AA while looking perfectly urgent. Lightened
+     until it clears 4.5:1 as text even on its own 15% fill (4.57:1), and
+     5.54:1 on the plain card. Solid `bg-destructive` only gains contrast
+     against its near-black foreground. */
+  --destructive: #ff5a4f;
+  --destructive-fill: rgba(255, 90, 79, 0.13);
+  --destructive-line: rgba(255, 90, 79, 0.32);
+  --destructive-foreground: #0d0d0d;
+  --info: #238aff;
+  --info-fill: rgba(35, 138, 255, 0.12);
+  --info-line: rgba(35, 138, 255, 0.3);
+  --info-foreground: #0a0a0a;
+  --neutral: #8a968a;
+  --neutral-fill: rgba(138, 150, 138, 0.1);
+  --neutral-line: rgba(138, 150, 138, 0.24);
+
+  --tier-1: #12c400;
+  --tier-2: #4fb86e;
+  --tier-3: #f0b429;
+  --tier-4: #8a968a;
+
+  --rating-elite: #12c400;
+  --rating-strong: #8acf2e;
+  --rating-average: #f0b429;
+  --rating-developing: #e8791a;
+  --rating-poor: #ff1105;
+  --rating-none: #8a968a;
+  --rating-ink: #0a0a0a;
+
   --sidebar: #121212;
-  --sidebar-foreground: #C7C4BE;
-  --sidebar-primary: #38FF5A;
-  --sidebar-primary-foreground: #0A0A0A;
+  --sidebar-foreground: #c7c4be;
+  --sidebar-primary: var(--gk-green);
+  --sidebar-primary-foreground: #0a0a0a;
   --sidebar-accent: #232323;
-  --sidebar-accent-foreground: #F0EEE9;
-  --sidebar-border: #2A2A2A;
-  --sidebar-ring: #38FF5A;
-  /* Carbon palette aliases */
-  --carbon-bg: #0D0D0D;
+  --sidebar-accent-foreground: #f0eee9;
+  --sidebar-border: #2a2a2a;
+  --sidebar-ring: var(--gk-green);
+
+  --carbon-bg: #0d0d0d;
   --carbon-section: #121212;
   --carbon-panel: #161616;
-  --carbon-card: #1C1C1C;
+  --carbon-card: #1c1c1c;
   --carbon-raised: #232323;
-  --carbon-border: #2A2A2A;
-  --cloud-dancer: #F0EEE9;
-  --gk-green: #38FF5A;
-  --signal-blue: #14AEFF;
-  --flux-magenta: #DA14FF;
-  --ember-orange: #F0B429;
-  --rating-good: #A7D900;
-  --rating-danger: #FF4D4D;
-  /* Volt Signal accent family — on carbon the brand volt passes both
-     grades, so graphic and text accents share one hue in dark mode. */
-  --accent-volt: #38FF5A;
-  --accent-ink: #38FF5A;
-  --accent-soft: color-mix(in oklab, var(--accent-volt) 15%, transparent);
-  --accent-edge: color-mix(in oklab, var(--accent-volt) 36%, var(--border));
-  --accent-glow: color-mix(in oklab, var(--accent-volt) 45%, transparent);
+  --carbon-border: #2a2a2a;
+  --signal-blue: #238aff;
+  --flux-magenta: #da14ff;
+  --ember-orange: #ff6514;
+
+  --chart-1: var(--gk-green);
+  --chart-2: #238aff;
+  --chart-3: #da14ff;
+  --chart-4: #f0b429;
+  --chart-5: #ff6514;
+
+  --ring-soft:
+    0 1px 0 0 color-mix(in oklab, white 4%, transparent) inset, 0 0 0 1px var(--border);
+  --shadow-popover: 0 12px 32px rgba(0, 0, 0, 0.28);
+  --shadow-sheet: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+  --glow-primary: 0 0 18px -6px var(--primary);
+
+  /* Legacy aliases — on carbon the brand green is both graphic- and
+     text-grade, so ink and volt share one hue. */
+  --gk-green-ink: var(--gk-green);
+  --cloud-dancer: #f0eee9;
+  --rating-good: var(--rating-strong);
+  --rating-danger: var(--rating-poor);
+  --accent-volt: var(--gk-green);
+  --accent-ink: var(--gk-green);
+  --accent-soft: var(--primary-fill);
+  --accent-edge: color-mix(in oklab, var(--gk-green) 36%, var(--border));
+  --accent-glow: color-mix(in oklab, var(--gk-green) 45%, transparent);
 }
 
+/* ── PRINT — dossiers, match reports, PDFs ── */
+[data-theme="print"] {
+  --background: #ffffff;
+  --foreground: #0a0a0a;
+  --card: #ffffff;
+  --card-foreground: #0a0a0a;
+  --panel: #ffffff;
+  --popover: #ffffff;
+  --popover-foreground: #0a0a0a;
+  --secondary: #f2f1ed;
+  --secondary-foreground: #0a0a0a;
+  --muted: #f5f4f0;
+  --muted-foreground: #4a4a45;
+  --accent: #edebe6;
+  --accent-foreground: #0a0a0a;
+  --border: #c9c6bf;
+  --input: #ffffff;
+
+  --primary: var(--gk-green-deep);
+  --primary-foreground: #ffffff;
+  --primary-hover: var(--gk-green-deep);
+  --primary-press: var(--gk-green-deep);
+  --primary-ink: var(--gk-green-deep);
+  --primary-fill: #e8f5e4;
+  --primary-line: #a9d69c;
+  --ring: var(--gk-green-deep);
+
+  /* No halo on paper — a printed dossier gets its emphasis from the rail. */
+  --stat-glow-blur: 0px;
+  --stat-glow-spread: 0px;
+
+  --success: #0a7a00;
+  --success-fill: #e8f5e4;
+  --success-line: #a9d69c;
+  --success-foreground: #ffffff;
+  /* Same separation as light: a printed dossier has to show due-soon and
+     overdue apart too. */
+  --warning: #7a5200;
+  --warning-fill: #fbf0e0;
+  --warning-line: #e0c79a;
+  --warning-foreground: #ffffff;
+  --destructive: #96190f;
+  --destructive-fill: #fbeae8;
+  --destructive-line: #dfb0ab;
+  --destructive-foreground: #ffffff;
+  --info: #005e92;
+  --info-fill: #e6f0f8;
+  --info-line: #a9c8e0;
+  --info-foreground: #ffffff;
+  --neutral: #55554f;
+  --neutral-fill: #f2f1ed;
+  --neutral-line: #c9c6bf;
+
+  --tier-1: #0a7a00;
+  --tier-2: #2f6448;
+  --tier-3: #7a5200;
+  --tier-4: #55554f;
+
+  --rating-elite: #0a7a00;
+  --rating-strong: #46760a;
+  --rating-average: #8a3200;
+  --rating-developing: #a4430a;
+  --rating-poor: #96190f;
+  --rating-none: #55554f;
+  --rating-ink: #ffffff;
+
+  --sidebar: #ffffff;
+  --sidebar-foreground: #0a0a0a;
+  --sidebar-primary: var(--gk-green-deep);
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #edebe6;
+  --sidebar-accent-foreground: #0a0a0a;
+  --sidebar-border: #c9c6bf;
+  --sidebar-ring: var(--gk-green-deep);
+
+  --carbon-bg: #ffffff;
+  --carbon-section: #f5f4f0;
+  --carbon-panel: #ffffff;
+  --carbon-card: #ffffff;
+  --carbon-raised: #edebe6;
+  --carbon-border: #c9c6bf;
+  --signal-blue: #005e92;
+  --flux-magenta: #8e0ba8;
+  --ember-orange: #8a3200;
+
+  --ring-soft: 0 0 0 1px var(--border);
+  --shadow-popover: none;
+  --shadow-sheet: none;
+  --glow-primary: none;
+
+  --gk-green-ink: var(--gk-green-deep);
+  --cloud-dancer: #0a0a0a;
+  --rating-good: var(--rating-elite);
+  --rating-danger: var(--rating-poor);
+  --accent-volt: var(--gk-green-deep);
+  --accent-ink: var(--gk-green-deep);
+  --accent-soft: var(--primary-fill);
+  --accent-edge: var(--primary-line);
+  --accent-glow: transparent;
+}
+
+/* Any page printed falls back to the print theme automatically */
+@media print {
+  :root,
+  .dark,
+  [data-theme="dark"],
+  [data-theme="light"] {
+    --background: #ffffff;
+    --foreground: #0a0a0a;
+    --card: #ffffff;
+    --card-foreground: #0a0a0a;
+    --panel: #ffffff;
+    --popover: #ffffff;
+    --muted: #f5f4f0;
+    --muted-foreground: #4a4a45;
+    --accent: #edebe6;
+    --accent-foreground: #0a0a0a;
+    --border: #c9c6bf;
+    --primary: var(--gk-green-deep);
+    --primary-foreground: #ffffff;
+    --primary-ink: var(--gk-green-deep);
+    --primary-fill: #e8f5e4;
+    --primary-line: #a9d69c;
+    --success: #0a7a00;
+    --warning: #7a5200;
+    --destructive: #96190f;
+    --info: #005e92;
+    --rating-elite: #0a7a00;
+    --rating-strong: #46760a;
+    --rating-average: #8a3200;
+    --rating-poor: #96190f;
+    --sidebar: #ffffff;
+    --sidebar-foreground: #0a0a0a;
+    --sidebar-border: #c9c6bf;
+    --shadow-popover: none;
+    --shadow-sheet: none;
+    --glow-primary: none;
+    --gk-green-ink: var(--gk-green-deep);
+    --accent-volt: var(--gk-green-deep);
+    --accent-ink: var(--gk-green-deep);
+    --accent-glow: transparent;
+  }
+  .no-print {
+    display: none !important;
+  }
+}
 
 @layer base {
-  * { border-color: var(--color-border); }
-  :focus-visible {
-    outline: 3px solid var(--color-ring) !important;
-    outline-offset: 3px;
+  * {
+    border-color: var(--color-border);
   }
-  html { color-scheme: light; }
-  html.dark { color-scheme: dark; }
+  :focus-visible {
+    outline: var(--focus-ring) !important;
+    outline-offset: var(--focus-offset);
+  }
+  html {
+    color-scheme: light;
+  }
+  html.dark,
+  html[data-theme="dark"] {
+    color-scheme: dark;
+  }
+  html[data-theme="light"],
+  html[data-theme="print"] {
+    color-scheme: light;
+  }
   body {
     background-color: var(--color-background);
     color: var(--color-foreground);
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
+    text-wrap: pretty;
+  }
+  ::selection {
+    background: var(--primary-fill);
+  }
+  .font-mono,
+  code,
+  kbd,
+  samp {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
   }
 }
 
@@ -247,36 +612,149 @@
   }
 }
 
+/* ── GKHQ type utilities ── */
+
+/* Display headers — Be Vietnam Pro, uppercase, tracking near zero */
+@utility gk-display {
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: -0.014em;
+  text-transform: uppercase;
+}
+
+/* Small structural section label */
+@utility gk-section {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 11.5px;
+  line-height: 1.2;
+  letter-spacing: 0.055em;
+  text-transform: uppercase;
+}
+
+/* Mono micro-label above a number */
+@utility gk-stat-label {
+  font-family: var(--font-mono);
+  font-weight: 400;
+  font-size: 10px;
+  line-height: 1.2;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+
+/* The big number itself */
+@utility gk-stat {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 30px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+@utility gk-nav {
+  font-family: var(--font-mono);
+  font-weight: 500;
+  font-size: 12px;
+  line-height: 1.2;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+/* ── GKHQ surface utilities ── */
 
 @utility surface-grad {
-  background-image: linear-gradient(180deg, color-mix(in oklab, var(--card) 100%, transparent), color-mix(in oklab, var(--background) 100%, transparent));
-}
-@utility ring-soft {
-  box-shadow: 0 1px 0 0 color-mix(in oklab, white 4%, transparent) inset, 0 0 0 1px var(--border);
+  background-image: linear-gradient(
+    180deg,
+    color-mix(in oklab, var(--card) 100%, transparent),
+    color-mix(in oklab, var(--background) 100%, transparent)
+  );
 }
 
-/* --- Signal command-centre surfaces --- */
+@utility ring-soft {
+  box-shadow: var(--ring-soft);
+}
+
+/* Dark elevation: surface step + 2.5% inset top highlight */
+@utility raised {
+  background-color: var(--carbon-raised);
+  box-shadow: inset 0 1px 0 0 color-mix(in oklab, white 2.5%, transparent);
+}
+
+/* Command panel: deliberately square, hairline, primary-tinted on hover */
 @utility command-panel {
   border-radius: 0;
   border: 1px solid var(--border);
   background-color: var(--card);
-  transition: border-color 160ms ease, box-shadow 160ms ease;
+  transition: border-color var(--dur-fast) var(--ease-panel);
   &:hover {
     border-color: color-mix(in oklab, var(--primary) 35%, var(--border));
   }
 }
 
+/* Faint radial neon glow — hero marks only */
+@utility hero-glow {
+  background-image: radial-gradient(
+    60% 60% at 50% 40%,
+    color-mix(in oklab, var(--primary) 14%, transparent) 0%,
+    transparent 70%
+  );
+}
+
+/* 64px grid overlay, masked to the top of a hero */
+@utility hero-grid {
+  background-image:
+    linear-gradient(
+      to right,
+      color-mix(in oklab, var(--border) 70%, transparent) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      to bottom,
+      color-mix(in oklab, var(--border) 70%, transparent) 1px,
+      transparent 1px
+    );
+  background-size: 64px 64px;
+  mask-image: linear-gradient(to bottom, black, transparent);
+}
+
 @utility bar-grow {
-  animation: bar-grow 520ms cubic-bezier(0.2, 0.7, 0.3, 1) both;
+  animation: bar-grow var(--dur-med) var(--ease-bar) both;
   transform-origin: left center;
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
 }
 
 @keyframes bar-grow {
-  from { transform: scaleX(0); }
-  to { transform: scaleX(1); }
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
 }
 
-/* --- Volt Signal accent treatments (see /design/accent-proposal) --- */
+/* Live pulse dot */
+@utility live-dot {
+  animation: live-pulse 1.8s var(--ease-panel) infinite;
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+@keyframes live-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+/* --- Volt Signal accent treatments (see /design/accent-proposal).
+       Retained on the GKHQ primary family so existing screens keep working. --- */
 @utility accent-rail {
   position: relative;
   background-image: linear-gradient(90deg, var(--accent-soft), transparent 34%);
@@ -295,7 +773,7 @@
   display: inline-flex;
   align-items: center;
   gap: 0.375rem;
-  border-radius: var(--radius);
+  border-radius: var(--radius-sm);
   border: 1px solid var(--accent-edge);
   background-color: var(--accent-soft);
   color: var(--accent-ink);
@@ -316,14 +794,20 @@
   height: 0.5rem;
   border-radius: 9999px;
   background-color: var(--accent-volt);
-  animation: accent-ping 2s cubic-bezier(0.2, 0.7, 0.3, 1) infinite;
+  animation: accent-ping 2s var(--ease-panel) infinite;
   @media (prefers-reduced-motion: reduce) {
     animation: none;
   }
 }
 
 @keyframes accent-ping {
-  0% { box-shadow: 0 0 0 0 var(--accent-glow); }
-  70% { box-shadow: 0 0 0 6px transparent; }
-  100% { box-shadow: 0 0 0 0 transparent; }
+  0% {
+    box-shadow: 0 0 0 0 var(--accent-glow);
+  }
+  70% {
+    box-shadow: 0 0 0 6px transparent;
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
 }

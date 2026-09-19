@@ -3,21 +3,42 @@ import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Card, TierBadge, Avatar, Pill, SectionTitle, ProgressBar } from "@/components/primitives";
-import { goalkeepers, formatDate, formatRelative, type Tier } from "@/lib/mock-data";
+import { formatDate, formatRelative, type Goalkeeper, type Tier } from "@/lib/mock-data";
 import { useLoggedInteractions } from "@/lib/interactions/use-interactions";
-import { ArrowLeft, Info, Video, FileText, Phone, Eye, Users as UsersIcon, Calendar as CalendarIcon, Upload, ExternalLink } from "lucide-react";
+import {
+  ArrowLeft,
+  Info,
+  Video,
+  FileText,
+  Phone,
+  Eye,
+  Users as UsersIcon,
+  Calendar as CalendarIcon,
+  Upload,
+  ExternalLink,
+} from "lucide-react";
 import { listMatchReports } from "@/lib/match-reports/reports.functions";
-import { PILLAR_IDS, PILLAR_LABELS, type MatchReportRow, type PillarId } from "@/lib/match-reports/schema";
+import {
+  PILLAR_IDS,
+  PILLAR_LABELS,
+  type MatchReportRow,
+  type PillarId,
+} from "@/lib/match-reports/schema";
 import { ReportPreviewModal } from "@/components/report-preview-modal";
 import { WorkflowDialog, type WorkflowKind } from "@/components/workflows";
 import { useAuth } from "@/lib/auth";
 import { listMedia, openAsset, formatBytes, type MediaAsset } from "@/lib/media-store";
 import { buildHighlightReelItems } from "@/lib/goalkeeper-highlight-reel";
-import { UpdateClubButton } from "@/components/update-club-dialog";
+import { EditDetailsButton } from "@/components/edit-player-details-dialog";
 import { DutyOfCarePanel } from "@/components/duty-of-care-panel";
-import { listPlayers } from "@/lib/players.functions";
-import { findPlayerByName, interactionBelongsToGoalkeeper } from "@/lib/goalkeeper-player-link";
-import { compareInteractionsByAlertThenDate, interactionOutcomeAlertRank } from "@/lib/interaction-alert-rank";
+import { listPlayers, type PlayerRosterRow } from "@/lib/players.functions";
+import { interactionBelongsToGoalkeeper, normalisePersonName } from "@/lib/goalkeeper-player-link";
+import { rosterRowForLegacySlug, toGoalkeeper } from "@/lib/roster/live-goalkeepers";
+import { withSeedNarrative } from "@/lib/roster/goalkeeper-profile";
+import {
+  compareInteractionsByAlertThenDate,
+  interactionOutcomeAlertRank,
+} from "@/lib/interaction-alert-rank";
 
 /** Inclusive 1–5 finite numeric guard for report scores/averages. */
 function isValidScore(v: unknown): v is number {
@@ -25,39 +46,58 @@ function isValidScore(v: unknown): v is number {
 }
 
 export const Route = createFileRoute("/goalkeepers/$gkId")({
-  loader: ({ params }) => {
-    const gk = goalkeepers.find((g) => g.id === params.gkId);
-    if (!gk) throw notFound();
-    return { gk };
-  },
   component: GkDetail,
-  notFoundComponent: () => <div className="p-8 text-sm text-muted-foreground">Goalkeeper not found.</div>,
-  errorComponent: ({ error }) => <div className="p-8 text-sm text-destructive">{error.message}</div>,
+  notFoundComponent: () => (
+    <div className="p-8 text-sm text-muted-foreground">Goalkeeper not found.</div>
+  ),
+  errorComponent: ({ error }) => (
+    <div className="p-8 text-sm text-destructive">{error.message}</div>
+  ),
 });
 
 const TYPE_ICON: Record<string, typeof Video> = {
-  "Live Match Observation": Eye, "Training Ground Visit": UsersIcon,
-  "Coffee Catch Up": UsersIcon, "Phone Call": Phone,
+  "Live Match Observation": Eye,
+  "Training Ground Visit": UsersIcon,
+  "Coffee Catch Up": UsersIcon,
+  "Phone Call": Phone,
 };
 
-function normaliseName(s: string): string {
-  return s.trim().toLowerCase().replace(/\s+/g, " ");
-}
-
+/**
+ * Compact pillar names for the stat row under the headline numbers.
+ *
+ * Display only — `PILLAR_LABELS` stays the canonical wording and is used in
+ * every tooltip, aria-label and the detailed breakdown below.
+ */
+const PILLAR_SHORT_LABELS: Record<PillarId, string> = {
+  protect_goal: "Protect Goal",
+  protect_space: "Protect Space",
+  protect_air: "Protect Air",
+  control_play: "Control Play",
+  change_play: "Change Play",
+  psych: "Psychological",
+  physical: "Physical",
+};
 
 function formatDob(iso: string): string {
   if (!iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return "Not recorded";
   const [year, month, day] = iso.split("-").map(Number);
-  return new Intl.DateTimeFormat("en-GB", { day: "2-digit", month: "short", year: "numeric", timeZone: "UTC" })
-    .format(new Date(Date.UTC(year, month - 1, day)));
+  return new Intl.DateTimeFormat("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(Date.UTC(year, month - 1, day)));
 }
 
 function formatContractExpiry(value: string): string {
   if (value === "—") return "-";
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return "Not recorded";
   const [year, month] = value.split("-").map(Number);
-  return new Intl.DateTimeFormat("en-GB", { month: "long", year: "numeric", timeZone: "UTC" })
-    .format(new Date(Date.UTC(year, month - 1, 1)));
+  return new Intl.DateTimeFormat("en-GB", {
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(Date.UTC(year, month - 1, 1)));
 }
 
 /** Sort match-report dates newest-first; undated reports sink to the bottom. */
@@ -68,32 +108,86 @@ function compareMatchDatesNewestFirst(a: string | null, b: string | null): numbe
   return b.localeCompare(a);
 }
 
+/**
+ * Resolve `/goalkeepers/gk-…` against the live roster.
+ *
+ * The lookup lives here rather than in the route loader on purpose: the roster
+ * is a client-side React Query read and a loader cannot await one. It uses the
+ * `["players", "roster"]` key the list page already populates, so arriving from
+ * the list costs no extra request.
+ *
+ * Three outcomes, deliberately rendered differently — a goalkeeper whose row is
+ * still in flight must never read as one who does not exist:
+ *
+ *   - roster pending   → "Loading goalkeeper…"
+ *   - roster unreachable → an explicit failure, retryable by refreshing
+ *   - roster here, no row for this slug → a genuine `notFound()`
+ */
 function GkDetail() {
-  const { gk } = Route.useLoaderData();
-  const { can, user } = useAuth();
-  const { data: loggedInteractions } = useLoggedInteractions();
+  const { gkId } = Route.useParams();
   const listPlayersFn = useServerFn(listPlayers);
-  const { data: players } = useQuery({
+  const {
+    data: players,
+    isPending: rosterPending,
+    isError: rosterUnavailable,
+  } = useQuery({
     queryKey: ["players", "roster"],
     queryFn: () => listPlayersFn(),
     staleTime: 5 * 60_000,
   });
-  const linkedPlayer = useMemo(
-    () => findPlayerByName(players, gk.name),
-    [players, gk.name],
-  );
-  const linkedPlayerId = linkedPlayer?.id ?? (gk as { playerId?: string | null }).playerId ?? null;
+  const player = useMemo(() => rosterRowForLegacySlug(players, gkId), [players, gkId]);
+  // The database has no column for a biography, a development plan or the
+  // highlight-reel links, so `toGoalkeeper` cannot carry them. Layering them
+  // back on keeps this page from blanking all three for every goalkeeper who
+  // has them. See `withSeedNarrative`.
+  const gk = useMemo(() => (player ? withSeedNarrative(toGoalkeeper(player)) : null), [player]);
+
+  if (rosterPending) {
+    return (
+      <div className="p-8 text-sm text-muted-foreground" role="status">
+        Loading goalkeeper…
+      </div>
+    );
+  }
+
+  // `isError` stays true after a failed background refetch — including the one
+  // Edit Details triggers by invalidating ["players"] — even though the rows
+  // are still in cache. Only call the roster unavailable when there is nothing
+  // to resolve against, or a working profile flips to the failure copy.
+  if (rosterUnavailable && !players) {
+    return (
+      <div className="p-8 text-sm text-destructive" role="status">
+        The roster could not be loaded. Refresh the page to try again.
+      </div>
+    );
+  }
+
+  if (!gk || !player) throw notFound();
+
+  return <GkProfile gk={gk} player={player} />;
+}
+
+function GkProfile({ gk, player }: { gk: Goalkeeper; player: PlayerRosterRow }) {
+  const { can, user } = useAuth();
+  const { data: loggedInteractions } = useLoggedInteractions();
+  // The row this profile was resolved from is the canonical `players` record,
+  // so there is no second name match to make: club edits, Duty of Care and
+  // media all key off it directly.
+  const linkedPlayerId = player.id;
   const mediaGoalkeeperIds = useMemo(
     () => Array.from(new Set([gk.id, linkedPlayerId].filter((id): id is string => !!id))),
     [gk.id, linkedPlayerId],
   );
-  const displayClub = linkedPlayer?.current_club || gk.club;
-  const displayLeague = linkedPlayer?.league || gk.league;
+  // Club, league and citizenship are read straight off the canonical row.
+  // `gk` is a mapping of that same row, so there is no second opinion to fall
+  // back to. Citizenship is shown in exactly one place: its stat box below.
+  const displayClub = player.current_club;
+  const displayLeague = player.league;
+  const displayNationality = player.nationality;
   const profileSummary = [
-    gk.tags.includes("Free Agent") ? "Free Agent" : (displayClub || "Club not recorded"),
+    gk.tags.includes("Free Agent") ? "Free Agent" : displayClub || "Club not recorded",
     !gk.tags.includes("Free Agent") ? displayLeague : null,
-    gk.nationality || "Nationality not recorded",
-    `${gk.age} yrs`,
+    gk.age != null ? `${gk.age} yrs` : null,
     gk.height,
     gk.foot ? `${gk.foot} foot` : null,
   ].filter((value): value is string => Boolean(value));
@@ -104,7 +198,7 @@ function GkDetail() {
         .sort((a, b) => +new Date(b.occurredAt) - +new Date(a.occurredAt)),
     [loggedInteractions, gk, linkedPlayerId],
   );
-  
+
   const [gkMedia, setGkMedia] = useState<MediaAsset[]>([]);
   const [mediaLoading, setMediaLoading] = useState(true);
   const [mediaError, setMediaError] = useState<string | null>(null);
@@ -119,9 +213,13 @@ function GkDetail() {
       setMediaLoading(false);
     }
   }, [mediaGoalkeeperIds]);
-  useEffect(() => { void loadMedia(); }, [loadMedia]);
   useEffect(() => {
-    const h = () => { void loadMedia(); };
+    void loadMedia();
+  }, [loadMedia]);
+  useEffect(() => {
+    const h = () => {
+      void loadMedia();
+    };
     window.addEventListener("rpm:media-uploaded", h);
     window.addEventListener("rpm:media-updated", h);
     return () => {
@@ -152,11 +250,16 @@ function GkDetail() {
     return () => window.removeEventListener("rpm:report-submitted", h);
   }, [queryClient]);
 
+  // `normalisePersonName`, not a local lowercase: `gk.name` is
+  // `players.full_name` and the two tables disagree about apostrophes —
+  // `Rich O'Donnell` is stored straight on the roster, `Max O’Leary` curly on
+  // his reports. Interactions already fold both; matching reports any other
+  // way silently loses a goalkeeper's whole history.
   const gkReports = useMemo<MatchReportRow[]>(() => {
-    const target = normaliseName(gk.name);
+    const target = normalisePersonName(gk.name);
     const all = data?.reports ?? [];
     return all
-      .filter((r) => normaliseName(r.goalkeeper) === target)
+      .filter((r) => normalisePersonName(r.goalkeeper) === target)
       .sort((a, b) => compareMatchDatesNewestFirst(a.match_date, b.match_date));
   }, [data, gk.name]);
 
@@ -176,20 +279,32 @@ function GkDetail() {
 
   const pillarAverages = useMemo(() => {
     const out: Record<PillarId, number | null> = {
-      protect_goal: null, protect_space: null, protect_air: null,
-      control_play: null, change_play: null, psych: null, physical: null,
+      protect_goal: null,
+      protect_space: null,
+      protect_air: null,
+      control_play: null,
+      change_play: null,
+      psych: null,
+      physical: null,
     };
     for (const id of PILLAR_IDS) {
       const vals = last5.map((r) => r.scores[id]).filter(isValidScore);
-      out[id] = vals.length ? Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 10) / 10 : null;
+      out[id] = vals.length
+        ? Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 10) / 10
+        : null;
     }
     return out;
   }, [last5]);
 
   const pillarContributors = useMemo(() => {
     const out: Record<PillarId, MatchReportRow[]> = {
-      protect_goal: [], protect_space: [], protect_air: [],
-      control_play: [], change_play: [], psych: [], physical: [],
+      protect_goal: [],
+      protect_space: [],
+      protect_air: [],
+      control_play: [],
+      change_play: [],
+      psych: [],
+      physical: [],
     };
     for (const id of PILLAR_IDS) {
       out[id] = last5.filter((r) => isValidScore(r.scores[id]));
@@ -211,11 +326,21 @@ function GkDetail() {
       `Opponent: ${r.opponent?.trim() || "not recorded"}`,
       pillarLine,
       extra ?? "",
-    ].filter(Boolean).join("\n");
+    ]
+      .filter(Boolean)
+      .join("\n");
   };
 
   type TimelineItem =
-    | { kind: "interaction"; id: string; date: string; type: string; notes: string; outcome: string; followUp: string }
+    | {
+        kind: "interaction";
+        id: string;
+        date: string;
+        type: string;
+        notes: string;
+        outcome: string;
+        followUp: string;
+      }
     | { kind: "report"; id: string; date: string | null; report: MatchReportRow };
 
   const timelineItems = useMemo<TimelineItem[]>(() => {
@@ -259,40 +384,47 @@ function GkDetail() {
     </div>
   );
 
-
   return (
     <div className="space-y-5">
-      <Link to="/goalkeepers" className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"><ArrowLeft className="size-3.5" /> Goalkeepers</Link>
+      <Link
+        to="/goalkeepers"
+        className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+      >
+        <ArrowLeft className="size-3.5" /> Goalkeepers
+      </Link>
 
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="flex min-w-0 items-start gap-3 sm:gap-4">
-          <Avatar initials={gk.initials} size={56} imageUrl={gk.profileImage} alt={`${gk.name} portrait`} />
+          <Avatar
+            initials={gk.initials}
+            size={84}
+            imageUrl={gk.profileImage}
+            alt={`${gk.name} portrait`}
+          />
           <div className="min-w-0">
             <div className="flex items-center gap-2.5 flex-wrap">
               <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">{gk.name}</h1>
               <TierBadge tier={gk.tier} />
-              {gk.tags.map((tag: string) => <TierBadge key={tag} tier={tag as Tier} />)}
-              {gk.onLoan && <Pill tone="info">On loan{gk.parentClub ? ` from ${gk.parentClub}` : ""}</Pill>}
+              {gk.tags.map((tag: string) => (
+                <TierBadge key={tag} tier={tag as Tier} />
+              ))}
+              {gk.onLoan && (
+                <Pill tone="info">On loan{gk.parentClub ? ` from ${gk.parentClub}` : ""}</Pill>
+              )}
             </div>
             <div className="mt-1 text-sm leading-snug text-muted-foreground">
               {profileSummary.join(" · ")}
             </div>
-            {/* Prefer a name-matched players row so club corrections work even
-                when the legacy profile has no stored playerId. */}
-            {linkedPlayerId ? (
-              <div className="mt-1 flex flex-wrap items-center gap-3 text-xs">
-                <Link to="/system/players/$playerId" params={{ playerId: linkedPlayerId }} className="text-primary hover:underline">
-                  View player record
-                </Link>
-                <UpdateClubButton
-                  playerId={linkedPlayerId}
-                  playerName={gk.name}
-                  currentClub={displayClub ?? ""}
-                />
-              </div>
-            ) : (
-              <div className="mt-1 text-xs text-muted-foreground">Player record not linked — this profile is read-only.</div>
-            )}
+            {/* The profile is resolved from the roster row itself, so club
+                corrections always have a canonical record to write back to. */}
+            <div className="mt-1 flex flex-wrap items-center gap-3 text-xs">
+              <EditDetailsButton
+                player={player}
+                playerId={linkedPlayerId}
+                playerName={gk.name}
+                currentClub={displayClub ?? ""}
+              />
+            </div>
 
             {gk.instagram && (
               <div className="mt-1 text-xs">
@@ -303,7 +435,10 @@ function GkDetail() {
                   className="text-primary hover:underline inline-flex items-center gap-1"
                   aria-label={`${gk.name} on Instagram (opens in new tab)`}
                 >
-                  @{gk.instagram.replace(/^https?:\/\/(www\.)?instagram\.com\//i, "").replace(/\/$/, "") || "instagram"}
+                  @
+                  {gk.instagram
+                    .replace(/^https?:\/\/(www\.)?instagram\.com\//i, "")
+                    .replace(/\/$/, "") || "instagram"}
                 </a>
               </div>
             )}
@@ -331,8 +466,6 @@ function GkDetail() {
         )}
       </div>
 
-      <DutyOfCarePanel playerId={linkedPlayerId} playerName={gk.name} />
-
       {gk.bio && (
         <Card className="p-4">
           <SectionTitle>Profile</SectionTitle>
@@ -340,31 +473,39 @@ function GkDetail() {
         </Card>
       )}
 
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7">
-        {([
-          {
-            label: "Rating",
-            value: isLoading
-              ? "…"
-              : isError
-                ? "—"
-                : averageRating != null
-                  ? `${averageRating.toFixed(1)}/5`
-                  : "—",
-            hint: !isLoading && !isError && averageRating != null
-              ? `${ratingContributors.length} report${ratingContributors.length === 1 ? "" : "s"}`
-              : undefined,
-          },
-          { label: "Contract expiry", value: formatContractExpiry(gk.contractUntil) },
-          { label: "DOB", value: formatDob(gk.dob) },
-          { label: "Age", value: String(gk.age) },
-          { label: "Height", value: gk.height || "—" },
-          { label: "Shirt number", value: gk.shirtNumber != null ? String(gk.shirtNumber) : "—" },
-          { label: "Preferred foot", value: gk.foot || "—" },
-        ] as const).map((metric) => (
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-8">
+        {(
+          [
+            {
+              label: "Rating",
+              value: isLoading
+                ? "…"
+                : isError
+                  ? "—"
+                  : averageRating != null
+                    ? `${averageRating.toFixed(1)}/5`
+                    : "—",
+              hint:
+                !isLoading && !isError && averageRating != null
+                  ? `${ratingContributors.length} report${ratingContributors.length === 1 ? "" : "s"}`
+                  : undefined,
+            },
+            { label: "Contract expiry", value: formatContractExpiry(gk.contractUntil) },
+            { label: "DOB", value: formatDob(gk.dob) },
+            { label: "Age", value: gk.age != null ? String(gk.age) : "Not recorded" },
+            { label: "Citizenship", value: displayNationality || "—" },
+            { label: "Height", value: gk.height || "—" },
+            { label: "Shirt number", value: gk.shirtNumber != null ? String(gk.shirtNumber) : "—" },
+            { label: "Preferred foot", value: gk.foot || "—" },
+          ] as const
+        ).map((metric) => (
           <Card key={metric.label} className="px-3 py-2.5">
-            <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{metric.label}</div>
-            <div className="mt-0.5 text-sm font-semibold tabular-nums leading-tight">{metric.value}</div>
+            <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+              {metric.label}
+            </div>
+            <div className="mt-0.5 text-sm font-semibold tabular-nums leading-tight">
+              {metric.value}
+            </div>
             {"hint" in metric && metric.hint ? (
               <div className="mt-0.5 text-[10px] text-muted-foreground">{metric.hint}</div>
             ) : null}
@@ -372,101 +513,412 @@ function GkDetail() {
         ))}
       </div>
 
-      <Card className="p-4">
-        <div className="flex items-center justify-between gap-2 mb-2">
-          <SectionTitle>Highlight Reel</SectionTitle>
-          {highlightReelItems.length > 0 ? (
-            <span className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
-              {highlightReelItems.length} clip{highlightReelItems.length === 1 ? "" : "s"}
-            </span>
-          ) : null}
+      {/* The skill scores themselves, as stats rather than as a buried panel.
+          Each value is the stored last-5-report average already computed above
+          — nothing is recalculated or re-weighted here. */}
+      <div>
+        <div className="mb-1.5 flex items-baseline justify-between gap-2">
+          <SectionTitle>Skill Scores</SectionTitle>
+          <span className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
+            Last 5 match reports
+          </span>
         </div>
-        {highlightReelItems.length === 0 ? (
-          <div className="rounded-md border border-dashed border-border/80 bg-muted/20 px-3 py-4 text-center">
-            <p className="text-xs text-muted-foreground">No highlight reel uploaded yet.</p>
-            <p className="mt-1 text-[11px] text-muted-foreground/80">
-              Slot reserved for {gk.name} — upload a clip via Media and tag it Highlight.
-            </p>
-          </div>
-        ) : (
-          <ul className="space-y-1.5">
-            {highlightReelItems.map((item) => (
-              <li key={item.id}>
-                {item.kind === "link" ? (
-                  <a
-                    href={item.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-2 rounded-md border border-border/60 bg-accent/10 px-2.5 py-2 text-xs hover:border-primary/40 hover:bg-accent/30"
-                  >
-                    <Video className="size-3.5 shrink-0 text-muted-foreground" />
-                    <span className="min-w-0 flex-1 truncate font-medium">{item.label}</span>
-                    <ExternalLink className="size-3 shrink-0 text-muted-foreground" />
-                  </a>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => { void openAsset(item.asset, user); }}
-                    className="flex w-full items-center gap-2 rounded-md border border-border/60 bg-accent/10 px-2.5 py-2 text-left text-xs hover:border-primary/40 hover:bg-accent/30"
-                  >
-                    <Video className="size-3.5 shrink-0 text-muted-foreground" />
-                    <span className="min-w-0 flex-1 truncate font-medium">{item.label}</span>
-                    <ExternalLink className="size-3 shrink-0 text-muted-foreground" />
-                  </button>
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
-      </Card>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7">
+          {PILLAR_IDS.map((id) => {
+            const v = pillarAverages[id];
+            const contributors = pillarContributors[id];
+            return (
+              <Card key={id} className="px-3 py-2.5">
+                <div
+                  className="text-[10px] uppercase leading-tight tracking-wide text-muted-foreground"
+                  title={PILLAR_LABELS[id]}
+                >
+                  {PILLAR_SHORT_LABELS[id]}
+                </div>
+                <div className="mt-0.5 text-xl font-semibold tabular-nums font-mono leading-tight">
+                  {isLoading ? "…" : isError || v == null ? "—" : v.toFixed(1)}
+                  {!isLoading && !isError && v != null && (
+                    <span className="ml-0.5 text-xs font-normal text-muted-foreground">/5</span>
+                  )}
+                </div>
+                <div className="mt-1">
+                  <ProgressBar value={v != null ? (v / 5) * 100 : 0} />
+                </div>
+                <div className="mt-1 text-[10px] text-muted-foreground">
+                  {isLoading
+                    ? "Loading…"
+                    : isError
+                      ? "Unavailable"
+                      : `${contributors.length} of 5 scored`}
+                </div>
+              </Card>
+            );
+          })}
+        </div>
+      </div>
 
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <Card className="lg:col-span-2 p-4">
-          <SectionTitle>Activity Timeline</SectionTitle>
-          <div className="relative pl-5 space-y-3 before:absolute before:left-1.5 before:top-1 before:bottom-1 before:w-px before:bg-border">
-            {timelineItems.length === 0 ? (
-              <div className="text-xs text-muted-foreground italic py-2">No activity recorded yet.</div>
-            ) : (
-              timelineItems.map((item) => {
-                if (item.kind === "report") {
-                  const r = item.report;
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+        <div className="space-y-4 lg:col-span-3">
+          <Card className="p-4">
+            <SectionTitle>Activity Timeline</SectionTitle>
+            <div className="relative pl-5 space-y-3 before:absolute before:left-1.5 before:top-1 before:bottom-1 before:w-px before:bg-border">
+              {timelineItems.length === 0 ? (
+                <div className="text-xs text-muted-foreground italic py-2">
+                  No activity recorded yet.
+                </div>
+              ) : (
+                timelineItems.map((item) => {
+                  if (item.kind === "report") {
+                    const r = item.report;
+                    return (
+                      <div key={item.id} className="relative">
+                        <div className="absolute -left-[15px] top-1 size-3 rounded-full bg-success ring-4 ring-background" />
+                        <div className="flex items-center justify-between gap-2 flex-wrap">
+                          <div className="flex items-center gap-1.5 text-sm font-medium">
+                            <FileText className="size-3.5 text-muted-foreground" />
+                            Match Report
+                          </div>
+                          <div className="text-[11px] text-muted-foreground tabular-nums font-mono">
+                            {r.match_date ? formatDate(r.match_date) : "undated"} ·{" "}
+                            {r.match_date
+                              ? formatRelative(r.match_date)
+                              : formatRelative(new Date().toISOString())}
+                          </div>
+                        </div>
+                        <div className="text-sm text-muted-foreground mt-0.5">
+                          {r.opponent ? `Match report vs ${r.opponent}` : "Match report submitted"}
+                          {r.competition ? ` · ${r.competition}` : ""}
+                        </div>
+                        <div className="flex gap-1.5 mt-1.5">
+                          {r.average != null && (
+                            <Pill tone="success">Avg {r.average.toFixed(1)}/5</Pill>
+                          )}
+                          {r.coach && <Pill tone="info">{r.coach}</Pill>}
+                        </div>
+                      </div>
+                    );
+                  }
+                  const Icon = TYPE_ICON[item.type] ?? FileText;
                   return (
                     <div key={item.id} className="relative">
-                      <div className="absolute -left-[15px] top-1 size-3 rounded-full bg-success ring-4 ring-background" />
+                      <div className="absolute -left-[15px] top-1 size-3 rounded-full bg-primary ring-4 ring-background" />
                       <div className="flex items-center justify-between gap-2 flex-wrap">
-                        <div className="flex items-center gap-1.5 text-sm font-medium"><FileText className="size-3.5 text-muted-foreground" />Match Report</div>
-                        <div className="text-[11px] text-muted-foreground tabular-nums font-mono">{r.match_date ? formatDate(r.match_date) : "undated"} · {r.match_date ? formatRelative(r.match_date) : formatRelative(new Date().toISOString())}</div>
+                        <div className="flex items-center gap-1.5 text-sm font-medium">
+                          <Icon className="size-3.5 text-muted-foreground" />
+                          {item.type}
+                        </div>
+                        <div className="text-[11px] text-muted-foreground tabular-nums font-mono">
+                          {formatDate(item.date)} · {formatRelative(item.date)}
+                        </div>
                       </div>
-                      <div className="text-sm text-muted-foreground mt-0.5">
-                        {r.opponent ? `Match report vs ${r.opponent}` : "Match report submitted"}
-                        {r.competition ? ` · ${r.competition}` : ""}
-                      </div>
-                      <div className="flex gap-1.5 mt-1.5">
-                        {r.average != null && <Pill tone="success">Avg {r.average.toFixed(1)}/5</Pill>}
-                        {r.coach && <Pill tone="info">{r.coach}</Pill>}
+                      <div className="text-sm text-muted-foreground mt-0.5">{item.notes}</div>
+                      <div className="mt-1.5 flex flex-wrap gap-1.5">
+                        <Pill
+                          tone={
+                            interactionOutcomeAlertRank(item.outcome) === 0
+                              ? "destructive"
+                              : interactionOutcomeAlertRank(item.outcome) === 1
+                                ? "warning"
+                                : "muted"
+                          }
+                        >
+                          {item.outcome}
+                        </Pill>
+                        <Pill tone="info">↳ {item.followUp}</Pill>
                       </div>
                     </div>
                   );
-                }
-                const Icon = TYPE_ICON[item.type] ?? FileText;
-                return (
-                  <div key={item.id} className="relative">
-                    <div className="absolute -left-[15px] top-1 size-3 rounded-full bg-primary ring-4 ring-background" />
-                    <div className="flex items-center justify-between gap-2 flex-wrap">
-                      <div className="flex items-center gap-1.5 text-sm font-medium"><Icon className="size-3.5 text-muted-foreground" />{item.type}</div>
-                      <div className="text-[11px] text-muted-foreground tabular-nums font-mono">{formatDate(item.date)} · {formatRelative(item.date)}</div>
-                    </div>
-                    <div className="text-sm text-muted-foreground mt-0.5">{item.notes}</div>
-                    <div className="mt-1.5 flex flex-wrap gap-1.5"><Pill tone={interactionOutcomeAlertRank(item.outcome) === 0 ? "destructive" : interactionOutcomeAlertRank(item.outcome) === 1 ? "warning" : "muted"}>{item.outcome}</Pill><Pill tone="info">↳ {item.followUp}</Pill></div>
-                  </div>
-                );
-              })
-            )}
-          </div>
-        </Card>
+                })
+              )}
+            </div>
+          </Card>
 
-        <div className="space-y-4">
+          <Card className="p-4">
+            <SectionTitle>Skill Score Coverage</SectionTitle>
+            {isLoading ? (
+              <div className="text-xs text-muted-foreground italic py-2">Loading…</div>
+            ) : isError ? (
+              <div className="text-xs text-destructive py-2">Couldn't load skill scores.</div>
+            ) : gkReports.length === 0 ? (
+              <div className="space-y-1.5 py-2">
+                <div className="text-xs text-muted-foreground italic">
+                  No skill scores available
+                </div>
+                <div className="text-[11px] text-muted-foreground leading-snug">
+                  Pillar means are calculated from valid 1–5 scores across the last 5 match reports.
+                </div>
+                <Link
+                  to="/reports"
+                  search={{
+                    from: "",
+                    to: "",
+                    coach: "",
+                    mentorProfileId: "",
+                    source: "",
+                    gk: gk.name,
+                    openSubmit: "1",
+                  }}
+                  className="text-[11px] text-primary hover:underline inline-flex items-center gap-0.5"
+                >
+                  Submit a Match Report for {gk.name}
+                </Link>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div className="text-[10px] uppercase text-muted-foreground">
+                  Pool of last {last5.length} report{last5.length === 1 ? "" : "s"}:
+                  <span className="ml-1 normal-case text-muted-foreground tracking-normal">
+                    {last5.map(reportRef).join(" · ")}
+                  </span>
+                </div>
+                {PILLAR_IDS.map((id) => {
+                  const v = pillarAverages[id];
+                  const contributors = pillarContributors[id];
+                  const hasEnough = contributors.length >= 5;
+                  return (
+                    <div key={id}>
+                      <div className="flex justify-between text-[11px] mb-1">
+                        <span className="text-muted-foreground">{PILLAR_LABELS[id]}</span>
+                        <span className="tabular-nums font-mono font-medium">
+                          {hasEnough && v != null ? (
+                            `${v.toFixed(1)}/5`
+                          ) : (
+                            <span
+                              className="text-muted-foreground italic"
+                              title="At least 5 valid 1–5 scores for this pillar in the last 5 reports are needed to show an average"
+                            >
+                              not recorded
+                            </span>
+                          )}
+                        </span>
+                      </div>
+                      <div
+                        className="flex gap-1.5 mb-1"
+                        aria-label={`${PILLAR_LABELS[id]} status: ${contributors.length} of 5 valid scores submitted`}
+                      >
+                        <Pill tone="success">{contributors.length} submitted</Pill>
+                        <Pill tone={5 - contributors.length > 0 ? "warning" : "muted"}>
+                          {5 - contributors.length} missing
+                        </Pill>
+                      </div>
+                      {hasEnough && <ProgressBar value={v != null ? (v / 5) * 100 : 0} />}
+                      {!hasEnough && (
+                        <div className="text-[11px] text-muted-foreground leading-snug mt-1 space-y-1">
+                          <div>
+                            <span className="font-medium text-foreground">
+                              {contributors.length} of 5
+                            </span>{" "}
+                            scored reports available for this pillar. Need{" "}
+                            <span className="font-medium text-foreground">
+                              {5 - contributors.length}
+                            </span>{" "}
+                            more with a valid {PILLAR_LABELS[id]} score (1–5).
+                          </div>
+                          <ValidityHint>
+                            A valid scored report has a{" "}
+                            <span className="font-medium text-foreground">{PILLAR_LABELS[id]}</span>{" "}
+                            score between 1 and 5.
+                          </ValidityHint>
+
+                          {contributors.length > 0 && (
+                            <div className="flex flex-wrap gap-1">
+                              {contributors.map((r) => (
+                                <button
+                                  key={r.report_id}
+                                  type="button"
+                                  onClick={() => setPreviewId(r.report_id)}
+                                  title={reportTooltip(
+                                    r,
+                                    `${PILLAR_LABELS[id]}: ${r.scores[id]}/5\nClick to preview`,
+                                  )}
+                                  aria-label={`Preview match report for ${r.match_date ? formatDate(r.match_date) : "undated match"} versus ${r.opponent?.trim() || "opponent TBC"}, ${PILLAR_LABELS[id]} score ${r.scores[id]} of 5`}
+                                  className="px-1.5 py-0.5 rounded border border-border/60 bg-accent/20 text-[10px] text-muted-foreground hover:text-foreground hover:border-primary/40 tabular-nums focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                >
+                                  {reportRef(r)}
+                                </button>
+                              ))}
+                              {Array.from({ length: 5 - contributors.length }).map((_, i) => (
+                                <span
+                                  key={`missing-${id}-${i}`}
+                                  className="px-1.5 py-0.5 rounded border border-dashed border-border/60 text-[10px] text-muted-foreground italic"
+                                  title={`Missing report with a valid ${PILLAR_LABELS[id]} score`}
+                                >
+                                  missing report
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                            <Link
+                              to="/reports"
+                              search={{
+                                from: "",
+                                to: "",
+                                coach: "",
+                                mentorProfileId: "",
+                                source: "",
+                                gk: gk.name,
+                                openSubmit: "1",
+                                last5Gk: "",
+                              }}
+                              className="text-primary hover:underline inline-flex items-center gap-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
+                            >
+                              Submit a Match Report for {gk.name}
+                            </Link>
+                            <Link
+                              to="/calendar"
+                              search={{ gkId: gk.id }}
+                              className="text-muted-foreground hover:text-foreground hover:underline inline-flex items-center gap-0.5"
+                            >
+                              <CalendarIcon className="size-3.5" /> See upcoming matches
+                            </Link>
+                          </div>
+                        </div>
+                      )}
+                      {hasEnough && contributors.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {contributors.map((r) => (
+                            <button
+                              key={r.report_id}
+                              type="button"
+                              onClick={() => setPreviewId(r.report_id)}
+                              title={reportTooltip(
+                                r,
+                                `${PILLAR_LABELS[id]}: ${r.scores[id]}/5\nClick to preview`,
+                              )}
+                              aria-label={`Preview match report for ${r.match_date ? formatDate(r.match_date) : "undated match"} versus ${r.opponent?.trim() || "opponent TBC"}, ${PILLAR_LABELS[id]} score ${r.scores[id]} of 5`}
+                              className="px-1.5 py-0.5 rounded border border-border/60 bg-accent/20 text-[10px] text-muted-foreground hover:text-foreground hover:border-primary/40 tabular-nums focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:border-primary"
+                            >
+                              {reportRef(r)}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+                {gkReports.length > 0 && gkReports.length < 5 && (
+                  <div className="text-[11px] text-muted-foreground leading-snug border-t border-border/40 pt-2">
+                    <span className="font-medium text-foreground">{gkReports.length} of 5</span>{" "}
+                    match reports available for this goalkeeper.
+                    <Link
+                      to="/reports"
+                      search={{
+                        from: "",
+                        to: "",
+                        coach: "",
+                        mentorProfileId: "",
+                        source: "",
+                        gk: gk.name,
+                        openSubmit: "1",
+                      }}
+                      className="ml-1 text-primary hover:underline"
+                    >
+                      Submit a Match Report for {gk.name}
+                    </Link>
+                    <Link
+                      to="/calendar"
+                      search={{ gkId: gk.id }}
+                      className="ml-2 text-muted-foreground hover:text-foreground hover:underline inline-flex items-center gap-0.5"
+                    >
+                      <CalendarIcon className="size-3.5" /> See upcoming matches
+                    </Link>
+                  </div>
+                )}
+              </div>
+            )}
+          </Card>
+        </div>
+
+        <div className="space-y-4 lg:col-span-2">
+          <DutyOfCarePanel playerId={linkedPlayerId} playerName={gk.name} compact />
+
+          <Card className="p-4">
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <SectionTitle>Highlight Reel</SectionTitle>
+              {highlightReelItems.length > 0 ? (
+                <span className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
+                  {highlightReelItems.length} clip{highlightReelItems.length === 1 ? "" : "s"}
+                </span>
+              ) : null}
+            </div>
+            {highlightReelItems.length === 0 ? (
+              <div className="rounded-md border border-dashed border-border/80 bg-muted/20 px-3 py-4 text-center">
+                <p className="text-xs text-muted-foreground">No highlight reel uploaded yet.</p>
+                <p className="mt-1 text-[11px] text-muted-foreground">
+                  Slot reserved for {gk.name} — upload a clip via Media and tag it Highlight.
+                </p>
+              </div>
+            ) : (
+              <ul className="space-y-1.5">
+                {highlightReelItems.map((item) => (
+                  <li key={item.id}>
+                    {item.kind === "link" ? (
+                      <a
+                        href={item.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 rounded-md border border-border/60 bg-accent/10 px-2.5 py-2 text-xs hover:border-primary/40 hover:bg-accent/30"
+                      >
+                        <Video className="size-3.5 shrink-0 text-muted-foreground" />
+                        <span className="min-w-0 flex-1 truncate font-medium">{item.label}</span>
+                        <ExternalLink className="size-3 shrink-0 text-muted-foreground" />
+                      </a>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          void openAsset(item.asset, user);
+                        }}
+                        className="flex w-full items-center gap-2 rounded-md border border-border/60 bg-accent/10 px-2.5 py-2 text-left text-xs hover:border-primary/40 hover:bg-accent/30"
+                      >
+                        <Video className="size-3.5 shrink-0 text-muted-foreground" />
+                        <span className="min-w-0 flex-1 truncate font-medium">{item.label}</span>
+                        <ExternalLink className="size-3 shrink-0 text-muted-foreground" />
+                      </button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Card>
+
+          <Card className="p-4">
+            <div className="flex items-center justify-between gap-2">
+              <SectionTitle>Media ({gkMedia.length})</SectionTitle>
+              {can("media.upload") && (
+                <button
+                  onClick={() => setWorkflow("media")}
+                  className="inline-flex items-center gap-1 h-7 px-2 rounded-md border border-border text-[11px] hover:bg-accent"
+                >
+                  <Upload className="size-3.5" /> Upload
+                </button>
+              )}
+            </div>
+            <div className="space-y-1.5">
+              {mediaLoading && <p className="text-xs text-muted-foreground">Loading media…</p>}
+              {mediaError && <p className="text-xs text-destructive">{mediaError}</p>}
+              {!mediaLoading && !mediaError && gkMedia.length === 0 && (
+                <p className="text-xs text-muted-foreground">No media linked to {gk.name} yet.</p>
+              )}
+              {gkMedia.map((m) => (
+                <div key={m.id} className="flex items-center justify-between gap-2 text-xs">
+                  <button
+                    onClick={() => {
+                      void openAsset(m, user);
+                    }}
+                    className="min-w-0 flex-1 truncate text-left hover:underline inline-flex items-center gap-1"
+                    title={`${m.title} · ${formatBytes(m.file_size)}`}
+                  >
+                    <ExternalLink className="size-3 shrink-0 text-muted-foreground" />
+                    <span className="truncate">{m.title}</span>
+                  </button>
+                  <Pill>{m.media_type}</Pill>
+                </div>
+              ))}
+            </div>
+          </Card>
+
           <Card className="p-4">
             <div className="flex items-center justify-between mb-2 gap-2">
               <SectionTitle>Match Reports ({isLoading ? "…" : gkReports.length})</SectionTitle>
@@ -474,25 +926,43 @@ function GkDetail() {
                 {gkReports.length > 0 && (
                   <Link
                     to="/reports"
-                    search={{ from: "", to: "", coach: "", mentorProfileId: "", source: "", gk: "", openSubmit: "", last5Gk: gk.name }}
+                    search={{
+                      from: "",
+                      to: "",
+                      coach: "",
+                      mentorProfileId: "",
+                      source: "",
+                      gk: "",
+                      openSubmit: "",
+                      last5Gk: gk.name,
+                    }}
                     className="text-[11px] text-primary hover:underline"
                   >
                     View last 5 in Reports →
                   </Link>
                 )}
                 {isError && (
-                  <button onClick={() => refetch()} className="text-[11px] text-primary hover:underline">Retry</button>
+                  <button
+                    onClick={() => refetch()}
+                    className="text-[11px] text-primary hover:underline"
+                  >
+                    Retry
+                  </button>
                 )}
               </div>
             </div>
             {isLoading ? (
-              <div className="text-xs text-muted-foreground italic py-2">Loading real Match Reports…</div>
+              <div className="text-xs text-muted-foreground italic py-2">
+                Loading real Match Reports…
+              </div>
             ) : isError ? (
               <div className="text-xs text-destructive py-2">
                 Couldn't load Match Reports. {isFetching ? "Retrying…" : "Try again."}
               </div>
             ) : gkReports.length === 0 ? (
-              <div className="text-xs text-muted-foreground italic py-2">No Match Reports recorded for this goalkeeper yet.</div>
+              <div className="text-xs text-muted-foreground italic py-2">
+                No Match Reports recorded for this goalkeeper yet.
+              </div>
             ) : (
               <div className="space-y-2">
                 {gkReports.slice(0, 5).map((r) => (
@@ -520,168 +990,6 @@ function GkDetail() {
               </div>
             )}
           </Card>
-
-          <Card className="p-4">
-            <SectionTitle>Skill Scores (last 5 match reports)</SectionTitle>
-            {isLoading ? (
-              <div className="text-xs text-muted-foreground italic py-2">Loading…</div>
-            ) : isError ? (
-              <div className="text-xs text-destructive py-2">Couldn't load skill scores.</div>
-            ) : gkReports.length === 0 ? (
-              <div className="space-y-1.5 py-2">
-                <div className="text-xs text-muted-foreground italic">No skill scores available</div>
-                <div className="text-[11px] text-muted-foreground leading-snug">
-                  Pillar means are calculated from valid 1–5 scores across the last 5 match reports.
-                </div>
-                <Link to="/reports" search={{ from: "", to: "", coach: "", mentorProfileId: "", source: "", gk: gk.name, openSubmit: "1" }} className="text-[11px] text-primary hover:underline inline-flex items-center gap-0.5">
-                  Submit a Match Report for {gk.name}
-                </Link>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                <div className="text-[10px] uppercase text-muted-foreground">
-                  Pool of last {last5.length} report{last5.length === 1 ? "" : "s"}:
-                  <span className="ml-1 normal-case text-muted-foreground/80 tracking-normal">
-                    {last5.map(reportRef).join(" · ")}
-                  </span>
-                </div>
-                {PILLAR_IDS.map((id) => {
-                  const v = pillarAverages[id];
-                  const contributors = pillarContributors[id];
-                  const hasEnough = contributors.length >= 5;
-                  return (
-                    <div key={id}>
-                      <div className="flex justify-between text-[11px] mb-1">
-                        <span className="text-muted-foreground">{PILLAR_LABELS[id]}</span>
-                        <span className="tabular-nums font-mono font-medium">
-                          {hasEnough && v != null
-                            ? `${v.toFixed(1)}/5`
-                            : <span className="text-muted-foreground italic" title="At least 5 valid 1–5 scores for this pillar in the last 5 reports are needed to show an average">not recorded</span>}
-                        </span>
-                      </div>
-                      <div className="flex gap-1.5 mb-1" aria-label={`${PILLAR_LABELS[id]} status: ${contributors.length} of 5 valid scores submitted`}>
-                        <Pill tone="success">{contributors.length} submitted</Pill>
-                        <Pill tone={5 - contributors.length > 0 ? "warning" : "muted"}>{5 - contributors.length} missing</Pill>
-                      </div>
-                      {hasEnough && <ProgressBar value={v != null ? (v / 5) * 100 : 0} />}
-                      {!hasEnough && (
-                        <div className="text-[11px] text-muted-foreground leading-snug mt-1 space-y-1">
-                          <div>
-                            <span className="font-medium text-foreground">{contributors.length} of 5</span> scored reports available for this pillar.
-                            Need <span className="font-medium text-foreground">{5 - contributors.length}</span> more with a valid {PILLAR_LABELS[id]} score (1–5).
-                          </div>
-                          <ValidityHint>
-                            A valid scored report has a <span className="font-medium text-foreground">{PILLAR_LABELS[id]}</span> score between 1 and 5.
-                          </ValidityHint>
-
-                          {contributors.length > 0 && (
-                            <div className="flex flex-wrap gap-1">
-                              {contributors.map((r) => (
-                                <button
-                                  key={r.report_id}
-                                  type="button"
-                                  onClick={() => setPreviewId(r.report_id)}
-                                  title={reportTooltip(r, `${PILLAR_LABELS[id]}: ${r.scores[id]}/5\nClick to preview`)}
-                                  aria-label={`Preview match report for ${r.match_date ? formatDate(r.match_date) : "undated match"} versus ${r.opponent?.trim() || "opponent TBC"}, ${PILLAR_LABELS[id]} score ${r.scores[id]} of 5`}
-                                  className="px-1.5 py-0.5 rounded border border-border/60 bg-accent/20 text-[10px] text-muted-foreground hover:text-foreground hover:border-primary/40 tabular-nums focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                                >
-                                  {reportRef(r)}
-                                </button>
-                              ))}
-                              {Array.from({ length: 5 - contributors.length }).map((_, i) => (
-                                <span
-                                  key={`missing-${id}-${i}`}
-                                  className="px-1.5 py-0.5 rounded border border-dashed border-border/60 text-[10px] text-muted-foreground/70 italic"
-                                  title={`Missing report with a valid ${PILLAR_LABELS[id]} score`}
-                                >
-                                  missing report
-                                </span>
-                              ))}
-                            </div>
-                          )}
-                          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                            <Link
-                              to="/reports"
-                              search={{ from: "", to: "", coach: "", mentorProfileId: "", source: "", gk: gk.name, openSubmit: "1", last5Gk: "" }}
-                              className="text-primary hover:underline inline-flex items-center gap-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
-                            >
-                              Submit a Match Report for {gk.name}
-                            </Link>
-                            <Link to="/calendar" search={{ gkId: gk.id }} className="text-muted-foreground hover:text-foreground hover:underline inline-flex items-center gap-0.5">
-                              <CalendarIcon className="size-3.5" /> See upcoming matches
-                            </Link>
-                          </div>
-
-                        </div>
-                      )}
-                      {hasEnough && contributors.length > 0 && (
-                        <div className="flex flex-wrap gap-1 mt-1">
-                          {contributors.map((r) => (
-                            <button
-                              key={r.report_id}
-                              type="button"
-                              onClick={() => setPreviewId(r.report_id)}
-                              title={reportTooltip(r, `${PILLAR_LABELS[id]}: ${r.scores[id]}/5\nClick to preview`)}
-                              aria-label={`Preview match report for ${r.match_date ? formatDate(r.match_date) : "undated match"} versus ${r.opponent?.trim() || "opponent TBC"}, ${PILLAR_LABELS[id]} score ${r.scores[id]} of 5`}
-                              className="px-1.5 py-0.5 rounded border border-border/60 bg-accent/20 text-[10px] text-muted-foreground hover:text-foreground hover:border-primary/40 tabular-nums focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:border-primary"
-                            >
-                              {reportRef(r)}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-                {gkReports.length > 0 && gkReports.length < 5 && (
-                  <div className="text-[11px] text-muted-foreground leading-snug border-t border-border/40 pt-2">
-                    <span className="font-medium text-foreground">{gkReports.length} of 5</span> match reports available for this goalkeeper.
-                    <Link to="/reports" search={{ from: "", to: "", coach: "", mentorProfileId: "", source: "", gk: gk.name, openSubmit: "1" }} className="ml-1 text-primary hover:underline">
-                      Submit a Match Report for {gk.name}
-                    </Link>
-                    <Link to="/calendar" search={{ gkId: gk.id }} className="ml-2 text-muted-foreground hover:text-foreground hover:underline inline-flex items-center gap-0.5">
-                      <CalendarIcon className="size-3.5" /> See upcoming matches
-                    </Link>
-                  </div>
-                )}
-
-              </div>
-            )}
-          </Card>
-
-          <Card className="p-4">
-            <div className="flex items-center justify-between gap-2">
-              <SectionTitle>Media ({gkMedia.length})</SectionTitle>
-              {can("media.upload") && (
-                <button
-                  onClick={() => setWorkflow("media")}
-                  className="inline-flex items-center gap-1 h-7 px-2 rounded-md border border-border text-[11px] hover:bg-accent"
-                >
-                  <Upload className="size-3.5" /> Upload
-                </button>
-              )}
-            </div>
-            <div className="space-y-1.5">
-              {mediaLoading && <p className="text-xs text-muted-foreground">Loading media…</p>}
-              {mediaError && <p className="text-xs text-destructive">{mediaError}</p>}
-              {!mediaLoading && !mediaError && gkMedia.length === 0 && (
-                <p className="text-xs text-muted-foreground">No media linked to {gk.name} yet.</p>
-              )}
-              {gkMedia.map((m) => (
-                <div key={m.id} className="flex items-center justify-between gap-2 text-xs">
-                  <button
-                    onClick={() => { void openAsset(m, user); }}
-                    className="min-w-0 flex-1 truncate text-left hover:underline inline-flex items-center gap-1"
-                    title={`${m.title} · ${formatBytes(m.file_size)}`}
-                  >
-                    <ExternalLink className="size-3 shrink-0 text-muted-foreground" />
-                    <span className="truncate">{m.title}</span>
-                  </button>
-                  <Pill>{m.media_type}</Pill>
-                </div>
-              ))}
-            </div>
-          </Card>
         </div>
       </div>
 
@@ -694,7 +1002,9 @@ function GkDetail() {
       <ReportPreviewModal
         reportId={previewId}
         open={previewId !== null}
-        onOpenChange={(o) => { if (!o) setPreviewId(null); }}
+        onOpenChange={(o) => {
+          if (!o) setPreviewId(null);
+        }}
       />
     </div>
   );

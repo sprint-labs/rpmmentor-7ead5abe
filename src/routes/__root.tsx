@@ -69,7 +69,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     links: [
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
-      { rel: "stylesheet", href: "https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Work+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" },
+      { rel: "stylesheet", href: "https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@500;600;700;800&family=Saira:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700;800&display=swap" },
       { rel: "stylesheet", href: appCss },
       { rel: "icon", type: "image/png", href: "/favicon.png" },
       { rel: "apple-touch-icon", sizes: "180x180", href: "/apple-touch-icon.png" },
@@ -97,14 +97,14 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 });
 
 const bootSplashCss = `
-#boot-splash{position:fixed;inset:0;z-index:2147483646;display:flex;align-items:center;justify-content:center;background:#0A0A0A;transition:opacity .35s ease-out;opacity:1;pointer-events:auto}
+#boot-splash{position:fixed;inset:0;z-index:2147483646;display:flex;align-items:center;justify-content:center;background:#0D0D0D;transition:opacity .35s ease-out;opacity:1;pointer-events:auto}
 #boot-splash[data-hide="1"]{opacity:0;pointer-events:none}
 #boot-splash .bs-wrap{display:flex;flex-direction:column;align-items:center;gap:18px}
-#boot-splash .bs-mark{width:64px;height:64px;border-radius:14px;background:linear-gradient(135deg,#00E5A0 0%,#00B37A 100%);display:flex;align-items:center;justify-content:center;color:#0A0A0A;font-family:'Chakra Petch',system-ui,sans-serif;font-weight:700;font-size:26px;letter-spacing:.02em;box-shadow:0 10px 40px rgba(0,229,160,.25);animation:bs-pulse 1.6s ease-in-out infinite}
+#boot-splash .bs-mark{width:64px;height:64px;border-radius:16px;background:linear-gradient(135deg,#12C400 0%,#0A7A00 100%);display:flex;align-items:center;justify-content:center;color:#0A0A0A;font-family:'Be Vietnam Pro',system-ui,sans-serif;font-weight:700;font-size:26px;letter-spacing:-.014em;box-shadow:0 10px 40px rgba(18,196,0,.25);animation:bs-pulse 1.6s ease-in-out infinite}
 #boot-splash .bs-bar{width:120px;height:2px;background:rgba(255,255,255,.08);border-radius:2px;overflow:hidden;position:relative}
-#boot-splash .bs-bar::after{content:"";position:absolute;top:0;left:0;height:100%;width:40%;background:linear-gradient(90deg,transparent,#00E5A0,transparent);animation:bs-slide 1.1s ease-in-out infinite}
+#boot-splash .bs-bar::after{content:"";position:absolute;top:0;left:0;height:100%;width:40%;background:linear-gradient(90deg,transparent,#12C400,transparent);animation:bs-slide 1.1s ease-in-out infinite}
 #boot-splash .bs-label{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10px;letter-spacing:.24em;text-transform:uppercase;color:rgba(255,255,255,.5)}
-@keyframes bs-pulse{0%,100%{transform:scale(1);box-shadow:0 10px 40px rgba(0,229,160,.25)}50%{transform:scale(1.05);box-shadow:0 14px 56px rgba(0,229,160,.45)}}
+@keyframes bs-pulse{0%,100%{transform:scale(1);box-shadow:0 10px 40px rgba(18,196,0,.25)}50%{transform:scale(1.05);box-shadow:0 14px 56px rgba(18,196,0,.45)}}
 @keyframes bs-slide{0%{left:-40%}100%{left:100%}}
 @media (prefers-reduced-motion:reduce){#boot-splash .bs-mark,#boot-splash .bs-bar::after{animation:none}}
 `;
@@ -113,7 +113,7 @@ const bootSplashHideScript = `(()=>{const el=document.getElementById('boot-splas
 
 function RootShell({ children }: { children: ReactNode }) {
   return (
-    <html lang="en" className="dark" suppressHydrationWarning>
+    <html lang="en" className="dark" data-theme="dark" suppressHydrationWarning>
       <head>
         <ScriptOnce>{themeInitScript}</ScriptOnce>
         <style dangerouslySetInnerHTML={{ __html: bootSplashCss }} />

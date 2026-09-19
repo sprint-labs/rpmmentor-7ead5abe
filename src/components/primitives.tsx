@@ -5,12 +5,15 @@ import { cn } from "@/lib/utils";
 import { TIER_DEFINITIONS } from "@/lib/mock-data";
 import type { Tier, DutyLevel } from "@/lib/mock-data";
 
+// Outlined, like every other badge: a 15% wash of the badge's own hue behind
+// its label costs roughly a point of contrast, which is the difference between
+// passing and failing AA for the paler hues. The dot carries the fill instead.
 const DUTY_TONES: Record<DutyLevel, { dot: string; badge: string }> = {
-  up_to_date: { dot: "bg-success", badge: "bg-success/15 text-success border-success/30" },
-  due_soon: { dot: "bg-warning", badge: "bg-warning/15 text-warning border-warning/30" },
+  up_to_date: { dot: "bg-success", badge: "text-success border-success/40" },
+  due_soon: { dot: "bg-warning", badge: "text-warning border-warning/40" },
   overdue: {
     dot: "bg-destructive",
-    badge: "bg-destructive/15 text-destructive border-destructive/40",
+    badge: "text-destructive border-destructive/40",
   },
   not_required: {
     dot: "bg-muted-foreground/50",
@@ -118,7 +121,7 @@ export function Breadcrumbs({ items, className }: { items: BreadcrumbItem[]; cla
                 {item.label}
               </span>
             )}
-            {!isLast && <ChevronRight className="size-3 text-muted-foreground/60" />}
+            {!isLast && <ChevronRight className="size-3 text-muted-foreground" />}
           </span>
         );
       })}
@@ -157,6 +160,9 @@ export function StatCard({
         : accent === "info"
           ? "before:bg-info"
           : "before:bg-primary";
+  // The default is `--primary-ink`, not `--primary`: the brand volt is
+  // graphic-grade and reads at 2.35:1 on the light theme's white card, which
+  // even a 30px headline number fails. The ink grade is the text-safe one.
   const valueTone =
     accent === "warning"
       ? "text-warning"
@@ -164,23 +170,40 @@ export function StatCard({
         ? "text-destructive"
         : accent === "info"
           ? "text-info"
-          : "text-primary";
+          : "text-primary-ink";
+  // Blur and spread come from the theme, not from here: the same halo that
+  // reads as a crisp edge on white blooms into the gutter on carbon. See
+  // `--stat-glow-blur` / `--stat-glow-spread` in styles.css.
   const glow =
     accent === "warning"
-      ? "shadow-[0_0_18px_-6px_var(--warning)]"
+      ? "shadow-[0_0_var(--stat-glow-blur)_var(--stat-glow-spread)_var(--warning)]"
       : accent === "destructive"
-        ? "shadow-[0_0_18px_-6px_var(--destructive)]"
+        ? "shadow-[0_0_var(--stat-glow-blur)_var(--stat-glow-spread)_var(--destructive)]"
         : accent === "info"
-          ? "shadow-[0_0_18px_-6px_var(--info)]"
-          : "shadow-[0_0_18px_-6px_var(--primary)]";
+          ? "shadow-[0_0_var(--stat-glow-blur)_var(--stat-glow-spread)_var(--info)]"
+          : "shadow-[0_0_var(--stat-glow-blur)_var(--stat-glow-spread)_var(--primary)]";
+  // Hover rings the whole card in its own accent and lifts the halo. Each card
+  // keeps its own hue rather than all of them turning green, so the highlight
+  // still says which card the pointer is on. `group-hover` is what fires it:
+  // every one of these is wrapped in a Link on the dashboard.
+  const hover =
+    accent === "warning"
+      ? "group-hover:ring-warning/70 group-hover:shadow-[0_0_calc(var(--stat-glow-blur)*2)_var(--stat-glow-spread)_var(--warning)]"
+      : accent === "destructive"
+        ? "group-hover:ring-destructive/70 group-hover:shadow-[0_0_calc(var(--stat-glow-blur)*2)_var(--stat-glow-spread)_var(--destructive)]"
+        : accent === "info"
+          ? "group-hover:ring-info/70 group-hover:shadow-[0_0_calc(var(--stat-glow-blur)*2)_var(--stat-glow-spread)_var(--info)]"
+          : "group-hover:ring-primary/70 group-hover:shadow-[0_0_calc(var(--stat-glow-blur)*2)_var(--stat-glow-spread)_var(--primary)]";
   const isEmpty = typeof value === "number" && value === 0 && emptyMessage;
   return (
     <div
       className={cn(
         "command-panel p-4 relative overflow-hidden text-card-foreground",
         "before:content-[''] before:absolute before:left-0 before:top-0 before:h-full before:w-[2px]",
+        "ring-1 ring-transparent transition-[box-shadow,--tw-ring-color] duration-150",
         rail,
         glow,
+        hover,
       )}
     >
       <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground font-mono">
@@ -189,14 +212,14 @@ export function StatCard({
       <div
         className={cn(
           "mt-1.5 text-3xl font-bold tabular-nums font-mono leading-none",
-          isEmpty ? "text-muted-foreground/60 text-base font-normal" : valueTone,
+          isEmpty ? "text-muted-foreground text-base font-normal" : valueTone,
         )}
       >
         {isEmpty ? emptyMessage : value}
       </div>
       {hint && <div className="text-[10px] text-muted-foreground mt-2">{hint}</div>}
       {updatedAt && (
-        <div className="text-[10px] text-muted-foreground/70 mt-3 font-mono tabular-nums">
+        <div className="text-[10px] text-muted-foreground mt-3 font-mono tabular-nums">
           Updated {updatedAt}
         </div>
       )}
@@ -204,14 +227,36 @@ export function StatCard({
   );
 }
 
-export function TierBadge({ tier }: { tier: Tier }) {
+/**
+ * A tier, a status, or nothing recorded yet.
+ *
+ * `null` is a real state on the roster — a goalkeeper management has not tiered
+ * — and it reads as "Unassigned" rather than as a blank, so an untiered
+ * goalkeeper is visibly waiting for a decision instead of looking like a
+ * rendering gap. It takes the warning hue because it is an outstanding action,
+ * not a rung on the care ladder.
+ */
+export function TierBadge({ tier }: { tier: Tier | null | undefined }) {
+  if (!tier) {
+    return (
+      <span className="inline-flex items-center whitespace-nowrap rounded border border-destructive/40 px-1.5 py-0.5 text-[10px] font-medium text-destructive">
+        Unassigned
+      </span>
+    );
+  }
+  // Outlined, not filled. A 15% wash of the label's own hue behind it cost
+  // roughly a full point of contrast and put Tier 2, Tier 3 and Academy under
+  // 4.5:1 in light mode and Tier 3 and Academy under it in dark. The hue still
+  // reads from the text and the border, which is where it was doing the work.
   const styles: Record<Tier, string> = {
-    "Tier 1": "bg-warning/15 text-warning border-warning/40",
-    "Tier 2": "bg-info/15 text-info border-info/30",
-    "Tier 3": "bg-primary/15 text-primary border-primary/30",
-    "Tier 4": "bg-muted text-muted-foreground border-border",
-    Academy: "bg-tier-3/20 text-tier-3 border-tier-3/40",
-    "Free Agent": "bg-muted text-muted-foreground border-border",
+    "Tier 1": "text-tier-1 border-tier-1/40",
+    "Tier 2": "text-tier-2 border-tier-2/40",
+    "Tier 3": "text-tier-3 border-tier-3/40",
+    "Tier 4": "text-muted-foreground border-border",
+    // Academy is a tag, not a rung on the care ladder, so it takes a tag hue
+    // rather than borrowing a tier's green.
+    Academy: "text-info border-info/40",
+    "Free Agent": "text-muted-foreground border-border",
   };
   return (
     <span
@@ -227,11 +272,12 @@ export function TierBadge({ tier }: { tier: Tier }) {
 export const StatusBadge = TierBadge;
 
 export function TierLevelBadge({ level }: { level: 1 | 2 | 3 | 4 }) {
+  // Outlined for the same contrast reason as `TierBadge` above.
   const styles: Record<1 | 2 | 3 | 4, string> = {
-    1: "bg-warning/15 text-warning border-warning/40",
-    2: "bg-info/15 text-info border-info/30",
-    3: "bg-primary/15 text-primary border-primary/30",
-    4: "bg-muted text-muted-foreground border-border",
+    1: "text-tier-1 border-tier-1/40",
+    2: "text-tier-2 border-tier-2/40",
+    3: "text-tier-3 border-tier-3/40",
+    4: "text-muted-foreground border-border",
   };
   return (
     <span
@@ -271,12 +317,13 @@ export function Pill({
   children: ReactNode;
   tone?: "muted" | "success" | "warning" | "destructive" | "info";
 }) {
+  // Outlined for the same contrast reason as the badges above.
   const t: Record<string, string> = {
-    muted: "bg-muted text-muted-foreground border-border",
-    success: "bg-success/15 text-success border-success/30",
-    warning: "bg-warning/15 text-warning border-warning/30",
-    destructive: "bg-destructive/15 text-destructive border-destructive/40",
-    info: "bg-info/15 text-info border-info/30",
+    muted: "text-muted-foreground border-border",
+    success: "text-success border-success/40",
+    warning: "text-warning border-warning/40",
+    destructive: "text-destructive border-destructive/40",
+    info: "text-info border-info/40",
   };
   return (
     <span

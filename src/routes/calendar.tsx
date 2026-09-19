@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -8,7 +8,7 @@ import { PageHeader, Card, Pill } from "@/components/primitives";
 import { formatDate, goalkeepers } from "@/lib/mock-data";
 import { useEffect, useMemo, useState } from "react";
 import { withPermission } from "@/components/require-permission";
-import { X, Plus, Pencil, Trash2, NotebookPen, Upload } from "lucide-react";
+import { X, Plus, Pencil, Trash2, NotebookPen, Upload, ChevronLeft, ChevronRight } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { WorkflowDialog, type WorkflowKind } from "@/components/workflows";
 import { FixtureImportDialog } from "@/components/calendar/fixture-import-dialog";
@@ -24,6 +24,16 @@ import {
 } from "@/lib/calendar.functions";
 import { listPlayers } from "@/lib/players.functions";
 import { listReportCoverage } from "@/lib/calendar/report-coverage.functions";
+import {
+  formatMonthParam,
+  isSameMonth,
+  localDateIso,
+  monthGrid,
+  monthLabel,
+  monthOf,
+  parseMonthParam,
+  shiftMonth,
+} from "@/lib/calendar/month";
 import {
   cancelCalendarEvent,
   listEventFollowUps,
@@ -126,6 +136,12 @@ const calendarSearchSchema = z.object({
   /** Wording carried over when a manager escalates a dashboard alert. */
   title: fallback(z.string(), "").default(""),
   notes: fallback(z.string(), "").default(""),
+  /**
+   * Month to open on, `YYYY-MM`. Empty means "the month containing today",
+   * which is what every existing link to this page already expects, so adding
+   * the parameter leaves those links behaving exactly as before.
+   */
+  month: fallback(z.string(), "").default(""),
 });
 
 export const Route = createFileRoute("/calendar")({
@@ -193,11 +209,6 @@ function startTimeLabel(e: DisplayEvent) {
   return e.startTime ? e.startTime.slice(0, 5) : "";
 }
 
-/** The calendar date a user is looking at, not a UTC instant. */
-function localDateIso(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-
 /** What the chosen type will ask the assigned mentor for. */
 function followUpHint(eventType: string): string {
   if (!isEventType(eventType)) return "Retired type — reclassify to save this event.";
@@ -206,7 +217,14 @@ function followUpHint(eventType: string): string {
 }
 
 function CalendarPage() {
-  const { gkId, new: openNewOnMount, title: prefillTitle, notes: prefillNotes } = Route.useSearch();
+  const {
+    gkId,
+    new: openNewOnMount,
+    title: prefillTitle,
+    notes: prefillNotes,
+    month: monthParam,
+  } = Route.useSearch();
+  const navigate = useNavigate();
   const { can, user } = useAuth();
   const canManage = can("calendar.manage");
   const [workflow, setWorkflow] = useState<WorkflowKind | null>(null);
@@ -410,17 +428,27 @@ function CalendarPage() {
   const [view, setView] = useState<"month" | "week">("month");
   const today = new Date();
   const todayIso = localDateIso(today);
-  const start = new Date(today.getFullYear(), today.getMonth(), 1);
-  const startDow = (start.getDay() + 6) % 7; // Mon = 0
-  const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
-  const cells: (Date | null)[] = [];
-  for (let i = 0; i < startDow; i++) cells.push(null);
-  for (let d = 1; d <= daysInMonth; d++) cells.push(new Date(today.getFullYear(), today.getMonth(), d));
-  while (cells.length % 7 !== 0) cells.push(null);
+  const todayMonth = monthOf(today);
+  // The month on screen comes from the URL, so a link can open a specific one
+  // and the browser's back button steps between months. An absent or malformed
+  // value falls back to today's month, which is how this page always behaved.
+  const monthCursor = parseMonthParam(monthParam, todayMonth);
+  const cells = monthGrid(monthCursor);
 
+  function goToMonth(next: { year: number; month: number }) {
+    void navigate({
+      to: "/calendar",
+      search: (prev) => ({ ...prev, month: formatMonthParam(next) }),
+      replace: true,
+    });
+  }
+
+  // Keyed by local calendar date. Keying on `Date.toDateString()` meant
+  // building a Date per row and per lookup, when the ISO day is already the
+  // value the rows carry.
   const eventsByDay = new Map<string, DisplayEvent[]>();
   displayEvents.forEach((e) => {
-    const k = new Date(`${e.date}T00:00:00`).toDateString();
+    const k = e.date.slice(0, 10);
     if (!eventsByDay.has(k)) eventsByDay.set(k, []);
     eventsByDay.get(k)!.push(e);
   });
@@ -582,19 +610,56 @@ function CalendarPage() {
 
       {view === "month" ? (
         <Card className="p-3">
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <button
+              type="button"
+              onClick={() => goToMonth(shiftMonth(monthCursor, -1))}
+              aria-label={`Show ${monthLabel(shiftMonth(monthCursor, -1))}`}
+              className="inline-flex size-8 items-center justify-center rounded-md border border-border text-muted-foreground hover:bg-accent hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <ChevronLeft className="size-4" />
+            </button>
+            <div className="flex items-center gap-2">
+              <h2
+                className="font-mono text-sm font-bold uppercase tracking-[0.14em]"
+                aria-live="polite"
+              >
+                {monthLabel(monthCursor)}
+              </h2>
+              {!isSameMonth(monthCursor, todayMonth) && (
+                <button
+                  type="button"
+                  onClick={() => goToMonth(todayMonth)}
+                  className="rounded border border-border px-2 py-0.5 text-[10px] font-mono uppercase tracking-widest text-muted-foreground hover:bg-accent hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  Today
+                </button>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={() => goToMonth(shiftMonth(monthCursor, 1))}
+              aria-label={`Show ${monthLabel(shiftMonth(monthCursor, 1))}`}
+              className="inline-flex size-8 items-center justify-center rounded-md border border-border text-muted-foreground hover:bg-accent hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <ChevronRight className="size-4" />
+            </button>
+          </div>
           <div className="grid grid-cols-7 text-[10px] uppercase tracking-wider text-muted-foreground mb-2">
             {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => <div key={d} className="px-2 py-1">{d}</div>)}
           </div>
           <div className="grid grid-cols-7 gap-1">
-            {cells.map((d, i) => {
-              const isToday = d?.toDateString() === today.toDateString();
-              const dayEvents = d ? eventsByDay.get(d.toDateString()) ?? [] : [];
-              const iso = d ? localDateIso(d) : "";
+            {cells.map((cell) => {
+              const isToday = cell.iso === todayIso;
+              // Adjacent-month days are shown greyed for alignment but carry no
+              // events, so a fixture is never listed under two months.
+              const dayEvents = cell.inMonth ? eventsByDay.get(cell.iso) ?? [] : [];
+              const iso = cell.iso;
               return (
-                <div key={i} className={`group min-h-24 rounded-md border p-1.5 ${d ? "bg-card border-border" : "border-transparent"} ${isToday ? "ring-1 ring-primary" : ""}`}>
-                  {d && (
+                <div key={cell.iso} className={`group min-h-24 rounded-md border p-1.5 ${cell.inMonth ? "bg-card border-border" : "border-transparent opacity-40"} ${isToday ? "ring-1 ring-primary" : ""}`}>
+                  {cell.inMonth ? (
                     <div className="mb-1 flex items-center justify-between">
-                      <span className={`text-[11px] tabular-nums font-mono font-medium ${isToday ? "text-primary" : "text-muted-foreground"}`}>{d.getDate()}</span>
+                      <span className={`text-[11px] tabular-nums font-mono font-medium ${isToday ? "text-primary" : "text-muted-foreground"}`}>{cell.day}</span>
                       <span className="flex items-center gap-0.5">
                         {canLog && (
                           <button
@@ -615,6 +680,12 @@ function CalendarPage() {
                             <Plus className="size-3" />
                           </button>
                         )}
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="mb-1">
+                      <span className="text-[11px] tabular-nums font-mono font-medium text-muted-foreground">
+                        {cell.day}
                       </span>
                     </div>
                   )}

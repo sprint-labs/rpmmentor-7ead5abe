@@ -825,7 +825,7 @@ export function BroadcastCentre() {
                   <div
                     className={cn(
                       "mt-1.5 whitespace-pre-wrap text-xs leading-relaxed",
-                      body.trim() ? "text-muted-foreground" : "italic text-muted-foreground/60",
+                      body.trim() ? "text-muted-foreground" : "italic text-muted-foreground",
                     )}
                   >
                     {body.trim() || "Your message will appear here as you type."}

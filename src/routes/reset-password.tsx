@@ -4,7 +4,7 @@ import { ArrowLeft, CheckCircle2, Eye, EyeOff, Lock } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { recordPasswordRecovery } from "@/lib/account.functions";
-import { LOGIN_LOCKUP_SRC } from "@/lib/brand";
+import { GkhqLockup } from "@/components/gkhq-lockup";
 import { parseRecoveryCallback, stripAuthCallbackFromUrl } from "@/lib/password-recovery";
 
 export const Route = createFileRoute("/reset-password")({
@@ -123,7 +123,7 @@ function ResetPasswordPage() {
     <main id="main-content" tabIndex={-1} className="min-h-screen flex items-center justify-center bg-background p-6">
       <div className="w-full max-w-md">
         <div className="mb-10">
-          <img src={LOGIN_LOCKUP_SRC} alt="Mentor Hub by RPM" className="h-40 w-auto" />
+          <GkhqLockup stacked markClassName="size-20" wordmarkClassName="h-10 w-auto" alt="GKHQ Mentor Hub" />
         </div>
 
         {status === "checking" && (

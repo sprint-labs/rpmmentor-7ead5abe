@@ -52,7 +52,7 @@ import {
   ANNOUNCEMENT_CLOCK_INTERVAL_MS,
   useAnnouncementClock,
 } from "@/lib/support/announcement-clock";
-import { BrandMark } from "@/components/brand-mark";
+import { GkhqMark, GkhqWordmark } from "@/components/gkhq-lockup";
 import { OfflineBanner } from "@/components/offline-banner";
 import { SyncManager } from "@/components/sync-manager";
 import { InstallPrompt } from "@/components/install-prompt";
@@ -403,9 +403,10 @@ export function AppShell() {
             aria-label="Mentor Hub"
             className="size-11 md:w-auto md:h-auto flex items-center justify-center md:justify-start gap-2.5 shrink-0 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           >
-            <BrandMark className="size-9 shrink-0" alt="" />
+            <GkhqMark className="size-9 shrink-0" />
+            <GkhqWordmark className="hidden h-5 w-auto shrink-0 sm:block" alt="GKHQ" />
             <span
-              className="hidden sm:inline font-semibold text-foreground tracking-tight"
+              className="hidden font-medium tracking-tight text-muted-foreground md:inline"
               aria-hidden="true"
             >
               Mentor Hub
@@ -848,7 +849,7 @@ export function AppShell() {
             className="fixed inset-y-0 right-0 z-50 w-[min(22rem,calc(100vw-1rem))] md:w-72 flex flex-col border-l border-sidebar-border bg-sidebar shadow-2xl"
           >
             <div className="flex items-center gap-2.5 px-4 min-h-16 md:h-14 border-b border-sidebar-border">
-              <BrandMark className="size-7 shrink-0" alt="Mentor Hub" />
+              <GkhqMark className="size-7 shrink-0" alt="Mentor Hub" />
               <div className="flex flex-col leading-tight min-w-0 flex-1">
                 <h2 id="menu-title" className="text-sm font-semibold tracking-tight truncate">
                   {user.name}

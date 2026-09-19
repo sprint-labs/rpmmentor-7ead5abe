@@ -104,7 +104,7 @@ describe("HelpUpdatesLauncher", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Open Help and updates, 1 new" }));
+    fireEvent.click(screen.getByRole("button", { name: "Open Help & updates, 1 new" }));
 
     expect(screen.getByRole("dialog", { name: "Help & updates" })).toBeTruthy();
     expect(screen.getByText("Product update 1")).toBeTruthy();
@@ -117,18 +117,18 @@ describe("HelpUpdatesLauncher", () => {
     await waitFor(() => expect(onAskQuestion).toHaveBeenCalledTimes(1));
     expect(screen.queryByRole("dialog", { name: "Help & updates" })).toBeNull();
 
-    fireEvent.click(screen.getByRole("button", { name: "Open Help and updates, 1 new" }));
+    fireEvent.click(screen.getByRole("button", { name: "Open Help & updates, 1 new" }));
     fireEvent.click(screen.getByRole("button", { name: "Report a problem" }));
     await waitFor(() => expect(onReportProblem).toHaveBeenCalledTimes(1));
 
-    fireEvent.click(screen.getByRole("button", { name: "Open Help and updates, 1 new" }));
+    fireEvent.click(screen.getByRole("button", { name: "Open Help & updates, 1 new" }));
     fireEvent.click(screen.getByRole("button", { name: "Open your messages" }));
     await waitFor(() => expect(onOpenMessages).toHaveBeenCalledTimes(1));
   });
 
   it("moves focus into the modal and restores it after Escape", async () => {
     render(<LauncherHarness />);
-    const trigger = screen.getByRole("button", { name: "Open Help and updates, 1 new" });
+    const trigger = screen.getByRole("button", { name: "Open Help & updates, 1 new" });
     fireEvent.click(trigger);
 
     const close = screen.getByRole("button", { name: "Close Help and updates" });
@@ -178,7 +178,7 @@ describe("HelpUpdatesLauncher", () => {
     }
 
     render(<FocusHandoffHarness />);
-    fireEvent.click(screen.getByRole("button", { name: "Open Help and updates, 1 new" }));
+    fireEvent.click(screen.getByRole("button", { name: "Open Help & updates, 1 new" }));
     fireEvent.click(screen.getByRole("button", { name: "Ask a question" }));
 
     const workflow = await screen.findByRole("dialog", { name: "Question workflow" });
@@ -190,7 +190,7 @@ describe("HelpUpdatesLauncher", () => {
     const unread = [1, 2, 3, 4].map((index) => makeAnnouncement(index));
     render(<LauncherHarness items={unread} unreadCount={4} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Open Help and updates, 4 new" }));
+    fireEvent.click(screen.getByRole("button", { name: "Open Help & updates, 4 new" }));
 
     unread.forEach((announcement) => {
       expect(screen.getByText(announcement.title)).toBeTruthy();
@@ -201,12 +201,12 @@ describe("HelpUpdatesLauncher", () => {
     const { rerender } = render(
       <LauncherHarness items={[]} unreadCount={0} announcementsPending />,
     );
-    fireEvent.click(screen.getByRole("button", { name: "Open Help and updates" }));
+    fireEvent.click(screen.getByRole("button", { name: "Open Help & updates" }));
     expect(screen.getByText("Loading product updates…")).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "Close Help and updates" }));
     rerender(<LauncherHarness items={[]} unreadCount={0} announcementsError />);
-    fireEvent.click(screen.getByRole("button", { name: "Open Help and updates" }));
+    fireEvent.click(screen.getByRole("button", { name: "Open Help & updates" }));
     expect(screen.getByText("Product updates are unavailable. Try again later.")).toBeTruthy();
     expect(screen.queryByText(/You're up to date/)).toBeNull();
   });
@@ -240,7 +240,7 @@ describe("HelpUpdatesLauncher", () => {
     }
 
     render(<StatefulHarness />);
-    fireEvent.click(screen.getByRole("button", { name: "Open Help and updates, 4 new" }));
+    fireEvent.click(screen.getByRole("button", { name: "Open Help & updates, 4 new" }));
 
     const markButtons = screen.getAllByRole("button", { name: "Mark as read" });
     markButtons[0].focus();

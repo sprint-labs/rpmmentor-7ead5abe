@@ -1,4 +1,6 @@
-import { dutyStatusForGk, type DutyLevel, type Goalkeeper } from "./mock-data";
+import { type DutyLevel, type Goalkeeper } from "./mock-data";
+import { UNASSIGNED_TIER_LABEL } from "./roster-snapshot";
+import { normalisePersonName } from "./goalkeeper-player-link";
 
 export type GoalkeeperFilterState = {
   q: string;
@@ -31,8 +33,18 @@ const LEGACY_TIER_CATEGORY_TIERS = {
   "Tier 3-4": ["Tier 3", "Tier 4"],
 } as const;
 
+/**
+ * Fold a goalkeeper name for keying across tables.
+ *
+ * Delegates to `normalisePersonName` rather than lowercasing alone: every
+ * caller keys one table's spelling against another's — roster names against
+ * report names, duty rows, stored event names — and `public.players` spells
+ * an apostrophe straight (`Rich O'Donnell`) where `match_reports_cache`
+ * spells it curly (`Max O\u2019Leary`). A fold that ignores that silently
+ * drops the row it was asked to find.
+ */
 export function normaliseGoalkeeperName(value: string): string {
-  return value.trim().toLowerCase().replace(/\s+/g, " ");
+  return normalisePersonName(value);
 }
 
 export function clearGoalkeeperFilters(filters: GoalkeeperFilterState): GoalkeeperFilterState {
@@ -99,10 +111,24 @@ export function countActiveGoalkeeperFilters(filters: GoalkeeperFilterState): nu
   );
 }
 
+/**
+ * Duty level for one goalkeeper, supplied by the caller.
+ *
+ * The filter does not compute this. `duty_of_care_at()` is the only thing
+ * entitled to decide a duty status, and the roster already reads its projection
+ * for the column and the chips — so the filter takes the same answer rather
+ * than working one out of its own.
+ */
+export type DutyLevelLookup = (goalkeeperName: string) => DutyLevel;
+
+/** Used when a caller filters nothing by duty; never narrows the result set. */
+const ALL_DUTY_UNKNOWN: DutyLevelLookup = () => "not_enough_data";
+
 export function filterGoalkeepers(
   goalkeepers: Goalkeeper[],
   filters: GoalkeeperFilterState,
   ratingsByGoalkeeper: ReadonlyMap<string, GoalkeeperRating>,
+  dutyLevelFor: DutyLevelLookup = ALL_DUTY_UNKNOWN,
   now = Date.now(),
 ) {
   const selectedTiers = csv(filters.tiers);
@@ -123,7 +149,7 @@ export function filterGoalkeepers(
     if (filters.cat === "Tier 3-4" && goalkeeper.tier !== "Tier 3" && goalkeeper.tier !== "Tier 4")
       return false;
 
-    if (filters.duty !== "all" && dutyStatusForGk(goalkeeper).level !== (filters.duty as DutyLevel))
+    if (filters.duty !== "all" && dutyLevelFor(goalkeeper.name) !== (filters.duty as DutyLevel))
       return false;
 
     if (
@@ -134,7 +160,10 @@ export function filterGoalkeepers(
     )
       return false;
 
-    if (selectedTiers.length && !selectedTiers.includes(goalkeeper.tier)) return false;
+    // `Unassigned` is a selectable tier in its own right: a goalkeeper with no
+    // tier is someone waiting on a decision, not someone to hide from the list.
+    if (selectedTiers.length && !selectedTiers.includes(goalkeeper.tier ?? UNASSIGNED_TIER_LABEL))
+      return false;
     if (selectedLeagues.length && !selectedLeagues.includes(goalkeeper.league)) return false;
     if (selectedNats.length && !selectedNats.includes(goalkeeper.nationality)) return false;
 
