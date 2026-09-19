@@ -14,6 +14,7 @@ import {
 } from "@/components/primitives";
 import { DUTY_LABELS, type DutyLevel, type Goalkeeper, type TierLevelLabel } from "@/lib/mock-data";
 import { listPlayerDutyOfCare } from "@/lib/duty-of-care.functions";
+import { DUTY_SEVERITY } from "@/lib/duty-of-care-status";
 import { listPlayers } from "@/lib/players.functions";
 import { toGoalkeepers } from "@/lib/roster/live-goalkeepers";
 import { UNASSIGNED_TIER_LABEL } from "@/lib/roster-snapshot";
@@ -573,7 +574,11 @@ function GoalkeepersList() {
     for (const g of goalkeepers) {
       if (g.league) leagues.add(g.league);
       if (g.nationality) nats.add(g.nationality);
-      if (g.contractUntil && g.contractUntil !== "—") years.add(g.contractUntil.slice(0, 4));
+      // Only a real four-digit year: the contract filter matches on /^\d{4}$/,
+      // so any other option would set an active filter that narrows nothing
+      // while the "Advanced filters" badge counts it as one.
+      const year = g.contractUntil?.slice(0, 4) ?? "";
+      if (/^\d{4}$/.test(year)) years.add(year);
     }
     return {
       allLeagues: [...leagues].sort(),
@@ -647,8 +652,11 @@ function GoalkeepersList() {
     return [...filtered].sort((a, b) => {
       const aRating = ratingsByGoalkeeper.get(normaliseGoalkeeperName(a.name))?.average ?? null;
       const bRating = ratingsByGoalkeeper.get(normaliseGoalkeeperName(b.name))?.average ?? null;
-      const aDuty = dutyFor(a.name).label;
-      const bDuty = dutyFor(b.name).label;
+      // Severity, not the label. The label sorts alphabetically, which puts
+      // Overdue fourth of five and reshuffles the table whenever the view's
+      // `status_label` wording changes.
+      const aDuty = DUTY_SEVERITY[dutyFor(a.name).level];
+      const bDuty = DUTY_SEVERITY[dutyFor(b.name).level];
 
       switch (sort.key) {
         case "goalkeeper":
@@ -702,16 +710,31 @@ function GoalkeepersList() {
       ),
     [dutyIndex, dutyQueryState, goalkeepers],
   );
-  const DUTIES: { id: "all" | DutyLevel; label: string; count: number }[] = [
+  // Until the duty read answers, every goalkeeper falls into `not_enough_data`
+  // by construction — so a number here would say "Not enough data 116, Overdue
+  // 0" about a roster nobody has classified yet. The chips show nothing instead
+  // of something false, and "All" is a plain roster count that is true either
+  // way.
+  const dutyCountsKnown = !dutyPending && !dutyUnavailable;
+  const dutyChipCount = (count: number) => (dutyCountsKnown ? count : null);
+  const DUTIES: { id: "all" | DutyLevel; label: string; count: number | null }[] = [
     { id: "all", label: "All", count: dutyCounts.total },
-    { id: "up_to_date", label: DUTY_LABELS.up_to_date, count: dutyCounts.up_to_date },
-    { id: "due_soon", label: DUTY_LABELS.due_soon, count: dutyCounts.due_soon },
-    { id: "overdue", label: DUTY_LABELS.overdue, count: dutyCounts.overdue },
-    { id: "not_required", label: DUTY_LABELS.not_required, count: dutyCounts.not_required },
+    {
+      id: "up_to_date",
+      label: DUTY_LABELS.up_to_date,
+      count: dutyChipCount(dutyCounts.up_to_date),
+    },
+    { id: "due_soon", label: DUTY_LABELS.due_soon, count: dutyChipCount(dutyCounts.due_soon) },
+    { id: "overdue", label: DUTY_LABELS.overdue, count: dutyChipCount(dutyCounts.overdue) },
+    {
+      id: "not_required",
+      label: DUTY_LABELS.not_required,
+      count: dutyChipCount(dutyCounts.not_required),
+    },
     {
       id: "not_enough_data",
       label: DUTY_LABELS.not_enough_data,
-      count: dutyCounts.not_enough_data,
+      count: dutyChipCount(dutyCounts.not_enough_data),
     },
   ];
 
@@ -905,7 +928,7 @@ function GoalkeepersList() {
                             )}
                             {duty.label}
                             <span className="tabular-nums font-mono text-[10px] opacity-70">
-                              {duty.count}
+                              {duty.count ?? "…"}
                             </span>
                           </button>
                         );
@@ -997,7 +1020,9 @@ function GoalkeepersList() {
               >
                 {duty.id !== "all" && <TrafficLight level={duty.id as DutyLevel} size={7} />}
                 {duty.label}
-                <span className="tabular-nums font-mono text-[10px] opacity-70">{duty.count}</span>
+                <span className="tabular-nums font-mono text-[10px] opacity-70">
+                  {duty.count ?? "…"}
+                </span>
               </button>
             ))}
           </div>
