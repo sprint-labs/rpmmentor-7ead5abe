@@ -146,7 +146,7 @@ function PermissionsReportPage() {
       <Card className="p-4 mb-4">
         <div className="flex flex-wrap items-center gap-4 text-sm">
           <div className="flex items-center gap-2">
-            <ShieldCheck className="size-4 text-primary" />
+            <ShieldCheck className="size-4 text-primary-ink" />
             <span className="text-muted-foreground">Effective role:</span>
             <span className="font-medium">{effectiveRole ? ROLE_LABEL[effectiveRole] : "—"}</span>
           </div>

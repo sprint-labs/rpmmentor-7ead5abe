@@ -133,7 +133,7 @@ function DistributionRow({
       <span className="sr-only"> of the roster</span>
       <ArrowUpRight
         aria-hidden="true"
-        className="size-3 shrink-0 text-muted-foreground transition-colors group-hover:text-primary"
+        className="size-3 shrink-0 text-muted-foreground transition-colors group-hover:text-primary-ink"
       />
     </Link>
   );

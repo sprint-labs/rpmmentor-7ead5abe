@@ -96,7 +96,7 @@ export function HandwrittenNotesField({
       <div className="flex items-start justify-between gap-2">
         <div>
           <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            <Sparkles className="size-3.5 text-primary" />Transcribe Handwritten Notes
+            <Sparkles className="size-3.5 text-primary-ink" />Transcribe Handwritten Notes
           </div>
           <p className="text-[11px] text-muted-foreground mt-0.5">
             Snap or upload a clear photo of your notes — AI will turn it into typed text you can add to {destinationLabel === "comments" ? "Comments" : "Notes"}.

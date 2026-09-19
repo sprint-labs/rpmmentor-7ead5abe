@@ -230,7 +230,7 @@ function ResetPasswordPage() {
           <>
             <div className="mb-8">
               <div className="size-12 rounded-xl bg-secondary grid place-items-center mb-5">
-                <CheckCircle2 className="size-6 text-primary" />
+                <CheckCircle2 className="size-6 text-primary-ink" />
               </div>
               <h1 className="text-4xl font-display font-bold uppercase tracking-[0.02em] leading-tight">
                 Password updated

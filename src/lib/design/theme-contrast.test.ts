@@ -178,6 +178,26 @@ describe("text is never dimmed below its token", () => {
   });
 });
 
+describe("the brand volt is never used as text", () => {
+  // `--primary` is graphic-grade. On the light theme it resolves to the raw
+  // volt and reads at 2.35:1 on a white card, which fails AA at any size and
+  // even fails the 3:1 large-text floor. `--primary-ink` exists for text and
+  // resolves to the same value as `--primary` on the dark theme, so using it
+  // costs nothing there and fixes the light theme.
+  //
+  // This shipped on 135 elements — every green link, the "Viewing as" chip,
+  // the role selector — and was invisible in review because the product's
+  // default theme is the one where the two grades happen to be identical.
+  it("no text-primary in app source", () => {
+    const offenders = grepSource(
+      /className="[^"]*\btext-primary(?![-\w])/g,
+      // Vendored shadcn, not this project's design work.
+      /\/components\/ui\//,
+    );
+    expect(offenders, offenders.join("\n")).toEqual([]);
+  });
+});
+
 describe("a tier or status badge never sits on a wash of its own hue", () => {
   // Tailwind mixes these in oklab, so the effective background is darker than
   // a plain alpha blend suggests and the label loses roughly a point of

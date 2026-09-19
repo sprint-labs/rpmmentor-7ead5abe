@@ -435,7 +435,7 @@ function GkProfile({ gk, player }: { gk: Goalkeeper; player: PlayerRosterRow }) 
                   href={gk.instagram}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-primary hover:underline inline-flex items-center gap-1"
+                  className="text-primary-ink hover:underline inline-flex items-center gap-1"
                   aria-label={`${gk.name} on Instagram (opens in new tab)`}
                 >
                   @
@@ -679,7 +679,7 @@ function GkProfile({ gk, player }: { gk: Goalkeeper; player: PlayerRosterRow }) 
                     gk: gk.name,
                     openSubmit: "1",
                   }}
-                  className="text-[11px] text-primary hover:underline inline-flex items-center gap-0.5"
+                  className="text-[11px] text-primary-ink hover:underline inline-flex items-center gap-0.5"
                 >
                   Submit a Match Report for {gk.name}
                 </Link>
@@ -782,7 +782,7 @@ function GkProfile({ gk, player }: { gk: Goalkeeper; player: PlayerRosterRow }) 
                                 openSubmit: "1",
                                 last5Gk: "",
                               }}
-                              className="text-primary hover:underline inline-flex items-center gap-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
+                              className="text-primary-ink hover:underline inline-flex items-center gap-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
                             >
                               Submit a Match Report for {gk.name}
                             </Link>
@@ -833,7 +833,7 @@ function GkProfile({ gk, player }: { gk: Goalkeeper; player: PlayerRosterRow }) 
                         gk: gk.name,
                         openSubmit: "1",
                       }}
-                      className="ml-1 text-primary hover:underline"
+                      className="ml-1 text-primary-ink hover:underline"
                     >
                       Submit a Match Report for {gk.name}
                     </Link>
@@ -957,7 +957,7 @@ function GkProfile({ gk, player }: { gk: Goalkeeper; player: PlayerRosterRow }) 
                       openSubmit: "",
                       last5Gk: gk.name,
                     }}
-                    className="text-[11px] text-primary hover:underline"
+                    className="text-[11px] text-primary-ink hover:underline"
                   >
                     View last 5 in Reports →
                   </Link>
@@ -965,7 +965,7 @@ function GkProfile({ gk, player }: { gk: Goalkeeper; player: PlayerRosterRow }) 
                 {isError && (
                   <button
                     onClick={() => refetch()}
-                    className="text-[11px] text-primary hover:underline"
+                    className="text-[11px] text-primary-ink hover:underline"
                   >
                     Retry
                   </button>

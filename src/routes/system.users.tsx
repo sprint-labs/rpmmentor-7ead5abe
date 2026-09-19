@@ -28,7 +28,7 @@ const ROLES: Role[] = ["super_admin", "admin", "mentor_manager", "mentor"];
 type RoleOrNone = Role | "";
 
 const ROLE_TONE: Record<Role, string> = {
-  super_admin: "bg-primary/15 text-primary border-primary/30",
+  super_admin: "bg-primary/15 text-primary-ink border-primary/30",
   admin: "bg-accent text-accent-foreground border-border",
   mentor_manager: "bg-warning/15 text-warning border-warning/30",
   mentor: "bg-success/15 text-success border-success/30",
@@ -206,7 +206,7 @@ function SystemUsersPage() {
   return (
     <div className="max-w-5xl mx-auto space-y-5">
       {isRefreshing && (
-        <div className="fixed top-0 left-0 right-0 z-50 flex items-center justify-center gap-2 border-b border-primary/20 bg-primary/10 py-2 text-xs font-medium text-primary backdrop-blur-sm">
+        <div className="fixed top-0 left-0 right-0 z-50 flex items-center justify-center gap-2 border-b border-primary/20 bg-primary/10 py-2 text-xs font-medium text-primary-ink backdrop-blur-sm">
           <Loader2 className="size-4 animate-spin" />
           Refreshing dashboard counts and lists…
         </div>
@@ -250,8 +250,8 @@ function SystemUsersPage() {
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <div className="flex items-center gap-2">
-            <ShieldCheck className="size-4 text-primary" />
-            <span className="text-[10px] uppercase tracking-wider font-medium text-primary">
+            <ShieldCheck className="size-4 text-primary-ink" />
+            <span className="text-[10px] uppercase tracking-wider font-medium text-primary-ink">
               System · Super Admin
             </span>
           </div>

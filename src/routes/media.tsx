@@ -182,7 +182,7 @@ function MediaPage() {
       <Card className="p-3">
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <Filter className="size-3.5" />Filters {activeFilterCount > 0 && <span className="px-1.5 rounded bg-primary/15 text-primary text-[10px]">{activeFilterCount}</span>}
+            <Filter className="size-3.5" />Filters {activeFilterCount > 0 && <span className="px-1.5 rounded bg-primary/15 text-primary-ink text-[10px]">{activeFilterCount}</span>}
           </div>
           {activeFilterCount > 0 && (
             <button onClick={reset} className="text-[11px] text-muted-foreground hover:text-foreground inline-flex items-center gap-1">
@@ -233,7 +233,7 @@ function MediaPage() {
                 const cur = new Set(f.tags ?? []);
                 if (cur.has(t)) cur.delete(t); else cur.add(t);
                 return { ...f, tags: cur.size ? Array.from(cur) : undefined };
-              })} className={`px-2 py-0.5 rounded text-[10px] border transition-colors ${active ? "bg-primary/15 border-primary/40 text-primary" : "border-border text-muted-foreground hover:bg-accent/40"}`}>
+              })} className={`px-2 py-0.5 rounded text-[10px] border transition-colors ${active ? "bg-primary/15 border-primary/40 text-primary-ink" : "border-border text-muted-foreground hover:bg-accent/40"}`}>
                 {t}
               </button>
             );

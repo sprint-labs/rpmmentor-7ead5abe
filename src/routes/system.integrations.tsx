@@ -90,7 +90,7 @@ function IntegrationsPage() {
           <h1 className="text-2xl font-semibold tracking-tight">Integrations</h1>
           <p className="text-sm text-muted-foreground mt-1">
             Runtime status for connected services.{" "}
-            <Link to="/system/github" className="text-primary hover:underline">
+            <Link to="/system/github" className="text-primary-ink hover:underline">
               GitHub sync
             </Link>
           </p>
@@ -110,7 +110,7 @@ function IntegrationsPage() {
         <div className="flex items-center justify-between gap-4 border-b border-border p-4">
           <div className="flex items-center gap-3">
             <div className="rounded-md bg-accent p-2">
-              <Database className="h-5 w-5 text-primary" />
+              <Database className="h-5 w-5 text-primary-ink" />
             </div>
             <div>
               <h2 className="font-medium leading-tight">Match Reports store</h2>
@@ -221,7 +221,7 @@ function IntegrationsPage() {
         <div className="flex items-center justify-between gap-4 border-b border-border p-4">
           <div className="flex items-center gap-3">
             <div className="rounded-md bg-accent p-2">
-              <FileSpreadsheet className="h-5 w-5 text-primary" />
+              <FileSpreadsheet className="h-5 w-5 text-primary-ink" />
             </div>
             <div>
               <h2 className="font-medium leading-tight">Google Sheets</h2>
@@ -263,7 +263,7 @@ function IntegrationsPage() {
                 href={`https://docs.google.com/spreadsheets/d/${s.spreadsheetId}/edit`}
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex items-center gap-1.5 text-primary hover:underline"
+                className="inline-flex items-center gap-1.5 text-primary-ink hover:underline"
               >
                 {s.spreadsheetTitle}
                 <ExternalLink className="h-3.5 w-3.5" />

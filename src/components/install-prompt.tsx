@@ -345,14 +345,16 @@ export function InstallPrompt() {
     return (
       <Card onClose={() => snooze("manual-close")}>
         <div className="grid grid-cols-[auto_minmax(0,1fr)] items-start gap-x-3 gap-y-3 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:items-center">
-          <div className="flex size-9 shrink-0 items-center justify-center rounded-md bg-primary/15 text-primary">
+          <div className="flex size-9 shrink-0 items-center justify-center rounded-md bg-primary/15 text-primary-ink">
             <Download className="size-4" />
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-[13px] font-semibold text-foreground">Install Mentor Hub</p>
             <p className="text-[11px] text-muted-foreground">
               Add to your home screen for a fullscreen app experience.{" "}
-              <Link to="/install" className="text-primary hover:underline">Learn how</Link>
+              <Link to="/install" className="text-primary-ink hover:underline">
+                Learn how
+              </Link>
             </p>
           </div>
           <button
@@ -371,7 +373,7 @@ export function InstallPrompt() {
     return (
       <Card onClose={() => snooze("manual-close")}>
         <div className="flex items-start gap-3">
-          <div className="flex size-9 shrink-0 items-center justify-center rounded-md bg-primary/15 text-primary">
+          <div className="flex size-9 shrink-0 items-center justify-center rounded-md bg-primary/15 text-primary-ink">
             <Download className="size-4" />
           </div>
           <div className="flex-1 min-w-0">
@@ -384,7 +386,10 @@ export function InstallPrompt() {
                 <Plus className="size-3" /> Add to Home Screen
               </span>
             </p>
-            <Link to="/install" className="mt-1 inline-block text-xs text-primary hover:underline">
+            <Link
+              to="/install"
+              className="mt-1 inline-block text-xs text-primary-ink hover:underline"
+            >
               Step-by-step guide
             </Link>
           </div>

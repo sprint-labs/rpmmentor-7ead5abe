@@ -75,7 +75,7 @@ function LoginPage() {
 
         {MAINTENANCE_MODE && (
           <div role="status" className="mb-8 rounded-xl border border-primary/30 bg-primary/10 px-4 py-3">
-            <p className="text-xs font-semibold uppercase tracking-[0.08em] text-primary">Temporary maintenance</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.08em] text-primary-ink">Temporary maintenance</p>
             <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
               Access is currently limited while final updates are completed. We expect the platform to be live again within the next couple of hours.
             </p>
@@ -169,7 +169,7 @@ function LoginPage() {
         {view === "sent" && (
           <>
             <div className="mb-8">
-              <div className="size-12 rounded-xl bg-secondary grid place-items-center mb-5"><CheckCircle2 className="size-6 text-primary" /></div>
+              <div className="size-12 rounded-xl bg-secondary grid place-items-center mb-5"><CheckCircle2 className="size-6 text-primary-ink" /></div>
               <h1 className="text-4xl font-display font-bold uppercase tracking-[0.02em] leading-tight">Check your inbox</h1>
               <p className="text-sm text-muted-foreground mt-3 leading-relaxed">If an account exists for <span className="text-foreground font-medium">{sentTo}</span>, you'll receive a reset link shortly.</p>
             </div>

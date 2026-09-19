@@ -771,7 +771,7 @@ export function VoiceNoteField({
       <div className="flex items-start justify-between gap-2">
         <div>
           <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            <Sparkles className="size-3.5 text-primary" />Voice Note → Comments
+            <Sparkles className="size-3.5 text-primary-ink" />Voice Note → Comments
           </div>
           <p className="text-[11px] text-muted-foreground mt-0.5">Record a spoken match note — AI transcribes it into text you can drop into the comments field. Up to {MAX_SECONDS / 60} minutes.</p>
         </div>
@@ -835,7 +835,7 @@ export function VoiceNoteField({
             <div className="rounded-md border border-border bg-background p-2.5 space-y-2">
               <div className="flex items-center justify-between gap-2">
                 <div className="inline-flex items-center gap-2 text-xs">
-                  <Loader2 className="size-3.5 animate-spin text-primary" />
+                  <Loader2 className="size-3.5 animate-spin text-primary-ink" />
                   <span className="font-medium text-foreground">
                     {phase === "preparing" && "Preparing audio…"}
                     {phase === "uploading" && "Uploading to AI…"}
@@ -874,7 +874,7 @@ export function VoiceNoteField({
                   </div>
                   <div className="flex flex-wrap gap-1">
                     {attemptLog.slice(0, -1).map((entry, i) => (
-                      <span key={entry.id} className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-sm text-[10px] ${entry.status === "error" ? "bg-destructive/15 text-destructive" : entry.status === "success" ? "bg-gk-green/15 text-gk-green" : "bg-primary/15 text-primary"}`}>
+                      <span key={entry.id} className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-sm text-[10px] ${entry.status === "error" ? "bg-destructive/15 text-destructive" : entry.status === "success" ? "bg-gk-green/15 text-gk-green" : "bg-primary/15 text-primary-ink"}`}>
                         {i + 1}. {new Date(entry.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
                         {entry.status === "error" && <AlertTriangle className="size-3" />}
                         {entry.status === "success" && <CheckCircle2 className="size-3" />}
@@ -986,7 +986,7 @@ export function VoiceNoteField({
                       <li key={entry.id} className="flex items-start gap-2 text-[11px]">
                         <span className="text-muted-foreground font-mono tabular-nums">{i + 1}.</span>
                         <span className="text-muted-foreground font-mono tabular-nums">{new Date(entry.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</span>
-                        <span className={`shrink-0 inline-flex items-center gap-1 px-1 rounded-sm ${entry.status === "success" ? "bg-gk-green/20 text-gk-green" : entry.status === "error" ? "bg-destructive/20 text-destructive" : "bg-primary/20 text-primary"}`}>
+                        <span className={`shrink-0 inline-flex items-center gap-1 px-1 rounded-sm ${entry.status === "success" ? "bg-gk-green/20 text-gk-green" : entry.status === "error" ? "bg-destructive/20 text-destructive" : "bg-primary/20 text-primary-ink"}`}>
                           {entry.status === "success" && <CheckCircle2 className="size-3" />}
                           {entry.status === "error" && <AlertTriangle className="size-3" />}
                           {entry.status === "started" && <Loader2 className="size-3 animate-spin" />}
@@ -1130,7 +1130,7 @@ export function VoiceNoteField({
                     const isCurrent = i === arr.length - 1 && transcript === v.text;
                     const badgeClass =
                       v.source === "ai"
-                        ? "bg-primary/15 text-primary border-primary/30"
+                        ? "bg-primary/15 text-primary-ink border-primary/30"
                         : v.source === "saved"
                         ? "bg-success/15 text-success border-success/30"
                         : "bg-amber-500/15 text-foreground border-amber-500/30";
@@ -1191,7 +1191,7 @@ export function VoiceNoteField({
                         className={`w-full text-left flex gap-2 items-start text-xs rounded-sm px-1.5 py-1 hover:bg-accent focus:outline-none focus-visible:ring-1 focus-visible:ring-primary ${active ? "bg-primary/10 border-l-2 border-primary" : ""}`}
                         aria-label={`Jump to ${fmtTs(s.start)}: ${s.text}`}
                       >
-                        <span className="font-mono tabular-nums text-[10px] text-primary shrink-0 mt-0.5">{fmtTs(s.start)}</span>
+                        <span className="font-mono tabular-nums text-[10px] text-primary-ink shrink-0 mt-0.5">{fmtTs(s.start)}</span>
                         <span className="text-foreground leading-relaxed">{s.text}</span>
                       </button>
                     );
@@ -1300,7 +1300,7 @@ export function VoiceNoteField({
                       type="button"
                       disabled={rewriting || !transcript || transcript.trim().length < 20}
                       onClick={() => void requestRewrite()}
-                      className="inline-flex items-center gap-1 h-7 px-2 rounded-md border border-primary/40 text-primary text-[11px] font-medium hover:bg-primary/10 disabled:opacity-40 disabled:cursor-not-allowed"
+                      className="inline-flex items-center gap-1 h-7 px-2 rounded-md border border-primary/40 text-primary-ink text-[11px] font-medium hover:bg-primary/10 disabled:opacity-40 disabled:cursor-not-allowed"
                       title="Create a faithful, polished rewrite using the selected fixture details"
                     >
                       {rewriting ? <Loader2 className="size-3 animate-spin" /> : <Sparkles className="size-3" />}
@@ -1329,7 +1329,7 @@ export function VoiceNoteField({
                       type="button"
                       disabled={rewriting || !transcript || transcript.trim().length < 20}
                       onClick={() => void requestRewrite()}
-                      className="inline-flex items-center gap-1 h-7 px-2 rounded-md border border-primary/40 text-primary text-[11px] font-medium hover:bg-primary/10 disabled:opacity-40 disabled:cursor-not-allowed"
+                      className="inline-flex items-center gap-1 h-7 px-2 rounded-md border border-primary/40 text-primary-ink text-[11px] font-medium hover:bg-primary/10 disabled:opacity-40 disabled:cursor-not-allowed"
                       title="Create a faithful, polished rewrite using the selected fixture details"
                     >
                       {rewriting ? <Loader2 className="size-3 animate-spin" /> : <Sparkles className="size-3" />}
@@ -1340,7 +1340,7 @@ export function VoiceNoteField({
                       type="button"
                       disabled={summarizing || !transcript || transcript.trim().length < 20}
                       onClick={() => void requestSummary()}
-                      className="inline-flex items-center gap-1 h-7 px-2 rounded-md border border-primary/40 text-primary text-[11px] font-medium hover:bg-primary/10 disabled:opacity-40 disabled:cursor-not-allowed"
+                      className="inline-flex items-center gap-1 h-7 px-2 rounded-md border border-primary/40 text-primary-ink text-[11px] font-medium hover:bg-primary/10 disabled:opacity-40 disabled:cursor-not-allowed"
                       title="Use AI to draft a structured summary from this transcript"
                     >
                       {summarizing ? <Loader2 className="size-3 animate-spin" /> : <Sparkles className="size-3" />}
@@ -1364,7 +1364,7 @@ export function VoiceNoteField({
               {aiMode === "report-rewrite" && rewrite && (
                 <div className="rounded-md border border-primary/40 bg-primary/5 p-2 space-y-2" aria-label="AI-suggested report rewrite">
                   <div className="flex items-center justify-between gap-2">
-                    <div className="text-[11px] font-semibold uppercase tracking-wider text-primary inline-flex items-center gap-1">
+                    <div className="text-[11px] font-semibold uppercase tracking-wider text-primary-ink inline-flex items-center gap-1">
                       <Sparkles className="size-3" /> AI rewrite — review before using
                     </div>
                     <button
@@ -1408,7 +1408,7 @@ export function VoiceNoteField({
               {aiMode === "structured-summary" && summary && (
                 <div className="rounded-md border border-primary/40 bg-primary/5 p-2 space-y-2" aria-label="AI-suggested structured summary">
                   <div className="flex items-center justify-between gap-2">
-                    <div className="text-[11px] font-semibold uppercase tracking-wider text-primary inline-flex items-center gap-1">
+                    <div className="text-[11px] font-semibold uppercase tracking-wider text-primary-ink inline-flex items-center gap-1">
                       <Sparkles className="size-3" /> AI suggestion — review before inserting
                     </div>
                     <button

@@ -260,7 +260,7 @@ function FollowUpsPage() {
         ) : visible.length === 0 ? (
           <div className="rounded-md border border-dashed border-border px-3 py-8 text-center text-sm text-muted-foreground">
             Nothing here.{" "}
-            <Link to="/calendar" className="text-primary hover:underline">
+            <Link to="/calendar" className="text-primary-ink hover:underline">
               Open the calendar
             </Link>{" "}
             to schedule an event.

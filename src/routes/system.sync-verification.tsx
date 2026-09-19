@@ -177,7 +177,7 @@ function SyncVerificationPage() {
         <p className="text-sm text-muted-foreground mt-1">
           Runtime checks that the synced competitions list, player-linking helpers and roster data
           are loaded in this build.{" "}
-          <Link to="/system/github" className="text-primary hover:underline">
+          <Link to="/system/github" className="text-primary-ink hover:underline">
             GitHub sync
           </Link>
         </p>

@@ -145,7 +145,7 @@ function PlayerPicker({
           <div className="text-sm font-medium truncate">{selected.full_name}</div>
           <div className="text-[11px] text-muted-foreground truncate">{selected.club} · {selected.league}</div>
         </div>
-        <button type="button" onClick={() => onChange("")} className="text-[11px] text-primary hover:underline shrink-0">
+        <button type="button" onClick={() => onChange("")} className="text-[11px] text-primary-ink hover:underline shrink-0">
           Change
         </button>
       </div>
@@ -199,7 +199,7 @@ function Success({
   const player = playerId ? selectPlayer(playerId) : null;
   return (
     <div className="text-center py-6">
-      <div className="mx-auto size-14 grid place-items-center rounded-full bg-primary/15 text-primary">
+      <div className="mx-auto size-14 grid place-items-center rounded-full bg-primary/15 text-primary-ink">
         <CheckCircle2 className="size-7" />
       </div>
       <h4 className="mt-3 text-base font-semibold">{title}</h4>
@@ -236,7 +236,7 @@ function Success({
 
 function WellbeingPicker({ value, onChange }: { value: WellbeingFlag; onChange: (v: WellbeingFlag) => void }) {
   const opts: Array<{ v: WellbeingFlag; label: string; hint: string; tone: string }> = [
-    { v: "green", label: "Green", hint: "Player is well", tone: "border-primary/40 bg-primary/10 text-primary" },
+    { v: "green", label: "Green", hint: "Player is well", tone: "border-primary/40 bg-primary/10 text-primary-ink" },
     { v: "amber", label: "Amber", hint: "Some concern", tone: "border-warning/40 bg-warning/10 text-warning" },
     { v: "red", label: "Red", hint: "Escalate today", tone: "border-destructive/40 bg-destructive/10 text-destructive" },
   ];

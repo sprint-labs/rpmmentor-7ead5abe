@@ -255,13 +255,13 @@ export function WorkflowDialog({
     activeKind === "report"
       ? handoff
         ? "Live Match Observation · the interaction is created when this report is submitted"
-        : "Draft autosaves locally · Submission writes to the RPM Match Reports Google Sheet"
+        : "Draft autosaves locally · Submission saves to the RPM match report store"
       : activeKind === "media"
         ? "Stored in the central media repository"
         : activeKind === "interaction"
           ? isEditing
             ? "Corrects the original record · visible everywhere it appears"
-            : "Saved to Lovable Cloud · visible in the interactions log"
+            : "Saved to the RPM database · visible in the interactions log"
           : activeKind === "bug" || activeKind === "question"
             ? "Goes to the Super Admin support inbox · you will get a reply in Help & Messages"
             : "Saved locally to this session";
@@ -419,7 +419,7 @@ function Submitted({
       {pending ? (
         <AlertCircle className="size-10 text-amber-500 mx-auto" />
       ) : (
-        <CheckCircle2 className="size-10 text-primary mx-auto" />
+        <CheckCircle2 className="size-10 text-primary-ink mx-auto" />
       )}
       <p className="text-sm font-medium mt-3">{message}</p>
       {detail && <div className="mt-3">{detail}</div>}
@@ -455,7 +455,7 @@ function TagPicker({ value, onChange }: { value: string[]; onChange: (v: string[
             key={t}
             type="button"
             onClick={() => onChange(active ? value.filter((x) => x !== t) : [...value, t])}
-            className={`px-2 py-0.5 rounded text-[10px] border ${active ? "bg-primary/15 border-primary/40 text-primary" : "border-border text-muted-foreground hover:bg-accent/40"}`}
+            className={`px-2 py-0.5 rounded text-[10px] border ${active ? "bg-primary/15 border-primary/40 text-primary-ink" : "border-border text-muted-foreground hover:bg-accent/40"}`}
           >
             {t}
           </button>
@@ -579,7 +579,7 @@ function AudioSaveStatusNote({
   }
   if (status === "saved") {
     return (
-      <p className="inline-flex items-center gap-1.5 text-xs text-primary">
+      <p className="inline-flex items-center gap-1.5 text-xs text-primary-ink">
         <CheckCircle2 className="size-3.5" /> Audio saved
       </p>
     );
@@ -1415,7 +1415,7 @@ export function InteractionForm({
       {savedInteraction && audioUploading && <AudioUploadProgress progress={audioProgress} />}
 
       {savedInteraction && audioStatus === "saved" && (
-        <p className="inline-flex items-center gap-1.5 text-xs text-primary">
+        <p className="inline-flex items-center gap-1.5 text-xs text-primary-ink">
           <CheckCircle2 className="size-3.5" /> Audio saved
         </p>
       )}
@@ -1432,7 +1432,7 @@ export function InteractionForm({
           <button
             type="button"
             onClick={discardDraft}
-            className="shrink-0 text-primary hover:text-primary/80"
+            className="shrink-0 text-primary-ink hover:underline"
           >
             Start blank
           </button>
@@ -1464,7 +1464,7 @@ export function InteractionForm({
                     setExternalGoalkeeperName("");
                     clearFieldError("gkId");
                   }}
-                  className="text-[11px] text-primary hover:text-primary/80"
+                  className="text-[11px] text-primary-ink hover:underline"
                 >
                   Choose from RPM roster
                 </button>
@@ -1497,7 +1497,7 @@ export function InteractionForm({
                     setExternalGoalkeeperName("");
                     clearFieldError("gkId");
                   }}
-                  className="text-[11px] text-primary hover:text-primary/80"
+                  className="text-[11px] text-primary-ink hover:underline"
                 >
                   Non-RPM Goalkeeper
                 </button>
@@ -1557,7 +1557,7 @@ export function InteractionForm({
               <button
                 type="button"
                 onClick={resetClub}
-                className="mt-1 inline-flex items-center gap-1 text-[11px] text-primary hover:text-primary/80"
+                className="mt-1 inline-flex items-center gap-1 text-[11px] text-primary-ink hover:underline"
               >
                 <RotateCcw className="size-3" /> Reset to roster club
               </button>
@@ -1718,7 +1718,7 @@ export function InteractionForm({
 }
 
 /**
- * Match Report form — writes to the RPM Match Reports Google Sheet via
+ * Match Report form — writes to `public.match_reports_cache` via
  * a server function. Fields locked to the confirmed 14-column schema.
  */
 function ReportForm({
@@ -2258,7 +2258,7 @@ function ReportForm({
       return (
         <Submitted
           pending
-          message="This report is queued locally. It has not yet been submitted to the RPM Match Reports Google Sheet, so it is not available to view yet."
+          message="This report is queued on this device. It has not reached the RPM match report store yet, so it is not available to view."
           onDone={onDone}
         />
       );
@@ -2268,8 +2268,8 @@ function ReportForm({
         pending={!!done.interactionError}
         message={
           done.interactionError
-            ? `Match report submitted to the RPM Match Reports Google Sheet · Average ${done.average.toFixed(1)}. The Live Match Observation interaction could NOT be created (${done.interactionError}), so it will not appear in the interactions log. Do not resubmit the report — tell an administrator.`
-            : `Match report submitted to the RPM Match Reports Google Sheet · Average ${done.average.toFixed(1)}. A Live Match Observation interaction has been logged against this goalkeeper.`
+            ? `Match report submitted · Average ${done.average.toFixed(1)}. The Live Match Observation interaction could NOT be created (${done.interactionError}), so it will not appear in the interactions log. Do not resubmit the report — tell an administrator.`
+            : `Match report submitted · Average ${done.average.toFixed(1)}. A Live Match Observation interaction has been logged against this goalkeeper.`
         }
         onDone={onDone}
         action={{
@@ -3015,14 +3015,14 @@ function MediaAttachPicker({
           <Paperclip className="size-3.5" />
           Attach Media{" "}
           {selected.length > 0 && (
-            <span className="text-primary normal-case">· {selected.length} selected</span>
+            <span className="text-primary-ink normal-case">· {selected.length} selected</span>
           )}
         </div>
         {user && (
           <button
             type="button"
             onClick={() => setShowUpload((v) => !v)}
-            className="text-[11px] text-primary hover:underline"
+            className="text-[11px] text-primary-ink hover:underline"
           >
             {showUpload ? "Cancel upload" : "Upload new"}
           </button>
@@ -3171,12 +3171,12 @@ function MediaUploadRow({ item }: { item: MediaUploadItem<MediaAsset> }) {
     <li className="rounded-md border border-border bg-input/20 px-3 py-2.5">
       <div className="flex items-start gap-2">
         {item.status === "succeeded" ? (
-          <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" />
+          <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-primary-ink" aria-hidden="true" />
         ) : item.status === "failed" ? (
           <AlertCircle className="mt-0.5 size-4 shrink-0 text-destructive" aria-hidden="true" />
         ) : item.status === "uploading" ? (
           <Loader2
-            className="mt-0.5 size-4 shrink-0 animate-spin text-primary"
+            className="mt-0.5 size-4 shrink-0 animate-spin text-primary-ink"
             aria-hidden="true"
           />
         ) : (

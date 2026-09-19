@@ -299,7 +299,7 @@ function MobileGoalkeeperCard({
         <Link
           to="/goalkeepers/$gkId"
           params={{ gkId: gk.id }}
-          className="inline-flex min-h-11 items-center text-sm font-medium text-primary hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="inline-flex min-h-11 items-center text-sm font-medium text-primary-ink hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           Open profile →
         </Link>
@@ -948,7 +948,7 @@ function GoalkeepersList() {
                               <TrafficLight level={duty.id as DutyLevel} size={7} />
                             )}
                             {duty.label}
-                            <span className="tabular-nums font-mono text-[10px] opacity-70">
+                            <span className="tabular-nums font-mono text-[10px]">
                               {duty.count ?? "…"}
                             </span>
                           </button>
@@ -1041,9 +1041,7 @@ function GoalkeepersList() {
               >
                 {duty.id !== "all" && <TrafficLight level={duty.id as DutyLevel} size={7} />}
                 {duty.label}
-                <span className="tabular-nums font-mono text-[10px] opacity-70">
-                  {duty.count ?? "…"}
-                </span>
+                <span className="tabular-nums font-mono text-[10px]">{duty.count ?? "…"}</span>
               </button>
             ))}
           </div>
@@ -1146,7 +1144,7 @@ function GoalkeepersList() {
         {sorted.length === 0 ? (
           <div className="px-4 py-8 text-center text-xs text-muted-foreground">
             No goalkeepers match the current filters.{" "}
-            <button onClick={resetAll} className="text-primary hover:underline">
+            <button onClick={resetAll} className="text-primary-ink hover:underline">
               Clear search and filters
             </button>
           </div>
@@ -1205,7 +1203,7 @@ function GoalkeepersList() {
               <tr>
                 <td colSpan={11} className="px-4 py-8 text-center text-xs text-muted-foreground">
                   No goalkeepers match the current filters.{" "}
-                  <button onClick={resetAll} className="text-primary hover:underline">
+                  <button onClick={resetAll} className="text-primary-ink hover:underline">
                     Clear search and filters
                   </button>
                 </td>

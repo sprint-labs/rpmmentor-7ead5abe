@@ -197,7 +197,7 @@ function ReportsPage() {
         title={navSource?.title ?? "Match Report Submission Centre"}
         description={
           isLoading
-            ? "Loading match reports from Google Sheets…"
+            ? "Loading match reports…"
             : `${reports.length} match reports · source: RPM Match Reports Sheet`
         }
         action={

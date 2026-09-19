@@ -45,7 +45,7 @@ export function MentorPrimaryActions({
             onClick={onLogInteraction}
             className="min-h-[7.5rem] rounded-lg border-2 border-primary bg-primary/10 text-foreground px-5 py-4 text-left flex flex-col justify-between gap-4 hover:bg-primary/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           >
-            <Plus className="size-8 text-primary" aria-hidden="true" />
+            <Plus className="size-8 text-primary-ink" aria-hidden="true" />
             <span>
               <span className="block text-xl font-display font-bold uppercase tracking-[0.02em]">
                 {mentorPrimaryActionLabels.logInteraction}
@@ -64,7 +64,7 @@ export function MentorPrimaryActions({
           className="flex min-h-14 items-center justify-between gap-3 rounded-lg border border-border bg-card px-4 py-3 hover:bg-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           <span className="inline-flex items-center gap-2.5">
-            <Calendar className="size-5 text-primary" aria-hidden="true" />
+            <Calendar className="size-5 text-primary-ink" aria-hidden="true" />
             <span className="text-sm font-semibold uppercase tracking-wider">
               {mentorPrimaryActionLabels.viewCalendar}
             </span>

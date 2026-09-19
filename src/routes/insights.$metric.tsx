@@ -248,14 +248,14 @@ function InsightDrilldown() {
                   type: "",
                   source: "interactions-logged",
                 }}
-                className="text-[10px] font-mono uppercase tracking-widest text-primary inline-flex items-center gap-1"
+                className="text-[10px] font-mono uppercase tracking-widest text-primary-ink inline-flex items-center gap-1"
               >
                 Open full interaction log <ArrowUpRight className="size-3" />
               </Link>
             ) : (
               <Link
                 to={meta.to}
-                className="text-[10px] font-mono uppercase tracking-widest text-primary inline-flex items-center gap-1"
+                className="text-[10px] font-mono uppercase tracking-widest text-primary-ink inline-flex items-center gap-1"
               >
                 {meta.linkLabel} <ArrowUpRight className="size-3" />
               </Link>
@@ -273,7 +273,7 @@ function InsightDrilldown() {
             search={{ from: period.fromDate, to: period.toDate, level: "", tier: "" }}
             className={`px-2.5 h-7 inline-flex items-center border text-[10px] font-mono uppercase tracking-widest ${
               m === active
-                ? "border-primary text-primary"
+                ? "border-primary text-primary-ink"
                 : "border-border text-muted-foreground hover:text-foreground"
             }`}
           >

@@ -659,7 +659,7 @@ function CalendarPage() {
                 <div key={cell.iso} className={`group min-h-24 rounded-md border p-1.5 ${cell.inMonth ? "bg-card border-border" : "border-transparent opacity-40"} ${isToday ? "ring-1 ring-primary" : ""}`}>
                   {cell.inMonth ? (
                     <div className="mb-1 flex items-center justify-between">
-                      <span className={`text-[11px] tabular-nums font-mono font-medium ${isToday ? "text-primary" : "text-muted-foreground"}`}>{cell.day}</span>
+                      <span className={`text-[11px] tabular-nums font-mono font-medium ${isToday ? "text-primary-ink" : "text-muted-foreground"}`}>{cell.day}</span>
                       <span className="flex items-center gap-0.5">
                         {canLog && (
                           <button
@@ -732,7 +732,7 @@ function CalendarPage() {
               return (
                 <div key={d.toISOString()} className={`min-h-72 rounded-md border border-border p-2 ${isToday ? "ring-1 ring-primary" : ""}`}>
                   <div className="text-[10px] uppercase text-muted-foreground">{d.toLocaleDateString("en", { weekday: "short" })}</div>
-                  <div className={`text-lg font-semibold tabular-nums font-mono ${isToday ? "text-primary" : ""}`}>{d.getDate()}</div>
+                  <div className={`text-lg font-semibold tabular-nums font-mono ${isToday ? "text-primary-ink" : ""}`}>{d.getDate()}</div>
                   <div className="space-y-1.5 mt-2">
                     {dayEvents.map((e) => (
                       <div key={e.id} className="text-[11px] p-1.5 rounded bg-accent/40 border border-border/60">

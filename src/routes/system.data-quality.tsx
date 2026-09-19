@@ -471,7 +471,7 @@ function ReportCard({ report }: { report: GoalkeeperQualityReport }) {
               </div>
               {fix && (
                 <div className="mt-2 ml-1 flex items-start gap-2 text-xs">
-                  <Wrench className="size-3.5 mt-0.5 text-primary shrink-0" />
+                  <Wrench className="size-3.5 mt-0.5 text-primary-ink shrink-0" />
                   <div className="space-y-1">
                     <div>
                       <span className="font-medium text-foreground">Suggested fix: </span>

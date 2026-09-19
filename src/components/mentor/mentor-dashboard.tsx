@@ -239,7 +239,7 @@ export function MentorDashboard({ user }: Props) {
         {isError && (
           <button
             onClick={() => refetch()}
-            className="mt-2 text-xs uppercase tracking-wider text-primary underline"
+            className="mt-2 text-xs uppercase tracking-wider text-primary-ink underline"
           >
             Retry
           </button>
@@ -395,7 +395,7 @@ export function MentorDashboard({ user }: Props) {
                       onClick={() =>
                         trackClick(isReport ? "outstanding-report" : "outstanding-clip", actionHref)
                       }
-                      className="shrink-0 text-xs px-2.5 py-1.5 rounded-md border border-border hover:bg-accent/40 text-primary inline-flex items-center gap-1"
+                      className="shrink-0 text-xs px-2.5 py-1.5 rounded-md border border-border hover:bg-accent/40 text-primary-ink inline-flex items-center gap-1"
                     >
                       {isReport ? "Submit report" : "Upload clip"}
                       <ArrowUpRight className="size-3" />
@@ -409,7 +409,7 @@ export function MentorDashboard({ user }: Props) {
                             ? `Log an interaction for ${item.gkName}`
                             : "Log an interaction"
                         }
-                        className="shrink-0 text-xs px-2.5 py-1.5 rounded-md border border-border hover:bg-accent/40 text-primary inline-flex items-center gap-1"
+                        className="shrink-0 text-xs px-2.5 py-1.5 rounded-md border border-border hover:bg-accent/40 text-primary-ink inline-flex items-center gap-1"
                       >
                         <Plus className="size-3" /> Log
                       </button>
@@ -426,7 +426,7 @@ export function MentorDashboard({ user }: Props) {
           <div className="flex items-center justify-between gap-2">
             <SectionTitle>Write-ups Due</SectionTitle>
             {!isFollowUpsError && (
-              <Link to="/follow-ups" className="text-[11px] text-primary hover:underline">
+              <Link to="/follow-ups" className="text-[11px] text-primary-ink hover:underline">
                 See all follow-ups
               </Link>
             )}
@@ -437,7 +437,7 @@ export function MentorDashboard({ user }: Props) {
               <button
                 type="button"
                 onClick={() => void refetchFollowUps()}
-                className="mt-2 uppercase tracking-wider text-primary underline"
+                className="mt-2 uppercase tracking-wider text-primary-ink underline"
               >
                 Retry
               </button>
@@ -502,7 +502,6 @@ export function MentorDashboard({ user }: Props) {
                 key={d}
                 role="tab"
                 aria-selected={rangeDays === d}
-                aria-label={`Next ${d} days`}
                 onClick={() => setRangeDays(d)}
                 className={cn(
                   "px-2.5 py-1 text-[11px] uppercase tracking-wider rounded-md border transition-colors",
@@ -511,7 +510,11 @@ export function MentorDashboard({ user }: Props) {
                     : "bg-transparent text-muted-foreground border-border hover:border-primary/50",
                 )}
               >
-                {d}d
+                {/* Named by its own content rather than an aria-label. The
+                    label read "Next 7 days" while the tab read "7d", so the
+                    visible text was not part of the accessible name and a
+                    speech user could not ask for what they could see. */}
+                {d}d<span className="sr-only"> — next {d} days</span>
               </button>
             ))}
           </div>
@@ -568,7 +571,7 @@ export function MentorDashboard({ user }: Props) {
             <button
               type="button"
               onClick={() => void refetch()}
-              className="text-xs px-3 py-1.5 rounded-md border border-border hover:bg-accent/40 text-primary"
+              className="text-xs px-3 py-1.5 rounded-md border border-border hover:bg-accent/40 text-primary-ink"
             >
               Retry
             </button>
@@ -593,7 +596,7 @@ export function MentorDashboard({ user }: Props) {
             {filters.length > 0 ? (
               <button
                 onClick={clearFilters}
-                className="text-xs px-3 py-1.5 rounded-md border border-border hover:bg-accent/40 text-primary inline-flex items-center gap-1"
+                className="text-xs px-3 py-1.5 rounded-md border border-border hover:bg-accent/40 text-primary-ink inline-flex items-center gap-1"
               >
                 Clear filters
               </button>
@@ -601,7 +604,7 @@ export function MentorDashboard({ user }: Props) {
               <Link
                 to="/calendar"
                 search={{ gkId: "", new: false }}
-                className="text-xs px-3 py-1.5 rounded-md border border-border hover:bg-accent/40 text-primary inline-flex items-center gap-1"
+                className="text-xs px-3 py-1.5 rounded-md border border-border hover:bg-accent/40 text-primary-ink inline-flex items-center gap-1"
               >
                 View calendar <ArrowUpRight className="size-3" />
               </Link>
@@ -657,7 +660,7 @@ export function MentorDashboard({ user }: Props) {
                             aria-label={
                               e.gkName ? `Log an interaction for ${e.gkName}` : "Log an interaction"
                             }
-                            className="shrink-0 text-xs px-2.5 py-1.5 rounded-md border border-border hover:bg-accent/40 text-primary inline-flex items-center gap-1"
+                            className="shrink-0 text-xs px-2.5 py-1.5 rounded-md border border-border hover:bg-accent/40 text-primary-ink inline-flex items-center gap-1"
                           >
                             <Plus className="size-3" /> Log
                           </button>

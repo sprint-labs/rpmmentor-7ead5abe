@@ -483,7 +483,7 @@ function Dashboard() {
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] font-mono uppercase tracking-[0.12em] text-muted-foreground">
                 <Link
                   to="/goalkeepers"
-                  className="text-primary inline-flex items-center gap-1 normal-case tracking-normal"
+                  className="text-primary-ink inline-flex items-center gap-1 normal-case tracking-normal"
                 >
                   Goalkeepers <ArrowUpRight className="size-3" />
                 </Link>
@@ -567,7 +567,7 @@ function Dashboard() {
                   <Link
                     to="/calendar"
                     search={{ gkId: "", new: true }}
-                    className="text-[10px] font-mono uppercase tracking-widest text-primary inline-flex items-center gap-1 hover:underline"
+                    className="text-[10px] font-mono uppercase tracking-widest text-primary-ink inline-flex items-center gap-1 hover:underline"
                   >
                     <Plus className="size-3" /> New event
                   </Link>
@@ -576,7 +576,7 @@ function Dashboard() {
                   to="/insights/$metric"
                   params={{ metric: "events" }}
                   search={{ from: period.fromDate, to: period.toDate, level: "", tier: "" }}
-                  className="text-[10px] font-mono uppercase tracking-widest text-primary inline-flex items-center gap-1"
+                  className="text-[10px] font-mono uppercase tracking-widest text-primary-ink inline-flex items-center gap-1"
                 >
                   All events <ArrowUpRight className="size-3" />
                 </Link>
@@ -606,7 +606,7 @@ function Dashboard() {
                 <Link
                   to="/calendar"
                   search={{ gkId: "", new: false }}
-                  className="text-[10px] font-mono uppercase tracking-widest text-primary hover:underline"
+                  className="text-[10px] font-mono uppercase tracking-widest text-primary-ink hover:underline"
                 >
                   Open calendar
                 </Link>
@@ -623,7 +623,7 @@ function Dashboard() {
                   <Link
                     to="/calendar"
                     search={{ gkId: "", new: true }}
-                    className="text-[10px] font-mono uppercase tracking-widest text-primary hover:underline"
+                    className="text-[10px] font-mono uppercase tracking-widest text-primary-ink hover:underline"
                   >
                     Schedule an event
                   </Link>
@@ -631,7 +631,7 @@ function Dashboard() {
                   <Link
                     to="/calendar"
                     search={{ gkId: "", new: false }}
-                    className="text-[10px] font-mono uppercase tracking-widest text-primary hover:underline"
+                    className="text-[10px] font-mono uppercase tracking-widest text-primary-ink hover:underline"
                   >
                     View calendar
                   </Link>
@@ -648,7 +648,7 @@ function Dashboard() {
                 const content = (
                   <>
                     <div className="flex-1 min-w-0">
-                      <div className="text-[10px] font-mono text-primary mb-1 uppercase tracking-widest">
+                      <div className="text-[10px] font-mono text-primary-ink mb-1 uppercase tracking-widest">
                         {formatRelative(e.event_date)}
                         {e.start_time ? ` · ${e.start_time.slice(0, 5)}` : ""}
                       </div>
@@ -715,7 +715,7 @@ function Dashboard() {
                   <button
                     type="button"
                     onClick={() => setWorkflow("interaction")}
-                    className="text-[10px] font-mono uppercase tracking-widest text-primary inline-flex items-center gap-1 hover:underline"
+                    className="text-[10px] font-mono uppercase tracking-widest text-primary-ink inline-flex items-center gap-1 hover:underline"
                   >
                     <Plus className="size-3" /> Log interaction
                   </button>

@@ -80,7 +80,7 @@ function AlertsPage() {
                         <div className="text-[11px] text-muted-foreground">{formatRelative(a.date)}</div>
                       </div>
                       <Pill tone={a.severity === "high" ? "destructive" : a.severity === "medium" ? "warning" : "info"}>{a.severity}</Pill>
-                      {gk && <Link to="/goalkeepers/$gkId" params={{ gkId: gk.id }} className="text-xs text-primary">Open →</Link>}
+                      {gk && <Link to="/goalkeepers/$gkId" params={{ gkId: gk.id }} className="text-xs text-primary-ink">Open →</Link>}
                     </div>
                   );
                 })}
@@ -144,7 +144,7 @@ function DutyNotificationsPanel() {
                   <div className="text-[11px] text-muted-foreground">{formatRelative(n.date)}</div>
                 </div>
                 <Pill tone={sev === "muted" ? "muted" : sev}>{label(n.to)}</Pill>
-                <Link to="/goalkeepers/$gkId" params={{ gkId: n.gkId }} onClick={() => markRead(n.id)} className="text-xs text-primary">Open →</Link>
+                <Link to="/goalkeepers/$gkId" params={{ gkId: n.gkId }} onClick={() => markRead(n.id)} className="text-xs text-primary-ink">Open →</Link>
               </div>
             );
           })}

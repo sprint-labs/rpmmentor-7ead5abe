@@ -100,7 +100,7 @@ function PlayerRecordsInner() {
                 <Link
                   to="/system/players/$playerId"
                   params={{ playerId: p.id }}
-                  className="text-xs text-primary hover:text-primary/80 shrink-0"
+                  className="text-xs text-primary-ink hover:underline shrink-0"
                 >
                   {can("players.manage") ? "Edit record" : "Edit club"}
                 </Link>

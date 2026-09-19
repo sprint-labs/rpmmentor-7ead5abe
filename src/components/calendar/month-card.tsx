@@ -111,7 +111,7 @@ export function CalendarMonthCard({
           <Link
             to="/calendar"
             search={{ gkId: "", new: false, month: monthParam }}
-            className="text-[10px] font-mono uppercase tracking-widest text-primary inline-flex items-center gap-1 hover:underline"
+            className="text-[10px] font-mono uppercase tracking-widest text-primary-ink inline-flex items-center gap-1 hover:underline"
           >
             Open calendar <ArrowUpRight className="size-3" />
           </Link>
@@ -127,7 +127,7 @@ export function CalendarMonthCard({
           type="button"
           onClick={() => setCursor((c) => shiftMonth(c, -1))}
           aria-label={`Show ${monthLabel(shiftMonth(cursor, -1))}`}
-          className="inline-flex size-7 items-center justify-center rounded border border-border text-muted-foreground hover:border-primary/50 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          className="inline-flex size-7 items-center justify-center rounded border border-border text-muted-foreground hover:border-primary/50 hover:text-primary-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
         >
           <ChevronLeft className="size-3.5" />
         </button>
@@ -141,7 +141,7 @@ export function CalendarMonthCard({
           type="button"
           onClick={() => setCursor((c) => shiftMonth(c, 1))}
           aria-label={`Show ${monthLabel(shiftMonth(cursor, 1))}`}
-          className="inline-flex size-7 items-center justify-center rounded border border-border text-muted-foreground hover:border-primary/50 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          className="inline-flex size-7 items-center justify-center rounded border border-border text-muted-foreground hover:border-primary/50 hover:text-primary-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
         >
           <ChevronRight className="size-3.5" />
         </button>
@@ -219,7 +219,7 @@ export function CalendarMonthCard({
                     "relative flex aspect-square min-h-8 flex-col items-center justify-center rounded border text-[11px] tabular-nums transition-colors",
                     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
                     "border-border/60 text-foreground hover:border-primary/50 hover:bg-accent/40",
-                    isToday ? "border-primary bg-primary/10 font-bold text-primary" : "",
+                    isToday ? "border-primary bg-primary/10 font-bold text-primary-ink" : "",
                   ].join(" ")}
                 >
                   <span>{cell.day}</span>

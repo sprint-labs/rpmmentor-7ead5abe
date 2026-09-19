@@ -41,7 +41,7 @@ export function BulletinDashboardCard({ scope }: BulletinDashboardCardProps) {
         action={
           <Link
             to="/bulletins"
-            className="inline-flex min-h-11 items-center gap-1.5 rounded-md px-2 text-xs font-semibold uppercase tracking-[0.08em] text-primary hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            className="inline-flex min-h-11 items-center gap-1.5 rounded-md px-2 text-xs font-semibold uppercase tracking-[0.08em] text-primary-ink hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
           >
             Open board
             <ArrowRight className="size-3.5" aria-hidden="true" />
@@ -49,7 +49,7 @@ export function BulletinDashboardCard({ scope }: BulletinDashboardCardProps) {
         }
       >
         <span className="inline-flex items-center gap-2">
-          <Columns3 className="size-4 text-primary" aria-hidden="true" />
+          <Columns3 className="size-4 text-primary-ink" aria-hidden="true" />
           {scope === "team" ? "Team Bulletin Board" : "My Bulletin Board"}
         </span>
       </SectionTitle>
@@ -64,7 +64,7 @@ export function BulletinDashboardCard({ scope }: BulletinDashboardCardProps) {
           <button
             type="button"
             onClick={() => void refetch()}
-            className="min-h-11 rounded-md px-3 text-xs font-semibold uppercase tracking-wider text-primary hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            className="min-h-11 rounded-md px-3 text-xs font-semibold uppercase tracking-wider text-primary-ink hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
           >
             Retry
           </button>

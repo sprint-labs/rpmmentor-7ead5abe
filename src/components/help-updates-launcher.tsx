@@ -187,7 +187,7 @@ export function HelpUpdatesLauncher({
                   onClick={() => runAction(onAskQuestion)}
                   className="flex min-h-20 flex-col items-start justify-between rounded-md border border-primary/35 bg-primary/10 p-3 text-left hover:bg-primary/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
-                  <MessageSquarePlus className="size-4 text-primary" aria-hidden="true" />
+                  <MessageSquarePlus className="size-4 text-primary-ink" aria-hidden="true" />
                   <span className="text-sm font-medium">Ask a question</span>
                 </button>
                 <button
@@ -207,7 +207,7 @@ export function HelpUpdatesLauncher({
                     Updates
                   </div>
                   {announcements.some((announcement) => !announcement.readAt) && (
-                    <span className="text-[10px] font-semibold uppercase tracking-wider text-primary">
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-primary-ink">
                       New updates
                     </span>
                   )}
@@ -249,7 +249,7 @@ export function HelpUpdatesLauncher({
                                   "mt-1.5 inline-flex items-center gap-1 text-[11px] font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                                   isRead
                                     ? "cursor-default text-muted-foreground"
-                                    : "text-primary hover:underline",
+                                    : "text-primary-ink hover:underline",
                                 )}
                               >
                                 {isRead ? (
@@ -308,7 +308,7 @@ export function HelpUpdatesLauncher({
             <X className="size-3.5" aria-hidden="true" />
           </button>
           <div className="pr-7">
-            <div className="text-[10px] font-semibold uppercase tracking-wider text-primary">
+            <div className="text-[10px] font-semibold uppercase tracking-wider text-primary-ink">
               New
             </div>
             <div className="mt-1 text-sm font-medium">Help and product news now live here</div>
