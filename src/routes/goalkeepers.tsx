@@ -578,7 +578,7 @@ function GoalkeepersList() {
       allNats: [...nats].sort(),
       contractYears: [...years].sort(),
     };
-  }, []);
+  }, [goalkeepers]);
 
   const selectedTiers = csv(search.tiers);
   const selectedLeagues = csv(search.leagues);
@@ -693,7 +693,7 @@ function GoalkeepersList() {
         goalkeepers.map((g) => g.name),
         dutyQueryState,
       ),
-    [dutyIndex, dutyQueryState],
+    [dutyIndex, dutyQueryState, goalkeepers],
   );
   const DUTIES: { id: "all" | DutyLevel; label: string; count: number }[] = [
     { id: "all", label: "All", count: dutyCounts.total },

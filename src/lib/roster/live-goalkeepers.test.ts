@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { toGoalkeeper, toGoalkeepers } from "./live-goalkeepers";
+import { findGoalkeeperById, toGoalkeeper, toGoalkeepers } from "./live-goalkeepers";
 import type { PlayerRosterRow } from "@/lib/players.functions";
 
 function row(over: Partial<PlayerRosterRow> = {}): PlayerRosterRow {
@@ -183,5 +183,23 @@ describe("toGoalkeepers", () => {
   it("returns an empty roster rather than throwing on a malformed response", () => {
     expect(toGoalkeepers(null)).toEqual([]);
     expect(toGoalkeepers(undefined)).toEqual([]);
+  });
+});
+
+describe("findGoalkeeperById", () => {
+  it("resolves a live-only goalkeeper by the slug the list emits", () => {
+    // Alfie Smith and Daniel Barden are not in the seed. The list still links
+    // to /goalkeepers/gk-alfie-smith; the profile has to find them here.
+    expect(findGoalkeeperById([row({ full_name: "Alfie Smith" })], "gk-alfie-smith")?.name).toBe(
+      "Alfie Smith",
+    );
+    expect(
+      findGoalkeeperById([row({ full_name: "Daniel Barden" })], "gk-daniel-barden")?.name,
+    ).toBe("Daniel Barden");
+  });
+
+  it("returns undefined when the slug is unknown or the roster is missing", () => {
+    expect(findGoalkeeperById([row()], "gk-nobody")).toBeUndefined();
+    expect(findGoalkeeperById(null, "gk-harrison-male")).toBeUndefined();
   });
 });

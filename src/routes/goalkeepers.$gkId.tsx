@@ -32,6 +32,7 @@ import { buildHighlightReelItems } from "@/lib/goalkeeper-highlight-reel";
 import { EditDetailsButton } from "@/components/edit-player-details-dialog";
 import { DutyOfCarePanel } from "@/components/duty-of-care-panel";
 import { listPlayers } from "@/lib/players.functions";
+import { findGoalkeeperById } from "@/lib/roster/live-goalkeepers";
 import { findPlayerByName, interactionBelongsToGoalkeeper } from "@/lib/goalkeeper-player-link";
 import {
   compareInteractionsByAlertThenDate,
@@ -44,8 +45,19 @@ function isValidScore(v: unknown): v is number {
 }
 
 export const Route = createFileRoute("/goalkeepers/$gkId")({
-  loader: ({ params }) => {
-    const gk = goalkeepers.find((g) => g.id === params.gkId);
+  loader: async ({ params, context: { queryClient } }) => {
+    const fromSeed = goalkeepers.find((g) => g.id === params.gkId);
+    if (fromSeed) return { gk: fromSeed };
+
+    // Live-only rows (Alfie Smith, Daniel Barden) share the list's slug but
+    // are not in the seed. Resolve them from the same roster query the list
+    // already caches so the click path does not 404.
+    const rows = await queryClient.ensureQueryData({
+      queryKey: ["players", "roster"],
+      queryFn: () => listPlayers(),
+      staleTime: 5 * 60_000,
+    });
+    const gk = findGoalkeeperById(rows, params.gkId);
     if (!gk) throw notFound();
     return { gk };
   },

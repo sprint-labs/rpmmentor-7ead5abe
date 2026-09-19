@@ -122,3 +122,18 @@ export function toGoalkeepers(rows: readonly PlayerRosterRow[] | null | undefine
   if (!Array.isArray(rows)) return [];
   return rows.map(toGoalkeeper);
 }
+
+/**
+ * Resolve a profile slug (`gk-alfie-smith`) against the live roster.
+ *
+ * The list emits these slugs for every row, including names that are not in
+ * the seed. The profile page has to use the same lookup or those links 404.
+ */
+export function findGoalkeeperById(
+  rows: readonly PlayerRosterRow[] | null | undefined,
+  gkId: string,
+): Goalkeeper | undefined {
+  if (!Array.isArray(rows) || !gkId) return undefined;
+  const row = rows.find((candidate) => legacyGkSlugForName(candidate.full_name) === gkId);
+  return row ? toGoalkeeper(row) : undefined;
+}
