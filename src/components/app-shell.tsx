@@ -72,7 +72,6 @@ const NAV: NavItem[] = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, exact: true, perm: "goalkeepers.view" },
   { to: "/bulletins", label: "Bulletin Board", icon: Columns3, perm: "bulletins.view" },
   { to: "/goalkeepers", label: "Goalkeepers", icon: Users, perm: "goalkeepers.view" },
-  { to: "/system/players", label: "Player Records", icon: Database, perm: "players.edit_club" },
   { to: "/users", label: "Team Members", icon: UserCog, perm: "mentors.view" },
   {
     to: "/interactions",

@@ -22,6 +22,7 @@ import {
   type Goalkeeper,
 } from "@/lib/mock-data";
 import { londonToday } from "@/lib/time/london";
+import { legacyGkSlugForName } from "@/lib/goalkeeper-player-link";
 
 /**
  * The remaining insight drilldowns, each on the shared workbench shell. Yellow
@@ -262,9 +263,11 @@ export function PlayerRecordWorkbench({
 
           {canSetTier ? <PlayerTierEditor key={player.id} player={player} /> : null}
 
+          {/* The profile is addressed by the legacy `gk-…` slug, not by
+              `players.id`, so the name is what bridges the two. */}
           <Link
-            to="/system/players/$playerId"
-            params={{ playerId: player.id }}
+            to="/goalkeepers/$gkId"
+            params={{ gkId: legacyGkSlugForName(player.full_name) }}
             className="mt-5 inline-flex min-h-10 items-center gap-1.5 rounded-md border border-border px-3 text-xs font-medium hover:bg-accent/40"
           >
             Open player record <ArrowRight className="size-3.5" aria-hidden="true" />

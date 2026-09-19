@@ -1,114 +1,20 @@
-import { useMemo, useState } from "react";
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { useServerFn } from "@tanstack/react-start";
-import { useQuery } from "@tanstack/react-query";
-import { Search } from "lucide-react";
-import { RequirePermission } from "@/components/require-permission";
-import { Card } from "@/components/primitives";
-import { listPlayers } from "@/lib/players.functions";
-import { useAuth } from "@/lib/auth";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 
+/**
+ * Player Records has been folded into the goalkeeper roster.
+ *
+ * Correcting a record is done on the goalkeeper's own profile, through Edit
+ * Details, which already carries every field this page offered and re-checks
+ * the caller's role on the server the same way. Keeping a second list of the
+ * same people, reachable only from the System menu, meant two places to look
+ * for one player and two places to keep in step.
+ *
+ * The route stays as a redirect rather than disappearing: these URLs are in
+ * bookmarks and in older notification links, and a 404 is a worse answer than
+ * the roster.
+ */
 export const Route = createFileRoute("/system/players/")({
-  component: PlayerRecordsPage,
-  head: () => ({
-    meta: [
-      { title: "Player Records · Mentor Hub" },
-      {
-        name: "description",
-        content:
-          "Canonical player records from the Mentor Hub database, with editable current club.",
-      },
-      { property: "og:title", content: "Player Records · Mentor Hub" },
-      {
-        property: "og:description",
-        content: "Canonical player records with editable current club.",
-      },
-      { property: "og:type", content: "website" },
-      { name: "twitter:card", content: "summary" },
-    ],
-  }),
+  beforeLoad: () => {
+    throw redirect({ to: "/goalkeepers" });
+  },
 });
-
-function PlayerRecordsPage() {
-  return (
-    <RequirePermission permission="players.edit_club">
-      <PlayerRecordsInner />
-    </RequirePermission>
-  );
-}
-
-function PlayerRecordsInner() {
-  const { can } = useAuth();
-  const fetchPlayers = useServerFn(listPlayers);
-  const { data, isLoading, error } = useQuery({
-    queryKey: ["players", "roster"],
-    queryFn: () => fetchPlayers(),
-    staleTime: 60_000,
-  });
-  const [q, setQ] = useState("");
-
-  const rows = useMemo(() => {
-    const list = data ?? [];
-    const needle = q.trim().toLowerCase();
-    if (!needle) return list;
-    return list.filter(
-      (p) =>
-        p.full_name.toLowerCase().includes(needle) || p.current_club.toLowerCase().includes(needle),
-    );
-  }, [data, q]);
-
-  return (
-    <div className="p-4 md:p-6 space-y-4">
-      <div>
-        <h1 className="text-lg font-semibold">Player Records</h1>
-        <p className="text-xs text-muted-foreground">
-          Canonical database records. Managers can correct clubs; Super Admins can correct or
-          recoverably delete the full operational record.
-        </p>
-      </div>
-
-      <div className="relative max-w-sm">
-        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-        <input
-          aria-label="Search players"
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="Search name or club"
-          className="w-full rounded-md border border-border bg-background pl-8 pr-3 py-2 text-sm"
-        />
-      </div>
-
-      <Card className="p-0 overflow-hidden">
-        {isLoading ? (
-          <p className="p-4 text-sm text-muted-foreground">Loading player records…</p>
-        ) : error ? (
-          <p role="alert" className="p-4 text-sm text-destructive">
-            {error instanceof Error ? error.message : "Could not load player records."}
-          </p>
-        ) : rows.length === 0 ? (
-          <p className="p-4 text-sm text-muted-foreground">No player records match.</p>
-        ) : (
-          <ul className="divide-y divide-border">
-            {rows.map((p) => (
-              <li key={p.id} className="flex items-center justify-between gap-3 px-4 py-2.5">
-                <div className="min-w-0">
-                  <p className="text-sm font-medium truncate">{p.full_name}</p>
-                  <p className="text-xs text-muted-foreground truncate">
-                    {p.current_club || "No club recorded"}
-                  </p>
-                </div>
-                <Link
-                  to="/system/players/$playerId"
-                  params={{ playerId: p.id }}
-                  className="text-xs text-primary-ink hover:underline shrink-0"
-                >
-                  {can("players.manage") ? "Edit record" : "Edit club"}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        )}
-      </Card>
-    </div>
-  );
-}

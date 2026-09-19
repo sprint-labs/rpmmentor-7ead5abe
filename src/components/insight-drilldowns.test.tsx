@@ -212,7 +212,7 @@ describe("PlayerRecordWorkbench", () => {
     expect(detail.getByRole("heading", { name: "Christian Walton" })).toBeTruthy();
     expect(detail.getByText("On loan from Brighton")).toBeTruthy();
     expect(detail.getByRole("link", { name: /Open player record/ }).getAttribute("href")).toBe(
-      "/system/players/11111111-1111-4111-8111-111111111111",
+      "/goalkeepers/gk-christian-walton",
     );
 
     const row = screen.getByRole("button", { name: "Show details for Christian Walton" });
