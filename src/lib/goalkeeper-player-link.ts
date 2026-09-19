@@ -6,12 +6,26 @@
  */
 
 export function normalisePersonName(value: string): string {
-  return value.trim().toLowerCase().replace(/\s+/g, " ");
+  return (
+    value
+      .trim()
+      .toLowerCase()
+      // A curly apostrophe and a straight one are the same name to a person and
+      // two different strings to a Map. The roster carries both spellings —
+      // `Rich O'Donnell` in the database, `Rich O’Donnell` in the legacy
+      // profile — and without this his profile silently fails to find his
+      // player record, taking Duty of Care, Edit Details and his media with it.
+      .replace(/[\u2018\u2019\u02BC]/g, "'")
+      .replace(/\s+/g, " ")
+  );
 }
 
 /** Deterministic legacy slug used by the mock roster (`gk-harrison-male`). */
 export function legacyGkSlugForName(name: string): string {
-  return `gk-${name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}`;
+  return `gk-${name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "")}`;
 }
 
 export function findPlayerByName<T extends { full_name: string }>(

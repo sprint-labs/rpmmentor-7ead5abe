@@ -14,6 +14,8 @@ function validPlayerUpdate(overrides: Record<string, unknown> = {}) {
     instagramUrl: "https://www.instagram.com/example/",
     contractUntil: "June 2027",
     tier: "Tier 2",
+    isAcademy: false,
+    isFreeAgent: false,
     ...overrides,
   };
 }
@@ -39,6 +41,8 @@ describe("playerRecordUpdateSchema", () => {
       instagramUrl: "https://www.instagram.com/example/",
       contractUntil: null,
       tier: "Tier 2",
+      isAcademy: false,
+      isFreeAgent: false,
     });
   });
 
@@ -48,6 +52,22 @@ describe("playerRecordUpdateSchema", () => {
 
   it("rejects a tier outside the database constraint", () => {
     expect(() => playerRecordUpdateSchema.parse(validPlayerUpdate({ tier: "Tier 9" }))).toThrow();
+  });
+
+  it.each(["Academy", "Free Agent"])("no longer accepts %s as a tier", (tier) => {
+    // Both are statuses now, carried by their own boolean. Accepting either
+    // here would write a value `players_tier_check` rejects.
+    expect(() => playerRecordUpdateSchema.parse(validPlayerUpdate({ tier }))).toThrow();
+  });
+
+  it("carries Academy and Free Agent independently of the tier", () => {
+    const parsed = playerRecordUpdateSchema.parse(
+      validPlayerUpdate({ tier: "Tier 1", isAcademy: true, isFreeAgent: true }),
+    );
+
+    expect(parsed.tier).toBe("Tier 1");
+    expect(parsed.isAcademy).toBe(true);
+    expect(parsed.isFreeAgent).toBe(true);
   });
 
   it("strips attempted identity and tombstone changes", () => {

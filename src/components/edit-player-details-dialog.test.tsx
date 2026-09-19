@@ -40,6 +40,8 @@ const PLAYER = {
   instagram_url: null,
   contract_until: "2027-06-30",
   tier: "Tier 1",
+  is_academy: false,
+  is_free_agent: false,
 };
 
 function renderButton() {

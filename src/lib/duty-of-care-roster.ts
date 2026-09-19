@@ -19,12 +19,30 @@ import { DUTY_LABELS, type DutyLevel } from "@/lib/mock-data";
 export interface RosterDutyStatus {
   level: DutyLevel;
   label: string;
+  /**
+   * Whole days since the last qualifying contact, or 0 when there has been
+   * none. Derived from the view's own `last_interaction_at` rather than
+   * recounted from interactions.
+   */
+  days: number;
 }
 
 export type RosterDutyIndex = Map<string, RosterDutyStatus>;
 
+/** Whole days between a date-only or timestamp value and now. */
+function daysSince(value: string | null | undefined, now: number): number {
+  if (!value) return 0;
+  const iso = /^\d{4}-\d{2}-\d{2}$/.test(value) ? `${value}T12:00:00` : value;
+  const then = new Date(iso).getTime();
+  if (!Number.isFinite(then)) return 0;
+  return Math.max(0, Math.floor((now - then) / 86_400_000));
+}
+
 /** Index the view's rows by normalised goalkeeper name. */
-export function buildRosterDutyIndex(rows: readonly PlayerDutyOfCareRow[]): RosterDutyIndex {
+export function buildRosterDutyIndex(
+  rows: readonly PlayerDutyOfCareRow[],
+  now = Date.now(),
+): RosterDutyIndex {
   const index: RosterDutyIndex = new Map();
   // Defensive: the roster is a whole page, and a malformed response should cost
   // one column rather than the screen.
@@ -33,7 +51,11 @@ export function buildRosterDutyIndex(rows: readonly PlayerDutyOfCareRow[]): Rost
     const name = normaliseGoalkeeperName(row.full_name ?? "");
     if (!name) continue;
     const level = dutyLevelFromState(row.state);
-    index.set(name, { level, label: row.status_label?.trim() || DUTY_LABELS[level] });
+    index.set(name, {
+      level,
+      label: row.status_label?.trim() || DUTY_LABELS[level],
+      days: daysSince(row.last_interaction_at, now),
+    });
   }
   return index;
 }
@@ -55,11 +77,37 @@ export function rosterDutyFor(
   goalkeeperName: string,
   state: RosterDutyQueryState = {},
 ): RosterDutyStatus {
-  if (state.error) return { level: "not_enough_data", label: "Unavailable" };
+  if (state.error) return { level: "not_enough_data", label: "Unavailable", days: 0 };
   const found = index.get(normaliseGoalkeeperName(goalkeeperName));
   if (found) return found;
-  if (state.pending) return { level: "not_enough_data", label: "Loading…" };
-  return { level: "not_enough_data", label: DUTY_LABELS.not_enough_data };
+  if (state.pending) return { level: "not_enough_data", label: "Loading…", days: 0 };
+  return { level: "not_enough_data", label: DUTY_LABELS.not_enough_data, days: 0 };
+}
+
+/**
+ * How many goalkeepers sit at each level, counted from the view's own rows.
+ *
+ * This needs no roster to match against, so it is the honest count for a
+ * headline figure: it reports what `duty_of_care_at()` says about every player
+ * it covers, rather than what a separate list of names happens to contain.
+ */
+export function countDutyRows(
+  rows: readonly PlayerDutyOfCareRow[] | null | undefined,
+): Record<DutyLevel, number> & { total: number } {
+  const counts = {
+    total: 0,
+    up_to_date: 0,
+    due_soon: 0,
+    overdue: 0,
+    not_required: 0,
+    not_enough_data: 0,
+  };
+  if (!Array.isArray(rows)) return counts;
+  for (const row of rows) {
+    counts[dutyLevelFromState(row.state)] += 1;
+    counts.total += 1;
+  }
+  return counts;
 }
 
 /** How many goalkeepers sit at each level, for the filter chips. */
