@@ -3,6 +3,7 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { toast } from "sonner";
 
 const authState = vi.hoisted(() => ({ canViewAlerts: false }));
 
@@ -114,7 +115,7 @@ function NotificationState() {
 
 beforeEach(() => {
   window.localStorage.clear();
-  window.localStorage.setItem("rpm.notifications.v1", JSON.stringify([storedNotification]));
+  window.localStorage.setItem("rpm.notifications.v2", JSON.stringify([storedNotification]));
   authState.canViewAlerts = false;
   liveRows.players = [];
   liveRows.duty = [];
@@ -123,6 +124,7 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   window.localStorage.clear();
+  vi.clearAllMocks();
 });
 
 describe("NotificationsProvider alert access", () => {
@@ -145,7 +147,7 @@ describe("resolving a duty notification", () => {
   it("removes every copy of that goalkeeper's current level and records it", () => {
     authState.canViewAlerts = true;
     window.localStorage.setItem(
-      "rpm.notifications.v1",
+      "rpm.notifications.v2",
       JSON.stringify([
         storedNotification,
         { ...storedNotification, id: "duty-2", date: "2026-08-23T09:00:00.000Z" },
@@ -195,7 +197,7 @@ describe("resolved duty levels", () => {
 describe("duty alerts from the live roster and the duty-of-care view", () => {
   beforeEach(() => {
     authState.canViewAlerts = true;
-    window.localStorage.removeItem("rpm.notifications.v1");
+    window.localStorage.removeItem("rpm.notifications.v2");
   });
 
   it("announces a goalkeeper who exists only in the live database", async () => {
@@ -203,7 +205,7 @@ describe("duty alerts from the live roster and the duty-of-care view", () => {
     liveRows.players = [{ full_name: "Ada Newsigning" }];
     liveRows.duty = [dutyRow("Ada Newsigning", "red")];
     window.localStorage.setItem(
-      "rpm.duty.snapshot.v1",
+      "rpm.duty.snapshot.v2",
       JSON.stringify({ "gk-ada-newsigning": "due_soon" }),
     );
 
@@ -213,7 +215,7 @@ describe("duty alerts from the live roster and the duty-of-care view", () => {
     // The id is the legacy profile slug, which is what the header bell and the
     // alerts page pass to `/goalkeepers/$gkId`.
     expect(
-      JSON.parse(window.localStorage.getItem("rpm.notifications.v1") ?? "[]")[0],
+      JSON.parse(window.localStorage.getItem("rpm.notifications.v2") ?? "[]")[0],
     ).toMatchObject({
       gkId: "gk-ada-newsigning",
       gkName: "Ada Newsigning",
@@ -229,14 +231,14 @@ describe("duty alerts from the live roster and the duty-of-care view", () => {
     liveRows.players = [{ full_name: "James Beadle" }];
     liveRows.duty = [dutyRow("James Beadle", "complete")];
     window.localStorage.setItem(
-      "rpm.duty.snapshot.v1",
+      "rpm.duty.snapshot.v2",
       JSON.stringify({ "gk-james-beadle": "up_to_date" }),
     );
 
     renderProvider();
 
     await waitFor(() =>
-      expect(JSON.parse(window.localStorage.getItem("rpm.duty.snapshot.v1") ?? "{}")).toEqual({
+      expect(JSON.parse(window.localStorage.getItem("rpm.duty.snapshot.v2") ?? "{}")).toEqual({
         "gk-james-beadle": "up_to_date",
       }),
     );
@@ -249,14 +251,14 @@ describe("duty alerts from the live roster and the duty-of-care view", () => {
     liveRows.players = [{ full_name: "Ada Newsigning" }, { full_name: "Bo Latejoiner" }];
     liveRows.duty = [dutyRow("Ada Newsigning", "red"), dutyRow("Bo Latejoiner", "red")];
     window.localStorage.setItem(
-      "rpm.duty.snapshot.v1",
+      "rpm.duty.snapshot.v2",
       JSON.stringify({ "gk-ada-newsigning": "overdue" }),
     );
 
     renderProvider();
 
     await waitFor(() =>
-      expect(JSON.parse(window.localStorage.getItem("rpm.duty.snapshot.v1") ?? "{}")).toEqual({
+      expect(JSON.parse(window.localStorage.getItem("rpm.duty.snapshot.v2") ?? "{}")).toEqual({
         "gk-ada-newsigning": "overdue",
         "gk-bo-latejoiner": "overdue",
       }),
@@ -281,14 +283,100 @@ describe("duty alerts from the live roster and the duty-of-care view", () => {
     liveRows.players = [{ full_name: "Ada Newsigning" }];
     liveRows.duty = [dutyRow("Ada Newsigning", "red")];
     window.localStorage.setItem(
-      "rpm.duty.snapshot.v1",
+      "rpm.duty.snapshot.v2",
       JSON.stringify({ "gk-ada-newsigning": "due_soon" }),
     );
 
     renderProvider();
 
-    expect(JSON.parse(window.localStorage.getItem("rpm.duty.snapshot.v1") ?? "{}")).toEqual({
+    expect(JSON.parse(window.localStorage.getItem("rpm.duty.snapshot.v2") ?? "{}")).toEqual({
       "gk-ada-newsigning": "due_soon",
     });
+  });
+});
+
+/**
+ * The v1 key space held what the previous implementation computed from the empty
+ * `interactions` seed: exactly two values across the whole roster, 100
+ * `not_enough_data` and 14 `not_required`. Reading it as a record of anyone's
+ * previous duty level announces a change for every goalkeeper the live view
+ * disagrees with — up to a hundred alerts and a hundred toasts on one load.
+ */
+describe("the v1 key space is not read as a previous level", () => {
+  beforeEach(() => {
+    authState.canViewAlerts = true;
+    window.localStorage.clear();
+  });
+
+  it("announces nothing when only the stale v1 snapshot exists", async () => {
+    // What every current browser holds: the live view contradicts all of it.
+    window.localStorage.setItem(
+      "rpm.duty.snapshot.v1",
+      JSON.stringify({
+        "gk-ada-newsigning": "not_enough_data",
+        "gk-bo-latejoiner": "not_enough_data",
+        "gk-fourth-tier": "not_required",
+      }),
+    );
+    liveRows.players = [
+      { full_name: "Ada Newsigning" },
+      { full_name: "Bo Latejoiner" },
+      { full_name: "Fourth Tier" },
+    ];
+    liveRows.duty = [
+      dutyRow("Ada Newsigning", "red"),
+      dutyRow("Bo Latejoiner", "amber"),
+      dutyRow("Fourth Tier", "green"),
+    ];
+
+    renderProvider();
+
+    await waitFor(() =>
+      expect(JSON.parse(window.localStorage.getItem("rpm.duty.snapshot.v2") ?? "{}")).toEqual({
+        "gk-ada-newsigning": "overdue",
+        "gk-bo-latejoiner": "due_soon",
+        "gk-fourth-tier": "up_to_date",
+      }),
+    );
+
+    // Two goalkeepers need attention, so the silent seed path states them. What
+    // must not happen is a transition alert, and no toast may fire.
+    const stored = JSON.parse(window.localStorage.getItem("rpm.notifications.v2") ?? "[]");
+    expect(stored.map((n: { id: string }) => n.id).sort()).toEqual([
+      "seed-gk-ada-newsigning",
+      "seed-gk-bo-latejoiner",
+    ]);
+    expect(toast.error).not.toHaveBeenCalled();
+    expect(toast.warning).not.toHaveBeenCalled();
+    expect(toast.success).not.toHaveBeenCalled();
+    // The stale key is left alone so a rollback still finds its own state.
+    expect(window.localStorage.getItem("rpm.duty.snapshot.v1")).toBeTruthy();
+  });
+
+  it("announces nothing when a stale v1 inbox exists alongside the v1 snapshot", async () => {
+    // With items already stored the seed path is skipped, so this asserts the
+    // other branch: no fresh transition is derived from v1 either.
+    window.localStorage.setItem(
+      "rpm.duty.snapshot.v1",
+      JSON.stringify({ "gk-ada-newsigning": "not_enough_data" }),
+    );
+    window.localStorage.setItem("rpm.notifications.v1", JSON.stringify([storedNotification]));
+    liveRows.players = [{ full_name: "Ada Newsigning" }];
+    liveRows.duty = [dutyRow("Ada Newsigning", "red")];
+
+    renderProvider();
+
+    await waitFor(() =>
+      expect(JSON.parse(window.localStorage.getItem("rpm.duty.snapshot.v2") ?? "{}")).toEqual({
+        "gk-ada-newsigning": "overdue",
+      }),
+    );
+    expect(toast.error).not.toHaveBeenCalled();
+    // The v1 inbox is not carried forward; the v2 inbox states the live condition.
+    expect(
+      JSON.parse(window.localStorage.getItem("rpm.notifications.v2") ?? "[]").map(
+        (n: { id: string }) => n.id,
+      ),
+    ).toEqual(["seed-gk-ada-newsigning"]);
   });
 });

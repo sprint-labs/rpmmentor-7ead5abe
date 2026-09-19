@@ -22,9 +22,29 @@ export { isDutyLevelResolved, pruneResolvedDutyLevels, type DutyNotif, type Reso
 export type EmailFrequency = "off" | "daily" | "weekly";
 export interface EmailPrefs { frequency: EmailFrequency; recipients: string[]; lastSent?: string }
 
-const STORAGE_KEY = "rpm.notifications.v1";
+/**
+ * The inbox and the snapshot are at v2 because everything stored under v1 was
+ * written by the previous implementation, which recomputed each level from the
+ * empty `interactions` seed. That produced exactly two values across all 114
+ * seed goalkeepers — 100 `not_enough_data` and 14 `not_required` — so the v1
+ * snapshot is not a record of anyone's duty status, and the v1 inbox is not a
+ * record of anything that happened.
+ *
+ * Reading v1 as the previous level would announce a change for every goalkeeper
+ * the live view disagrees with — up to a hundred alerts and a hundred toasts on
+ * one Super Admin's first load. Starting a new key space instead means the
+ * `first` guard sees no snapshot, takes the silent seed path, and announces
+ * nothing. v1 is left in place rather than deleted so a rollback still finds
+ * its own state.
+ *
+ * `rpm.duty.resolved.v1` is deliberately NOT versioned. Those entries are
+ * explicit user acknowledgements, and `pruneResolvedDutyLevels` already drops
+ * any whose level the live view contradicts, keeping only the ones that still
+ * hold.
+ */
+const STORAGE_KEY = "rpm.notifications.v2";
 const PREFS_KEY = "rpm.notif.prefs.v1";
-const SNAPSHOT_KEY = "rpm.duty.snapshot.v1";
+const SNAPSHOT_KEY = "rpm.duty.snapshot.v2";
 const RESOLVED_KEY = "rpm.duty.resolved.v1";
 
 interface Ctx {
@@ -106,9 +126,9 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
     const first = Object.keys(snap).length === 0;
     const acknowledged = load<ResolvedDutyLevels>(RESOLVED_KEY, {});
 
-    // The snapshot keeps its legacy `gk-…` key space, so the one already in
-    // this browser still matches and nothing is re-announced. A goalkeeper who
-    // is new to the snapshot — a signing, or a first load — is recorded without
+    // Goalkeepers are keyed by the legacy `gk-…` slug, which is also the
+    // profile route param, so an alert can always be opened. A goalkeeper the
+    // snapshot has not seen — a signing, or a first load — is recorded without
     // an alert, which is what stops a burst here.
     const current = dutyLevelSnapshot(liveLevels);
     const fresh = dutyLevelChanges(liveLevels, snap, acknowledged);
