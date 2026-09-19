@@ -213,7 +213,7 @@ export function checkGoalkeeper(gk: Goalkeeper, now: Date = new Date()): RosterI
       field: "dob",
       message: "Date of birth is missing or malformed.",
     });
-  } else if (Number.isFinite(gk.age)) {
+  } else if (gk.age != null && Number.isFinite(gk.age)) {
     const computed = ageFromDob(dob, now);
     if (Math.abs(computed - gk.age) > 1) {
       issues.push({

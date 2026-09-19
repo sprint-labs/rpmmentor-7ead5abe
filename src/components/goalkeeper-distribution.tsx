@@ -51,6 +51,14 @@ const ROW_TONE: Record<string, { bar: string; label: string }> = {
   },
 };
 
+/**
+ * Percent of the track below which a bar stops being visible at all.
+ *
+ * Shared with the dashboard's Duty of Care Monitor, which draws the same kind
+ * of proportional bar and has the same small-share rows.
+ */
+export const MIN_VISIBLE_BAR = 3;
+
 const FALLBACK_TONE = {
   bar: "bg-muted-foreground/60",
   label: "text-muted-foreground border-border bg-muted",
@@ -68,7 +76,14 @@ function DistributionRow({
   pending: boolean;
 }) {
   const tone = ROW_TONE[label] ?? FALLBACK_TONE;
-  const width = pending || count == null ? 0 : Math.min(100, percent);
+  // A row with someone in it always shows something. Free Agent is 1 of 116 —
+  // 0.9% of the track, which rounds to no visible pixels at all, so the bar
+  // would say "none" about a goalkeeper who exists.
+  const width =
+    pending || count == null || count === 0 ? 0 : Math.max(MIN_VISIBLE_BAR, Math.min(100, percent));
+  // One number for the row: the label a sighted reader sees and the label a
+  // screen reader hears must not be 1% and 0.9% of the same thing.
+  const shown = Math.round(percent);
 
   return (
     <Link
@@ -77,7 +92,7 @@ function DistributionRow({
       aria-label={
         count == null
           ? `View ${label} goalkeepers`
-          : `View ${count} ${label} goalkeepers, ${percent}% of the roster`
+          : `View ${count} ${label} goalkeepers, ${shown}% of the roster`
       }
       className="group flex min-h-11 items-center gap-3 rounded-md px-2 py-1.5 transition-colors hover:bg-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
     >
@@ -103,7 +118,7 @@ function DistributionRow({
           {pending || count == null ? "…" : count}
         </span>
         <span className="w-10 text-right font-mono text-[11px] text-muted-foreground">
-          {pending || count == null ? "" : `${Math.round(percent)}%`}
+          {pending || count == null ? "" : `${shown}%`}
         </span>
       </span>
 

@@ -142,7 +142,7 @@ function GkDetail() {
   const profileSummary = [
     gk.tags.includes("Free Agent") ? "Free Agent" : displayClub || "Club not recorded",
     !gk.tags.includes("Free Agent") ? displayLeague : null,
-    `${gk.age} yrs`,
+    gk.age != null ? `${gk.age} yrs` : null,
     gk.height,
     gk.foot ? `${gk.foot} foot` : null,
   ].filter((value): value is string => Boolean(value));
@@ -448,7 +448,7 @@ function GkDetail() {
             },
             { label: "Contract expiry", value: formatContractExpiry(gk.contractUntil) },
             { label: "DOB", value: formatDob(gk.dob) },
-            { label: "Age", value: String(gk.age) },
+            { label: "Age", value: gk.age != null ? String(gk.age) : "—" },
             { label: "Citizenship", value: displayNationality || "—" },
             { label: "Height", value: gk.height || "—" },
             { label: "Shirt number", value: gk.shirtNumber != null ? String(gk.shirtNumber) : "—" },

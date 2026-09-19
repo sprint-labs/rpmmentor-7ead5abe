@@ -143,7 +143,16 @@ vi.mock("@tanstack/react-start", async (importOriginal) => {
       fn === listPlayerDutyOfCareMock
         ? vi.fn().mockResolvedValue(DUTY_ROWS)
         : fn === listPlayersMock
-          ? vi.fn().mockResolvedValue(PLAYER_ROWS)
+          ? // The roster deliberately lands AFTER duty of care, which is the
+            // order production sees. Anything derived from the roster has to
+            // recompute on its arrival; resolving both together would let a
+            // memo with a missing roster dependency pass by luck.
+            vi.fn().mockImplementation(
+              () =>
+                new Promise((resolve) => {
+                  setTimeout(() => resolve(PLAYER_ROWS), 20);
+                }),
+            )
           : vi.fn().mockResolvedValue({ reports: [] }),
   };
 });
@@ -236,6 +245,50 @@ describe("Goalkeepers page", () => {
     },
     60_000,
   );
+
+  it("counts the duty chips over the roster once it has loaded", async () => {
+    // The roster used to be a module constant, so the memo that counts these
+    // chips was written without it in its dependency list. When the roster
+    // became a database read that starts empty, every chip rendered 0 beside a
+    // full list of results — a number the page contradicted on the same screen.
+    //
+    // This asserts the behaviour, not the cause: `useMemo` is a performance
+    // hint that React may recompute anyway, so no component test can force the
+    // stale-cache condition reliably. The dependency array is what makes it
+    // correct; this is here to catch a chip that stops counting the roster for
+    // any reason.
+    await renderGoalkeepers();
+
+    await waitFor(() => {
+      expect(screen.getAllByText("3 results").length).toBeGreaterThan(0);
+    });
+
+    // The chip reads as its label followed by its count, e.g. "All3".
+    const chipTexts = screen
+      .getAllByRole("button")
+      .map((button) => button.textContent ?? "")
+      .filter((text) => /^All\s*\d+$/.test(text));
+
+    expect(chipTexts.length).toBeGreaterThan(0);
+    for (const text of chipTexts) {
+      expect(text).toBe(`All${PLAYER_ROWS.length}`);
+    }
+  });
+
+  it("fills the advanced filter dropdowns from the loaded roster", async () => {
+    // Same class of bug: these options were derived once, from an empty roster.
+    await renderGoalkeepers();
+
+    await waitFor(() => {
+      expect(screen.getAllByText("3 results").length).toBeGreaterThan(0);
+    });
+
+    // Every league the fixture rows carry should be offerable as an option.
+    const leagues = new Set(PLAYER_ROWS.map((row) => row.league));
+    for (const league of leagues) {
+      expect(screen.getAllByText(league).length).toBeGreaterThan(0);
+    }
+  });
 
   it("keeps search visible and updates the URL-backed result query", async () => {
     const { router } = await renderGoalkeepers();

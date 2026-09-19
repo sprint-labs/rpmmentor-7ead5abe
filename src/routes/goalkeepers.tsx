@@ -563,7 +563,9 @@ function GoalkeepersList() {
     [dutyIndex, dutyQueryState],
   );
 
-  // Distinct dropdown options derived from the live roster.
+  // Distinct dropdown options derived from the live roster. The dependency on
+  // `goalkeepers` is load-bearing: it starts empty and arrives, and without it
+  // every one of these three dropdowns stays empty for good.
   const { allLeagues, allNats, contractYears } = useMemo(() => {
     const leagues = new Set<string>();
     const nats = new Set<string>();
@@ -578,7 +580,7 @@ function GoalkeepersList() {
       allNats: [...nats].sort(),
       contractYears: [...years].sort(),
     };
-  }, []);
+  }, [goalkeepers]);
 
   const selectedTiers = csv(search.tiers);
   const selectedLeagues = csv(search.leagues);
@@ -683,9 +685,14 @@ function GoalkeepersList() {
           return compareNullable(aRating, bRating, sort.direction);
       }
     });
-  }, [filtered, ratingsByGoalkeeper, sort]);
+    // `dutyFor` belongs here: the comparator reads it, and the duty rows arrive
+    // after the first render. Without it, sorting by Duty of Care orders by
+    // whatever the index said before it had loaded.
+  }, [filtered, ratingsByGoalkeeper, sort, dutyFor]);
 
   const CATS_LIST = CATS;
+  // Same again: counted over the roster, so it has to recompute when the roster
+  // lands. Otherwise every chip reads 0 beside a list of results.
   const dutyCounts = useMemo(
     () =>
       countRosterDuty(
@@ -693,7 +700,7 @@ function GoalkeepersList() {
         goalkeepers.map((g) => g.name),
         dutyQueryState,
       ),
-    [dutyIndex, dutyQueryState],
+    [dutyIndex, dutyQueryState, goalkeepers],
   );
   const DUTIES: { id: "all" | DutyLevel; label: string; count: number }[] = [
     { id: "all", label: "All", count: dutyCounts.total },
@@ -1211,7 +1218,7 @@ function GoalkeepersList() {
                     <td className="px-2 text-muted-foreground text-xs">
                       {gk.tags.includes("Free Agent") ? "-" : gk.league || "-"}
                     </td>
-                    <td className="px-2 tabular-nums font-mono">{gk.age}</td>
+                    <td className="px-2 tabular-nums font-mono">{gk.age ?? "-"}</td>
                     <td className="px-2 text-muted-foreground">{gk.nationality || "—"}</td>
                     <td className="px-2 text-muted-foreground">
                       {formatContractExpiry(gk.contractUntil)}

@@ -54,7 +54,8 @@ export interface PlayerRow {
   league: string;
   status: string;
   region: string;
-  age: number;
+  /** Null when no date of birth is recorded for this goalkeeper. */
+  age: number | null;
   nationality: string;
   contract_until: string;
   next_fixture_at: string;

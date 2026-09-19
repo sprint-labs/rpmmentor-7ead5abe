@@ -29,7 +29,8 @@ import { listMatchReports } from "@/lib/match-reports/reports.functions";
 import { isDateOnlyInPeriod, lastNDaysPeriod } from "@/lib/dashboard-period";
 import { getOverviewDashboardStats } from "@/lib/overview-dashboard.functions";
 import { getRosterSnapshot } from "@/lib/roster-snapshot.functions";
-import { GoalkeeperDistribution } from "@/components/goalkeeper-distribution";
+import { GoalkeeperDistribution, MIN_VISIBLE_BAR } from "@/components/goalkeeper-distribution";
+import { wholePercentsSummingTo100 } from "@/lib/roster-snapshot";
 import { listCalendarEvents } from "@/lib/calendar.functions";
 import { listPlayerDutyOfCare } from "@/lib/duty-of-care.functions";
 import { countDutyRows } from "@/lib/duty-of-care-roster";
@@ -195,6 +196,65 @@ function Dashboard() {
 
   const canViewSystemAlerts = can("alerts.view");
   const dutyOverview = countDutyRows(dutyRows);
+  // The five duty bands are mutually exclusive and cover the whole roster, so
+  // this is a distribution and has to total 100%. Rounding each band on its own
+  // does not: 116 goalkeepers split 39/32/15/28/2 round to
+  // 34 + 28 + 13 + 24 + 2 = 101%. Largest remainder, same as the Goalkeeper
+  // Distribution panel, so the column totals what a distribution claims.
+  const dutyBandCounts = [
+    dutyOverview.up_to_date,
+    dutyOverview.due_soon,
+    dutyOverview.overdue,
+    dutyOverview.not_required,
+    dutyOverview.not_enough_data,
+  ];
+  const dutyBandPercents = wholePercentsSummingTo100(dutyBandCounts);
+  const dutyBands = (
+    [
+      {
+        level: "up_to_date",
+        label: "Up to date",
+        hint: "On cadence for tier",
+        bar: "bg-success",
+        value: "text-success",
+      },
+      {
+        level: "due_soon",
+        label: "Due soon",
+        hint: "Approaching cadence",
+        bar: "bg-warning",
+        value: "text-warning",
+      },
+      {
+        level: "overdue",
+        label: "Overdue",
+        hint: "Past required cadence",
+        bar: "bg-warning",
+        value: "text-warning",
+      },
+      {
+        level: "not_required",
+        label: "Not required",
+        hint: "Tier 4 — no formal duty",
+        bar: "bg-muted-foreground/50",
+        value: "text-foreground",
+      },
+      {
+        level: "not_enough_data",
+        label: "Not enough data",
+        hint: "Missing tier or interactions",
+        bar: "bg-muted-foreground/50",
+        value: "text-foreground",
+      },
+    ] as const
+  ).map((band, index) => ({
+    ...band,
+    count: dutyBandCounts[index],
+    pct: dutyBandPercents[index],
+    // A band with someone in it always draws something. One of 116 is 1% of
+    // the track, which is no visible pixels at all.
+    barWidth: dutyBandCounts[index] === 0 ? 0 : Math.max(MIN_VISIBLE_BAR, dutyBandPercents[index]),
+  }));
 
   // Upcoming interactions come from the shared team calendar only. There is
   // no sample/placeholder fallback — an empty schedule shows an empty state.
@@ -350,80 +410,40 @@ function Dashboard() {
           <p className="mb-4 text-xs leading-relaxed text-muted-foreground">
             Reference tier roster combined with live logged interactions.
           </p>
-          {interactionsPending ? (
+          {/* Gated on the duty read, which is where every number below comes
+              from. Gating on the interactions read instead drew five bands of
+              "0" while the card above this one still said "…". */}
+          {dutyPending ? (
             <p className="text-sm text-muted-foreground">Loading duty-of-care figures…</p>
-          ) : interactionsError ? (
+          ) : dutyUnavailable ? (
             <p className="text-sm text-muted-foreground">Duty-of-care figures didn't load.</p>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-5">
-              {(
-                [
-                  {
-                    level: "up_to_date",
-                    label: "Up to date",
-                    count: dutyOverview.up_to_date,
-                    hint: "On cadence for tier",
-                    bar: "bg-success",
-                    value: "text-success",
-                  },
-                  {
-                    level: "due_soon",
-                    label: "Due soon",
-                    count: dutyOverview.due_soon,
-                    hint: "Approaching cadence",
-                    bar: "bg-warning",
-                    value: "text-warning",
-                  },
-                  {
-                    level: "overdue",
-                    label: "Overdue",
-                    count: dutyOverview.overdue,
-                    hint: "Past required cadence",
-                    bar: "bg-warning",
-                    value: "text-warning",
-                  },
-                  {
-                    level: "not_required",
-                    label: "Not required",
-                    count: dutyOverview.not_required,
-                    hint: "Tier 4 — no formal duty",
-                    bar: "bg-muted-foreground/50",
-                    value: "text-foreground",
-                  },
-                  {
-                    level: "not_enough_data",
-                    label: "Not enough data",
-                    count: dutyOverview.not_enough_data,
-                    hint: "Missing tier or interactions",
-                    bar: "bg-muted-foreground/50",
-                    value: "text-foreground",
-                  },
-                ] as const
-              ).map((b) => {
-                const pct = Math.round((b.count / Math.max(1, dutyOverview.total)) * 100);
-                return (
-                  <Link
-                    key={b.level}
-                    to="/insights/$metric"
-                    params={{ metric: "duty" }}
-                    search={{ from: period.fromDate, to: period.toDate, level: b.level, tier: "" }}
-                    aria-label={`View goalkeepers: ${b.label}`}
-                    className="space-y-2 block -mx-2 px-2 py-1 hover:bg-accent/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                  >
-                    <div className="h-1.5 w-full bg-background overflow-hidden">
-                      <div className={`h-full bar-grow ${b.bar}`} style={{ width: `${pct}%` }} />
-                    </div>
-                    <div className="flex items-baseline justify-between font-mono text-xs">
-                      <span className="text-muted-foreground">{b.label}</span>
-                      <span className={`tabular-nums font-bold ${b.value}`}>{b.count}</span>
-                    </div>
-                    <div className="flex items-center justify-between text-[10px] text-muted-foreground/70">
-                      <span>{b.hint}</span>
-                      <span className="font-mono tabular-nums">{pct}%</span>
-                    </div>
-                  </Link>
-                );
-              })}
+              {dutyBands.map((b) => (
+                <Link
+                  key={b.level}
+                  to="/insights/$metric"
+                  params={{ metric: "duty" }}
+                  search={{ from: period.fromDate, to: period.toDate, level: b.level, tier: "" }}
+                  aria-label={`View goalkeepers: ${b.label}`}
+                  className="space-y-2 block -mx-2 px-2 py-1 hover:bg-accent/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                >
+                  <div className="h-1.5 w-full bg-background overflow-hidden">
+                    <div
+                      className={`h-full bar-grow ${b.bar}`}
+                      style={{ width: `${b.barWidth}%` }}
+                    />
+                  </div>
+                  <div className="flex items-baseline justify-between font-mono text-xs">
+                    <span className="text-muted-foreground">{b.label}</span>
+                    <span className={`tabular-nums font-bold ${b.value}`}>{b.count}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-[10px] text-muted-foreground/70">
+                    <span>{b.hint}</span>
+                    <span className="font-mono tabular-nums">{b.pct}%</span>
+                  </div>
+                </Link>
+              ))}
             </div>
           )}
         </div>
