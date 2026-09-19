@@ -315,8 +315,8 @@ function Dashboard() {
         <Link
           to="/goalkeepers"
           className="block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-          aria-label="View all goalkeepers"
         >
+          <span className="sr-only">View all goalkeepers: </span>
           <StatCard
             label="Total Goalkeepers"
             value={overviewError ? "—" : (overview?.totalGoalkeepers ?? "…")}
@@ -328,8 +328,8 @@ function Dashboard() {
           params={{ metric: "interactions" }}
           search={{ from: period.fromDate, to: period.toDate, level: "", tier: "" }}
           className="block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-info"
-          aria-label="Break down interactions logged"
         >
+          <span className="sr-only">Break down: </span>
           <StatCard
             label="Interactions Logged"
             value={overviewError ? "—" : (overview?.interactionsInPeriod ?? "…")}
@@ -347,8 +347,8 @@ function Dashboard() {
           params={{ metric: "duty" }}
           search={{ from: period.fromDate, to: period.toDate, level: "overdue", tier: "" }}
           className="block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-warning"
-          aria-label="Break down duty of care cadence"
         >
+          <span className="sr-only">Break down: </span>
           <StatCard
             label="Duty of Care"
             value={dutyPending ? "…" : dutyUnavailable ? "—" : dutyOverview.overdue}
@@ -368,8 +368,8 @@ function Dashboard() {
           params={{ metric: "reports" }}
           search={{ from: period.fromDate, to: period.toDate, level: "", tier: "" }}
           className="block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-          aria-label="Break down match reports by match date"
         >
+          <span className="sr-only">Break down: </span>
           <StatCard
             label="Match Reports"
             value={
@@ -389,8 +389,8 @@ function Dashboard() {
           params={{ metric: "mentors" }}
           search={{ from: period.fromDate, to: period.toDate, level: "", tier: "" }}
           className="block min-[390px]:col-span-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary md:col-span-1"
-          aria-label="Break down active mentors"
         >
+          <span className="sr-only">Break down: </span>
           <StatCard
             label="Active Mentors"
             value={overviewError ? "—" : (overview?.activeMentors ?? "…")}
@@ -438,9 +438,13 @@ function Dashboard() {
                   to="/insights/$metric"
                   params={{ metric: "duty" }}
                   search={{ from: period.fromDate, to: period.toDate, level: b.level, tier: "" }}
-                  aria-label={`View goalkeepers: ${b.label}`}
                   className="space-y-2 block -mx-2 px-2 py-1 hover:bg-accent/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                 >
+                  {/* Named by its own content. An aria-label that paraphrases
+                      the band reads as a different string from the one on
+                      screen, which breaks voice control — the visible words
+                      have to be part of the name. */}
+                  <span className="sr-only">View goalkeepers: </span>
                   <div className="h-1.5 w-full bg-background overflow-hidden">
                     <div
                       className={`h-full bar-grow ${b.bar}`}
@@ -451,7 +455,7 @@ function Dashboard() {
                     <span className="text-muted-foreground">{b.label}</span>
                     <span className={`tabular-nums font-bold ${b.value}`}>{b.count}</span>
                   </div>
-                  <div className="flex items-center justify-between text-[10px] text-muted-foreground/70">
+                  <div className="flex items-center justify-between text-[10px] text-muted-foreground">
                     <span>{b.hint}</span>
                     <span className="font-mono tabular-nums">{b.pct}%</span>
                   </div>
@@ -492,12 +496,12 @@ function Dashboard() {
           </SectionTitle>
           <div className="divide-y divide-border">
             {calendarPending ? (
-              <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground/70 py-6 text-center">
+              <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground py-6 text-center">
                 Loading calendar…
               </div>
             ) : calendarError ? (
               <div className="space-y-2 py-6 text-center">
-                <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground/70">
+                <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
                   Calendar didn't load
                 </div>
                 <Link
@@ -510,7 +514,7 @@ function Dashboard() {
               </div>
             ) : upcoming.length === 0 ? (
               <div className="space-y-2 py-6 text-center">
-                <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground/70">
+                <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
                   Nothing scheduled
                 </div>
                 <p className="text-[11px] text-muted-foreground px-2">
@@ -559,7 +563,7 @@ function Dashboard() {
                         {e.location ? ` · ${e.location}` : ""}
                       </div>
                     </div>
-                    <CalendarClock className="size-3.5 text-muted-foreground/60 shrink-0" />
+                    <CalendarClock className="size-3.5 text-muted-foreground shrink-0" />
                   </>
                 );
                 return gk ? (
@@ -627,15 +631,15 @@ function Dashboard() {
             </SectionTitle>
             <div className="space-y-3">
               {interactionsPending ? (
-                <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground/70 py-6 text-center">
+                <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground py-6 text-center">
                   Loading interactions…
                 </div>
               ) : interactionsError ? (
-                <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground/70 py-6 text-center">
+                <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground py-6 text-center">
                   Interactions didn't load
                 </div>
               ) : recentActivity.length === 0 ? (
-                <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground/70 py-6 text-center">
+                <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground py-6 text-center">
                   No interactions logged recently
                 </div>
               ) : (
@@ -647,7 +651,7 @@ function Dashboard() {
                         <span className="text-foreground font-semibold">{a.actor}</span> {a.action}{" "}
                         <span className="text-foreground font-semibold">{a.target}</span>
                       </p>
-                      <span className="text-[10px] text-muted-foreground/70 font-mono">
+                      <span className="text-[10px] text-muted-foreground font-mono">
                         {formatRelative(a.date)}
                       </span>
                     </div>
@@ -677,7 +681,7 @@ function Dashboard() {
             </SectionTitle>
             <div className="space-y-2">
               {alerts.length === 0 ? (
-                <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground/70 py-6 text-center">
+                <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground py-6 text-center">
                   Live alert feed not connected
                 </div>
               ) : (

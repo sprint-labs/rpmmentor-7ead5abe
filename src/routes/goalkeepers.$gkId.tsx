@@ -672,7 +672,7 @@ function GkProfile({ gk, linkedPlayer }: { gk: Goalkeeper; linkedPlayer: PlayerR
               <div className="space-y-3">
                 <div className="text-[10px] uppercase text-muted-foreground">
                   Pool of last {last5.length} report{last5.length === 1 ? "" : "s"}:
-                  <span className="ml-1 normal-case text-muted-foreground/80 tracking-normal">
+                  <span className="ml-1 normal-case text-muted-foreground tracking-normal">
                     {last5.map(reportRef).join(" · ")}
                   </span>
                 </div>
@@ -745,7 +745,7 @@ function GkProfile({ gk, linkedPlayer }: { gk: Goalkeeper; linkedPlayer: PlayerR
                               {Array.from({ length: 5 - contributors.length }).map((_, i) => (
                                 <span
                                   key={`missing-${id}-${i}`}
-                                  className="px-1.5 py-0.5 rounded border border-dashed border-border/60 text-[10px] text-muted-foreground/70 italic"
+                                  className="px-1.5 py-0.5 rounded border border-dashed border-border/60 text-[10px] text-muted-foreground italic"
                                   title={`Missing report with a valid ${PILLAR_LABELS[id]} score`}
                                 >
                                   missing report
@@ -850,7 +850,7 @@ function GkProfile({ gk, linkedPlayer }: { gk: Goalkeeper; linkedPlayer: PlayerR
             {highlightReelItems.length === 0 ? (
               <div className="rounded-md border border-dashed border-border/80 bg-muted/20 px-3 py-4 text-center">
                 <p className="text-xs text-muted-foreground">No highlight reel uploaded yet.</p>
-                <p className="mt-1 text-[11px] text-muted-foreground/80">
+                <p className="mt-1 text-[11px] text-muted-foreground">
                   Slot reserved for {gk.name} — upload a clip via Media and tag it Highlight.
                 </p>
               </div>

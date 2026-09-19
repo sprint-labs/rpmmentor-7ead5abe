@@ -1234,7 +1234,7 @@ function GoalkeepersList() {
                       <div className="flex flex-col">
                         <span>{gk.tags.includes("Free Agent") ? "-" : gk.club || "-"}</span>
                         {gk.onLoan && gk.parentClub && (
-                          <span className="text-[10px] text-muted-foreground/80 italic">
+                          <span className="text-[10px] text-muted-foreground italic">
                             on loan from {gk.parentClub}
                           </span>
                         )}

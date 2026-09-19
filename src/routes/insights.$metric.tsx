@@ -120,7 +120,7 @@ export const Route = createFileRoute("/insights/$metric")({
 
 function Empty({ label }: { label: string }) {
   return (
-    <div className="py-10 text-center text-[10px] font-mono uppercase tracking-widest text-muted-foreground/70">
+    <div className="py-10 text-center text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
       {label}
     </div>
   );

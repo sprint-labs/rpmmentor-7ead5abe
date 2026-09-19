@@ -30,24 +30,29 @@ import {
 /**
  * Bar and label colour per row.
  *
+ * The pills are outlined, not filled. A wash of the row's own hue behind its
+ * label cost roughly a point of contrast and put Tier 3, Tier 4 and Academy
+ * under the 4.5:1 AA floor; the hue still reads from the text, the border and
+ * the bar, which is where it was carrying meaning anyway.
+ *
  * The four tiers take the care-cadence ramp. Unassigned takes the warning hue
  * because it is an outstanding decision, not a rung on that ladder. Academy and
  * Free Agent take category hues rather than borrowing a tier's green, so a
  * status never reads as a tier at a glance.
  */
 const ROW_TONE: Record<string, { bar: string; label: string }> = {
-  "Tier 1": { bar: "bg-tier-1", label: "text-tier-1 border-tier-1/40 bg-tier-1/15" },
-  "Tier 2": { bar: "bg-tier-2", label: "text-tier-2 border-tier-2/40 bg-tier-2/15" },
-  "Tier 3": { bar: "bg-tier-3", label: "text-tier-3 border-tier-3/40 bg-tier-3/15" },
-  "Tier 4": { bar: "bg-tier-4", label: "text-tier-4 border-tier-4/40 bg-tier-4/15" },
+  "Tier 1": { bar: "bg-tier-1", label: "text-tier-1 border-tier-1/40" },
+  "Tier 2": { bar: "bg-tier-2", label: "text-tier-2 border-tier-2/40" },
+  "Tier 3": { bar: "bg-tier-3", label: "text-tier-3 border-tier-3/40" },
+  "Tier 4": { bar: "bg-tier-4", label: "text-tier-4 border-tier-4/40" },
   [UNASSIGNED_TIER_LABEL]: {
     bar: "bg-warning",
-    label: "text-warning border-warning/40 bg-warning/15",
+    label: "text-warning border-warning/40",
   },
-  Academy: { bar: "bg-info", label: "text-info border-info/40 bg-info/15" },
+  Academy: { bar: "bg-info", label: "text-info border-info/40" },
   "Free Agent": {
-    bar: "bg-muted-foreground/60",
-    label: "text-muted-foreground border-border bg-muted",
+    bar: "bg-neutral",
+    label: "text-muted-foreground border-border",
   },
 };
 
@@ -89,13 +94,14 @@ function DistributionRow({
     <Link
       to="/goalkeepers"
       search={searchForDistributionRow(label)}
-      aria-label={
-        count == null
-          ? `View ${label} goalkeepers`
-          : `View ${count} ${label} goalkeepers, ${shown}% of the roster`
-      }
       className="group flex min-h-11 items-center gap-3 rounded-md px-2 py-1.5 transition-colors hover:bg-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
     >
+      {/* Named by its own content rather than an aria-label. A label that
+          paraphrases the row ("View 31 Tier 1 goalkeepers") is a different
+          string from the one on screen ("Tier 1 31 27%"), which leaves anyone
+          using voice control asking for a name they cannot see. These two
+          spans add the words the numbers need without changing them. */}
+      <span className="sr-only">View goalkeepers: </span>
       <span
         className={cn(
           "w-[86px] shrink-0 rounded border px-1.5 py-0.5 text-center text-[10px] font-medium",
@@ -122,7 +128,11 @@ function DistributionRow({
         </span>
       </span>
 
-      <ArrowUpRight className="size-3 shrink-0 text-muted-foreground/50 transition-colors group-hover:text-primary" />
+      <span className="sr-only"> of the roster</span>
+      <ArrowUpRight
+        aria-hidden="true"
+        className="size-3 shrink-0 text-muted-foreground transition-colors group-hover:text-primary"
+      />
     </Link>
   );
 }
@@ -199,7 +209,7 @@ export function GoalkeeperDistribution({
             </div>
             {/* Said plainly, because two independent attributes counted against
                 the same total look wrong to anyone expecting a pie chart. */}
-            <p className="mt-2 text-[10px] leading-snug text-muted-foreground/80">
+            <p className="mt-2 text-[10px] leading-snug text-muted-foreground">
               A goalkeeper can hold a tier and a status at once, so these are counted separately and
               do not add up to 100%.
             </p>
