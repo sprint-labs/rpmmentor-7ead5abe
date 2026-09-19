@@ -327,6 +327,30 @@ describe("Goalkeepers page", () => {
     expect(screen.getAllByText("1 results").length).toBeGreaterThan(0);
   });
 
+  it("does not navigate once per tick of a rating slider drag", async () => {
+    // The interaction the Vercel toolbar measured at 373ms per event: a range
+    // slider fires `input` continuously while dragged, and each one was a
+    // router navigation that re-filtered and re-sorted the whole roster.
+    const { router } = await renderGoalkeepers();
+    fireEvent.click(screen.getByRole("button", { name: "Filters" }));
+    const drawer = await screen.findByRole("dialog");
+    fireEvent.click(within(drawer).getByRole("button", { name: /Advanced filters/ }));
+    const slider = (await within(drawer).findByLabelText("Minimum rating")) as HTMLInputElement;
+
+    for (const value of ["1.4", "1.9", "2.3", "2.8", "3.2"]) {
+      fireEvent.change(slider, { target: { value } });
+    }
+
+    // The thumb and the readout have already moved; the URL has not.
+    expect(slider.value).toBe("3.2");
+    expect(within(drawer).getAllByText("3.2–5.0").length).toBeGreaterThan(0);
+    expect(router.state.location.search.ratingMin).toBe(1);
+
+    await waitFor(() => {
+      expect(router.state.location.search.ratingMin).toBe(3.2);
+    });
+  });
+
   it("adopts a query set from outside the box", async () => {
     // Back/forward and Clear filters move the URL without touching the input,
     // so the draft has to follow — otherwise the box keeps showing a search

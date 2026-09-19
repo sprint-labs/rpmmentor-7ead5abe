@@ -18,6 +18,7 @@ import { DUTY_SEVERITY } from "@/lib/duty-of-care-status";
 import { listPlayers } from "@/lib/players.functions";
 import { toGoalkeepers } from "@/lib/roster/live-goalkeepers";
 import { UNASSIGNED_TIER_LABEL } from "@/lib/roster-snapshot";
+import { useUrlDraft } from "@/lib/use-url-draft";
 import {
   buildRosterDutyIndex,
   countRosterDuty,
@@ -37,7 +38,7 @@ import {
   toggleFrom,
   type GoalkeeperFilterState,
 } from "@/lib/goalkeeper-filters";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { withPermission } from "@/components/require-permission";
 import {
   Drawer,
@@ -71,14 +72,6 @@ const searchSchema = z.object({
 
 type GoalkeeperSearch = GoalkeeperFilterState;
 type UpdateGoalkeeperSearch = (patch: Partial<GoalkeeperSearch>) => void;
-
-/**
- * How long the search box waits before writing to the URL.
- *
- * Long enough that a normal typing run costs one navigation instead of one per
- * character; short enough that the URL is right by the time anyone reads it.
- */
-const SEARCH_DEBOUNCE_MS = 250;
 
 export const Route = createFileRoute("/goalkeepers")({
   validateSearch: zodValidator(searchSchema),
@@ -372,6 +365,14 @@ function AdvancedFilterFields({
   ratingMin: number;
   ratingMax: number;
 }) {
+  // A range slider fires `input` continuously while dragged, and each one was
+  // a router navigation. This was the slowest interaction the Vercel toolbar
+  // measured on the page.
+  const commitRatingMin = useCallback((value: number) => update({ ratingMin: value }), [update]);
+  const commitRatingMax = useCallback((value: number) => update({ ratingMax: value }), [update]);
+  const [minDraft, setMinDraft] = useUrlDraft(ratingMin, commitRatingMin);
+  const [maxDraft, setMaxDraft] = useUrlDraft(ratingMax, commitRatingMax);
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
       {includeTier && <TierFilterOptions selectedTiers={selectedTiers} update={update} />}
@@ -477,7 +478,7 @@ function AdvancedFilterFields({
         <div className="text-[11px] uppercase text-muted-foreground mb-1.5">
           Rating range{" "}
           <span className="tabular-nums font-mono text-foreground">
-            {ratingMin.toFixed(1)}–{ratingMax.toFixed(1)}
+            {minDraft.toFixed(1)}–{maxDraft.toFixed(1)}
           </span>
         </div>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -488,13 +489,13 @@ function AdvancedFilterFields({
               min={1}
               max={5}
               step={0.1}
-              value={ratingMin}
-              onChange={(event) => update({ ratingMin: clampRating(Number(event.target.value)) })}
+              value={minDraft}
+              onChange={(event) => setMinDraft(clampRating(Number(event.target.value)))}
               className="flex-1"
               aria-label="Minimum rating"
             />
             <span className="w-8 tabular-nums font-mono text-foreground">
-              {ratingMin.toFixed(1)}
+              {minDraft.toFixed(1)}
             </span>
           </label>
           <label className="flex flex-1 items-center gap-2 text-[11px] text-muted-foreground">
@@ -504,13 +505,13 @@ function AdvancedFilterFields({
               min={1}
               max={5}
               step={0.1}
-              value={ratingMax}
-              onChange={(event) => update({ ratingMax: clampRating(Number(event.target.value)) })}
+              value={maxDraft}
+              onChange={(event) => setMaxDraft(clampRating(Number(event.target.value)))}
               className="flex-1"
               aria-label="Maximum rating"
             />
             <span className="w-8 tabular-nums font-mono text-foreground">
-              {ratingMax.toFixed(1)}
+              {maxDraft.toFixed(1)}
             </span>
           </label>
         </div>
@@ -635,37 +636,9 @@ function GoalkeepersList() {
     [navigate],
   );
 
-  /**
-   * The search box types into local state and the URL catches up.
-   *
-   * `update` is a router navigation, and this input was calling it once per
-   * keystroke — which re-ran the route, the filter and the sort over the whole
-   * roster before the character appeared. It measured as the slowest
-   * interaction on the page.
-   *
-   * The URL stays the source of truth for what is filtered; it just lands a
-   * beat after the keystroke, so a shared or bookmarked link is unchanged.
-   */
-  const [queryDraft, setQueryDraft] = useState(search.q);
-  // What we last wrote to the URL, so a change we caused is told apart from a
-  // change someone else caused.
-  const pushedQuery = useRef(search.q);
-
-  useEffect(() => {
-    // The URL moved under us — a back/forward, or Clear filters. Adopt it.
-    if (search.q === pushedQuery.current) return;
-    pushedQuery.current = search.q;
-    setQueryDraft(search.q);
-  }, [search.q]);
-
-  useEffect(() => {
-    if (queryDraft === pushedQuery.current) return;
-    const timer = setTimeout(() => {
-      pushedQuery.current = queryDraft;
-      update({ q: queryDraft });
-    }, SEARCH_DEBOUNCE_MS);
-    return () => clearTimeout(timer);
-  }, [queryDraft, update]);
+  // The search box types locally and the URL catches up. See `useUrlDraft`.
+  const commitQuery = useCallback((value: string) => update({ q: value }), [update]);
+  const [queryDraft, setQueryDraft] = useUrlDraft(search.q, commitQuery);
 
   useEffect(() => {
     if (!isMobile) return;
