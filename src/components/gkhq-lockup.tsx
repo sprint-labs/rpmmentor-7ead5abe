@@ -65,32 +65,31 @@ export function GkhqMark({ className, alt = "" }: { className?: string; alt?: st
 }
 
 /**
- * Mark plus wordmark, the full lockup.
+ * Mark plus wordmark, the full lockup: the G beside the word, never above it.
  *
- * `stacked` is for the sign-in page, where the brand has room to breathe;
- * the inline arrangement is for the header rail.
+ * Every surface draws the same arrangement and differs only in how large the
+ * pair is set — the header rail small, the sign-in and reset screens large.
+ *
+ * Callers size the gap through `className` rather than taking the default,
+ * because it does not scale with the mark on its own. The mark art is taller
+ * than it is wide (996 x 1145), so `object-contain` inside `GkhqMark`'s square
+ * box leaves slack at each side that already reads as space between the two;
+ * the larger the mark, the more of the gap is spoken for before `gap-*` is
+ * applied at all.
  */
 export function GkhqLockup({
   className,
   markClassName,
   wordmarkClassName,
-  stacked = false,
   alt = "GKHQ",
 }: {
   className?: string;
   markClassName?: string;
   wordmarkClassName?: string;
-  stacked?: boolean;
   alt?: string;
 }) {
   return (
-    <span
-      className={cn(
-        "inline-flex",
-        stacked ? "flex-col items-start gap-4" : "items-center gap-2.5",
-        className,
-      )}
-    >
+    <span className={cn("inline-flex items-center gap-2.5", className)}>
       <GkhqMark className={markClassName} />
       <GkhqWordmark className={wordmarkClassName} alt={alt} />
     </span>
