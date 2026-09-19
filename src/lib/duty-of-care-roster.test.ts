@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { buildRosterDutyIndex, countRosterDuty, rosterDutyFor } from "./duty-of-care-roster";
+import {
+  buildRosterDutyIndex,
+  countDutyRows,
+  countRosterDuty,
+  rosterDutyFor,
+} from "./duty-of-care-roster";
 import type { PlayerDutyOfCareRow } from "./duty-of-care.functions";
 
 function row(over: Partial<PlayerDutyOfCareRow>): PlayerDutyOfCareRow {
@@ -21,14 +26,31 @@ function row(over: Partial<PlayerDutyOfCareRow>): PlayerDutyOfCareRow {
   };
 }
 
+/** Fixed clock so the day maths cannot drift with the calendar. */
+const NOW = Date.parse("2026-09-19T12:00:00Z");
+
 describe("rosterDutyFor", () => {
   it("gives the list the same answer the profile shows", () => {
-    const index = buildRosterDutyIndex([row({})]);
+    const index = buildRosterDutyIndex([row({})], NOW);
 
     expect(rosterDutyFor(index, "Max Crocombe")).toEqual({
       level: "overdue",
       label: "Overdue",
+      // 2026-08-25 to 2026-09-19.
+      days: 25,
     });
+  });
+
+  it("counts days from the view's own last contact, not from interactions", () => {
+    const index = buildRosterDutyIndex([row({ last_interaction_at: "2026-09-09" })], NOW);
+
+    expect(rosterDutyFor(index, "Max Crocombe").days).toBe(10);
+  });
+
+  it("reports zero days when the view records no contact at all", () => {
+    const index = buildRosterDutyIndex([row({ last_interaction_at: null })], NOW);
+
+    expect(rosterDutyFor(index, "Max Crocombe").days).toBe(0);
   });
 
   it("matches the goalkeeper regardless of case or spacing", () => {
@@ -75,6 +97,7 @@ describe("rosterDutyFor", () => {
     expect(rosterDutyFor(new Map(), "Max Crocombe", { pending: true })).toEqual({
       level: "not_enough_data",
       label: "Loading…",
+      days: 0,
     });
   });
 
@@ -112,5 +135,45 @@ describe("countRosterDuty", () => {
       not_required: 1,
       not_enough_data: 1,
     });
+  });
+});
+
+describe("countDutyRows", () => {
+  // The dashboard headline used to recompute duty on the client from logged
+  // interactions keyed by legacy slug, and undercounted: the card read 10 while
+  // the roster list read 15. Counting the view's own rows needs no roster to
+  // match names against, so there is nothing left to disagree about.
+  it("counts the view's own rows, with no roster to match against", () => {
+    const counts = countDutyRows([
+      row({ full_name: "A", state: "red" }),
+      row({ full_name: "B", state: "red" }),
+      row({ full_name: "C", state: "amber" }),
+      row({ full_name: "D", state: "green" }),
+      row({ full_name: "E", state: "not_required" }),
+      row({ full_name: "F", state: "no_data" }),
+    ]);
+
+    expect(counts).toEqual({
+      total: 6,
+      overdue: 2,
+      due_soon: 1,
+      up_to_date: 1,
+      not_required: 1,
+      not_enough_data: 1,
+    });
+  });
+
+  it("counts a row the roster has never heard of", () => {
+    // `countRosterDuty` can only count goalkeepers whose names it was given.
+    // This one answers for everyone the view covers, which is the point.
+    const rows = [row({ full_name: "Someone Not In The Roster", state: "red" })];
+
+    expect(countDutyRows(rows).overdue).toBe(1);
+    expect(countRosterDuty(buildRosterDutyIndex(rows), []).overdue).toBe(0);
+  });
+
+  it("returns zeroes rather than throwing on a malformed response", () => {
+    expect(countDutyRows(null).total).toBe(0);
+    expect(countDutyRows(undefined).overdue).toBe(0);
   });
 });

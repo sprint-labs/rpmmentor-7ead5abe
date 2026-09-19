@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { dutyStatusForGk, goalkeepers } from "./mock-data";
+import { dutyStatusForGk, goalkeepers, type DutyLevel } from "./mock-data";
 import {
   canonicaliseLegacyTierCategory,
   clearGoalkeeperFilters,
@@ -150,5 +150,59 @@ describe("goalkeeper filter behaviour", () => {
     const after = goalkeepers.map((goalkeeper) => dutyStatusForGk(goalkeeper));
 
     expect(after).toEqual(before);
+  });
+});
+
+describe("the duty filter reads the live view", () => {
+  // The roster chips, the Duty of Care column and this filter must all be the
+  // same answer. They were not: the column and chips read
+  // `public.player_duty_of_care`, while the filter recomputed from a seed
+  // interactions array that is empty — so every goalkeeper came back
+  // "not enough data" and selecting "Overdue 15" returned nothing at all.
+  const overdueNames = new Set(goalkeepers.slice(0, 3).map((g) => g.name));
+  const dutyLevelFor = (name: string): DutyLevel =>
+    overdueNames.has(name) ? "overdue" : "up_to_date";
+
+  it("returns the goalkeepers the supplied lookup calls overdue", () => {
+    const results = filterGoalkeepers(
+      goalkeepers,
+      { ...defaultFilters, duty: "overdue" },
+      noRatings,
+      dutyLevelFor,
+    );
+
+    expect(results).toHaveLength(overdueNames.size);
+    expect(results.every((g) => overdueNames.has(g.name))).toBe(true);
+  });
+
+  it("returns everyone else for the complementary level", () => {
+    const results = filterGoalkeepers(
+      goalkeepers,
+      { ...defaultFilters, duty: "up_to_date" },
+      noRatings,
+      dutyLevelFor,
+    );
+
+    expect(results).toHaveLength(goalkeepers.length - overdueNames.size);
+  });
+
+  it("counts the same goalkeepers the chip counts", () => {
+    // A chip showing "Overdue 15" and a filter returning 15 rows are the same
+    // question asked twice; the numbers cannot be allowed to diverge.
+    const chipCount = goalkeepers.filter((g) => dutyLevelFor(g.name) === "overdue").length;
+    const filtered = filterGoalkeepers(
+      goalkeepers,
+      { ...defaultFilters, duty: "overdue" },
+      noRatings,
+      dutyLevelFor,
+    );
+
+    expect(filtered).toHaveLength(chipCount);
+  });
+
+  it("never narrows the roster when no duty filter is applied", () => {
+    expect(
+      filterGoalkeepers(goalkeepers, { ...defaultFilters, duty: "all" }, noRatings, dutyLevelFor),
+    ).toHaveLength(goalkeepers.length);
   });
 });

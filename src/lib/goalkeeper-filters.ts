@@ -1,4 +1,4 @@
-import { dutyStatusForGk, type DutyLevel, type Goalkeeper } from "./mock-data";
+import { type DutyLevel, type Goalkeeper } from "./mock-data";
 
 export type GoalkeeperFilterState = {
   q: string;
@@ -99,10 +99,24 @@ export function countActiveGoalkeeperFilters(filters: GoalkeeperFilterState): nu
   );
 }
 
+/**
+ * Duty level for one goalkeeper, supplied by the caller.
+ *
+ * The filter does not compute this. `duty_of_care_at()` is the only thing
+ * entitled to decide a duty status, and the roster already reads its projection
+ * for the column and the chips — so the filter takes the same answer rather
+ * than working one out of its own.
+ */
+export type DutyLevelLookup = (goalkeeperName: string) => DutyLevel;
+
+/** Used when a caller filters nothing by duty; never narrows the result set. */
+const ALL_DUTY_UNKNOWN: DutyLevelLookup = () => "not_enough_data";
+
 export function filterGoalkeepers(
   goalkeepers: Goalkeeper[],
   filters: GoalkeeperFilterState,
   ratingsByGoalkeeper: ReadonlyMap<string, GoalkeeperRating>,
+  dutyLevelFor: DutyLevelLookup = ALL_DUTY_UNKNOWN,
   now = Date.now(),
 ) {
   const selectedTiers = csv(filters.tiers);
@@ -123,7 +137,7 @@ export function filterGoalkeepers(
     if (filters.cat === "Tier 3-4" && goalkeeper.tier !== "Tier 3" && goalkeeper.tier !== "Tier 4")
       return false;
 
-    if (filters.duty !== "all" && dutyStatusForGk(goalkeeper).level !== (filters.duty as DutyLevel))
+    if (filters.duty !== "all" && dutyLevelFor(goalkeeper.name) !== (filters.duty as DutyLevel))
       return false;
 
     if (

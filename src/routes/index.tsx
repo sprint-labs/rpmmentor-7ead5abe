@@ -4,13 +4,7 @@ import { WorkflowDialog, type WorkflowKind } from "@/components/workflows";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { PageHeader, StatCard, SectionTitle, TierBadge } from "@/components/primitives";
-import {
-  alerts,
-  goalkeepers,
-  formatRelative,
-  computeDutyOverview,
-  type Alert,
-} from "@/lib/mock-data";
+import { alerts, goalkeepers, formatRelative, type Alert } from "@/lib/mock-data";
 import { compareAlertSeverity } from "@/lib/interaction-alert-rank";
 import { useLoggedInteractions } from "@/lib/interactions/use-interactions";
 import { ErrorBoundary } from "@/components/error-boundary";
@@ -44,6 +38,8 @@ import {
 } from "@/lib/roster-snapshot";
 import { NO_TIER_LABEL } from "@/components/insight-drilldowns";
 import { listCalendarEvents } from "@/lib/calendar.functions";
+import { listPlayerDutyOfCare } from "@/lib/duty-of-care.functions";
+import { countDutyRows } from "@/lib/duty-of-care-roster";
 import { BulletinDashboardCard } from "@/components/bulletins/dashboard-card";
 
 const OVERVIEW_PERIOD_DAYS = 14;
@@ -107,6 +103,23 @@ function Dashboard() {
     enabled: Boolean(user && user.role !== "mentor"),
     staleTime: 30_000,
   });
+  // Duty of Care comes from `public.player_duty_of_care` — the `duty_of_care_at()`
+  // projection — so this headline, the roster chips and each profile badge are
+  // three views of one answer. It used to be recomputed here from logged
+  // interactions keyed by legacy slug, which quietly undercounted: the card
+  // said 10 while the roster said 15.
+  const dutyListFn = useServerFn(listPlayerDutyOfCare);
+  const {
+    data: dutyRows,
+    isPending: dutyPending,
+    isError: dutyUnavailable,
+  } = useQuery({
+    queryKey: ["duty-of-care", "roster"],
+    queryFn: () => dutyListFn(),
+    enabled: Boolean(user && user.role !== "mentor"),
+    staleTime: 60_000,
+  });
+
   // Upcoming Events reads the shared team calendar (same cache as /calendar).
   const fetchCalendarEvents = useServerFn(listCalendarEvents);
   const {
@@ -161,16 +174,6 @@ function Dashboard() {
     isPending: interactionsPending,
     isError: interactionsError,
   } = useLoggedInteractions(Boolean(user) && user?.role !== "mentor");
-  const dutySource = useMemo(
-    () =>
-      (loggedInteractions ?? []).map((i) => ({
-        gkId: i.gkSlug,
-        type: i.interactionType,
-        date: i.occurredAt,
-      })),
-    [loggedInteractions],
-  );
-
   // Show only durable interactions here; sample activity must never be mixed
   // into a live operational dashboard.
   const recentActivity = useMemo(
@@ -198,7 +201,7 @@ function Dashboard() {
   }
 
   const canViewSystemAlerts = can("alerts.view");
-  const dutyOverview = computeDutyOverview(dutySource);
+  const dutyOverview = countDutyRows(dutyRows);
 
   // Upcoming interactions come from the shared team calendar only. There is
   // no sample/placeholder fallback — an empty schedule shows an empty state.
@@ -282,13 +285,13 @@ function Dashboard() {
         >
           <StatCard
             label="Duty of Care"
-            value={interactionsPending ? "…" : interactionsError ? "—" : dutyOverview.overdue}
+            value={dutyPending ? "…" : dutyUnavailable ? "—" : dutyOverview.overdue}
             hint={
-              interactionsError
+              dutyUnavailable
                 ? "Count unavailable"
                 : dutyOverview.overdue > 0
-                  ? "Players past required cadence"
-                  : "Nothing overdue on the reference roster"
+                  ? `Goalkeepers past required cadence · of ${dutyOverview.total}`
+                  : "Nothing overdue"
             }
             accent="warning"
             emptyMessage="Nothing overdue"

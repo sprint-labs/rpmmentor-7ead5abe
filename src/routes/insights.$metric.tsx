@@ -18,7 +18,9 @@ import { listPlayers } from "@/lib/players.functions";
 import { listUsersAndRoles } from "@/lib/users-and-roles.functions";
 import { listMatchReports } from "@/lib/match-reports/reports.functions";
 import { listAssignableMentors, listCalendarEvents } from "@/lib/calendar.functions";
-import { alerts as systemAlerts, goalkeepers, dutyStatusForGk } from "@/lib/mock-data";
+import { alerts as systemAlerts, goalkeepers } from "@/lib/mock-data";
+import { listPlayerDutyOfCare } from "@/lib/duty-of-care.functions";
+import { buildRosterDutyIndex, rosterDutyFor } from "@/lib/duty-of-care-roster";
 import { isDateOnlyInPeriod, lastNDaysPeriod } from "@/lib/dashboard-period";
 import { isDashboardInteractionType } from "@/lib/interactions/schema";
 import { buildActiveMentorInsightRows } from "@/lib/active-mentor-insights";
@@ -196,15 +198,18 @@ function InsightDrilldown() {
     enabled && (active === "interactions" || active === "duty"),
   );
 
-  const dutySource = useMemo(
-    () =>
-      (interactions.data ?? []).map((i) => ({
-        gkId: i.gkSlug,
-        type: i.interactionType,
-        date: i.occurredAt,
-      })),
-    [interactions.data],
-  );
+  // Duty of Care reads `public.player_duty_of_care`, the same projection the
+  // dashboard headline, the roster chips and every profile badge read. It was
+  // recomputed here from logged interactions keyed by legacy slug, which is why
+  // this drilldown said 10 overdue while the roster said 15.
+  const dutyListFn = useServerFn(listPlayerDutyOfCare);
+  const duty = useQuery({
+    queryKey: ["duty-of-care", "roster"],
+    queryFn: () => dutyListFn(),
+    enabled: enabled && active === "duty",
+    staleTime: 60_000,
+  });
+  const dutyIndex = useMemo(() => buildRosterDutyIndex(duty.data ?? []), [duty.data]);
 
   if (!user || user.role === "mentor") return null;
   if (active === "alerts" && !canViewSystemAlerts) {
@@ -301,11 +306,11 @@ function InsightDrilldown() {
 
         {active === "duty" &&
           (() => {
-            if (interactions.isLoading) return <Empty label="Loading…" />;
-            if (interactions.isError) return <Empty label="Duty of Care unavailable" />;
+            if (duty.isPending) return <Empty label="Loading…" />;
+            if (duty.isError) return <Empty label="Duty of Care unavailable" />;
             const rows = goalkeepers.map((gk) => ({
               gk,
-              duty: dutyStatusForGk(gk, dutySource),
+              duty: rosterDutyFor(dutyIndex, gk.name),
             }));
             if (rows.length === 0) return <Empty label="No goalkeepers on the roster" />;
             return <DutyOfCareWorkbench rows={rows} initialLevel={search.level} />;
