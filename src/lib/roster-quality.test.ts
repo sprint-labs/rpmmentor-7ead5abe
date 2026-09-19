@@ -88,10 +88,51 @@ describe("parseContractDate", () => {
     expect(parseContractDate("June 2027")?.getMonth()).toBe(5);
   });
 
+  it("reads a February contract, which contractISO writes as day 30", () => {
+    // `contractISO` emits day 30 for every month, so "February 2027" arrives
+    // as 2027-02-30 — a day February does not have. A contract is
+    // month-granular, so the day is clamped to the month end rather than the
+    // whole row being reported as unreadable.
+    const parsed = parseContractDate("2027-02-30");
+
+    expect(parsed).not.toBeNull();
+    expect(parsed!.getMonth()).toBe(1);
+    expect(parsed!.getDate()).toBe(28);
+  });
+
+  it("clamps to 29 February in a leap year", () => {
+    expect(parseContractDate("2028-02-30")!.getDate()).toBe(29);
+  });
+
+  it("agrees with the month-and-year form it was converted from", () => {
+    // Both spellings of the same contract must land on the same day, or the
+    // expiry check would disagree with itself depending on the source.
+    for (const [monthYear, iso] of [
+      ["February 2027", "2027-02-30"],
+      ["June 2027", "2027-06-30"],
+      ["November 2026", "2026-11-30"],
+    ] as const) {
+      expect(parseContractDate(iso)?.getTime()).toBe(parseContractDate(monthYear)?.getTime());
+    }
+  });
+
+  it("does not flag a February contract as unreadable", () => {
+    const gk = toGoalkeeper(row({ contract_until: "February 2029" }));
+    const issues = codes(gk, { databaseBackedOnly: true });
+
+    expect(gk.contractUntil).toBe("2029-02-30");
+    expect(issues).not.toContain("unparseable_contract");
+    expect(issues).not.toContain("missing_contract");
+  });
+
   it("rejects a value it cannot read", () => {
     // `contractISO` turns an unreadable stored value into "undefined-06-30".
     expect(parseContractDate("undefined-06-30")).toBeNull();
     expect(parseContractDate("TBC")).toBeNull();
+    // Clamping the day is not licence to accept nonsense.
+    expect(parseContractDate("2027-13-30")).toBeNull();
+    expect(parseContractDate("2027-02-45")).toBeNull();
+    expect(parseContractDate("2027-06-00")).toBeNull();
   });
 
   it("does not flag a live contract as unreadable", () => {

@@ -107,6 +107,11 @@ function calendarDate(year: number, monthIndex: number, day: number): Date | nul
   return survived ? date : null;
 }
 
+/** Day 0 of the next month is the last day of this one. */
+function lastDayOfMonth(year: number, monthIndex: number): number {
+  return new Date(year, monthIndex + 1, 0).getDate();
+}
+
 /**
  * Parse a contract end date, or null when it cannot be read.
  *
@@ -121,7 +126,18 @@ export function parseContractDate(input: string | undefined | null): Date | null
   if (!raw) return null;
 
   const iso = raw.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
-  if (iso) return calendarDate(Number(iso[1]), Number(iso[2]) - 1, Number(iso[3]));
+  if (iso) {
+    const year = Number(iso[1]);
+    const monthIndex = Number(iso[2]) - 1;
+    const day = Number(iso[3]);
+    if (monthIndex < 0 || monthIndex > 11 || day < 1 || day > 31) return null;
+    // A contract is month-granular, and `contractISO` writes day 30 for every
+    // month — so "February 2027" arrives here as `2027-02-30`. The day carries
+    // no meaning, and rejecting it as an impossible date would report every
+    // February contract as unreadable. Clamped to the month end, which is what
+    // the month-and-year branch below returns anyway.
+    return new Date(year, monthIndex, Math.min(day, lastDayOfMonth(year, monthIndex)));
+  }
 
   const monthYear = raw.match(/^([A-Za-z]+)\s+(\d{4})$/);
   if (!monthYear) return null;
