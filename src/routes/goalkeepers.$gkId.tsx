@@ -32,7 +32,7 @@ import { buildHighlightReelItems } from "@/lib/goalkeeper-highlight-reel";
 import { EditDetailsButton } from "@/components/edit-player-details-dialog";
 import { DutyOfCarePanel } from "@/components/duty-of-care-panel";
 import { listPlayers, type PlayerRosterRow } from "@/lib/players.functions";
-import { interactionBelongsToGoalkeeper } from "@/lib/goalkeeper-player-link";
+import { interactionBelongsToGoalkeeper, normalisePersonName } from "@/lib/goalkeeper-player-link";
 import { rosterRowForLegacySlug, toGoalkeeper } from "@/lib/roster/live-goalkeepers";
 import {
   compareInteractionsByAlertThenDate,
@@ -77,10 +77,6 @@ const PILLAR_SHORT_LABELS: Record<PillarId, string> = {
   physical: "Physical",
 };
 
-function normaliseName(s: string): string {
-  return s.trim().toLowerCase().replace(/\s+/g, " ");
-}
-
 function formatDob(iso: string): string {
   if (!iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return "Not recorded";
   const [year, month, day] = iso.split("-").map(Number);
@@ -123,7 +119,8 @@ function compareMatchDatesNewestFirst(a: string | null, b: string | null): numbe
  * still in flight must never read as one who does not exist:
  *
  *   - roster pending   → "Loading goalkeeper…"
- *   - roster unreachable → an explicit failure, retryable by refreshing
+ *   - roster unreachable with nothing in cache → an explicit failure, retryable
+ *   - roster here (including a cached row after a failed refetch) → keep it
  *   - roster here, no row for this slug → a genuine `notFound()`
  */
 function GkDetail() {
@@ -149,7 +146,10 @@ function GkDetail() {
     );
   }
 
-  if (rosterUnavailable) {
+  // TanStack Query keeps prior `data` when a background refetch fails and
+  // still flips `isError`. A profile that already resolved must keep using
+  // that cached row instead of being replaced by the failure copy.
+  if (rosterUnavailable && !players) {
     return (
       <div className="p-8 text-sm text-destructive" role="status">
         The roster could not be loaded. Refresh the page to try again.
@@ -246,10 +246,10 @@ function GkProfile({ gk, player }: { gk: Goalkeeper; player: PlayerRosterRow }) 
   }, [queryClient]);
 
   const gkReports = useMemo<MatchReportRow[]>(() => {
-    const target = normaliseName(gk.name);
+    const target = normalisePersonName(gk.name);
     const all = data?.reports ?? [];
     return all
-      .filter((r) => normaliseName(r.goalkeeper) === target)
+      .filter((r) => normalisePersonName(r.goalkeeper) === target)
       .sort((a, b) => compareMatchDatesNewestFirst(a.match_date, b.match_date));
   }, [data, gk.name]);
 

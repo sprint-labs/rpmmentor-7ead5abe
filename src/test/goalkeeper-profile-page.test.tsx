@@ -71,19 +71,21 @@ vi.mock("@/lib/media-store", async (importOriginal) => ({
 vi.mock("@/lib/match-reports/reports.functions", () => ({
   deleteMatchReport: vi.fn(),
   getMatchReport: vi.fn(),
-  listMatchReports: vi.fn(),
+  listMatchReports: listMatchReportsMock,
   submitMatchReport: vi.fn(),
   updateMatchReport: vi.fn(),
 }));
 
 const {
   getPlayerDutyOfCareMock,
+  listMatchReportsMock,
   listPlayerDutyOfCareMock,
   listPlayersMock,
   resetDutyOfCareMock,
   LIVE_ONLY_PLAYER,
 } = vi.hoisted(() => ({
   getPlayerDutyOfCareMock: vi.fn(),
+  listMatchReportsMock: vi.fn(),
   listPlayerDutyOfCareMock: vi.fn(),
   listPlayersMock: vi.fn(),
   resetDutyOfCareMock: vi.fn(),
@@ -127,11 +129,13 @@ vi.mock("@tanstack/react-start", async (importOriginal) => {
     useServerFn: (fn: unknown) =>
       fn === listPlayersMock
         ? () => listPlayersMock()
-        : fn === listPlayerDutyOfCareMock
-          ? vi.fn().mockResolvedValue([])
-          : fn === getPlayerDutyOfCareMock
-            ? vi.fn().mockResolvedValue({ state: "green" })
-            : vi.fn().mockResolvedValue({ reports: [] }),
+        : fn === listMatchReportsMock
+          ? () => listMatchReportsMock()
+          : fn === listPlayerDutyOfCareMock
+            ? vi.fn().mockResolvedValue([])
+            : fn === getPlayerDutyOfCareMock
+              ? vi.fn().mockResolvedValue({ state: "green" })
+              : vi.fn().mockResolvedValue({ reports: [] }),
   };
 });
 
@@ -145,11 +149,12 @@ async function renderProfile(initialEntry: string) {
 
   await router.load();
 
-  return render(
+  const view = render(
     <QueryClientProvider client={queryClient}>
       <RouterProvider router={router} />
     </QueryClientProvider>,
   );
+  return { ...view, queryClient };
 }
 
 beforeAll(() => {
@@ -174,6 +179,7 @@ beforeAll(() => {
 
 beforeEach(() => {
   listPlayersMock.mockResolvedValue([LIVE_ONLY_PLAYER]);
+  listMatchReportsMock.mockResolvedValue({ reports: [] });
 });
 
 afterEach(() => {
@@ -215,5 +221,63 @@ describe("Goalkeeper profile page", () => {
       expect(screen.getByText(/The roster could not be loaded/)).toBeTruthy();
     });
     expect(screen.queryByText("Goalkeeper not found.")).toBeNull();
+  });
+
+  it("keeps a cached profile when a later roster refetch fails", async () => {
+    const { queryClient } = await renderProfile("/goalkeepers/gk-kwame-asante");
+
+    expect(await screen.findByRole("heading", { name: "Kwame Asante" })).toBeTruthy();
+
+    listPlayersMock.mockRejectedValue(new Error("roster unreachable"));
+    await queryClient.refetchQueries({ queryKey: ["players", "roster"] });
+
+    expect(screen.getByRole("heading", { name: "Kwame Asante" })).toBeTruthy();
+    expect(screen.queryByText(/The roster could not be loaded/)).toBeNull();
+  });
+
+  it("matches match reports when the filed name uses the other apostrophe", async () => {
+    listPlayersMock.mockResolvedValue([
+      {
+        ...LIVE_ONLY_PLAYER,
+        id: "00000000-0000-4000-8000-0000000000bb",
+        full_name: "Rich O'Donnell",
+        current_club: "Cambridge United",
+        league: "League Two",
+        nationality: "Republic of Ireland",
+      },
+    ]);
+    listMatchReportsMock.mockResolvedValue({
+      reports: [
+        {
+          report_id: "mr2_rich_odonnell",
+          legacy_report_id: "mr_rich_odonnell",
+          row_index: 2,
+          goalkeeper: "Rich O\u2019Donnell",
+          coach: "Test Coach",
+          team: "Cambridge United",
+          opponent: "Derby County",
+          competition: "League Two",
+          match_date: "2026-01-15",
+          scores: {
+            protect_goal: 4,
+            protect_space: 4,
+            protect_air: 4,
+            control_play: 4,
+            change_play: 4,
+            psych: 4,
+            physical: 4,
+          },
+          average: 4,
+          comments: "",
+        },
+      ],
+    });
+
+    await renderProfile("/goalkeepers/gk-rich-o-donnell");
+
+    expect(await screen.findByRole("heading", { name: "Rich O'Donnell" })).toBeTruthy();
+    expect(await screen.findByText("Match Reports (1)")).toBeTruthy();
+    expect(screen.getByText(/Opponent: Derby County/)).toBeTruthy();
+    expect(screen.queryByText("No Match Reports recorded for this goalkeeper yet.")).toBeNull();
   });
 });
