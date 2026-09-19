@@ -24,6 +24,10 @@ import { ArrowUpRight, AlertTriangle, CalendarClock, FileText, Plus } from "luci
 import { useAuth, ROLE_LABEL } from "@/lib/auth";
 import { MentorDashboard } from "@/components/mentor/mentor-dashboard";
 import { SyncStatusChip } from "@/components/sync-status-chip";
+import { DataFreshnessChip } from "@/components/data-freshness-chip";
+import { CalendarMonthCard } from "@/components/calendar/month-card";
+import { describeDataFreshness } from "@/lib/data-freshness";
+import { localDateIso } from "@/lib/calendar/month";
 import { listMatchReports } from "@/lib/match-reports/reports.functions";
 
 import { isDateOnlyInPeriod, lastNDaysPeriod } from "@/lib/dashboard-period";
@@ -67,6 +71,7 @@ function Dashboard() {
     data: reportsData,
     isLoading: reportsLoading,
     isError: reportsError,
+    dataUpdatedAt: reportsFetchedAt,
   } = useQuery({
     // Share the Reports page cache so the dashboard number and the
     // destination list are based on the same canonical Supabase read.
@@ -80,7 +85,11 @@ function Dashboard() {
   // the window used by the mentor Interactions card.
   const period = useMemo(() => lastNDaysPeriod(OVERVIEW_PERIOD_DAYS), []);
   const fetchOverview = useServerFn(getOverviewDashboardStats);
-  const { data: overview, isError: overviewError } = useQuery({
+  const {
+    data: overview,
+    isError: overviewError,
+    dataUpdatedAt: overviewFetchedAt,
+  } = useQuery({
     queryKey: ["overview-dashboard-stats", period.fromDate, period.toDate],
     queryFn: () => fetchOverview({ data: { fromDate: period.fromDate, toDate: period.toDate } }),
     enabled: Boolean(user && user.role !== "mentor"),
@@ -93,6 +102,7 @@ function Dashboard() {
     data: roster,
     isPending: rosterPending,
     isError: rosterError,
+    dataUpdatedAt: rosterFetchedAt,
   } = useQuery({
     queryKey: ["roster-snapshot"],
     queryFn: () => fetchRosterSnapshot(),
@@ -120,6 +130,7 @@ function Dashboard() {
     data: dutyRows,
     isPending: dutyPending,
     isError: dutyUnavailable,
+    dataUpdatedAt: dutyFetchedAt,
   } = useQuery({
     queryKey: ["duty-of-care", "roster"],
     queryFn: () => dutyListFn(),
@@ -133,6 +144,7 @@ function Dashboard() {
     data: teamEvents,
     isPending: calendarPending,
     isError: calendarError,
+    dataUpdatedAt: calendarFetchedAt,
   } = useQuery({
     queryKey: ["calendar-events"],
     queryFn: () => fetchCalendarEvents(),
@@ -180,21 +192,34 @@ function Dashboard() {
     data: loggedInteractions,
     isPending: interactionsPending,
     isError: interactionsError,
+    dataUpdatedAt: interactionsFetchedAt,
   } = useLoggedInteractions(Boolean(user) && user?.role !== "mentor");
   // Show only durable interactions here; sample activity must never be mixed
   // into a live operational dashboard.
   const recentActivity = useMemo(
     () =>
       (loggedInteractions ?? [])
-        .map((i) => ({
-          id: `interaction-${i.id}`,
-          actor: i.mentorName || "Mentor",
-          actorInitials: initialsOf(i.mentorName || "Mentor"),
-          action: `logged a ${i.interactionType.toLowerCase()} with`,
-          target: i.goalkeeperName,
-          gkId: i.gkSlug,
-          date: i.occurredAt,
-        }))
+        .map((i) => {
+          const name = (i.mentorName ?? "").trim();
+          // An email address is not a display name. When a profile carries no
+          // name, say so plainly rather than rendering the word "Mentor", or a
+          // login address, in the styling a real person's name gets.
+          const named = name.length > 0 && !name.includes("@");
+          return {
+            id: `interaction-${i.id}`,
+            actor: named ? name : "A mentor",
+            actorNamed: named,
+            actorInitials: named ? initialsOf(name) : "?",
+            action: `logged a ${i.interactionType.toLowerCase()} with`,
+            target: i.goalkeeperName,
+            gkId: i.gkSlug,
+            // Ordered and stamped by when it was LOGGED, which is what this
+            // panel is titled. Ordering by when the interaction happened meant
+            // a catch-up entered this morning about last week could be pushed
+            // off the list on the very day it was entered.
+            date: i.createdAt || i.occurredAt,
+          };
+        })
         .sort((a, b) => +new Date(b.date) - +new Date(a.date))
         .slice(0, 8),
     [loggedInteractions],
@@ -248,14 +273,22 @@ function Dashboard() {
       {
         level: "not_required",
         label: "Not required",
-        hint: "Tier 4 — no formal duty",
+        // Not only Tier 4: goalkeepers with no tier recorded land here too, and
+        // "Tier 4" told a manager they had no formal duty for someone who is
+        // simply untiered — which this same page flags for assignment. Verified
+        // against live data: 15 Tier 4 plus 2 with no tier.
+        hint: "Tier 4 or no tier recorded",
         bar: "bg-muted-foreground/50",
         value: "text-foreground",
       },
       {
         level: "not_enough_data",
-        label: "Not enough data",
-        hint: "Missing tier or interactions",
+        label: "Never contacted",
+        // Not a missing tier — an untiered goalkeeper is counted as "Not
+        // required" above. Verified against live data: every goalkeeper in this
+        // band holds Tier 1 or Tier 2 and none has any qualifying contact on
+        // record. That is a gap to close, not an absence of information.
+        hint: "Tiered, no qualifying contact recorded",
         bar: "bg-muted-foreground/50",
         value: "text-foreground",
       },
@@ -271,11 +304,47 @@ function Dashboard() {
 
   // Upcoming interactions come from the shared team calendar only. There is
   // no sample/placeholder fallback — an empty schedule shows an empty state.
-  const todayIso = new Date().toISOString().slice(0, 10);
-  const upcoming = (teamEvents ?? [])
+  // Local calendar date, not `toISOString()`. The ISO form is UTC, so between
+  // midnight and 01:00 BST it still reads as yesterday and today's fixtures
+  // reappear in this list under a "Yesterday" label — worse still for a viewer
+  // in a timezone behind UTC.
+  const todayIso = localDateIso(new Date());
+  const upcomingAll = (teamEvents ?? [])
     .filter((e) => e.event_date >= todayIso && e.status !== "cancelled")
-    .sort((a, b) => a.event_date.localeCompare(b.event_date))
-    .slice(0, 6);
+    .sort(
+      (a, b) =>
+        a.event_date.localeCompare(b.event_date) ||
+        (a.start_time ?? "").localeCompare(b.start_time ?? ""),
+    );
+  const UPCOMING_SHOWN = 6;
+  const upcoming = upcomingAll.slice(0, UPCOMING_SHOWN);
+
+  /**
+   * When this screen's figures were last read from the database.
+   *
+   * Every panel's fetch time is included, so the label is bounded by the most
+   * stale of them. The outbound sync queue is deliberately not consulted: it
+   * measures whether this device has finished uploading its own work, which
+   * says nothing about whether the numbers here are current.
+   */
+  const freshness = describeDataFreshness({
+    fetchedAt: [
+      reportsFetchedAt,
+      overviewFetchedAt,
+      rosterFetchedAt,
+      dutyFetchedAt,
+      calendarFetchedAt,
+      interactionsFetchedAt,
+    ],
+    anyError:
+      reportsError ||
+      overviewError ||
+      rosterError ||
+      dutyUnavailable ||
+      calendarError ||
+      interactionsError,
+    reportsSyncedAt: overview?.reportsSyncedAt ?? null,
+  });
 
   const greeting = `Good ${new Date().getHours() < 12 ? "morning" : new Date().getHours() < 18 ? "afternoon" : "evening"}, ${user.name.split(" ")[0]}`;
 
@@ -287,6 +356,16 @@ function Dashboard() {
         description={`${ROLE_LABEL[user.role]} view · overview of goalkeeper coverage and outstanding actions.`}
         action={
           <div className="grid w-full grid-cols-1 gap-2 min-[390px]:grid-cols-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center">
+            {/* Two different questions, so two indicators:
+                  - freshness: are the figures on this page current?
+                  - SyncStatusChip: has MY unsent work finished uploading?
+                The chip used to answer the second while being read as the
+                first, falling back to a hardcoded "Up to date" whenever the
+                queue was empty — which is its normal state. */}
+            <DataFreshnessChip
+              freshness={freshness}
+              className="w-fit justify-self-start whitespace-nowrap min-[390px]:col-span-2 sm:col-auto"
+            />
             <SyncStatusChip className="w-fit justify-self-start whitespace-nowrap min-[390px]:col-span-2 sm:col-auto" />
             {can("reports.submit") && (
               <button
@@ -353,11 +432,17 @@ function Dashboard() {
             label="Duty of Care"
             value={dutyPending ? "…" : dutyUnavailable ? "—" : dutyOverview.overdue}
             hint={
-              dutyUnavailable
-                ? "Count unavailable"
-                : dutyOverview.overdue > 0
-                  ? `Goalkeepers past required cadence · of ${dutyOverview.total}`
-                  : "Nothing overdue"
+              // "Nothing overdue" is an all-clear on a safeguarding metric, so
+              // it must never appear before the roster has actually been read.
+              // While loading the count is 0, which fell straight through to
+              // that reassurance.
+              dutyPending
+                ? "Checking the roster…"
+                : dutyUnavailable
+                  ? "Count unavailable"
+                  : dutyOverview.overdue > 0
+                    ? `Goalkeepers past required cadence · of ${dutyOverview.total}`
+                    : "Nothing overdue"
             }
             accent="warning"
             emptyMessage="Nothing overdue"
@@ -467,6 +552,17 @@ function Dashboard() {
 
         <GoalkeeperDistribution roster={roster} pending={rosterPending} error={rosterError} />
 
+        {/* Month calendar. Reads the same `["calendar-events"]` cache as the
+            Upcoming Events panel beside it, so the two cannot disagree and the
+            card costs no extra request. */}
+        <CalendarMonthCard
+          className="col-span-12 self-start lg:col-span-4"
+          events={teamEvents}
+          pending={calendarPending}
+          error={calendarError}
+          today={todayIso}
+        />
+
         {/* Upcoming interactions */}
         <div className="col-span-12 lg:col-span-4 command-panel p-5">
           <SectionTitle
@@ -494,6 +590,14 @@ function Dashboard() {
           >
             Upcoming Events
           </SectionTitle>
+          {/* An undisclosed cap on a list like this reads as "there are only
+              six". Live data regularly has several times that in the next week
+              alone, so the count says what is being withheld. */}
+          {!calendarPending && !calendarError && upcomingAll.length > upcoming.length ? (
+            <p className="-mt-2 mb-2 text-[10px] text-muted-foreground">
+              Showing the next {upcoming.length} of {upcomingAll.length} scheduled.
+            </p>
+          ) : null}
           <div className="divide-y divide-border">
             {calendarPending ? (
               <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground py-6 text-center">
@@ -648,8 +752,16 @@ function Dashboard() {
                     <div className="w-0.5 self-stretch min-h-8 bg-primary shrink-0" />
                     <div className="flex-1 min-w-0">
                       <p className="text-muted-foreground leading-snug">
-                        <span className="text-foreground font-semibold">{a.actor}</span> {a.action}{" "}
-                        <span className="text-foreground font-semibold">{a.target}</span>
+                        <span
+                          className={
+                            a.actorNamed
+                              ? "text-foreground font-semibold"
+                              : "italic text-muted-foreground"
+                          }
+                        >
+                          {a.actor}
+                        </span>{" "}
+                        {a.action} <span className="text-foreground font-semibold">{a.target}</span>
                       </p>
                       <span className="text-[10px] text-muted-foreground font-mono">
                         {formatRelative(a.date)}
