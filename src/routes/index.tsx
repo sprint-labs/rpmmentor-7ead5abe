@@ -29,14 +29,7 @@ import { listMatchReports } from "@/lib/match-reports/reports.functions";
 import { isDateOnlyInPeriod, lastNDaysPeriod } from "@/lib/dashboard-period";
 import { getOverviewDashboardStats } from "@/lib/overview-dashboard.functions";
 import { getRosterSnapshot } from "@/lib/roster-snapshot.functions";
-import {
-  ROSTER_STATUS_LABELS,
-  ROSTER_TIER_LABELS,
-  UNASSIGNED_TIER_LABEL,
-  type RosterCategoryCount,
-  type RosterTierLabel,
-} from "@/lib/roster-snapshot";
-import { NO_TIER_LABEL } from "@/components/insight-drilldowns";
+import { GoalkeeperDistribution } from "@/components/goalkeeper-distribution";
 import { listCalendarEvents } from "@/lib/calendar.functions";
 import { listPlayerDutyOfCare } from "@/lib/duty-of-care.functions";
 import { countDutyRows } from "@/lib/duty-of-care-roster";
@@ -435,117 +428,7 @@ function Dashboard() {
           )}
         </div>
 
-        {/* Roster categories */}
-        <div className="col-span-12 self-start command-panel p-4 lg:col-span-4">
-          <SectionTitle
-            action={
-              rosterError ? null : (
-                <span className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
-                  {rosterPending ? "…" : `${roster?.total ?? 0} on roster`}
-                </span>
-              )
-            }
-          >
-            Roster Snapshot
-          </SectionTitle>
-
-          {rosterError ? (
-            <p className="mt-3 text-xs text-muted-foreground" role="status">
-              Roster snapshot didn't load. Refresh the page to try again.
-            </p>
-          ) : (
-            <>
-              <section className="mt-3" aria-labelledby="duty-tier-categories">
-                <h3
-                  id="duty-tier-categories"
-                  className="mb-2 text-[10px] font-mono uppercase tracking-[0.14em] text-muted-foreground"
-                >
-                  Care cadence tiers
-                </h3>
-                <div className="grid grid-cols-2 gap-2" aria-busy={rosterPending}>
-                  {(
-                    roster?.tiers.filter(
-                      (row): row is RosterCategoryCount<RosterTierLabel> =>
-                        row.label !== UNASSIGNED_TIER_LABEL,
-                    ) ?? ROSTER_TIER_LABELS.map((label) => ({ label, count: null }))
-                  ).map(({ label, count }) => (
-                    <Link
-                      key={label}
-                      to="/goalkeepers"
-                      search={{ tiers: label }}
-                      aria-label={
-                        count == null
-                          ? `View ${label} goalkeepers`
-                          : `View ${count} ${label} goalkeepers`
-                      }
-                      className="group flex min-h-12 items-center gap-2 rounded-md border border-border bg-background/40 px-2.5 py-2 hover:border-primary/50 hover:bg-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                    >
-                      <TierBadge tier={label} />
-                      <span className="ml-auto font-mono text-lg font-bold tabular-nums text-foreground">
-                        {count ?? "…"}
-                      </span>
-                      <ArrowUpRight className="size-3 shrink-0 text-muted-foreground transition-colors group-hover:text-primary" />
-                    </Link>
-                  ))}
-                </div>
-              </section>
-
-              <section
-                className="mt-4 border-t border-border pt-3"
-                aria-labelledby="player-status-categories"
-              >
-                <h3
-                  id="player-status-categories"
-                  className="mb-2 text-[10px] font-mono uppercase tracking-[0.14em] text-muted-foreground"
-                >
-                  Status groups
-                </h3>
-                <div className="grid grid-cols-2 gap-2" aria-busy={rosterPending}>
-                  {(
-                    roster?.statuses ??
-                    ROSTER_STATUS_LABELS.map((label) => ({ label, count: null }))
-                  ).map(({ label, count }) => (
-                    <Link
-                      key={label}
-                      to="/goalkeepers"
-                      search={{ cat: label === "Free Agent" ? "Free Agents" : label }}
-                      aria-label={
-                        count == null
-                          ? `View ${label} goalkeepers`
-                          : `View ${count} ${label} goalkeepers`
-                      }
-                      className="group flex min-h-12 items-center gap-2 rounded-md border border-border bg-background/40 px-2.5 py-2 hover:border-primary/50 hover:bg-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                    >
-                      <TierBadge tier={label} />
-                      <span className="ml-auto font-mono text-lg font-bold tabular-nums text-foreground">
-                        {count ?? "…"}
-                      </span>
-                      <ArrowUpRight className="size-3 shrink-0 text-muted-foreground transition-colors group-hover:text-primary" />
-                    </Link>
-                  ))}
-                </div>
-              </section>
-
-              {roster && roster.unassigned > 0 ? (
-                <Link
-                  to="/insights/$metric"
-                  params={{ metric: "goalkeepers" }}
-                  search={{
-                    from: period.fromDate,
-                    to: period.toDate,
-                    level: "",
-                    tier: NO_TIER_LABEL,
-                  }}
-                  className="mt-3 flex items-center gap-1 border-t border-border pt-3 text-[10px] text-warning hover:underline"
-                >
-                  {roster.unassigned} goalkeeper{roster.unassigned === 1 ? "" : "s"} have no tier
-                  recorded — assign one
-                  <ArrowUpRight className="size-3 shrink-0" />
-                </Link>
-              ) : null}
-            </>
-          )}
-        </div>
+        <GoalkeeperDistribution roster={roster} pending={rosterPending} error={rosterError} />
 
         {/* Upcoming interactions */}
         <div className="col-span-12 lg:col-span-4 command-panel p-5">
