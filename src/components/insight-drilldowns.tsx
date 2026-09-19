@@ -21,6 +21,7 @@ import {
   type DutyStatus,
   type Goalkeeper,
 } from "@/lib/mock-data";
+import { londonToday } from "@/lib/time/london";
 
 /**
  * The remaining insight drilldowns, each on the shared workbench shell. Yellow
@@ -561,10 +562,17 @@ export function ActiveMentorWorkbench({ mentors }: { mentors: ActiveMentorInsigh
 // Scheduled Events
 // ---------------------------------------------------------------------------
 
-/** Today and tomorrow are the ones worth flagging in the list. */
-function isImminent(eventDate: string): boolean {
-  const today = new Date().toISOString().slice(0, 10);
-  const tomorrow = new Date(Date.now() + 86_400_000).toISOString().slice(0, 10);
+/**
+ * Today and tomorrow are the ones worth flagging in the list.
+ *
+ * Counted in London, because that is the clock the row's own label is named
+ * from. Reading the boundary in UTC instead let the two disagree for the hour
+ * British Summer Time puts between them: at 23:30 UTC the label already said
+ * "Tomorrow" while this still called it today.
+ */
+function isImminent(eventDate: string, now: number = Date.now()): boolean {
+  const today = londonToday(now);
+  const tomorrow = londonToday(now + 86_400_000);
   return eventDate === today || eventDate === tomorrow;
 }
 
