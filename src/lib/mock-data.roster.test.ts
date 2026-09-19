@@ -14,7 +14,7 @@ describe("management-controlled roster tiers", () => {
   it("treats Academy as a tag on a numbered tier, not a replacement status", () => {
     const academy = goalkeepers.filter((goalkeeper) => goalkeeper.tags.includes("Academy"));
     expect(academy.length).toBeGreaterThan(0);
-    expect(academy.every((goalkeeper) => goalkeeper.tier.startsWith("Tier"))).toBe(true);
+    expect(academy.every((goalkeeper) => goalkeeper.tier?.startsWith("Tier"))).toBe(true);
     expect(academy.every((goalkeeper) => goalkeeper.status !== "Academy")).toBe(true);
   });
 

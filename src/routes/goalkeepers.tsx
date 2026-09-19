@@ -12,14 +12,11 @@ import {
   DutyBadge,
   Pill,
 } from "@/components/primitives";
-import {
-  goalkeepers,
-  DUTY_LABELS,
-  type DutyLevel,
-  type Goalkeeper,
-  type TierLevelLabel,
-} from "@/lib/mock-data";
+import { DUTY_LABELS, type DutyLevel, type Goalkeeper, type TierLevelLabel } from "@/lib/mock-data";
 import { listPlayerDutyOfCare } from "@/lib/duty-of-care.functions";
+import { listPlayers } from "@/lib/players.functions";
+import { toGoalkeepers } from "@/lib/roster/live-goalkeepers";
+import { UNASSIGNED_TIER_LABEL } from "@/lib/roster-snapshot";
 import {
   buildRosterDutyIndex,
   countRosterDuty,
@@ -95,7 +92,15 @@ const CATS = [
   "Tier 3-4",
   "Free Agents",
 ] as const;
-const TIER_OPTIONS: TierLevelLabel[] = ["Tier 1", "Tier 2", "Tier 3", "Tier 4"];
+// Unassigned sits alongside the four tiers: someone with no tier is waiting on
+// a decision, and filtering for exactly those people is the point.
+const TIER_OPTIONS: (TierLevelLabel | typeof UNASSIGNED_TIER_LABEL)[] = [
+  "Tier 1",
+  "Tier 2",
+  "Tier 3",
+  "Tier 4",
+  UNASSIGNED_TIER_LABEL,
+];
 const CONTRACT_OPTIONS: { id: string; label: string }[] = [
   { id: "any", label: "Any contract" },
   { id: "expired", label: "Expired / free agent" },
@@ -513,6 +518,22 @@ function GoalkeepersList() {
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [mobileAdvOpen, setMobileAdvOpen] = useState(false);
   const [sort, setSort] = useState<Sort | null>(null);
+
+  // The roster itself now comes from `public.players`, so this list and the
+  // dashboard count the same goalkeepers. Same query key as the profile page,
+  // so opening a profile and coming back costs nothing.
+  const listPlayersFn = useServerFn(listPlayers);
+  const {
+    data: playerRows,
+    isPending: rosterPending,
+    isError: rosterUnavailable,
+  } = useQuery({
+    queryKey: ["players", "roster"],
+    queryFn: () => listPlayersFn(),
+    staleTime: 5 * 60_000,
+  });
+  const goalkeepers = useMemo(() => toGoalkeepers(playerRows), [playerRows]);
+
   const listFn = useServerFn(listMatchReports);
   const { data: reportsData, isError: reportsUnavailable } = useQuery({
     queryKey: ["match-reports"],
@@ -722,11 +743,31 @@ function GoalkeepersList() {
 
   const clearFilters = () => update(clearGoalkeeperFilters(search));
 
+  // The roster is a database read now, so the page says which of the three it
+  // is — loading, unreachable, or here — rather than rendering an empty list
+  // that reads as "no goalkeepers".
+  if (rosterUnavailable) {
+    return (
+      <div className="space-y-5">
+        <PageHeader title="Goalkeepers" description="Roster unavailable." />
+        <Card className="p-8 text-center">
+          <p className="text-sm text-muted-foreground" role="status">
+            The roster could not be loaded. Refresh the page to try again.
+          </p>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-5">
       <PageHeader
         title="Goalkeepers"
-        description={`${goalkeepers.length} RPM clients under management across the UK and internationally.`}
+        description={
+          rosterPending
+            ? "Loading the roster…"
+            : `${goalkeepers.length} RPM clients under management across the UK and internationally.`
+        }
       />
 
       <div className="flex flex-wrap items-center gap-2">

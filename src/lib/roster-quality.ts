@@ -37,8 +37,18 @@ export interface GoalkeeperQualityReport {
 }
 
 const MONTHS: Record<string, number> = {
-  january: 0, february: 1, march: 2, april: 3, may: 4, june: 5,
-  july: 6, august: 7, september: 8, october: 9, november: 10, december: 11,
+  january: 0,
+  february: 1,
+  march: 2,
+  april: 3,
+  may: 4,
+  june: 5,
+  july: 6,
+  august: 7,
+  september: 8,
+  october: 9,
+  november: 10,
+  december: 11,
 };
 
 /** Parse "June 2027" → Date at month end, or null. */
@@ -77,17 +87,34 @@ const EXPIRING_DAYS = 90;
 
 export function checkGoalkeeper(gk: Goalkeeper, now: Date = new Date()): RosterIssue[] {
   const issues: RosterIssue[] = [];
-  const isFreeAgent = gk.status === "Free Agent";
+  // Free Agent is its own attribute now, not a value the tier column holds,
+  // so it is read from the tags rather than from the tier.
+  const isFreeAgent = gk.tags.includes("Free Agent");
 
   if (!gk.nationality?.trim()) {
-    issues.push({ code: "missing_nationality", severity: "error", field: "nationality", message: "Nationality is missing." });
+    issues.push({
+      code: "missing_nationality",
+      severity: "error",
+      field: "nationality",
+      message: "Nationality is missing.",
+    });
   }
 
   if (!isFreeAgent && !gk.club?.trim()) {
-    issues.push({ code: "missing_club", severity: "error", field: "club", message: "Club is missing." });
+    issues.push({
+      code: "missing_club",
+      severity: "error",
+      field: "club",
+      message: "Club is missing.",
+    });
   }
   if (!isFreeAgent && !gk.league?.trim()) {
-    issues.push({ code: "missing_league", severity: "warning", field: "league", message: "League is missing." });
+    issues.push({
+      code: "missing_league",
+      severity: "warning",
+      field: "league",
+      message: "League is missing.",
+    });
   }
 
   // Free-agent consistency
@@ -117,9 +144,7 @@ export function checkGoalkeeper(gk: Goalkeeper, now: Date = new Date()): RosterI
         code: "missing_parent_club",
         severity: gk.onLoan ? "error" : "warning",
         field: "parentClub",
-        message: gk.onLoan
-          ? "On loan but no parent club recorded."
-          : "Parent club is missing.",
+        message: gk.onLoan ? "On loan but no parent club recorded." : "Parent club is missing.",
       });
     } else if (gk.onLoan && parent.toLowerCase() === gk.club?.trim().toLowerCase()) {
       issues.push({
@@ -142,7 +167,12 @@ export function checkGoalkeeper(gk: Goalkeeper, now: Date = new Date()): RosterI
   if (!isFreeAgent) {
     const raw = gk.contractUntil?.trim();
     if (!raw) {
-      issues.push({ code: "missing_contract", severity: "error", field: "contractUntil", message: "Contract end date is missing." });
+      issues.push({
+        code: "missing_contract",
+        severity: "error",
+        field: "contractUntil",
+        message: "Contract end date is missing.",
+      });
     } else {
       const parsed = parseContractDate(raw);
       if (!parsed) {
@@ -177,7 +207,12 @@ export function checkGoalkeeper(gk: Goalkeeper, now: Date = new Date()): RosterI
   // DOB / age
   const dob = parseDob(gk.dob);
   if (!dob) {
-    issues.push({ code: "missing_dob", severity: "warning", field: "dob", message: "Date of birth is missing or malformed." });
+    issues.push({
+      code: "missing_dob",
+      severity: "warning",
+      field: "dob",
+      message: "Date of birth is missing or malformed.",
+    });
   } else if (Number.isFinite(gk.age)) {
     const computed = ageFromDob(dob, now);
     if (Math.abs(computed - gk.age) > 1) {
@@ -191,7 +226,12 @@ export function checkGoalkeeper(gk: Goalkeeper, now: Date = new Date()): RosterI
   }
 
   if (!gk.profileImage?.trim()) {
-    issues.push({ code: "missing_profile_image", severity: "info", field: "profileImage", message: "No profile image on file." });
+    issues.push({
+      code: "missing_profile_image",
+      severity: "info",
+      field: "profileImage",
+      message: "No profile image on file.",
+    });
   }
 
   return issues;
@@ -204,7 +244,10 @@ export function scoreIssues(issues: RosterIssue[]): number {
   return Math.max(0, 100 - penalty);
 }
 
-export function auditRoster(roster: Goalkeeper[], now: Date = new Date()): GoalkeeperQualityReport[] {
+export function auditRoster(
+  roster: Goalkeeper[],
+  now: Date = new Date(),
+): GoalkeeperQualityReport[] {
   return roster.map((gk) => {
     const issues = checkGoalkeeper(gk, now);
     return { gk, issues, score: scoreIssues(issues) };
@@ -212,8 +255,8 @@ export function auditRoster(roster: Goalkeeper[], now: Date = new Date()): Goalk
 }
 
 export interface RosterQualitySummary {
-  totalKeepers: number;
-  keepersWithIssues: number;
+  totalGoalkeepers: number;
+  goalkeepersWithIssues: number;
   totalIssues: number;
   bySeverity: Record<IssueSeverity, number>;
   byCode: Record<IssueCode, number>;
@@ -222,17 +265,23 @@ export interface RosterQualitySummary {
 export function summarise(reports: GoalkeeperQualityReport[]): RosterQualitySummary {
   const bySeverity: Record<IssueSeverity, number> = { error: 0, warning: 0, info: 0 };
   const byCode = {} as Record<IssueCode, number>;
-  let keepersWithIssues = 0;
+  let goalkeepersWithIssues = 0;
   let totalIssues = 0;
   for (const r of reports) {
-    if (r.issues.length > 0) keepersWithIssues += 1;
+    if (r.issues.length > 0) goalkeepersWithIssues += 1;
     for (const i of r.issues) {
       totalIssues += 1;
       bySeverity[i.severity] += 1;
       byCode[i.code] = (byCode[i.code] ?? 0) + 1;
     }
   }
-  return { totalKeepers: reports.length, keepersWithIssues, totalIssues, bySeverity, byCode };
+  return {
+    totalGoalkeepers: reports.length,
+    goalkeepersWithIssues,
+    totalIssues,
+    bySeverity,
+    byCode,
+  };
 }
 
 export const ISSUE_LABEL: Record<IssueCode, string> = {

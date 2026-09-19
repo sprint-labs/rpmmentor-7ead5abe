@@ -337,8 +337,9 @@ export function DutyOfCareWorkbench({
           id: "tier",
           label: "Filter by tier",
           allLabel: "All tiers",
-          optionsOf: (items) => [...new Set(items.map((row) => row.gk.tier))].sort(),
-          matches: (row, value) => row.gk.tier === value,
+          optionsOf: (items) =>
+            [...new Set(items.map((row) => row.gk.tier ?? NO_TIER_LABEL))].sort(),
+          matches: (row, value) => (row.gk.tier ?? NO_TIER_LABEL) === value,
         },
       ]}
       tiles={(visible, all) => [
@@ -378,7 +379,7 @@ export function DutyOfCareWorkbench({
         initials: row.gk.initials || initialsOf(row.gk.name),
         title: row.gk.name,
         subtitle: row.gk.club || "Club not recorded",
-        middleTop: row.gk.tier,
+        middleTop: row.gk.tier ?? NO_TIER_LABEL,
         middleBottom: row.duty.days ? `${row.duty.label} · ${row.duty.days}d` : row.duty.label,
         middleBottomHighlighted: row.duty.level === "overdue" || row.duty.level === "due_soon",
         rightTop: row.duty.label,
