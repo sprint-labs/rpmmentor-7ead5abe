@@ -302,6 +302,56 @@ describe("Goalkeepers page", () => {
     expect(screen.getAllByText("1 results").length).toBeGreaterThan(0);
   });
 
+  it("does not navigate once per keystroke", async () => {
+    // `update()` is a router navigation, and calling it per character re-ran
+    // the route, the filter and the sort over the whole roster before the
+    // character appeared — the slowest interaction on the page. The box now
+    // types into local state and the URL catches up.
+    const { router } = await renderGoalkeepers();
+    const search = screen.getByRole("textbox", {
+      name: "Search goalkeepers",
+    }) as HTMLInputElement;
+
+    for (const value of ["b", "be", "bea", "bead", "beadl", "beadle"]) {
+      fireEvent.change(search, { target: { value } });
+    }
+
+    // Responsive immediately, and the URL has not moved yet.
+    expect(search.value).toBe("beadle");
+    expect(router.state.location.search.q).toBe("");
+
+    // It still lands, so a shared or bookmarked link is unaffected.
+    await waitFor(() => {
+      expect(router.state.location.search.q).toBe("beadle");
+    });
+    expect(screen.getAllByText("1 results").length).toBeGreaterThan(0);
+  });
+
+  it("adopts a query set from outside the box", async () => {
+    // Back/forward and Clear filters move the URL without touching the input,
+    // so the draft has to follow — otherwise the box keeps showing a search
+    // the page is no longer running.
+    const { router } = await renderGoalkeepers();
+    const search = screen.getByRole("textbox", {
+      name: "Search goalkeepers",
+    }) as HTMLInputElement;
+
+    fireEvent.change(search, { target: { value: "beadle" } });
+    await waitFor(() => {
+      expect(router.state.location.search.q).toBe("beadle");
+    });
+
+    await router.navigate({
+      to: "/goalkeepers",
+      search: (prev: Record<string, unknown>) => ({ ...prev, q: "" }),
+      replace: true,
+    });
+
+    await waitFor(() => {
+      expect(search.value).toBe("");
+    });
+  });
+
   it("opens and closes mobile Filters while preserving selected tiers", async () => {
     const { router } = await renderGoalkeepers();
     const filtersTrigger = screen.getByRole("button", { name: "Filters" });

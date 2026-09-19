@@ -37,7 +37,7 @@ import {
   toggleFrom,
   type GoalkeeperFilterState,
 } from "@/lib/goalkeeper-filters";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { withPermission } from "@/components/require-permission";
 import {
   Drawer,
@@ -71,6 +71,14 @@ const searchSchema = z.object({
 
 type GoalkeeperSearch = GoalkeeperFilterState;
 type UpdateGoalkeeperSearch = (patch: Partial<GoalkeeperSearch>) => void;
+
+/**
+ * How long the search box waits before writing to the URL.
+ *
+ * Long enough that a normal typing run costs one navigation instead of one per
+ * character; short enough that the URL is right by the time anyone reads it.
+ */
+const SEARCH_DEBOUNCE_MS = 250;
 
 export const Route = createFileRoute("/goalkeepers")({
   validateSearch: zodValidator(searchSchema),
@@ -616,13 +624,48 @@ function GoalkeepersList() {
     );
   }, [reportsData]);
 
-  const update = (patch: Partial<GoalkeeperSearch>) => {
-    navigate({
-      search: (prev: GoalkeeperSearch) => ({ ...prev, ...patch }),
-      replace: true,
-      resetScroll: false,
-    });
-  };
+  const update = useCallback(
+    (patch: Partial<GoalkeeperSearch>) => {
+      navigate({
+        search: (prev: GoalkeeperSearch) => ({ ...prev, ...patch }),
+        replace: true,
+        resetScroll: false,
+      });
+    },
+    [navigate],
+  );
+
+  /**
+   * The search box types into local state and the URL catches up.
+   *
+   * `update` is a router navigation, and this input was calling it once per
+   * keystroke — which re-ran the route, the filter and the sort over the whole
+   * roster before the character appeared. It measured as the slowest
+   * interaction on the page.
+   *
+   * The URL stays the source of truth for what is filtered; it just lands a
+   * beat after the keystroke, so a shared or bookmarked link is unchanged.
+   */
+  const [queryDraft, setQueryDraft] = useState(search.q);
+  // What we last wrote to the URL, so a change we caused is told apart from a
+  // change someone else caused.
+  const pushedQuery = useRef(search.q);
+
+  useEffect(() => {
+    // The URL moved under us — a back/forward, or Clear filters. Adopt it.
+    if (search.q === pushedQuery.current) return;
+    pushedQuery.current = search.q;
+    setQueryDraft(search.q);
+  }, [search.q]);
+
+  useEffect(() => {
+    if (queryDraft === pushedQuery.current) return;
+    const timer = setTimeout(() => {
+      pushedQuery.current = queryDraft;
+      update({ q: queryDraft });
+    }, SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [queryDraft, update]);
 
   useEffect(() => {
     if (!isMobile) return;
@@ -644,7 +687,12 @@ function GoalkeepersList() {
   // The duty filter reads the same live index as the column and the chips, so
   // selecting "Overdue 15" cannot return a different 15 — or, as it did, none.
   const dutyLevelFor = useCallback((name: string) => dutyFor(name).level, [dutyFor]);
-  const filtered = filterGoalkeepers(goalkeepers, search, ratingsByGoalkeeper, dutyLevelFor);
+  // Memoised: this walks the whole roster, and a bare call re-ran it on every
+  // render — including renders that changed nothing it reads.
+  const filtered = useMemo(
+    () => filterGoalkeepers(goalkeepers, search, ratingsByGoalkeeper, dutyLevelFor),
+    [goalkeepers, search, ratingsByGoalkeeper, dutyLevelFor],
+  );
 
   const sorted = useMemo(() => {
     if (!sort) return filtered;
@@ -802,8 +850,8 @@ function GoalkeepersList() {
 
       <div className="flex flex-wrap items-center gap-2">
         <input
-          value={search.q}
-          onChange={(e) => update({ q: e.target.value })}
+          value={queryDraft}
+          onChange={(e) => setQueryDraft(e.target.value)}
           placeholder="Search name, club, league, nationality…"
           className="h-11 w-full rounded-md border border-border bg-input/60 px-3 text-sm sm:h-9 sm:w-80"
           aria-label="Search goalkeepers"
