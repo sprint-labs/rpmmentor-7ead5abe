@@ -1,17 +1,23 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { goalkeepers, dutyStatusForGk, type DutyLevel } from "./mock-data";
+import type { DutyLevel } from "./mock-data";
+import { listPlayerDutyOfCare } from "./duty-of-care.functions";
+import { listPlayers } from "./players.functions";
+import {
+  dutyLevelChanges,
+  dutyLevelSnapshot,
+  isDutyLevelResolved,
+  liveDutyEntries,
+  pruneResolvedDutyLevels,
+  seedFromLiveLevels,
+  type DutyNotif,
+  type ResolvedDutyLevels,
+} from "./duty-notifications";
 import { useAuth } from "./auth";
 
-export type DutyNotif = {
-  id: string;
-  gkId: string;
-  gkName: string;
-  from: DutyLevel;
-  to: DutyLevel;
-  date: string;
-  read: boolean;
-};
+export { isDutyLevelResolved, pruneResolvedDutyLevels, type DutyNotif, type ResolvedDutyLevels };
 
 export type EmailFrequency = "off" | "daily" | "weekly";
 export interface EmailPrefs { frequency: EmailFrequency; recipients: string[]; lastSent?: string }
@@ -20,38 +26,6 @@ const STORAGE_KEY = "rpm.notifications.v1";
 const PREFS_KEY = "rpm.notif.prefs.v1";
 const SNAPSHOT_KEY = "rpm.duty.snapshot.v1";
 const RESOLVED_KEY = "rpm.duty.resolved.v1";
-
-/**
- * Levels a user has explicitly resolved, keyed by goalkeeper.
- *
- * Duty alerts are derived from the current roster on every load, so an
- * unresolved condition re-announces itself with a fresh id and reads as brand
- * new even after it has been seen. Resolving records the level that was
- * acknowledged; the same level stays silent until that goalkeeper's duty status
- * actually moves, which is the only point a new alert carries new information.
- */
-export type ResolvedDutyLevels = Record<string, DutyLevel>;
-
-/** Drop acknowledgements whose goalkeeper has since moved to a different level. */
-export function pruneResolvedDutyLevels(
-  resolved: ResolvedDutyLevels,
-  currentLevels: Readonly<Record<string, DutyLevel>>,
-): ResolvedDutyLevels {
-  const next: ResolvedDutyLevels = {};
-  for (const [gkId, level] of Object.entries(resolved)) {
-    if (currentLevels[gkId] === level) next[gkId] = level;
-  }
-  return next;
-}
-
-/** True when this goalkeeper's arrival at `level` has already been resolved. */
-export function isDutyLevelResolved(
-  resolved: ResolvedDutyLevels,
-  gkId: string,
-  level: DutyLevel,
-): boolean {
-  return resolved[gkId] === level;
-}
 
 interface Ctx {
   items: DutyNotif[];
@@ -83,25 +57,6 @@ export function severityFor(from: DutyLevel, to: DutyLevel): "high" | "medium" |
   return "low";
 }
 
-function seedFromCurrent(): DutyNotif[] {
-  const out: DutyNotif[] = [];
-  goalkeepers.forEach((gk, i) => {
-    const cur = dutyStatusForGk(gk).level;
-    if (cur === "up_to_date" || cur === "not_required") return;
-    const from: DutyLevel = "up_to_date";
-    out.push({
-      id: `seed-${gk.id}`,
-      gkId: gk.id,
-      gkName: gk.name,
-      from,
-      to: cur,
-      date: new Date(Date.now() - 1000 * 60 * 60 * (6 + i * 3)).toISOString(),
-      read: false,
-    });
-  });
-  return out.sort((a, b) => +new Date(b.date) - +new Date(a.date)).slice(0, 24);
-}
-
 export function NotificationsProvider({ children }: { children: ReactNode }) {
   const { user, can } = useAuth();
   const canViewDutyNotifications = Boolean(user) && can("alerts.view");
@@ -113,30 +68,50 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
     load(RESOLVED_KEY, {} as ResolvedDutyLevels),
   );
 
+  // Duty of Care comes from `public.player_duty_of_care` — the
+  // `duty_of_care_at()` projection — and the roster from `public.players`.
+  // These are the query keys `/goalkeepers` and the dashboard already use, so
+  // the three surfaces share one cached answer and cannot disagree about a
+  // goalkeeper. Both are gated on the permission because the provider is
+  // mounted on every route, including `/login`.
+  const listPlayersFn = useServerFn(listPlayers);
+  const { data: playerRows } = useQuery({
+    queryKey: ["players", "roster"],
+    queryFn: () => listPlayersFn(),
+    staleTime: 5 * 60_000,
+    enabled: canViewDutyNotifications,
+  });
+
+  const dutyListFn = useServerFn(listPlayerDutyOfCare);
+  const { data: dutyRows } = useQuery({
+    queryKey: ["duty-of-care", "roster"],
+    queryFn: () => dutyListFn(),
+    staleTime: 60_000,
+    enabled: canViewDutyNotifications,
+  });
+
+  // `null` until both reads have answered. A pending or failed read is not the
+  // same as "every goalkeeper is at not_enough_data", and snapshotting that
+  // difference would invent a change for the whole roster.
+  const liveLevels = useMemo(
+    () => (playerRows && dutyRows ? liveDutyEntries(playerRows, dutyRows) : null),
+    [playerRows, dutyRows],
+  );
+
   useEffect(() => {
     if (!canViewDutyNotifications) return;
+    if (!liveLevels?.length) return;
 
     const snap = load<Record<string, DutyLevel>>(SNAPSHOT_KEY, {});
-    const current: Record<string, DutyLevel> = {};
-    const fresh: DutyNotif[] = [];
     const first = Object.keys(snap).length === 0;
     const acknowledged = load<ResolvedDutyLevels>(RESOLVED_KEY, {});
-    goalkeepers.forEach((gk) => {
-      const lvl = dutyStatusForGk(gk).level;
-      current[gk.id] = lvl;
-      const prev = snap[gk.id];
-      if (prev && prev !== lvl && !isDutyLevelResolved(acknowledged, gk.id, lvl)) {
-        fresh.push({
-          id: `${gk.id}-${Date.now()}-${lvl}`,
-          gkId: gk.id,
-          gkName: gk.name,
-          from: prev,
-          to: lvl,
-          date: new Date().toISOString(),
-          read: false,
-        });
-      }
-    });
+
+    // The snapshot keeps its legacy `gk-…` key space, so the one already in
+    // this browser still matches and nothing is re-announced. A goalkeeper who
+    // is new to the snapshot — a signing, or a first load — is recorded without
+    // an alert, which is what stops a burst here.
+    const current = dutyLevelSnapshot(liveLevels);
+    const fresh = dutyLevelChanges(liveLevels, snap, acknowledged);
     persist(SNAPSHOT_KEY, current);
 
     // A resolution only silences the level it acknowledged. Once a goalkeeper
@@ -146,7 +121,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
     persist(RESOLVED_KEY, stillResolved);
 
     if (first && items.length === 0) {
-      const seeded = seedFromCurrent().filter(
+      const seeded = seedFromLiveLevels(liveLevels).filter(
         (n) => !isDutyLevelResolved(stillResolved, n.gkId, n.to),
       );
       setItems(seeded);
@@ -165,7 +140,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canViewDutyNotifications]);
+  }, [canViewDutyNotifications, liveLevels]);
 
   const setPrefs = (p: EmailPrefs) => { setPrefsState(p); persist(PREFS_KEY, p); };
   const markAllRead = () => setItems((p) => { const n = p.map((x) => ({ ...x, read: true })); persist(STORAGE_KEY, n); return n; });
