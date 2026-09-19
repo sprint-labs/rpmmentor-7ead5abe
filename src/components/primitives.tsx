@@ -182,14 +182,28 @@ export function StatCard({
         : accent === "info"
           ? "shadow-[0_0_var(--stat-glow-blur)_var(--stat-glow-spread)_var(--info)]"
           : "shadow-[0_0_var(--stat-glow-blur)_var(--stat-glow-spread)_var(--primary)]";
+  // Hover rings the whole card in its own accent and lifts the halo. Each card
+  // keeps its own hue rather than all of them turning green, so the highlight
+  // still says which card the pointer is on. `group-hover` is what fires it:
+  // every one of these is wrapped in a Link on the dashboard.
+  const hover =
+    accent === "warning"
+      ? "group-hover:ring-warning/70 group-hover:shadow-[0_0_calc(var(--stat-glow-blur)*2)_var(--stat-glow-spread)_var(--warning)]"
+      : accent === "destructive"
+        ? "group-hover:ring-destructive/70 group-hover:shadow-[0_0_calc(var(--stat-glow-blur)*2)_var(--stat-glow-spread)_var(--destructive)]"
+        : accent === "info"
+          ? "group-hover:ring-info/70 group-hover:shadow-[0_0_calc(var(--stat-glow-blur)*2)_var(--stat-glow-spread)_var(--info)]"
+          : "group-hover:ring-primary/70 group-hover:shadow-[0_0_calc(var(--stat-glow-blur)*2)_var(--stat-glow-spread)_var(--primary)]";
   const isEmpty = typeof value === "number" && value === 0 && emptyMessage;
   return (
     <div
       className={cn(
         "command-panel p-4 relative overflow-hidden text-card-foreground",
         "before:content-[''] before:absolute before:left-0 before:top-0 before:h-full before:w-[2px]",
+        "ring-1 ring-transparent transition-[box-shadow,--tw-ring-color] duration-150",
         rail,
         glow,
+        hover,
       )}
     >
       <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground font-mono">
@@ -225,7 +239,7 @@ export function StatCard({
 export function TierBadge({ tier }: { tier: Tier | null | undefined }) {
   if (!tier) {
     return (
-      <span className="inline-flex items-center whitespace-nowrap rounded border border-warning/40 px-1.5 py-0.5 text-[10px] font-medium text-warning">
+      <span className="inline-flex items-center whitespace-nowrap rounded border border-destructive/40 px-1.5 py-0.5 text-[10px] font-medium text-destructive">
         Unassigned
       </span>
     );

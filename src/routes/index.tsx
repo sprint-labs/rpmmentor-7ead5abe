@@ -349,7 +349,9 @@ function Dashboard() {
   const greeting = `Good ${new Date().getHours() < 12 ? "morning" : new Date().getHours() < 18 ? "afternoon" : "evening"}, ${user.name.split(" ")[0]}`;
 
   return (
-    <div className="space-y-4">
+    // `pt-2` is the half-line of air the header was missing: the greeting sat
+    // hard against the app bar above it.
+    <div className="space-y-4 pt-2">
       <PageHeader
         title={greeting}
         titleClassName="break-words text-2xl leading-tight min-[390px]:text-[1.625rem] sm:text-3xl"
@@ -393,7 +395,7 @@ function Dashboard() {
       <div className="grid grid-cols-1 gap-3 min-[390px]:grid-cols-2 sm:gap-4 md:grid-cols-3 lg:grid-cols-5 [&>a]:h-full [&>a]:min-w-0 [&>a>div]:h-full">
         <Link
           to="/goalkeepers"
-          className="block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          className="group block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
         >
           <span className="sr-only">View all goalkeepers: </span>
           <StatCard
@@ -406,7 +408,7 @@ function Dashboard() {
           to="/insights/$metric"
           params={{ metric: "interactions" }}
           search={{ from: period.fromDate, to: period.toDate, level: "", tier: "" }}
-          className="block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-info"
+          className="group block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-info"
         >
           <span className="sr-only">Break down: </span>
           <StatCard
@@ -425,7 +427,7 @@ function Dashboard() {
           to="/insights/$metric"
           params={{ metric: "duty" }}
           search={{ from: period.fromDate, to: period.toDate, level: "overdue", tier: "" }}
-          className="block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-warning"
+          className="group block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-warning"
         >
           <span className="sr-only">Break down: </span>
           <StatCard
@@ -452,7 +454,7 @@ function Dashboard() {
           to="/insights/$metric"
           params={{ metric: "reports" }}
           search={{ from: period.fromDate, to: period.toDate, level: "", tier: "" }}
-          className="block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          className="group block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
         >
           <span className="sr-only">Break down: </span>
           <StatCard
@@ -473,7 +475,7 @@ function Dashboard() {
           to="/insights/$metric"
           params={{ metric: "mentors" }}
           search={{ from: period.fromDate, to: period.toDate, level: "", tier: "" }}
-          className="block min-[390px]:col-span-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary md:col-span-1"
+          className="group block min-[390px]:col-span-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary md:col-span-1"
         >
           <span className="sr-only">Break down: </span>
           <StatCard
@@ -489,7 +491,7 @@ function Dashboard() {
       {/* Operational grid */}
       <div className="grid grid-cols-12 gap-4">
         {/* Duty of Care monitor */}
-        <div className="col-span-12 self-start command-panel p-4 sm:p-5 lg:col-span-8">
+        <div className="col-span-12 self-start command-panel p-4 sm:p-5 lg:col-span-4">
           <SectionTitle
             className="flex-col items-start gap-2 sm:flex-row sm:items-center sm:gap-3"
             action={
@@ -503,10 +505,17 @@ function Dashboard() {
               </div>
             }
           >
-            Duty of Care Monitor · Reference
+            Duty of Care
           </SectionTitle>
+          {/* The title said "· Reference" and the subtitle described the
+              client-side calculation that combined a seed roster with logged
+              interactions. That calculation was removed when this moved to
+              `public.player_duty_of_care`; the wording stayed behind, telling
+              a manager to distrust the one canonical number on the page. */}
           <p className="mb-4 text-xs leading-relaxed text-muted-foreground">
-            Reference tier roster combined with live logged interactions.
+            {dutyPending || dutyUnavailable
+              ? "Live cadence status from the goalkeeper roster."
+              : `Live cadence status for all ${dutyOverview.total} goalkeepers. Percentages are of that roster.`}
           </p>
           {/* Gated on the duty read, which is where every number below comes
               from. Gating on the interactions read instead drew five bands of
@@ -516,7 +525,7 @@ function Dashboard() {
           ) : dutyUnavailable ? (
             <p className="text-sm text-muted-foreground">Duty-of-care figures didn't load.</p>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-x-6 gap-y-4">
               {dutyBands.map((b) => (
                 <Link
                   key={b.level}
@@ -558,6 +567,7 @@ function Dashboard() {
         <CalendarMonthCard
           className="col-span-12 self-start lg:col-span-4"
           events={teamEvents}
+          interactions={loggedInteractions}
           pending={calendarPending}
           error={calendarError}
           today={todayIso}
@@ -749,7 +759,7 @@ function Dashboard() {
               ) : (
                 recentActivity.map((a) => (
                   <div key={a.id} className="flex items-start gap-3 text-xs">
-                    <div className="w-0.5 self-stretch min-h-8 bg-primary shrink-0" />
+                    <div className="w-0.5 self-stretch min-h-8 bg-info shrink-0" />
                     <div className="flex-1 min-w-0">
                       <p className="text-muted-foreground leading-snug">
                         <span

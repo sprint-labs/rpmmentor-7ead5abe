@@ -115,6 +115,30 @@ describe("text is never dimmed below its token", () => {
     const offenders = grepSource(/className="[^"]*\btext-muted-foreground\/\d+/g);
     expect(offenders, offenders.join("\n")).toEqual([]);
   });
+
+  // The rule above only catches the `/40` slash syntax. A plain `opacity-*`
+  // class on the same element dims the text identically and walked straight
+  // past it: the dashboard's month card shipped `text-muted-foreground
+  // opacity-40` on its adjacent-month days, cleared the rule above, and axe
+  // then flagged every visible one of them on the deployed preview.
+  //
+  // Scoped deliberately:
+  //   - `opacity-0` and `opacity-100` are not partial dimming. Zero is a
+  //     hidden reveal-on-hover control, which contrast rules do not apply to.
+  //   - A variant-prefixed value (`disabled:opacity-30`, `group-hover:`,
+  //     `focus:`) is state-scoped, and a disabled control is exempt from AA.
+  //   - `components/ui` is vendored shadcn, not this project's design work.
+  it("no partial opacity on an element carrying text-muted-foreground", () => {
+    const DIMMED = String.raw`(?<![\w:-])opacity-(?!0\b)(?!100\b)\d+`;
+    const offenders = grepSource(
+      new RegExp(
+        `className="[^"]*(?:\\btext-muted-foreground\\b[^"]*${DIMMED}|${DIMMED}[^"]*\\btext-muted-foreground\\b)`,
+        "g",
+      ),
+      /\/components\/ui\//,
+    );
+    expect(offenders, offenders.join("\n")).toEqual([]);
+  });
 });
 
 describe("a tier or status badge never sits on a wash of its own hue", () => {
@@ -144,9 +168,10 @@ describe("a tier or status badge never sits on a wash of its own hue", () => {
 });
 
 /** Every `file:line` in the app source whose className matches. */
-function grepSource(pattern: RegExp): string[] {
+function grepSource(pattern: RegExp, exclude?: RegExp): string[] {
   const hits: string[] = [];
   for (const file of walk(SOURCES)) {
+    if (exclude?.test(file)) continue;
     const lines = readFileSync(file, "utf8").split("\n");
     lines.forEach((line, i) => {
       pattern.lastIndex = 0;

@@ -186,7 +186,9 @@ function DraftStatusIndicator({
       </span>
     );
   }
-  return <span className="opacity-60 text-muted-foreground">Autosaves every 5s</span>;
+  // No opacity: `--muted-foreground` sits just above 4.5:1, so dimming it at
+  // all drops this hint under the AA floor.
+  return <span className="text-muted-foreground">Autosaves every 5s</span>;
 }
 
 export type WorkflowKind = "interaction" | "report" | "media" | "goalkeeper" | "bug" | "question";

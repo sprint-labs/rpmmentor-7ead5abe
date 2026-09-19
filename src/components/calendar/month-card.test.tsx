@@ -94,6 +94,38 @@ describe("CalendarMonthCard", () => {
     expect(screen.queryByText(/events in September/)).toBeNull();
   });
 
+  it("leaves adjacent-month days out of the tab order and the a11y tree", () => {
+    // These squares are alignment padding: they hold no events here, and
+    // following one only re-opened the month already on screen. Leaving them
+    // as links also meant axe measured their contrast, which is how the
+    // earlier `opacity-40` styling failed AA on three visible days.
+    const { container } = render(
+      <CalendarMonthCard events={[]} pending={false} error={false} today={TODAY} />,
+    );
+    // 31 Aug leads September's grid and 1 Oct trails it.
+    expect(screen.queryByLabelText(/2026-08-31/)).toBeNull();
+    expect(screen.queryByLabelText(/2026-10-01/)).toBeNull();
+    expect(container.querySelectorAll('[aria-hidden="true"]').length).toBeGreaterThan(0);
+
+    // Every remaining link is a real day of the month on screen.
+    for (const link of screen.getAllByRole("link")) {
+      const label = link.getAttribute("aria-label") ?? "";
+      if (label.startsWith("2026-")) expect(label.startsWith("2026-09-")).toBe(true);
+    }
+  });
+
+  it("never dims muted text with an opacity class", () => {
+    // Guarded centrally in theme-contrast.test.ts too; asserted here so a
+    // change to this card fails next to the code that caused it.
+    const { container } = render(
+      <CalendarMonthCard events={[]} pending={false} error={false} today={TODAY} />,
+    );
+    const offenders = [...container.querySelectorAll('[class*="text-muted-foreground"]')].filter(
+      (el) => /(?<![\w:-])opacity-(?!0\b)(?!100\b)\d+/.test(el.className),
+    );
+    expect(offenders.map((el) => el.className)).toEqual([]);
+  });
+
   it("lays the week out Monday-first", () => {
     const { container } = render(
       <CalendarMonthCard events={[]} pending={false} error={false} today={TODAY} />,

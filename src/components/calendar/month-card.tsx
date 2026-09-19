@@ -22,8 +22,20 @@ export interface MonthCardEvent {
   status: string;
 }
 
+/** A logged interaction, reduced to the day it happened on. */
+export interface MonthCardInteraction {
+  id: string;
+  /** Local calendar date, `YYYY-MM-DD`. */
+  occurredAt: string;
+}
+
 export interface MonthCardProps {
   events: readonly MonthCardEvent[] | undefined;
+  /**
+   * Logged interactions, marked in the Interactions blue so the two kinds of
+   * activity are told apart at a glance rather than by reading the day.
+   */
+  interactions?: readonly MonthCardInteraction[] | undefined;
   pending: boolean;
   error: boolean;
   /**
@@ -50,6 +62,7 @@ export interface MonthCardProps {
  */
 export function CalendarMonthCard({
   events,
+  interactions,
   pending,
   error,
   today: todayProp,
@@ -74,6 +87,16 @@ export function CalendarMonthCard({
     }
     return counts;
   }, [events]);
+
+  /** Days carrying at least one logged interaction. */
+  const interactionDays = useMemo(() => {
+    const days = new Set<string>();
+    for (const interaction of interactions ?? []) {
+      const date = interaction.occurredAt?.slice(0, 10);
+      if (date) days.add(date);
+    }
+    return days;
+  }, [interactions]);
 
   const monthParam = formatMonthParam(cursor);
   const eventsThisMonth = useMemo(
@@ -149,8 +172,41 @@ export function CalendarMonthCard({
               const count = countsByDate.get(cell.iso) ?? 0;
               const isToday = cell.iso === today;
               const has = count > 0 && !pending;
+
+              // Days borrowed from the adjacent months are alignment padding,
+              // nothing more. They carry no events here, and following one led
+              // straight back to the month already on screen, so they are not
+              // links and are hidden from assistive technology — the month's
+              // real days are all present without them.
+              //
+              // They keep `text-muted-foreground` at full strength. Dimming it
+              // with an opacity class is a guaranteed AA failure: the token is
+              // tuned to sit just above 4.5:1, so anything below 100% drops
+              // under the floor. An earlier version of this card used
+              // `opacity-40` here and axe flagged all three visible outside
+              // days on the deployed preview.
+              if (!cell.inMonth) {
+                return (
+                  <div
+                    key={cell.iso}
+                    aria-hidden="true"
+                    className="flex aspect-square min-h-8 flex-col items-center justify-center rounded border border-transparent text-[11px] tabular-nums text-muted-foreground"
+                  >
+                    <span>{cell.day}</span>
+                    {/* Keeps the number on the same baseline as an in-month
+                        square, which reserves a row for its dots. */}
+                    <span aria-hidden="true" className="mt-0.5 h-1" />
+                  </div>
+                );
+              }
+
+              const logged = interactionDays.has(cell.iso) && !pending;
+              const parts = [
+                has ? `${count} event${count === 1 ? "" : "s"}` : "",
+                logged ? "interaction logged" : "",
+              ].filter(Boolean);
               const label = `${cell.iso}${
-                has ? ` — ${count} event${count === 1 ? "" : "s"}` : " — no events"
+                parts.length ? ` — ${parts.join(", ")}` : " — no events"
               }${isToday ? " (today)" : ""}`;
               return (
                 <Link
@@ -162,26 +218,24 @@ export function CalendarMonthCard({
                   className={[
                     "relative flex aspect-square min-h-8 flex-col items-center justify-center rounded border text-[11px] tabular-nums transition-colors",
                     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
-                    cell.inMonth
-                      ? "border-border/60 text-foreground hover:border-primary/50 hover:bg-accent/40"
-                      : "border-transparent text-muted-foreground opacity-40 hover:opacity-70",
+                    "border-border/60 text-foreground hover:border-primary/50 hover:bg-accent/40",
                     isToday ? "border-primary bg-primary/10 font-bold text-primary" : "",
                   ].join(" ")}
                 >
                   <span>{cell.day}</span>
-                  {/* Presence dot only. A precise count per square is noise at
-                      this size; the exact number is in the aria-label and on
-                      the calendar page itself. */}
-                  <span
-                    aria-hidden="true"
-                    className={`mt-0.5 h-1 w-1 rounded-full ${
-                      has
-                        ? cell.inMonth
-                          ? "bg-primary"
-                          : "bg-muted-foreground/40"
-                        : "bg-transparent"
-                    }`}
-                  />
+                  {/* Presence dots only — green for something scheduled, blue
+                      for an interaction logged. A precise count per square is
+                      noise at this size; the numbers are in the aria-label and
+                      on the calendar page itself. The row is always rendered so
+                      every square keeps the same baseline. */}
+                  <span aria-hidden="true" className="mt-0.5 flex h-1 items-center gap-0.5">
+                    <span
+                      className={`h-1 w-1 rounded-full ${has ? "bg-primary" : "bg-transparent"}`}
+                    />
+                    <span
+                      className={`h-1 w-1 rounded-full ${logged ? "bg-info" : "bg-transparent"}`}
+                    />
+                  </span>
                 </Link>
               );
             })}

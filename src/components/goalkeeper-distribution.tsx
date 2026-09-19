@@ -45,9 +45,11 @@ const ROW_TONE: Record<string, { bar: string; label: string }> = {
   "Tier 2": { bar: "bg-tier-2", label: "text-tier-2 border-tier-2/40" },
   "Tier 3": { bar: "bg-tier-3", label: "text-tier-3 border-tier-3/40" },
   "Tier 4": { bar: "bg-tier-4", label: "text-tier-4 border-tier-4/40" },
+  // Red, not amber: an untiered goalkeeper is an outstanding decision, and
+  // Tier 3 now carries the amber hue.
   [UNASSIGNED_TIER_LABEL]: {
-    bar: "bg-warning",
-    label: "text-warning border-warning/40",
+    bar: "bg-destructive",
+    label: "text-destructive border-destructive/40",
   },
   Academy: { bar: "bg-info", label: "text-info border-info/40" },
   "Free Agent": {
@@ -123,8 +125,8 @@ function DistributionRow({
         <span className="font-mono text-base font-bold leading-none text-foreground">
           {pending || count == null ? "…" : count}
         </span>
-        <span className="w-10 text-right font-mono text-[11px] text-muted-foreground">
-          {pending || count == null ? "" : `${shown}%`}
+        <span className="w-14 text-right font-mono text-[11px] text-muted-foreground">
+          {pending || count == null ? "" : `(${shown}%)`}
         </span>
       </span>
 

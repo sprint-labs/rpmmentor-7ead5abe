@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Check, CloudUpload, RefreshCw, AlertTriangle, WifiOff } from "lucide-react";
+import { RefreshCw, AlertTriangle, WifiOff } from "lucide-react";
 import { getLastSyncedAt, listJobs, subscribe, type SyncJob } from "@/lib/sync/queue";
 
 /**
@@ -45,7 +45,7 @@ export function SyncStatusChip({ className = "" }: { className?: string }) {
   const pending = jobs.length;
 
   let label: string;
-  let Icon = Check;
+  let Icon = WifiOff;
   let tone = "border-border/60 bg-muted/40 text-muted-foreground";
 
   if (!online && pending > 0) {
@@ -64,13 +64,14 @@ export function SyncStatusChip({ className = "" }: { className?: string }) {
     label = `Uploading · ${pending} unsent`;
     Icon = RefreshCw;
     tone = "border-sky-500/40 bg-sky-500/10 text-sky-200";
-  } else if (lastSynced) {
-    label = `Uploaded ${formatAgo(lastSynced)}`;
-    Icon = Check;
-    tone = "border-emerald-500/40 bg-emerald-500/10 text-emerald-200";
   } else {
-    label = "No unsent changes";
-    Icon = CloudUpload;
+    // Online with an empty queue is the normal state for almost everyone, and
+    // it is not news: there is nothing for the reader to do about it and no
+    // number it explains. Saying so anyway put a permanent chip in the header
+    // that people read as a status for the figures on the page — which it is
+    // not. It renders nothing, and reappears the moment there is something
+    // genuinely unsent.
+    return null;
   }
 
   const spinning = pending > 0 && !anyFailed && online;
