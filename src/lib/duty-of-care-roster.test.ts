@@ -59,6 +59,16 @@ describe("rosterDutyFor", () => {
     expect(rosterDutyFor(index, "  max   crocombe ").level).toBe("overdue");
   });
 
+  it("matches a curly apostrophe to the straight one the database stores", () => {
+    // Mock roster: `Rich O’Donnell` (U+2019). View: `Rich O'Donnell` (U+0027).
+    // The dashboard headline counts the view row without a name join; the
+    // insights workbench and Overdue filter look up by this index.
+    const index = buildRosterDutyIndex([row({ full_name: "Rich O'Donnell" })]);
+
+    expect(rosterDutyFor(index, "Rich O\u2019Donnell").level).toBe("overdue");
+    expect(rosterDutyFor(index, "Rich O'Donnell").level).toBe("overdue");
+  });
+
   it("maps each database state onto the roster's vocabulary", () => {
     const index = buildRosterDutyIndex([
       row({ full_name: "Red", state: "red", status_label: "Overdue" }),

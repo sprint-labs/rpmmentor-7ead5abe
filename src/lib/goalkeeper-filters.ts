@@ -32,7 +32,18 @@ const LEGACY_TIER_CATEGORY_TIERS = {
 } as const;
 
 export function normaliseGoalkeeperName(value: string): string {
-  return value.trim().toLowerCase().replace(/\s+/g, " ");
+  return (
+    value
+      .trim()
+      .toLowerCase()
+      // A curly apostrophe and a straight one are the same person. The mock
+      // roster stores `Rich O’Donnell` (U+2019); `players.full_name` stores
+      // `Rich O'Donnell` (U+0027). Duty indexing and the Overdue filter both
+      // key on this function, so without the fold he is counted on the
+      // dashboard and treated as "Not enough data" everywhere else.
+      .replace(/[\u2018\u2019\u02BC]/g, "'")
+      .replace(/\s+/g, " ")
+  );
 }
 
 export function clearGoalkeeperFilters(filters: GoalkeeperFilterState): GoalkeeperFilterState {
