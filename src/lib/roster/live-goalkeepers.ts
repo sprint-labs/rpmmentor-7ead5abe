@@ -122,3 +122,20 @@ export function toGoalkeepers(rows: readonly PlayerRosterRow[] | null | undefine
   if (!Array.isArray(rows)) return [];
   return rows.map(toGoalkeeper);
 }
+
+/**
+ * The roster row a `/goalkeepers/gk-…` URL names, or null when none matches.
+ *
+ * Keyed by the same legacy slug `toGoalkeeper` assigns, so the profile page
+ * resolves exactly what the roster list linked to — including a goalkeeper
+ * signed since the seed fixture was captured, who has no seed entry at all.
+ * Null here means a genuine miss, not "the roster has not arrived yet"; the
+ * caller decides that from its own query state.
+ */
+export function rosterRowForLegacySlug(
+  rows: readonly PlayerRosterRow[] | null | undefined,
+  slug: string,
+): PlayerRosterRow | null {
+  if (!Array.isArray(rows) || !slug) return null;
+  return rows.find((row) => legacyGkSlugForName(row.full_name) === slug) ?? null;
+}

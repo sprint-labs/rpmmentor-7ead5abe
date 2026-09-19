@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -32,8 +32,9 @@ import { buildHighlightReelItems } from "@/lib/goalkeeper-highlight-reel";
 import { EditDetailsButton } from "@/components/edit-player-details-dialog";
 import { DutyOfCarePanel } from "@/components/duty-of-care-panel";
 import { listPlayers, type PlayerRosterRow } from "@/lib/players.functions";
-import { resolveGoalkeeperProfile } from "@/lib/roster/goalkeeper-profile";
-import { findPlayerByName, interactionBelongsToGoalkeeper } from "@/lib/goalkeeper-player-link";
+import { interactionBelongsToGoalkeeper } from "@/lib/goalkeeper-player-link";
+import { rosterRowForLegacySlug, toGoalkeeper } from "@/lib/roster/live-goalkeepers";
+import { withSeedNarrative } from "@/lib/roster/goalkeeper-profile";
 import {
   compareInteractionsByAlertThenDate,
   interactionOutcomeAlertRank,
@@ -45,12 +46,6 @@ function isValidScore(v: unknown): v is number {
 }
 
 export const Route = createFileRoute("/goalkeepers/$gkId")({
-  // Deliberately does NOT decide whether this goalkeeper exists. It used to
-  // resolve against the seed array and throw `notFound()`, which was fine while
-  // the roster was that same array. Now the roster is `public.players`, and a
-  // goalkeeper who joined since the seed was captured would be listed on
-  // /goalkeepers and then told their own profile does not exist.
-  loader: ({ params }) => ({ gkId: params.gkId }),
   component: GkDetail,
   notFoundComponent: () => (
     <div className="p-8 text-sm text-muted-foreground">Goalkeeper not found.</div>
@@ -117,8 +112,23 @@ function compareMatchDatesNewestFirst(a: string | null, b: string | null): numbe
   return b.localeCompare(a);
 }
 
+/**
+ * Resolve `/goalkeepers/gk-…` against the live roster.
+ *
+ * The lookup lives here rather than in the route loader on purpose: the roster
+ * is a client-side React Query read and a loader cannot await one. It uses the
+ * `["players", "roster"]` key the list page already populates, so arriving from
+ * the list costs no extra request.
+ *
+ * Three outcomes, deliberately rendered differently — a goalkeeper whose row is
+ * still in flight must never read as one who does not exist:
+ *
+ *   - roster pending   → "Loading goalkeeper…"
+ *   - roster unreachable → an explicit failure, retryable by refreshing
+ *   - roster here, no row for this slug → a genuine `notFound()`
+ */
 function GkDetail() {
-  const { gkId } = Route.useLoaderData();
+  const { gkId } = Route.useParams();
   const listPlayersFn = useServerFn(listPlayers);
   const {
     data: players,
@@ -129,65 +139,51 @@ function GkDetail() {
     queryFn: () => listPlayersFn(),
     staleTime: 5 * 60_000,
   });
+  const player = useMemo(() => rosterRowForLegacySlug(players, gkId), [players, gkId]);
+  // The database has no column for a biography, a development plan or the
+  // highlight-reel links, so `toGoalkeeper` cannot carry them. Layering them
+  // back on keeps this page from blanking all three for every goalkeeper who
+  // has them. See `withSeedNarrative`.
+  const gk = useMemo(() => (player ? withSeedNarrative(toGoalkeeper(player)) : null), [player]);
 
-  /**
-   * Live row first, seed second. See `resolveGoalkeeperProfile` — the database
-   * is the source of truth for everything it holds, so the tier, tags, club and
-   * contract shown here cannot disagree with the roster row that was clicked to
-   * reach this page.
-   */
-  const { gk, livePlayer, seedGk } = useMemo(
-    () => resolveGoalkeeperProfile(players, gkId),
-    [players, gkId],
-  );
-
-  // A seed-only goalkeeper can still have a live player record under a slightly
-  // different spelling, which is what carries Duty of Care and Edit Details.
-  const linkedPlayer = livePlayer ?? findPlayerByName(players, seedGk?.name ?? "");
-  if (!gk) {
-    // Only claim a goalkeeper does not exist once the roster has been read.
-    if (rosterPending) {
-      return <div className="p-8 text-sm text-muted-foreground">Loading goalkeeper…</div>;
-    }
-    if (rosterUnavailable) {
-      return (
-        <div className="p-8 text-sm text-destructive" role="status">
-          The roster could not be loaded, so this profile is unavailable. Refresh to try again.
-        </div>
-      );
-    }
-    return <div className="p-8 text-sm text-muted-foreground">Goalkeeper not found.</div>;
+  if (rosterPending) {
+    return (
+      <div className="p-8 text-sm text-muted-foreground" role="status">
+        Loading goalkeeper…
+      </div>
+    );
   }
 
-  // Keyed by slug so nothing from the previous goalkeeper — an open report
-  // preview, a loaded media list — survives a move between profiles.
-  return <GkProfile key={gk.id} gk={gk} linkedPlayer={linkedPlayer} />;
+  if (rosterUnavailable) {
+    return (
+      <div className="p-8 text-sm text-destructive" role="status">
+        The roster could not be loaded. Refresh the page to try again.
+      </div>
+    );
+  }
+
+  if (!gk || !player) throw notFound();
+
+  return <GkProfile gk={gk} player={player} />;
 }
 
-/**
- * The profile itself, rendered only once a goalkeeper has been resolved.
- *
- * Kept apart from `GkDetail` so the loading, unavailable and not-found states
- * can return early: every hook below belongs to a goalkeeper already known to
- * exist, which is what the rules of hooks require.
- */
-function GkProfile({ gk, linkedPlayer }: { gk: Goalkeeper; linkedPlayer: PlayerRosterRow | null }) {
+function GkProfile({ gk, player }: { gk: Goalkeeper; player: PlayerRosterRow }) {
   const { can, user } = useAuth();
   const { data: loggedInteractions } = useLoggedInteractions();
-
-  const linkedPlayerId = linkedPlayer?.id ?? null;
+  // The row this profile was resolved from is the canonical `players` record,
+  // so there is no second name match to make: club edits, Duty of Care and
+  // media all key off it directly.
+  const linkedPlayerId = player.id;
   const mediaGoalkeeperIds = useMemo(
     () => Array.from(new Set([gk.id, linkedPlayerId].filter((id): id is string => !!id))),
     [gk.id, linkedPlayerId],
   );
-  const displayClub = linkedPlayer?.current_club || gk.club;
-  const displayLeague = linkedPlayer?.league || gk.league;
-  /**
-   * Citizenship is `players.nationality` — the canonical roster row first, the
-   * legacy profile only as a fallback. It is shown in exactly one place on this
-   * page: its own stat box below.
-   */
-  const displayNationality = linkedPlayer?.nationality || gk.nationality;
+  // Club, league and citizenship are read straight off the canonical row.
+  // `gk` is a mapping of that same row, so there is no second opinion to fall
+  // back to. Citizenship is shown in exactly one place: its stat box below.
+  const displayClub = player.current_club;
+  const displayLeague = player.league;
+  const displayNationality = player.nationality;
   const profileSummary = [
     gk.tags.includes("Free Agent") ? "Free Agent" : displayClub || "Club not recorded",
     !gk.tags.includes("Free Agent") ? displayLeague : null,
@@ -414,22 +410,16 @@ function GkProfile({ gk, linkedPlayer }: { gk: Goalkeeper; linkedPlayer: PlayerR
             <div className="mt-1 text-sm leading-snug text-muted-foreground">
               {profileSummary.join(" · ")}
             </div>
-            {/* Prefer a name-matched players row so club corrections work even
-                when the legacy profile has no stored playerId. */}
-            {linkedPlayerId ? (
-              <div className="mt-1 flex flex-wrap items-center gap-3 text-xs">
-                <EditDetailsButton
-                  player={linkedPlayer ?? null}
-                  playerId={linkedPlayerId}
-                  playerName={gk.name}
-                  currentClub={displayClub ?? ""}
-                />
-              </div>
-            ) : (
-              <div className="mt-1 text-xs text-muted-foreground">
-                Player record not linked — this profile is read-only.
-              </div>
-            )}
+            {/* The profile is resolved from the roster row itself, so club
+                corrections always have a canonical record to write back to. */}
+            <div className="mt-1 flex flex-wrap items-center gap-3 text-xs">
+              <EditDetailsButton
+                player={player}
+                playerId={linkedPlayerId}
+                playerName={gk.name}
+                currentClub={displayClub ?? ""}
+              />
+            </div>
 
             {gk.instagram && (
               <div className="mt-1 text-xs">
@@ -497,7 +487,7 @@ function GkProfile({ gk, linkedPlayer }: { gk: Goalkeeper; linkedPlayer: PlayerR
             },
             { label: "Contract expiry", value: formatContractExpiry(gk.contractUntil) },
             { label: "DOB", value: formatDob(gk.dob) },
-            { label: "Age", value: gk.age != null ? String(gk.age) : "—" },
+            { label: "Age", value: gk.age != null ? String(gk.age) : "Not recorded" },
             { label: "Citizenship", value: displayNationality || "—" },
             { label: "Height", value: gk.height || "—" },
             { label: "Shirt number", value: gk.shirtNumber != null ? String(gk.shirtNumber) : "—" },

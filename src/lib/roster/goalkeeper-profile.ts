@@ -1,64 +1,45 @@
 /**
- * Which goalkeeper a `/goalkeepers/$gkId` URL means.
+ * The two things the live roster cannot answer on its own.
  *
- * The roster now lists `public.players`, so a slug can name someone the seed
- * array has never heard of — anyone added since it was captured. Resolving
- * against the seed alone answered "no such goalkeeper" for a row the roster had
- * just shown, so the live table is consulted first and the seed contributes
- * only what no column exists for.
+ * `public.players` is the source of truth for who is on the roster and for
+ * every column it holds. Two gaps remain, and both are here:
  *
- * Kept out of the route so it can be tested directly: the invariant that
- * matters — every slug the roster can produce resolves to a profile — is a
- * property of this function, not of the page.
+ *  - **A goalkeeper's narrative** — biography, development plan, highlight-reel
+ *    links — has no column, so `toGoalkeeper` cannot carry it. A profile built
+ *    from the database alone silently blanks all three.
+ *
+ *  - **A name typed or picked on a form** has to resolve against the same live
+ *    roster the form offered, or it rejects goalkeepers it had just listed.
+ *
+ * Kept out of the routes so both are testable directly.
  */
 import { goalkeepers, type Goalkeeper } from "@/lib/mock-data";
-import {
-  findPlayerByName,
-  legacyGkSlugForName,
-  normalisePersonName,
-} from "@/lib/goalkeeper-player-link";
+import { findPlayerByName, normalisePersonName } from "@/lib/goalkeeper-player-link";
 import type { PlayerRosterRow } from "@/lib/players.functions";
 import { toGoalkeeper } from "@/lib/roster/live-goalkeepers";
 
-export interface ResolvedGoalkeeperProfile {
-  /** The goalkeeper to render, or null when the slug names nobody. */
-  gk: Goalkeeper | null;
-  /** The live roster row, when the slug matches one. */
-  livePlayer: PlayerRosterRow | null;
-  /** The seed row, when the slug matches one. */
-  seedGk: Goalkeeper | null;
-}
+/** Seed rows by normalised name, built once from the roster already in memory. */
+const SEED_BY_NAME = new Map(goalkeepers.map((gk) => [normalisePersonName(gk.name), gk] as const));
 
 /**
  * The narrative fields the database has no column for.
  *
  * Everything else — name, club, league, tier, Academy, Free Agent, contract —
- * comes from the live row, so this page cannot contradict the roster row that
- * was clicked to reach it.
+ * comes from the live row, so a profile cannot contradict the roster row that
+ * was clicked to reach it. A goalkeeper signed since the seed was captured
+ * simply has no narrative yet, which is honest: nobody has written one.
  */
-function withSeedNarrative(live: Goalkeeper, seed: Goalkeeper | null): Goalkeeper {
-  if (!seed) return live;
+export function withSeedNarrative(
+  live: Goalkeeper,
+  seed: ReadonlyMap<string, Goalkeeper> = SEED_BY_NAME,
+): Goalkeeper {
+  const match = seed.get(normalisePersonName(live.name));
+  if (!match) return live;
   return {
     ...live,
-    bio: seed.bio,
-    developmentPlan: seed.developmentPlan,
-    videoLinks: seed.videoLinks,
-  };
-}
-
-export function resolveGoalkeeperProfile(
-  players: readonly PlayerRosterRow[] | null | undefined,
-  slug: string,
-  seed: readonly Goalkeeper[] = goalkeepers,
-): ResolvedGoalkeeperProfile {
-  const seedGk = seed.find((g) => g.id === slug) ?? null;
-  const livePlayer =
-    (players ?? []).find((row) => legacyGkSlugForName(row.full_name) === slug) ?? null;
-
-  return {
-    gk: livePlayer ? withSeedNarrative(toGoalkeeper(livePlayer), seedGk) : seedGk,
-    livePlayer,
-    seedGk,
+    bio: match.bio,
+    developmentPlan: match.developmentPlan,
+    videoLinks: match.videoLinks,
   };
 }
 

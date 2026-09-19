@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { goalkeeperByName, resolveGoalkeeperProfile } from "./goalkeeper-profile";
+import { goalkeeperByName, withSeedNarrative } from "./goalkeeper-profile";
 import { toGoalkeepers } from "./live-goalkeepers";
 import { goalkeepers as seedRoster } from "@/lib/mock-data";
 import type { PlayerRosterRow } from "@/lib/players.functions";
@@ -22,80 +22,56 @@ function player(over: Partial<PlayerRosterRow> = {}): PlayerRosterRow {
   };
 }
 
-describe("every slug the roster can produce resolves to a profile", () => {
-  // The regression this exists for: the roster listed `public.players` while
-  // the profile resolved against the seed array, so anyone signed since the
-  // seed was captured was listed on /goalkeepers and then told their own
-  // profile did not exist.
-  const rows = [
-    player({ id: "live-1", full_name: "Alfie Smith", tier: null, is_academy: true }),
-    player({ id: "live-2", full_name: "Daniel Barden", tier: null }),
-  ];
+describe("the narrative the database has no column for", () => {
+  // The regression this exists for: resolving a profile from `public.players`
+  // alone is correct for every column it holds, and silently blanks the
+  // biography, the development plan and the highlight-reel links, because
+  // `toGoalkeeper` has nowhere to read them from.
+  const seedGk = seedRoster.find((gk) => gk.bio)!;
 
-  it.each(rows.map((row) => row.full_name))("%s has a profile", (name) => {
-    const slug = toGoalkeepers(rows).find((gk) => gk.name === name)!.id;
+  it("restores the biography, plan and reel onto a live row", () => {
+    const live = toGoalkeepers([player({ full_name: seedGk.name })])[0];
+    expect(live.bio).toBeUndefined();
+    expect(live.videoLinks).toEqual([]);
 
-    // Precondition: this is genuinely a live-only goalkeeper.
-    expect(seedRoster.some((gk) => gk.id === slug)).toBe(false);
+    const merged = withSeedNarrative(live);
 
-    const { gk } = resolveGoalkeeperProfile(rows, slug);
-    expect(gk).not.toBeNull();
-    expect(gk!.name).toBe(name);
+    expect(merged.bio).toBe(seedGk.bio);
+    expect(merged.developmentPlan).toEqual(seedGk.developmentPlan);
+    expect(merged.videoLinks).toEqual(seedGk.videoLinks);
   });
 
-  it("resolves every live row the roster would list", () => {
-    const resolved = toGoalkeepers(rows).map((gk) => resolveGoalkeeperProfile(rows, gk.id).gk);
-    expect(resolved.every(Boolean)).toBe(true);
-  });
-});
+  it("leaves every column the database does hold alone", () => {
+    const live = toGoalkeepers([
+      player({
+        full_name: seedGk.name,
+        tier: "Tier 4",
+        current_club: "Moved Since FC",
+        is_free_agent: true,
+      }),
+    ])[0];
 
-describe("the live row wins wherever the database has a column", () => {
-  const seedGk = seedRoster[0];
+    const merged = withSeedNarrative(live);
 
-  it("shows the live tier, club and status, not the seed's", () => {
-    const row = player({
-      full_name: seedGk.name,
-      tier: "Tier 4",
-      current_club: "Moved Since The Seed FC",
-      is_free_agent: true,
-    });
-
-    const { gk } = resolveGoalkeeperProfile([row], seedGk.id);
-
-    expect(gk!.tier).toBe("Tier 4");
-    expect(gk!.club).toBe("Moved Since The Seed FC");
-    expect(gk!.tags).toContain("Free Agent");
+    expect(merged.tier).toBe("Tier 4");
+    expect(merged.club).toBe("Moved Since FC");
+    expect(merged.tags).toContain("Free Agent");
   });
 
-  it("keeps the narrative fields the database has no column for", () => {
-    const row = player({ full_name: seedGk.name });
-    const { gk } = resolveGoalkeeperProfile([row], seedGk.id);
+  it("returns a goalkeeper with no seed entry untouched", () => {
+    // Anyone signed since the seed was captured has no narrative yet, which is
+    // honest — nobody has written one.
+    expect(seedRoster.some((gk) => gk.name === "Alfie Smith")).toBe(false);
+    const live = toGoalkeepers([player({ full_name: "Alfie Smith" })])[0];
 
-    expect(gk!.bio).toBe(seedGk.bio);
-    expect(gk!.developmentPlan).toEqual(seedGk.developmentPlan);
-    expect(gk!.videoLinks).toEqual(seedGk.videoLinks);
+    expect(withSeedNarrative(live)).toBe(live);
   });
 
-  it("reports the live row so the page can link Duty of Care to it", () => {
-    const row = player({ id: "live-3", full_name: seedGk.name });
-    const { livePlayer, seedGk: matchedSeed } = resolveGoalkeeperProfile([row], seedGk.id);
-
-    expect(livePlayer?.id).toBe("live-3");
-    expect(matchedSeed?.id).toBe(seedGk.id);
-  });
-});
-
-describe("while the roster is still loading, or when the slug is nobody", () => {
-  it("falls back to the seed rather than showing nothing", () => {
-    // The roster query has not answered yet. A goalkeeper the seed knows about
-    // should render immediately instead of flashing "not found".
-    const { gk } = resolveGoalkeeperProfile(undefined, seedRoster[0].id);
-    expect(gk?.name).toBe(seedRoster[0].name);
-  });
-
-  it("returns null for a slug in neither source", () => {
-    expect(resolveGoalkeeperProfile([], "gk-nobody-at-all").gk).toBeNull();
-    expect(resolveGoalkeeperProfile(null, "gk-nobody-at-all").gk).toBeNull();
+  it("matches on the name, apostrophe spelling included", () => {
+    const merged = withSeedNarrative(
+      toGoalkeepers([player({ full_name: seedGk.name.replace(/\u2019/g, "'") })])[0],
+    );
+    expect(merged.bio).toBe(seedGk.bio);
   });
 });
 
