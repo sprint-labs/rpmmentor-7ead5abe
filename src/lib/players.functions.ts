@@ -14,20 +14,17 @@ import { londonToday } from "@/lib/time/london";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const PLAYER_COLUMNS =
-  "id, full_name, current_club, parent_club, on_loan, league, nationality, instagram_url, contract_until, tier";
+  "id, full_name, current_club, parent_club, on_loan, league, nationality, instagram_url, contract_until, tier, is_academy, is_free_agent";
 
 /**
  * The values `players_tier_check` accepts. A player holds exactly one of them,
  * or none at all while management has yet to tier them.
+ *
+ * Academy and Free Agent are deliberately absent: they are statuses, not tiers,
+ * and live in `is_academy` / `is_free_agent`. A goalkeeper can be Tier 1 and
+ * Academy at once — seven of them are — which one column could never express.
  */
-export const PLAYER_TIER_VALUES = [
-  "Tier 1",
-  "Tier 2",
-  "Tier 3",
-  "Tier 4",
-  "Academy",
-  "Free Agent",
-] as const;
+export const PLAYER_TIER_VALUES = ["Tier 1", "Tier 2", "Tier 3", "Tier 4"] as const;
 export type PlayerTier = (typeof PLAYER_TIER_VALUES)[number];
 
 /** "" from a <select> means "no tier recorded", which is stored as NULL. */
@@ -67,6 +64,8 @@ export const playerRecordUpdateSchema = z.object({
   instagramUrl: nullableHttpUrl,
   contractUntil: nullableText(120),
   tier: nullableTier,
+  isAcademy: z.boolean(),
+  isFreeAgent: z.boolean(),
 });
 
 export const playerTierUpdateSchema = z.object({
@@ -90,6 +89,10 @@ export interface PlayerRosterRow {
   contract_until: string | null;
   /** NULL until management assigns a care-cadence tier. */
   tier: string | null;
+  /** Academy status, independent of tier. */
+  is_academy: boolean;
+  /** Free-agent status, independent of tier and of `current_club`. */
+  is_free_agent: boolean;
 }
 
 export const listPlayers = createServerFn({ method: "GET" })
@@ -231,6 +234,8 @@ export const updatePlayerRecord = createServerFn({ method: "POST" })
         instagram_url: data.instagramUrl,
         contract_until: data.contractUntil,
         tier: data.tier,
+        is_academy: data.isAcademy,
+        is_free_agent: data.isFreeAgent,
       })
       .eq("id", data.id)
       .is("deleted_at", null)
@@ -248,7 +253,9 @@ export const updatePlayerRecord = createServerFn({ method: "POST" })
       row.nationality !== data.nationality ||
       row.instagram_url !== data.instagramUrl ||
       row.contract_until !== data.contractUntil ||
-      row.tier !== data.tier
+      row.tier !== data.tier ||
+      row.is_academy !== data.isAcademy ||
+      row.is_free_agent !== data.isFreeAgent
     ) {
       throw new Error("The saved player record could not be confirmed.");
     }

@@ -44,6 +44,9 @@ interface DetailsForm {
   league: string;
   /** `players.nationality`, shown throughout the app as "Citizenship". */
   nationality: string;
+  /** Statuses, independent of tier — a Tier 1 goalkeeper can also be Academy. */
+  isAcademy: boolean;
+  isFreeAgent: boolean;
   instagramUrl: string;
   contractUntil: string;
   tier: string;
@@ -56,6 +59,8 @@ function formFromPlayer(player: PlayerRosterRow | null, fallbackClub: string): D
     onLoan: player?.on_loan ?? false,
     league: player?.league ?? "",
     nationality: player?.nationality ?? "",
+    isAcademy: player?.is_academy ?? false,
+    isFreeAgent: player?.is_free_agent ?? false,
     instagramUrl: player?.instagram_url ?? "",
     contractUntil: player?.contract_until ?? "",
     tier: player?.tier ?? "",
@@ -161,6 +166,8 @@ function EditDetailsDialog({
             instagramUrl: form.instagramUrl,
             contractUntil: form.contractUntil,
             tier: form.tier as (typeof PLAYER_TIER_VALUES)[number] | "",
+            isAcademy: form.isAcademy,
+            isFreeAgent: form.isFreeAgent,
           },
         });
         if (!confirmed?.id) throw new Error("The saved details could not be confirmed.");
@@ -210,8 +217,8 @@ function EditDetailsDialog({
 
         {!isSuperAdmin && (
           <p className="mt-2 rounded-md border border-border/60 bg-muted/30 px-3 py-2 text-[11px] leading-snug text-muted-foreground">
-            You can change the club and tier. Citizenship, league, loan status, contract and
-            Instagram are held to Super Admin by the database.
+            You can change the club and tier. Citizenship, league, loan status, contract, Instagram,
+            Academy and Free Agent are held to Super Admin by the database.
           </p>
         )}
 
@@ -315,16 +322,40 @@ function EditDetailsDialog({
                 </Field>
               </div>
 
-              <label className="flex items-center gap-2 text-xs font-medium sm:col-span-2">
-                <input
-                  type="checkbox"
-                  disabled={!isSuperAdmin}
-                  className="size-4 rounded border-border accent-primary disabled:opacity-60"
-                  checked={form.onLoan}
-                  onChange={(e) => set("onLoan", e.target.checked)}
-                />
-                On loan
-              </label>
+              <div className="flex flex-wrap gap-x-6 gap-y-2 sm:col-span-2">
+                <label className="flex items-center gap-2 text-xs font-medium">
+                  <input
+                    type="checkbox"
+                    disabled={!isSuperAdmin}
+                    className="size-4 rounded border-border accent-primary disabled:opacity-60"
+                    checked={form.onLoan}
+                    onChange={(e) => set("onLoan", e.target.checked)}
+                  />
+                  On loan
+                </label>
+                {/* Statuses, not tiers. A goalkeeper keeps their care-cadence
+                    tier while holding either of these. */}
+                <label className="flex items-center gap-2 text-xs font-medium">
+                  <input
+                    type="checkbox"
+                    disabled={!isSuperAdmin}
+                    className="size-4 rounded border-border accent-primary disabled:opacity-60"
+                    checked={form.isAcademy}
+                    onChange={(e) => set("isAcademy", e.target.checked)}
+                  />
+                  Academy
+                </label>
+                <label className="flex items-center gap-2 text-xs font-medium">
+                  <input
+                    type="checkbox"
+                    disabled={!isSuperAdmin}
+                    className="size-4 rounded border-border accent-primary disabled:opacity-60"
+                    checked={form.isFreeAgent}
+                    onChange={(e) => set("isFreeAgent", e.target.checked)}
+                  />
+                  Free Agent
+                </label>
+              </div>
             </div>
 
             <div className="flex justify-end gap-2">

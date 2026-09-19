@@ -58,6 +58,31 @@ describe("goalkeeper-player-link", () => {
   });
 });
 
+describe("apostrophes in names", () => {
+  it("matches a curly apostrophe to the straight one the database stores", () => {
+    // Real roster data: `players.full_name` holds "Rich O'Donnell" (U+0027)
+    // while the legacy profile carries "Rich O’Donnell" (U+2019). Before
+    // these were reconciled his profile could not find his player record, so
+    // Duty of Care, Edit Details and his media were all silently missing.
+    const players = [{ id: "p9", full_name: "Rich O'Donnell" }];
+
+    expect(findPlayerByName(players, "Rich O\u2019Donnell")?.id).toBe("p9");
+    expect(findPlayerByName(players, "rich o\u2019donnell")?.id).toBe("p9");
+  });
+
+  it("matches in the other direction too", () => {
+    const players = [{ id: "p9", full_name: "Rich O\u2019Donnell" }];
+
+    expect(findPlayerByName(players, "Rich O'Donnell")?.id).toBe("p9");
+  });
+
+  it("still tells genuinely different names apart", () => {
+    const players = [{ id: "p9", full_name: "Rich O'Donnell" }];
+
+    expect(findPlayerByName(players, "Rich O'Donnel")).toBeNull();
+  });
+});
+
 describe("competitions", () => {
   it("includes the cups and age groups David requested", () => {
     for (const needed of [

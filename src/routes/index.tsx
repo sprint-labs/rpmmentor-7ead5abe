@@ -35,7 +35,13 @@ import { listMatchReports } from "@/lib/match-reports/reports.functions";
 import { isDateOnlyInPeriod, lastNDaysPeriod } from "@/lib/dashboard-period";
 import { getOverviewDashboardStats } from "@/lib/overview-dashboard.functions";
 import { getRosterSnapshot } from "@/lib/roster-snapshot.functions";
-import { ROSTER_STATUS_LABELS, ROSTER_TIER_LABELS } from "@/lib/roster-snapshot";
+import {
+  ROSTER_STATUS_LABELS,
+  ROSTER_TIER_LABELS,
+  UNASSIGNED_TIER_LABEL,
+  type RosterCategoryCount,
+  type RosterTierLabel,
+} from "@/lib/roster-snapshot";
 import { NO_TIER_LABEL } from "@/components/insight-drilldowns";
 import { listCalendarEvents } from "@/lib/calendar.functions";
 import { BulletinDashboardCard } from "@/components/bulletins/dashboard-card";
@@ -455,7 +461,10 @@ function Dashboard() {
                 </h3>
                 <div className="grid grid-cols-2 gap-2" aria-busy={rosterPending}>
                   {(
-                    roster?.tiers ?? ROSTER_TIER_LABELS.map((label) => ({ label, count: null }))
+                    roster?.tiers.filter(
+                      (row): row is RosterCategoryCount<RosterTierLabel> =>
+                        row.label !== UNASSIGNED_TIER_LABEL,
+                    ) ?? ROSTER_TIER_LABELS.map((label) => ({ label, count: null }))
                   ).map(({ label, count }) => (
                     <Link
                       key={label}
