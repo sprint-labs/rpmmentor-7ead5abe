@@ -15,7 +15,10 @@ import type { DataFreshness } from "@/lib/data-freshness";
  * point of contrast, which is why every other badge in this app is outlined.
  */
 const TONE = {
-  fresh: { className: "border-success/40 text-success", Icon: Check },
+  // Tier 2's green, not the success green: this chip sits in a header beside
+  // tier badges and is read as one of them, so it takes their hue rather than
+  // introducing a second green a hair off theirs.
+  fresh: { className: "border-tier-2/40 text-tier-2", Icon: Check },
   stale: { className: "border-warning/40 text-warning", Icon: Clock },
   degraded: { className: "border-destructive/40 text-destructive", Icon: AlertTriangle },
   unknown: { className: "border-border text-muted-foreground", Icon: RefreshCw },
@@ -63,7 +66,10 @@ export function DataFreshnessChip({
       <span
         role="status"
         aria-live="polite"
-        className={`inline-flex h-6 items-center gap-1.5 rounded border px-2 text-[10px] font-semibold uppercase tracking-[0.08em] ${tone}`}
+        // Set exactly as TierBadge is. The size was already 10px; what made this
+        // read so much larger was uppercase, letter-spacing, semibold weight and a
+        // fixed 24px height, none of which a tier badge beside it uses.
+        className={`inline-flex items-center gap-1 whitespace-nowrap rounded border px-1.5 py-0.5 text-[10px] font-medium ${tone}`}
       >
         <Icon className="size-3" />
         {freshness.label}
