@@ -165,14 +165,17 @@ export function StatCard({
         : accent === "info"
           ? "text-info"
           : "text-primary";
+  // Blur and spread come from the theme, not from here: the same halo that
+  // reads as a crisp edge on white blooms into the gutter on carbon. See
+  // `--stat-glow-blur` / `--stat-glow-spread` in styles.css.
   const glow =
     accent === "warning"
-      ? "shadow-[0_0_18px_-6px_var(--warning)]"
+      ? "shadow-[0_0_var(--stat-glow-blur)_var(--stat-glow-spread)_var(--warning)]"
       : accent === "destructive"
-        ? "shadow-[0_0_18px_-6px_var(--destructive)]"
+        ? "shadow-[0_0_var(--stat-glow-blur)_var(--stat-glow-spread)_var(--destructive)]"
         : accent === "info"
-          ? "shadow-[0_0_18px_-6px_var(--info)]"
-          : "shadow-[0_0_18px_-6px_var(--primary)]";
+          ? "shadow-[0_0_var(--stat-glow-blur)_var(--stat-glow-spread)_var(--info)]"
+          : "shadow-[0_0_var(--stat-glow-blur)_var(--stat-glow-spread)_var(--primary)]";
   const isEmpty = typeof value === "number" && value === 0 && emptyMessage;
   return (
     <div

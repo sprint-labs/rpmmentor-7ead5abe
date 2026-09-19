@@ -186,6 +186,10 @@
   --primary-line: rgba(18, 196, 0, 0.38);
   --ring: var(--gk-green);
 
+  /* Accent halo on a KPI tile. See the dark block for why it differs. */
+  --stat-glow-blur: 18px;
+  --stat-glow-spread: -6px;
+
   --success: #087a00;
   --success-fill: #e4f5e9;
   --success-line: #c6e8d2;
@@ -305,6 +309,12 @@
   --primary-line: rgba(18, 196, 0, 0.32);
   --ring: var(--gk-green);
 
+  /* Carbon makes a glow carry much further than white does: the same halo
+     that reads as a crisp edge on the light theme blooms into the gutter
+     here. Dark keeps the cue, at roughly half the reach. */
+  --stat-glow-blur: 11px;
+  --stat-glow-spread: -9px;
+
   --success: #38ff5a;
   --success-fill: rgba(56, 255, 90, 0.11);
   --success-line: rgba(56, 255, 90, 0.26);
@@ -408,6 +418,10 @@
   --primary-fill: #e8f5e4;
   --primary-line: #a9d69c;
   --ring: var(--gk-green-deep);
+
+  /* No halo on paper — a printed dossier gets its emphasis from the rail. */
+  --stat-glow-blur: 0px;
+  --stat-glow-spread: 0px;
 
   --success: #0a7a00;
   --success-fill: #e8f5e4;
