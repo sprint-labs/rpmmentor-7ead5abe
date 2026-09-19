@@ -124,6 +124,37 @@ export function AppShell() {
   const notif = useNotifications();
 
   /**
+   * Dismiss the notifications panel by clicking away from it, or with Escape.
+   *
+   * This used to be a `fixed inset-0` backdrop rendered inside the panel, which
+   * never covered the page: the header it sits in carries `backdrop-blur`, and
+   * a backdrop filter makes an element the containing block for its fixed-
+   * position descendants. The backdrop was therefore sized to the header, so
+   * every click below the top bar missed it and the only way out was the bell
+   * itself. Listening on the document instead is independent of any ancestor's
+   * stacking or filters. `bellRef` wraps the trigger and the panel together, so
+   * a click on either still counts as inside.
+   */
+  useEffect(() => {
+    if (!bellOpen) return;
+    const onPointerDown = (event: MouseEvent | TouchEvent) => {
+      if (!bellRef.current?.contains(event.target as Node)) setBellOpen(false);
+    };
+    // `KeyboardEvent` is React's in this file, so name the DOM one explicitly.
+    const onKeyDown = (event: globalThis.KeyboardEvent) => {
+      if (event.key === "Escape") setBellOpen(false);
+    };
+    document.addEventListener("mousedown", onPointerDown);
+    document.addEventListener("touchstart", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+      document.removeEventListener("touchstart", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [bellOpen]);
+
+  /**
    * The durable inbox. Available to every role that can see the calendar, not
    * only to the alerts-view roles: an assigned mentor is exactly who needs to be
    * told about a new event or a write-up that has gone past its deadline.
@@ -508,7 +539,6 @@ export function AppShell() {
               </button>
               {bellOpen && (
                 <>
-                  <div className="fixed inset-0 z-20" onClick={() => setBellOpen(false)} />
                   <div
                     id="duty-notifications"
                     role="region"
