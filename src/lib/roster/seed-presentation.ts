@@ -49,7 +49,9 @@ const SEED_PRESENTATION = buildIndex(goalkeepers);
 /** Empty rather than undefined, so callers never branch on "do we know them". */
 const NOTHING_RECORDED: SeedPresentation = {
   dob: "",
-  age: 0,
+  // Not zero. A zero here reaches the roster as the literal age "0", which is
+  // a claim about a real person rather than an admission we have no date.
+  age: null,
   height: null,
   shirtNumber: null,
   foot: null,

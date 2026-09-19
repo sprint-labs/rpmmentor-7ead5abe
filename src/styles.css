@@ -323,9 +323,14 @@
   --warning-fill: rgba(240, 180, 41, 0.11);
   --warning-line: rgba(240, 180, 41, 0.26);
   --warning-foreground: #0a0a0a;
-  --destructive: #ff1105;
-  --destructive-fill: rgba(255, 17, 5, 0.13);
-  --destructive-line: rgba(255, 17, 5, 0.32);
+  /* #FF1105 reads at only 4.33:1 on the card, so every "3 overdue" chip and
+     error line set in it failed AA while looking perfectly urgent. Lightened
+     until it clears 4.5:1 as text even on its own 15% fill (4.57:1), and
+     5.54:1 on the plain card. Solid `bg-destructive` only gains contrast
+     against its near-black foreground. */
+  --destructive: #ff5a4f;
+  --destructive-fill: rgba(255, 90, 79, 0.13);
+  --destructive-line: rgba(255, 90, 79, 0.32);
   --destructive-foreground: #0d0d0d;
   --info: #238aff;
   --info-fill: rgba(35, 138, 255, 0.12);

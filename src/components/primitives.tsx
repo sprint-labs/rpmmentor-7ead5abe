@@ -5,12 +5,15 @@ import { cn } from "@/lib/utils";
 import { TIER_DEFINITIONS } from "@/lib/mock-data";
 import type { Tier, DutyLevel } from "@/lib/mock-data";
 
+// Outlined, like every other badge: a 15% wash of the badge's own hue behind
+// its label costs roughly a point of contrast, which is the difference between
+// passing and failing AA for the paler hues. The dot carries the fill instead.
 const DUTY_TONES: Record<DutyLevel, { dot: string; badge: string }> = {
-  up_to_date: { dot: "bg-success", badge: "bg-success/15 text-success border-success/30" },
-  due_soon: { dot: "bg-warning", badge: "bg-warning/15 text-warning border-warning/30" },
+  up_to_date: { dot: "bg-success", badge: "text-success border-success/40" },
+  due_soon: { dot: "bg-warning", badge: "text-warning border-warning/40" },
   overdue: {
     dot: "bg-destructive",
-    badge: "bg-destructive/15 text-destructive border-destructive/40",
+    badge: "text-destructive border-destructive/40",
   },
   not_required: {
     dot: "bg-muted-foreground/50",
@@ -118,7 +121,7 @@ export function Breadcrumbs({ items, className }: { items: BreadcrumbItem[]; cla
                 {item.label}
               </span>
             )}
-            {!isLast && <ChevronRight className="size-3 text-muted-foreground/60" />}
+            {!isLast && <ChevronRight className="size-3 text-muted-foreground" />}
           </span>
         );
       })}
@@ -157,6 +160,9 @@ export function StatCard({
         : accent === "info"
           ? "before:bg-info"
           : "before:bg-primary";
+  // The default is `--primary-ink`, not `--primary`: the brand volt is
+  // graphic-grade and reads at 2.35:1 on the light theme's white card, which
+  // even a 30px headline number fails. The ink grade is the text-safe one.
   const valueTone =
     accent === "warning"
       ? "text-warning"
@@ -164,7 +170,7 @@ export function StatCard({
         ? "text-destructive"
         : accent === "info"
           ? "text-info"
-          : "text-primary";
+          : "text-primary-ink";
   // Blur and spread come from the theme, not from here: the same halo that
   // reads as a crisp edge on white blooms into the gutter on carbon. See
   // `--stat-glow-blur` / `--stat-glow-spread` in styles.css.
@@ -192,14 +198,14 @@ export function StatCard({
       <div
         className={cn(
           "mt-1.5 text-3xl font-bold tabular-nums font-mono leading-none",
-          isEmpty ? "text-muted-foreground/60 text-base font-normal" : valueTone,
+          isEmpty ? "text-muted-foreground text-base font-normal" : valueTone,
         )}
       >
         {isEmpty ? emptyMessage : value}
       </div>
       {hint && <div className="text-[10px] text-muted-foreground mt-2">{hint}</div>}
       {updatedAt && (
-        <div className="text-[10px] text-muted-foreground/70 mt-3 font-mono tabular-nums">
+        <div className="text-[10px] text-muted-foreground mt-3 font-mono tabular-nums">
           Updated {updatedAt}
         </div>
       )}
@@ -219,20 +225,24 @@ export function StatCard({
 export function TierBadge({ tier }: { tier: Tier | null | undefined }) {
   if (!tier) {
     return (
-      <span className="inline-flex items-center whitespace-nowrap rounded border border-warning/30 bg-warning/10 px-1.5 py-0.5 text-[10px] font-medium text-warning">
+      <span className="inline-flex items-center whitespace-nowrap rounded border border-warning/40 px-1.5 py-0.5 text-[10px] font-medium text-warning">
         Unassigned
       </span>
     );
   }
+  // Outlined, not filled. A 15% wash of the label's own hue behind it cost
+  // roughly a full point of contrast and put Tier 2, Tier 3 and Academy under
+  // 4.5:1 in light mode and Tier 3 and Academy under it in dark. The hue still
+  // reads from the text and the border, which is where it was doing the work.
   const styles: Record<Tier, string> = {
-    "Tier 1": "bg-tier-1/15 text-tier-1 border-tier-1/40",
-    "Tier 2": "bg-tier-2/15 text-tier-2 border-tier-2/40",
-    "Tier 3": "bg-tier-3/15 text-tier-3 border-tier-3/40",
-    "Tier 4": "bg-muted text-muted-foreground border-border",
+    "Tier 1": "text-tier-1 border-tier-1/40",
+    "Tier 2": "text-tier-2 border-tier-2/40",
+    "Tier 3": "text-tier-3 border-tier-3/40",
+    "Tier 4": "text-muted-foreground border-border",
     // Academy is a tag, not a rung on the care ladder, so it takes a tag hue
     // rather than borrowing a tier's green.
-    Academy: "bg-info/15 text-info border-info/30",
-    "Free Agent": "bg-muted text-muted-foreground border-border",
+    Academy: "text-info border-info/40",
+    "Free Agent": "text-muted-foreground border-border",
   };
   return (
     <span
@@ -248,11 +258,12 @@ export function TierBadge({ tier }: { tier: Tier | null | undefined }) {
 export const StatusBadge = TierBadge;
 
 export function TierLevelBadge({ level }: { level: 1 | 2 | 3 | 4 }) {
+  // Outlined for the same contrast reason as `TierBadge` above.
   const styles: Record<1 | 2 | 3 | 4, string> = {
-    1: "bg-tier-1/15 text-tier-1 border-tier-1/40",
-    2: "bg-tier-2/15 text-tier-2 border-tier-2/40",
-    3: "bg-tier-3/15 text-tier-3 border-tier-3/40",
-    4: "bg-muted text-muted-foreground border-border",
+    1: "text-tier-1 border-tier-1/40",
+    2: "text-tier-2 border-tier-2/40",
+    3: "text-tier-3 border-tier-3/40",
+    4: "text-muted-foreground border-border",
   };
   return (
     <span
@@ -292,12 +303,13 @@ export function Pill({
   children: ReactNode;
   tone?: "muted" | "success" | "warning" | "destructive" | "info";
 }) {
+  // Outlined for the same contrast reason as the badges above.
   const t: Record<string, string> = {
-    muted: "bg-muted text-muted-foreground border-border",
-    success: "bg-success/15 text-success border-success/30",
-    warning: "bg-warning/15 text-warning border-warning/30",
-    destructive: "bg-destructive/15 text-destructive border-destructive/40",
-    info: "bg-info/15 text-info border-info/30",
+    muted: "text-muted-foreground border-border",
+    success: "text-success border-success/40",
+    warning: "text-warning border-warning/40",
+    destructive: "text-destructive border-destructive/40",
+    info: "text-info border-info/40",
   };
   return (
     <span

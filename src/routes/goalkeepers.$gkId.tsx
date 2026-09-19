@@ -34,6 +34,7 @@ import { DutyOfCarePanel } from "@/components/duty-of-care-panel";
 import { listPlayers, type PlayerRosterRow } from "@/lib/players.functions";
 import { interactionBelongsToGoalkeeper } from "@/lib/goalkeeper-player-link";
 import { rosterRowForLegacySlug, toGoalkeeper } from "@/lib/roster/live-goalkeepers";
+import { withSeedNarrative } from "@/lib/roster/goalkeeper-profile";
 import {
   compareInteractionsByAlertThenDate,
   interactionOutcomeAlertRank,
@@ -139,7 +140,11 @@ function GkDetail() {
     staleTime: 5 * 60_000,
   });
   const player = useMemo(() => rosterRowForLegacySlug(players, gkId), [players, gkId]);
-  const gk = useMemo(() => (player ? toGoalkeeper(player) : null), [player]);
+  // The database has no column for a biography, a development plan or the
+  // highlight-reel links, so `toGoalkeeper` cannot carry them. Layering them
+  // back on keeps this page from blanking all three for every goalkeeper who
+  // has them. See `withSeedNarrative`.
+  const gk = useMemo(() => (player ? withSeedNarrative(toGoalkeeper(player)) : null), [player]);
 
   if (rosterPending) {
     return (
@@ -182,7 +187,7 @@ function GkProfile({ gk, player }: { gk: Goalkeeper; player: PlayerRosterRow }) 
   const profileSummary = [
     gk.tags.includes("Free Agent") ? "Free Agent" : displayClub || "Club not recorded",
     !gk.tags.includes("Free Agent") ? displayLeague : null,
-    gk.age > 0 ? `${gk.age} yrs` : null,
+    gk.age != null ? `${gk.age} yrs` : null,
     gk.height,
     gk.foot ? `${gk.foot} foot` : null,
   ].filter((value): value is string => Boolean(value));
@@ -482,7 +487,7 @@ function GkProfile({ gk, player }: { gk: Goalkeeper; player: PlayerRosterRow }) 
             },
             { label: "Contract expiry", value: formatContractExpiry(gk.contractUntil) },
             { label: "DOB", value: formatDob(gk.dob) },
-            { label: "Age", value: gk.age > 0 ? String(gk.age) : "Not recorded" },
+            { label: "Age", value: gk.age != null ? String(gk.age) : "Not recorded" },
             { label: "Citizenship", value: displayNationality || "—" },
             { label: "Height", value: gk.height || "—" },
             { label: "Shirt number", value: gk.shirtNumber != null ? String(gk.shirtNumber) : "—" },
@@ -657,7 +662,7 @@ function GkProfile({ gk, player }: { gk: Goalkeeper; player: PlayerRosterRow }) 
               <div className="space-y-3">
                 <div className="text-[10px] uppercase text-muted-foreground">
                   Pool of last {last5.length} report{last5.length === 1 ? "" : "s"}:
-                  <span className="ml-1 normal-case text-muted-foreground/80 tracking-normal">
+                  <span className="ml-1 normal-case text-muted-foreground tracking-normal">
                     {last5.map(reportRef).join(" · ")}
                   </span>
                 </div>
@@ -730,7 +735,7 @@ function GkProfile({ gk, player }: { gk: Goalkeeper; player: PlayerRosterRow }) 
                               {Array.from({ length: 5 - contributors.length }).map((_, i) => (
                                 <span
                                   key={`missing-${id}-${i}`}
-                                  className="px-1.5 py-0.5 rounded border border-dashed border-border/60 text-[10px] text-muted-foreground/70 italic"
+                                  className="px-1.5 py-0.5 rounded border border-dashed border-border/60 text-[10px] text-muted-foreground italic"
                                   title={`Missing report with a valid ${PILLAR_LABELS[id]} score`}
                                 >
                                   missing report
@@ -835,7 +840,7 @@ function GkProfile({ gk, player }: { gk: Goalkeeper; player: PlayerRosterRow }) 
             {highlightReelItems.length === 0 ? (
               <div className="rounded-md border border-dashed border-border/80 bg-muted/20 px-3 py-4 text-center">
                 <p className="text-xs text-muted-foreground">No highlight reel uploaded yet.</p>
-                <p className="mt-1 text-[11px] text-muted-foreground/80">
+                <p className="mt-1 text-[11px] text-muted-foreground">
                   Slot reserved for {gk.name} — upload a clip via Media and tag it Highlight.
                 </p>
               </div>

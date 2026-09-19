@@ -14,9 +14,11 @@ import {
 } from "@/components/primitives";
 import { DUTY_LABELS, type DutyLevel, type Goalkeeper, type TierLevelLabel } from "@/lib/mock-data";
 import { listPlayerDutyOfCare } from "@/lib/duty-of-care.functions";
+import { DUTY_SEVERITY } from "@/lib/duty-of-care-status";
 import { listPlayers } from "@/lib/players.functions";
 import { toGoalkeepers } from "@/lib/roster/live-goalkeepers";
 import { UNASSIGNED_TIER_LABEL } from "@/lib/roster-snapshot";
+import { useUrlDraft } from "@/lib/use-url-draft";
 import {
   buildRosterDutyIndex,
   countRosterDuty,
@@ -363,6 +365,14 @@ function AdvancedFilterFields({
   ratingMin: number;
   ratingMax: number;
 }) {
+  // A range slider fires `input` continuously while dragged, and each one was
+  // a router navigation. This was the slowest interaction the Vercel toolbar
+  // measured on the page.
+  const commitRatingMin = useCallback((value: number) => update({ ratingMin: value }), [update]);
+  const commitRatingMax = useCallback((value: number) => update({ ratingMax: value }), [update]);
+  const [minDraft, setMinDraft] = useUrlDraft(ratingMin, commitRatingMin);
+  const [maxDraft, setMaxDraft] = useUrlDraft(ratingMax, commitRatingMax);
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
       {includeTier && <TierFilterOptions selectedTiers={selectedTiers} update={update} />}
@@ -468,7 +478,7 @@ function AdvancedFilterFields({
         <div className="text-[11px] uppercase text-muted-foreground mb-1.5">
           Rating range{" "}
           <span className="tabular-nums font-mono text-foreground">
-            {ratingMin.toFixed(1)}–{ratingMax.toFixed(1)}
+            {minDraft.toFixed(1)}–{maxDraft.toFixed(1)}
           </span>
         </div>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -479,13 +489,13 @@ function AdvancedFilterFields({
               min={1}
               max={5}
               step={0.1}
-              value={ratingMin}
-              onChange={(event) => update({ ratingMin: clampRating(Number(event.target.value)) })}
+              value={minDraft}
+              onChange={(event) => setMinDraft(clampRating(Number(event.target.value)))}
               className="flex-1"
               aria-label="Minimum rating"
             />
             <span className="w-8 tabular-nums font-mono text-foreground">
-              {ratingMin.toFixed(1)}
+              {minDraft.toFixed(1)}
             </span>
           </label>
           <label className="flex flex-1 items-center gap-2 text-[11px] text-muted-foreground">
@@ -495,13 +505,13 @@ function AdvancedFilterFields({
               min={1}
               max={5}
               step={0.1}
-              value={ratingMax}
-              onChange={(event) => update({ ratingMax: clampRating(Number(event.target.value)) })}
+              value={maxDraft}
+              onChange={(event) => setMaxDraft(clampRating(Number(event.target.value)))}
               className="flex-1"
               aria-label="Maximum rating"
             />
             <span className="w-8 tabular-nums font-mono text-foreground">
-              {ratingMax.toFixed(1)}
+              {maxDraft.toFixed(1)}
             </span>
           </label>
         </div>
@@ -563,7 +573,9 @@ function GoalkeepersList() {
     [dutyIndex, dutyQueryState],
   );
 
-  // Distinct dropdown options derived from the live roster.
+  // Distinct dropdown options derived from the live roster. The dependency on
+  // `goalkeepers` is load-bearing: it starts empty and arrives, and without it
+  // every one of these three dropdowns stays empty for good.
   const { allLeagues, allNats, contractYears } = useMemo(() => {
     const leagues = new Set<string>();
     const nats = new Set<string>();
@@ -571,14 +583,18 @@ function GoalkeepersList() {
     for (const g of goalkeepers) {
       if (g.league) leagues.add(g.league);
       if (g.nationality) nats.add(g.nationality);
-      if (g.contractUntil && g.contractUntil !== "—") years.add(g.contractUntil.slice(0, 4));
+      // Only a real four-digit year: the contract filter matches on /^\d{4}$/,
+      // so any other option would set an active filter that narrows nothing
+      // while the "Advanced filters" badge counts it as one.
+      const year = g.contractUntil?.slice(0, 4) ?? "";
+      if (/^\d{4}$/.test(year)) years.add(year);
     }
     return {
       allLeagues: [...leagues].sort(),
       allNats: [...nats].sort(),
       contractYears: [...years].sort(),
     };
-  }, []);
+  }, [goalkeepers]);
 
   const selectedTiers = csv(search.tiers);
   const selectedLeagues = csv(search.leagues);
@@ -609,13 +625,20 @@ function GoalkeepersList() {
     );
   }, [reportsData]);
 
-  const update = (patch: Partial<GoalkeeperSearch>) => {
-    navigate({
-      search: (prev: GoalkeeperSearch) => ({ ...prev, ...patch }),
-      replace: true,
-      resetScroll: false,
-    });
-  };
+  const update = useCallback(
+    (patch: Partial<GoalkeeperSearch>) => {
+      navigate({
+        search: (prev: GoalkeeperSearch) => ({ ...prev, ...patch }),
+        replace: true,
+        resetScroll: false,
+      });
+    },
+    [navigate],
+  );
+
+  // The search box types locally and the URL catches up. See `useUrlDraft`.
+  const commitQuery = useCallback((value: string) => update({ q: value }), [update]);
+  const [queryDraft, setQueryDraft] = useUrlDraft(search.q, commitQuery);
 
   useEffect(() => {
     if (!isMobile) return;
@@ -637,7 +660,12 @@ function GoalkeepersList() {
   // The duty filter reads the same live index as the column and the chips, so
   // selecting "Overdue 15" cannot return a different 15 — or, as it did, none.
   const dutyLevelFor = useCallback((name: string) => dutyFor(name).level, [dutyFor]);
-  const filtered = filterGoalkeepers(goalkeepers, search, ratingsByGoalkeeper, dutyLevelFor);
+  // Memoised: this walks the whole roster, and a bare call re-ran it on every
+  // render — including renders that changed nothing it reads.
+  const filtered = useMemo(
+    () => filterGoalkeepers(goalkeepers, search, ratingsByGoalkeeper, dutyLevelFor),
+    [goalkeepers, search, ratingsByGoalkeeper, dutyLevelFor],
+  );
 
   const sorted = useMemo(() => {
     if (!sort) return filtered;
@@ -645,8 +673,11 @@ function GoalkeepersList() {
     return [...filtered].sort((a, b) => {
       const aRating = ratingsByGoalkeeper.get(normaliseGoalkeeperName(a.name))?.average ?? null;
       const bRating = ratingsByGoalkeeper.get(normaliseGoalkeeperName(b.name))?.average ?? null;
-      const aDuty = dutyFor(a.name).label;
-      const bDuty = dutyFor(b.name).label;
+      // Severity, not the label. The label sorts alphabetically, which puts
+      // Overdue fourth of five and reshuffles the table whenever the view's
+      // `status_label` wording changes.
+      const aDuty = DUTY_SEVERITY[dutyFor(a.name).level];
+      const bDuty = DUTY_SEVERITY[dutyFor(b.name).level];
 
       switch (sort.key) {
         case "goalkeeper":
@@ -683,9 +714,14 @@ function GoalkeepersList() {
           return compareNullable(aRating, bRating, sort.direction);
       }
     });
-  }, [filtered, ratingsByGoalkeeper, sort]);
+    // `dutyFor` belongs here: the comparator reads it, and the duty rows arrive
+    // after the first render. Without it, sorting by Duty of Care orders by
+    // whatever the index said before it had loaded.
+  }, [filtered, ratingsByGoalkeeper, sort, dutyFor]);
 
   const CATS_LIST = CATS;
+  // Same again: counted over the roster, so it has to recompute when the roster
+  // lands. Otherwise every chip reads 0 beside a list of results.
   const dutyCounts = useMemo(
     () =>
       countRosterDuty(
@@ -693,18 +729,33 @@ function GoalkeepersList() {
         goalkeepers.map((g) => g.name),
         dutyQueryState,
       ),
-    [dutyIndex, dutyQueryState],
+    [dutyIndex, dutyQueryState, goalkeepers],
   );
-  const DUTIES: { id: "all" | DutyLevel; label: string; count: number }[] = [
+  // Until the duty read answers, every goalkeeper falls into `not_enough_data`
+  // by construction — so a number here would say "Not enough data 116, Overdue
+  // 0" about a roster nobody has classified yet. The chips show nothing instead
+  // of something false, and "All" is a plain roster count that is true either
+  // way.
+  const dutyCountsKnown = !dutyPending && !dutyUnavailable;
+  const dutyChipCount = (count: number) => (dutyCountsKnown ? count : null);
+  const DUTIES: { id: "all" | DutyLevel; label: string; count: number | null }[] = [
     { id: "all", label: "All", count: dutyCounts.total },
-    { id: "up_to_date", label: DUTY_LABELS.up_to_date, count: dutyCounts.up_to_date },
-    { id: "due_soon", label: DUTY_LABELS.due_soon, count: dutyCounts.due_soon },
-    { id: "overdue", label: DUTY_LABELS.overdue, count: dutyCounts.overdue },
-    { id: "not_required", label: DUTY_LABELS.not_required, count: dutyCounts.not_required },
+    {
+      id: "up_to_date",
+      label: DUTY_LABELS.up_to_date,
+      count: dutyChipCount(dutyCounts.up_to_date),
+    },
+    { id: "due_soon", label: DUTY_LABELS.due_soon, count: dutyChipCount(dutyCounts.due_soon) },
+    { id: "overdue", label: DUTY_LABELS.overdue, count: dutyChipCount(dutyCounts.overdue) },
+    {
+      id: "not_required",
+      label: DUTY_LABELS.not_required,
+      count: dutyChipCount(dutyCounts.not_required),
+    },
     {
       id: "not_enough_data",
       label: DUTY_LABELS.not_enough_data,
-      count: dutyCounts.not_enough_data,
+      count: dutyChipCount(dutyCounts.not_enough_data),
     },
   ];
 
@@ -772,8 +823,8 @@ function GoalkeepersList() {
 
       <div className="flex flex-wrap items-center gap-2">
         <input
-          value={search.q}
-          onChange={(e) => update({ q: e.target.value })}
+          value={queryDraft}
+          onChange={(e) => setQueryDraft(e.target.value)}
           placeholder="Search name, club, league, nationality…"
           className="h-11 w-full rounded-md border border-border bg-input/60 px-3 text-sm sm:h-9 sm:w-80"
           aria-label="Search goalkeepers"
@@ -898,7 +949,7 @@ function GoalkeepersList() {
                             )}
                             {duty.label}
                             <span className="tabular-nums font-mono text-[10px] opacity-70">
-                              {duty.count}
+                              {duty.count ?? "…"}
                             </span>
                           </button>
                         );
@@ -990,7 +1041,9 @@ function GoalkeepersList() {
               >
                 {duty.id !== "all" && <TrafficLight level={duty.id as DutyLevel} size={7} />}
                 {duty.label}
-                <span className="tabular-nums font-mono text-[10px] opacity-70">{duty.count}</span>
+                <span className="tabular-nums font-mono text-[10px] opacity-70">
+                  {duty.count ?? "…"}
+                </span>
               </button>
             ))}
           </div>
@@ -1202,7 +1255,7 @@ function GoalkeepersList() {
                       <div className="flex flex-col">
                         <span>{gk.tags.includes("Free Agent") ? "-" : gk.club || "-"}</span>
                         {gk.onLoan && gk.parentClub && (
-                          <span className="text-[10px] text-muted-foreground/80 italic">
+                          <span className="text-[10px] text-muted-foreground italic">
                             on loan from {gk.parentClub}
                           </span>
                         )}
@@ -1211,7 +1264,7 @@ function GoalkeepersList() {
                     <td className="px-2 text-muted-foreground text-xs">
                       {gk.tags.includes("Free Agent") ? "-" : gk.league || "-"}
                     </td>
-                    <td className="px-2 tabular-nums font-mono">{gk.age}</td>
+                    <td className="px-2 tabular-nums font-mono">{gk.age ?? "-"}</td>
                     <td className="px-2 text-muted-foreground">{gk.nationality || "—"}</td>
                     <td className="px-2 text-muted-foreground">
                       {formatContractExpiry(gk.contractUntil)}

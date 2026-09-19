@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { goalkeepers } from "@/lib/mock-data";
 import { listPlayers, type PlayerRosterRow } from "@/lib/players.functions";
+import { goalkeeperByName } from "@/lib/roster/goalkeeper-profile";
 import { COMPETITIONS } from "@/lib/competitions";
 import {
   EMPTY_CLUB_INDEX,
@@ -1781,10 +1782,7 @@ function ReportForm({
   const [opponent, setOpponent] = useState("");
 
   const goalkeeperOptions = useMemo(
-    () =>
-      players.length
-        ? players.map((p) => p.full_name)
-        : goalkeepers.map((g) => g.name),
+    () => (players.length ? players.map((p) => p.full_name) : goalkeepers.map((g) => g.name)),
     [players],
   );
   // Once the keeper is picked, Team is known, and a club plays a knowable set of
@@ -2583,9 +2581,11 @@ function ReportForm({
         onTranscribed={applyVoiceText}
         onAudioAttach={async ({ blob, mimeType, durationSec }) => {
           if (!user) throw new Error("Sign in required to save audio.");
-          const gk = goalkeepers.find(
-            (g) => g.name.trim().toLowerCase() === goalkeeper.trim().toLowerCase(),
-          );
+          // The picker above offers the live roster, so this must resolve
+          // against the live roster too. Matching only the seed rejected a
+          // goalkeeper the same form had just offered — anyone signed since
+          // the seed was captured — with "select a known goalkeeper".
+          const gk = goalkeeperByName(goalkeeper, players);
           if (!gk) throw new Error("Select a known goalkeeper before saving the voice note.");
           const ext = (mimeType.split("/")[1] || "webm").split(";")[0];
           const stamp = new Date().toISOString().replace(/[:.]/g, "-");
