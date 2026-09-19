@@ -28,7 +28,7 @@ const tierMutation = vi.hoisted(() => ({ calls: [] as Array<{ id: string; tier: 
 
 // Stub the server-function module so the middleware it registers never loads.
 vi.mock("@/lib/players.functions", () => ({
-  PLAYER_TIER_VALUES: ["Tier 1", "Tier 2", "Tier 3", "Tier 4", "Academy", "Free Agent"],
+  PLAYER_TIER_VALUES: ["Tier 1", "Tier 2", "Tier 3", "Tier 4"],
   updatePlayerTier: "update-player-tier",
 }));
 

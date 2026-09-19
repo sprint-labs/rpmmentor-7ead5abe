@@ -19,15 +19,14 @@ const PLAYER_COLUMNS =
 /**
  * The values `players_tier_check` accepts. A player holds exactly one of them,
  * or none at all while management has yet to tier them.
+ *
+ * Academy and Free Agent are no longer among them. They were never tiers — a
+ * goalkeeper can be Tier 1 AND in an academy, which one column cannot say — so
+ * they now live in `players.is_academy` / `players.is_free_agent`, and the
+ * constraint accepts only the four care-cadence tiers. Offering either here
+ * would put a value in the tier dropdown that the database rejects on save.
  */
-export const PLAYER_TIER_VALUES = [
-  "Tier 1",
-  "Tier 2",
-  "Tier 3",
-  "Tier 4",
-  "Academy",
-  "Free Agent",
-] as const;
+export const PLAYER_TIER_VALUES = ["Tier 1", "Tier 2", "Tier 3", "Tier 4"] as const;
 export type PlayerTier = (typeof PLAYER_TIER_VALUES)[number];
 
 /** "" from a <select> means "no tier recorded", which is stored as NULL. */
