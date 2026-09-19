@@ -78,9 +78,7 @@ function runChecks(): { group: string; checks: Check[] }[] {
     "p2",
   );
 
-  const harrison = goalkeepers.find(
-    (g) => normalisePersonName(g.name) === "harrison male",
-  );
+  const harrison = goalkeepers.find((g) => normalisePersonName(g.name) === "harrison male");
 
   return [
     {
@@ -140,13 +138,13 @@ function runChecks(): { group: string; checks: Check[] }[] {
           detail: harrison ? `id: ${harrison.id}` : "Not found",
         },
         {
-          label: "Club is Tranmere Rovers",
-          pass: harrison?.club === "Tranmere Rovers",
+          label: "Club is York City",
+          pass: harrison?.club === "York City",
           detail: harrison?.club ?? "—",
         },
         {
-          label: "League is EFL League Two",
-          pass: harrison?.league === "EFL League Two",
+          label: "League is National League",
+          pass: harrison?.league === "National League",
           detail: harrison?.league ?? "—",
         },
       ],
@@ -177,8 +175,8 @@ function SyncVerificationPage() {
       <header>
         <h1 className="text-2xl font-semibold tracking-tight">Sync verification</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Runtime checks that the synced competitions list, player-linking helpers and roster
-          data are loaded in this build.{" "}
+          Runtime checks that the synced competitions list, player-linking helpers and roster data
+          are loaded in this build.{" "}
           <Link to="/system/github" className="text-primary hover:underline">
             GitHub sync
           </Link>

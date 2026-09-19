@@ -207,7 +207,23 @@ export function StatCard({
   );
 }
 
-export function TierBadge({ tier }: { tier: Tier }) {
+/**
+ * A tier, a status, or nothing recorded yet.
+ *
+ * `null` is a real state on the roster — a goalkeeper management has not tiered
+ * — and it reads as "Unassigned" rather than as a blank, so an untiered
+ * goalkeeper is visibly waiting for a decision instead of looking like a
+ * rendering gap. It takes the warning hue because it is an outstanding action,
+ * not a rung on the care ladder.
+ */
+export function TierBadge({ tier }: { tier: Tier | null | undefined }) {
+  if (!tier) {
+    return (
+      <span className="inline-flex items-center whitespace-nowrap rounded border border-warning/30 bg-warning/10 px-1.5 py-0.5 text-[10px] font-medium text-warning">
+        Unassigned
+      </span>
+    );
+  }
   const styles: Record<Tier, string> = {
     "Tier 1": "bg-tier-1/15 text-tier-1 border-tier-1/40",
     "Tier 2": "bg-tier-2/15 text-tier-2 border-tier-2/40",

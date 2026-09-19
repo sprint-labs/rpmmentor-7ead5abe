@@ -1,4 +1,5 @@
 import { type DutyLevel, type Goalkeeper } from "./mock-data";
+import { UNASSIGNED_TIER_LABEL } from "./roster-snapshot";
 
 export type GoalkeeperFilterState = {
   q: string;
@@ -148,7 +149,10 @@ export function filterGoalkeepers(
     )
       return false;
 
-    if (selectedTiers.length && !selectedTiers.includes(goalkeeper.tier)) return false;
+    // `Unassigned` is a selectable tier in its own right: a goalkeeper with no
+    // tier is someone waiting on a decision, not someone to hide from the list.
+    if (selectedTiers.length && !selectedTiers.includes(goalkeeper.tier ?? UNASSIGNED_TIER_LABEL))
+      return false;
     if (selectedLeagues.length && !selectedLeagues.includes(goalkeeper.league)) return false;
     if (selectedNats.length && !selectedNats.includes(goalkeeper.nationality)) return false;
 

@@ -71,8 +71,56 @@ vi.mock("sonner", () => ({ toast: vi.fn() }));
 
 vi.mock("@/lib/match-reports/reports.functions", () => ({ listMatchReports: vi.fn() }));
 
-const { listPlayerDutyOfCareMock, DUTY_ROWS } = vi.hoisted(() => ({
+const { listPlayerDutyOfCareMock, listPlayersMock, DUTY_ROWS, PLAYER_ROWS } = vi.hoisted(() => ({
   listPlayerDutyOfCareMock: vi.fn(),
+  listPlayersMock: vi.fn(),
+  // The roster is a database read now, so these cases need rows to render.
+  // A handful is enough: they are about layout, search and the filter chips.
+  PLAYER_ROWS: [
+    {
+      id: "00000000-0000-4000-8000-000000000001",
+      full_name: "James Beadle",
+      current_club: "Birmingham City",
+      parent_club: "Brighton & Hove Albion",
+      on_loan: true,
+      league: "EFL Championship",
+      nationality: "England",
+      instagram_url: null,
+      contract_until: "June 2028",
+      tier: "Tier 1",
+      is_academy: false,
+      is_free_agent: false,
+    },
+    {
+      id: "00000000-0000-4000-8000-000000000002",
+      full_name: "Max Crocombe",
+      current_club: "Millwall",
+      parent_club: null,
+      on_loan: false,
+      league: "EFL Championship",
+      nationality: "New Zealand",
+      instagram_url: null,
+      contract_until: "June 2027",
+      tier: "Tier 1",
+      is_academy: false,
+      is_free_agent: false,
+    },
+    {
+      id: "00000000-0000-4000-8000-000000000003",
+      full_name: "Toby Bell",
+      current_club: "Chelsea",
+      parent_club: "Chelsea",
+      on_loan: false,
+      league: "Premier League",
+      nationality: "England",
+      instagram_url: null,
+      contract_until: "June 2027",
+      // Tiered AND Academy: the pairing the old single column could not hold.
+      tier: "Tier 1",
+      is_academy: true,
+      is_free_agent: false,
+    },
+  ],
   // Empty on purpose: these cases are about the page's layout and filters, and
   // an empty view keeps every duty label confined to the filter chips, which is
   // exactly what the first case asserts. The mapping itself is covered by
@@ -82,6 +130,7 @@ const { listPlayerDutyOfCareMock, DUTY_ROWS } = vi.hoisted(() => ({
 vi.mock("@/lib/duty-of-care.functions", () => ({
   listPlayerDutyOfCare: listPlayerDutyOfCareMock,
 }));
+vi.mock("@/lib/players.functions", () => ({ listPlayers: listPlayersMock }));
 
 // The page calls more than one server function and they answer with different
 // shapes, so the stub dispatches on which one it was handed rather than giving
@@ -93,7 +142,9 @@ vi.mock("@tanstack/react-start", async (importOriginal) => {
     useServerFn: (fn: unknown) =>
       fn === listPlayerDutyOfCareMock
         ? vi.fn().mockResolvedValue(DUTY_ROWS)
-        : vi.fn().mockResolvedValue({ reports: [] }),
+        : fn === listPlayersMock
+          ? vi.fn().mockResolvedValue(PLAYER_ROWS)
+          : vi.fn().mockResolvedValue({ reports: [] }),
   };
 });
 
