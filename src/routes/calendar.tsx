@@ -1,6 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
+import { stripFixtureDuplicateKey } from "@/lib/calendar/fixture-import/fields";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
@@ -23,7 +24,6 @@ import {
   type TeamCalendarEvent,
 } from "@/lib/calendar.functions";
 import { listPlayers } from "@/lib/players.functions";
-import { listReportCoverage } from "@/lib/calendar/report-coverage.functions";
 import {
   formatMonthParam,
   isSameMonth,
@@ -51,84 +51,11 @@ import {
   followUpDetail,
   unwaivePresentation,
 } from "@/components/events/follow-up-status";
-import {
-  missingReportTypes,
-  reportCoverageQueryKey,
-  shortLabel,
-  type GoalkeeperRef,
-  type ReportCoverageEntry,
-  type TrackedReportType,
-} from "@/lib/calendar/report-coverage";
 import { MatchParticipationControl } from "@/components/events/match-participation-control";
-import { MATCH_PARTICIPATION_STATUS_LABEL } from "@/lib/events/participation";
-
-function MissingReports({
-  coverage,
-  gk,
-  eventDate,
-  today,
-  variant,
-}: {
-  /**
-   * Undefined while the read is in flight or after it has failed. Treating that
-   * as "nothing logged" would put the original bug back: five MISSING badges on
-   * every goalkeeper, this time whenever the query has not answered yet.
-   */
-  coverage: readonly ReportCoverageEntry[] | undefined;
-  gk: GoalkeeperRef;
-  eventDate: string;
-  today: string;
-  variant: "compact" | "full";
-}) {
-  if (!coverage) return null;
-
-  const missing: TrackedReportType[] = missingReportTypes(coverage, gk, {
-    referenceDate: eventDate,
-    today,
-  });
-  if (missing.length === 0) return null;
-
-  if (variant === "compact") {
-    const shown = missing.slice(0, 3);
-    const overflow = missing.length - shown.length;
-    return (
-      <div
-        className="mt-0.5 flex flex-wrap items-center gap-0.5"
-        aria-label={`Missing report types: ${missing.join(", ")}`}
-      >
-        {shown.map((t) => (
-          <span
-            key={t}
-            title={`Missing: ${t} (last 30 days)`}
-            className="rounded-sm border border-warning/40 bg-warning/10 px-1 text-[9px] font-mono uppercase leading-tight text-warning"
-          >
-            {shortLabel(t)}
-          </span>
-        ))}
-        {overflow > 0 && (
-          <span className="text-[9px] text-muted-foreground">+{overflow}</span>
-        )}
-      </div>
-    );
-  }
-
-  return (
-    <div className="mt-1 flex flex-wrap items-center gap-1">
-      <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
-        Missing
-      </span>
-      {missing.map((t) => (
-        <span
-          key={t}
-          title={`No ${t} logged in last 30 days`}
-          className="rounded-sm border border-warning/40 bg-warning/10 px-1.5 py-0.5 text-[10px] text-warning"
-        >
-          {t}
-        </span>
-      ))}
-    </div>
-  );
-}
+import {
+  MATCH_PARTICIPATION_STATUS_LABEL,
+  type MatchParticipationStatus,
+} from "@/lib/events/participation";
 
 const calendarSearchSchema = z.object({
   gkId: fallback(z.string(), "").default(""),
@@ -142,6 +69,8 @@ const calendarSearchSchema = z.object({
    * the parameter leaves those links behaving exactly as before.
    */
   month: fallback(z.string(), "").default(""),
+  /** "" is every event, which is how this page has always opened. */
+  kind: fallback(z.enum(["", "fixtures", "interactions"]), "").default(""),
 });
 
 export const Route = createFileRoute("/calendar")({
@@ -149,30 +78,46 @@ export const Route = createFileRoute("/calendar")({
   component: withPermission(CalendarPage, "calendar.view"),
 });
 
-/**
- * Colours for the three current types, plus the retired ones so an event
- * scheduled before the list changed still renders as it always did.
- */
-const TONE: Record<string, "info" | "warning" | "success" | "muted" | "destructive"> = {
-  "Match": "info",
-  "Training Ground Visit": "warning",
-  "Coffee Catch-up": "success",
-  "Observation": "success",
-  "Mentor Visit": "warning",
-  "Meeting": "muted",
-  "Follow Up": "destructive",
-  "Other": "muted",
-};
+/** The calendar's kind filter, in tab order. */
+const KIND_FILTERS = [
+  { id: "" as const, label: "All" },
+  { id: "fixtures" as const, label: "Fixtures" },
+  { id: "interactions" as const, label: "Interactions" },
+];
 
-const CHIP: Record<string, string> = {
-  "Match": "bg-info/15 text-info border-info/30",
-  "Training Ground Visit": "bg-warning/15 text-warning border-warning/30",
-  "Coffee Catch-up": "bg-success/15 text-success border-success/30",
-  "Observation": "bg-success/15 text-success border-success/30",
-  "Mentor Visit": "bg-warning/15 text-warning border-warning/30",
-  "Follow Up": "bg-destructive/15 text-destructive border-destructive/30",
-  "Meeting": "bg-muted text-muted-foreground border-border",
-  "Other": "bg-muted text-muted-foreground border-border",
+/** The one event type that is a fixture; everything else is contact work. */
+const FIXTURE_EVENT_TYPE = "Match";
+
+function isFixtureEvent(eventType: string): boolean {
+  return eventType === FIXTURE_EVENT_TYPE;
+}
+
+/**
+ * What an event's colour says.
+ *
+ * Colour used to encode the event type, which meant eight types competing for
+ * five hues and told a reader nothing they could not already read in the label
+ * beside it. It now answers the question the calendar is actually scanned for:
+ *
+ *   blue    contact work — a visit, a catch-up, a call
+ *   green   a fixture where the goalkeeper is confirmed to have played
+ *   amber   a fixture where that is still unconfirmed, or they did not play
+ *
+ * So amber on this page means "somebody needs to confirm this", and it clears
+ * itself the moment participation is recorded.
+ */
+function eventTone(
+  eventType: string,
+  participation: MatchParticipationStatus,
+): "info" | "success" | "warning" {
+  if (!isFixtureEvent(eventType)) return "info";
+  return participation === "played" ? "success" : "warning";
+}
+
+const CHIP: Record<"info" | "success" | "warning", string> = {
+  info: "bg-info/15 text-info border-info/30",
+  success: "bg-success/15 text-success border-success/30",
+  warning: "bg-warning/15 text-warning border-warning/30",
 };
 
 interface DisplayEvent {
@@ -182,9 +127,12 @@ interface DisplayEvent {
   type: string;
   gkId?: string;
   gkName?: string;
-  /** Every identifier this event has for its goalkeeper, for coverage matching. */
-  gkRef: GoalkeeperRef;
   notes: string;
+  /**
+   * `notes` with the fixture-import marker taken out, for anything a person
+   * reads. `notes` itself stays raw so the editor saves the marker back.
+   */
+  displayNotes: string;
   location: string | null;
   startTime: string | null;
   assignedMentorName: string;
@@ -223,6 +171,7 @@ function CalendarPage() {
     title: prefillTitle,
     notes: prefillNotes,
     month: monthParam,
+    kind: kindFilter,
   } = Route.useSearch();
   const navigate = useNavigate();
   const { can, user } = useAuth();
@@ -247,25 +196,6 @@ function CalendarPage() {
     queryKey: ["calendar-events"],
     queryFn: () => fetchEvents(),
   });
-
-  // What has actually been logged, for the missing-report badges. Deliberately
-  // left undefined until it resolves; see MissingReports.
-  const fetchCoverage = useServerFn(listReportCoverage);
-  const { data: coverage } = useQuery({
-    queryKey: reportCoverageQueryKey,
-    queryFn: () => fetchCoverage(),
-    staleTime: 60_000,
-  });
-
-  // A queued report can reach the server while this page is open — the offline
-  // queue drains in the background and only announces itself as a window event.
-  useEffect(() => {
-    const invalidate = () => {
-      void queryClient.invalidateQueries({ queryKey: reportCoverageQueryKey });
-    };
-    window.addEventListener("rpm:report-submitted", invalidate);
-    return () => window.removeEventListener("rpm:report-submitted", invalidate);
-  }, [queryClient]);
 
   // Scheduling an event needs the canonical roster and the assignable profiles.
   // Only managers can open the form, so neither list is fetched for anyone else.
@@ -409,12 +339,8 @@ function CalendarPage() {
         type: e.event_type,
         gkId: gk?.id,
         gkName: e.goalkeeper_name ?? gk?.name,
-        gkRef: {
-          playerId: e.player_id,
-          gkSlug: gk?.id ?? null,
-          name: e.goalkeeper_name ?? gk?.name ?? null,
-        },
         notes: e.notes,
+        displayNotes: stripFixtureDuplicateKey(e.notes ?? ""),
         location: e.location,
         startTime: e.start_time,
         assignedMentorName: e.assigned_mentor_name,
@@ -422,8 +348,13 @@ function CalendarPage() {
         raw: e,
       } satisfies DisplayEvent;
     });
-    return filteredGoalkeeper ? mapped.filter((e) => e.gkId === filteredGoalkeeper.id) : mapped;
-  }, [events, filteredGoalkeeper]);
+    const forGoalkeeper = filteredGoalkeeper
+      ? mapped.filter((e) => e.gkId === filteredGoalkeeper.id)
+      : mapped;
+    if (!kindFilter) return forGoalkeeper;
+    const wantFixtures = kindFilter === "fixtures";
+    return forGoalkeeper.filter((e) => isFixtureEvent(e.type) === wantFixtures);
+  }, [events, filteredGoalkeeper, kindFilter]);
 
   const [view, setView] = useState<"month" | "week">("month");
   const today = new Date();
@@ -591,6 +522,35 @@ function CalendarPage() {
         }
       />
 
+      {/* Fixtures or contact work. A search parameter rather than component
+          state so the choice survives a reload and can be linked to, the same
+          as the goalkeeper filter below it. */}
+      <div
+        role="group"
+        aria-label="Filter events by kind"
+        className="inline-flex gap-1 rounded-md border border-border p-0.5"
+      >
+        {KIND_FILTERS.map((option) => {
+          const selected = kindFilter === option.id;
+          return (
+            <Link
+              key={option.id || "all"}
+              to="/calendar"
+              search={(prev) => ({ ...prev, kind: option.id })}
+              replace
+              aria-current={selected ? "true" : undefined}
+              className={`min-h-9 rounded px-3 py-1.5 text-xs font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                selected
+                  ? "bg-accent text-foreground"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {option.label}
+            </Link>
+          );
+        })}
+      </div>
+
       {filteredGoalkeeper && (
         <div className="flex items-center justify-between gap-3 rounded-md border border-border/60 bg-accent/30 px-3 py-2.5">
           <div className="text-sm">
@@ -691,7 +651,7 @@ function CalendarPage() {
                   )}
                   <div className="space-y-1">
                     {dayEvents.slice(0, 3).map((e) => {
-                      const cls = `w-full text-left text-[10px] truncate px-1.5 py-0.5 rounded border ${CHIP[e.type] ?? CHIP["Other"]}`;
+                      const cls = `w-full text-left text-[10px] truncate px-1.5 py-0.5 rounded border ${CHIP[eventTone(e.type, e.raw.participation_status)]}`;
                       const label = startTimeLabel(e) ? `${startTimeLabel(e)} ${e.title}` : e.title;
                       return (
                         <div key={e.id}>
@@ -699,20 +659,13 @@ function CalendarPage() {
                             <button
                               onClick={() => openEdit(e)}
                               className={cls + " hover:brightness-125 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"}
-                              title={e.notes || e.title}
+                              title={e.displayNotes || e.title}
                             >
                               {label}
                             </button>
                           ) : (
-                            <div className={cls} title={e.notes || e.title}>{label}</div>
+                            <div className={cls} title={e.displayNotes || e.title}>{label}</div>
                           )}
-                          <MissingReports
-                            coverage={coverage}
-                            gk={e.gkRef}
-                            eventDate={e.date}
-                            today={todayIso}
-                            variant="compact"
-                          />
                         </div>
                       );
                     })}
@@ -738,15 +691,14 @@ function CalendarPage() {
                       <div key={e.id} className="text-[11px] p-1.5 rounded bg-accent/40 border border-border/60">
                         <div className="font-medium leading-tight line-clamp-2">{e.title}</div>
                         {startTimeLabel(e) && <div className="text-[10px] text-muted-foreground tabular-nums font-mono">{startTimeLabel(e)}</div>}
-                        <div className="mt-1"><Pill tone={TONE[e.type] ?? "muted"}>{e.type}</Pill></div>
-                        {e.notes && <div className="mt-1 text-[10px] text-muted-foreground line-clamp-3">{e.notes}</div>}
-                        <MissingReports
-                          coverage={coverage}
-                          gk={e.gkRef}
-                          eventDate={e.date}
-                          today={todayIso}
-                          variant="full"
-                        />
+                        <div className="mt-1">
+                          <Pill tone={eventTone(e.type, e.raw.participation_status)}>{e.type}</Pill>
+                        </div>
+                        {e.displayNotes && (
+                          <div className="mt-1 text-[10px] text-muted-foreground line-clamp-3">
+                            {e.displayNotes}
+                          </div>
+                        )}
                         <div className="mt-1 flex items-center gap-2">
                           {canLog && (
                             <button onClick={() => openLog({ date: e.date, gkId: e.gkId })} className="inline-flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground">
@@ -781,7 +733,7 @@ function CalendarPage() {
               .map((e) => (
                 <div key={e.id} className="flex items-start gap-3 py-2 text-sm">
                   <div className="w-24 shrink-0 text-xs text-muted-foreground tabular-nums font-mono">{formatDate(e.date)}</div>
-                  <Pill tone={TONE[e.type] ?? "muted"}>{e.type}</Pill>
+                  <Pill tone={eventTone(e.type, e.raw.participation_status)}>{e.type}</Pill>
                   <div className="min-w-0 flex-1">
                     <div className="truncate">{e.title}</div>
                     <div className="text-xs text-muted-foreground">
@@ -810,7 +762,11 @@ function CalendarPage() {
                           Participation: {MATCH_PARTICIPATION_STATUS_LABEL[e.raw.participation_status]}
                         </div>
                       ))}
-                    {e.notes && <div className="mt-0.5 whitespace-pre-wrap text-xs text-muted-foreground">{e.notes}</div>}
+                    {e.displayNotes && (
+                      <div className="mt-0.5 whitespace-pre-wrap text-xs text-muted-foreground">
+                        {e.displayNotes}
+                      </div>
+                    )}
                     {(() => {
                       const row = followUpByEvent.get(e.id);
                       if (
@@ -842,13 +798,6 @@ function CalendarPage() {
                         </div>
                       );
                     })()}
-                    <MissingReports
-                      coverage={coverage}
-                      gk={e.gkRef}
-                      eventDate={e.date}
-                      today={todayIso}
-                      variant="full"
-                    />
                   </div>
                   {canManage && (
                     <div className="flex shrink-0 items-center gap-1">
