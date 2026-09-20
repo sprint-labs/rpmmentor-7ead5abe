@@ -39,6 +39,9 @@ import {
 } from "@/components/events/follow-up-status";
 import { formatDateOnly } from "@/lib/interactions/schema";
 import { BulletinDashboardCard } from "@/components/bulletins/dashboard-card";
+import { MentorMonthPanel } from "@/components/calendar/mentor-month-panel";
+import { listCalendarEvents } from "@/lib/calendar.functions";
+import { localDateIso } from "@/lib/calendar/month";
 
 import { lastNDaysPeriod } from "@/lib/dashboard-period";
 
@@ -107,6 +110,32 @@ export function MentorDashboard({ user }: Props) {
     window.addEventListener("rpm:report-submitted", handleReportSubmitted);
     return () => window.removeEventListener("rpm:report-submitted", handleReportSubmitted);
   }, [queryClient]);
+
+  // The shared team calendar, for the month panel. Same `["calendar-events"]`
+  // cache the calendar page and the manager home read, so this is one query
+  // rather than a mentor-specific endpoint. It is narrowed below to the events
+  // assigned to this mentor — the same predicate `getMentorDashboardStats`
+  // applies server-side for the upcoming list, so the grid and the list under
+  // it can never describe different diaries.
+  const fetchCalendarEvents = useServerFn(listCalendarEvents);
+  const {
+    data: teamEvents,
+    isPending: calendarPending,
+    isError: calendarError,
+  } = useQuery({
+    queryKey: ["calendar-events"],
+    queryFn: () => fetchCalendarEvents(),
+    enabled: canViewCalendar,
+    staleTime: 30_000,
+  });
+  const myEvents = useMemo(
+    () => (teamEvents ?? []).filter((e) => e.assigned_mentor_id === user.id),
+    [teamEvents, user.id],
+  );
+  // Local calendar date, not `toISOString()`. The ISO form is UTC, so between
+  // midnight and 01:00 BST it still reads as yesterday and today's square is
+  // ringed on the wrong day.
+  const todayIso = localDateIso(new Date());
 
   // Write-ups this mentor owes after an event that has already happened. Read
   // from the database, so a saved Match Report or Interaction clears it.
@@ -222,7 +251,6 @@ export function MentorDashboard({ user }: Props) {
       <MentorPrimaryActions
         canSubmitReport={canSubmitReport}
         canLogInteraction={canLog}
-        canViewCalendar={canViewCalendar}
         onLogReport={() => setWorkflow("report")}
         onLogInteraction={() => openLog()}
       />
@@ -342,6 +370,18 @@ export function MentorDashboard({ user }: Props) {
 
       <Card className="p-4">
         <SectionTitle>Upcoming Interactions and Matches</SectionTitle>
+
+        {/* The month this mentor is working in, moved off the button
+            stack above and on to the card that already answers "what is
+            coming up". The list below it stays as the detail view. */}
+        {canViewCalendar && (
+          <MentorMonthPanel
+            events={myEvents}
+            pending={calendarPending}
+            error={calendarError}
+            today={todayIso}
+          />
+        )}
 
         <div className="flex items-center justify-between gap-3 mb-3">
           <span className="text-xs text-muted-foreground">

@@ -1,11 +1,9 @@
-import { Link } from "@tanstack/react-router";
-import { ArrowUpRight, Calendar, FileText, Plus } from "lucide-react";
+import { FileText, Plus } from "lucide-react";
 import { mentorPrimaryActionLabels } from "./mentor-dashboard-cards";
 
 interface MentorPrimaryActionsProps {
   canSubmitReport: boolean;
   canLogInteraction: boolean;
-  canViewCalendar: boolean;
   onLogReport: () => void;
   onLogInteraction: () => void;
 }
@@ -13,11 +11,10 @@ interface MentorPrimaryActionsProps {
 export function MentorPrimaryActions({
   canSubmitReport,
   canLogInteraction,
-  canViewCalendar,
   onLogReport,
   onLogInteraction,
 }: MentorPrimaryActionsProps) {
-  if (!canSubmitReport && !canLogInteraction && !canViewCalendar) return null;
+  if (!canSubmitReport && !canLogInteraction) return null;
 
   return (
     <div className="space-y-3">
@@ -47,21 +44,6 @@ export function MentorPrimaryActions({
           </button>
         )}
       </div>
-      {canViewCalendar && (
-        <Link
-          to="/calendar"
-          search={{ gkId: "", new: false }}
-          className="flex min-h-14 items-center justify-between gap-3 rounded-lg border border-border bg-card px-4 py-3 hover:bg-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        >
-          <span className="inline-flex items-center gap-2.5">
-            <Calendar className="size-5 text-primary-ink" aria-hidden="true" />
-            <span className="text-sm font-semibold uppercase tracking-wider">
-              {mentorPrimaryActionLabels.viewCalendar}
-            </span>
-          </span>
-          <ArrowUpRight className="size-4 text-muted-foreground" aria-hidden="true" />
-        </Link>
-      )}
     </div>
   );
 }

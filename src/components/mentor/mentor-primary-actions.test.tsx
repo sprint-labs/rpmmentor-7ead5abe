@@ -27,14 +27,13 @@ afterEach(() => {
 });
 
 describe("MentorPrimaryActions", () => {
-  it("puts match report and interaction first, then calendar", () => {
+  it("puts match report before interaction, and offers no calendar link", () => {
     const onLogReport = vi.fn();
     const onLogInteraction = vi.fn();
     render(
       <MentorPrimaryActions
         canSubmitReport
         canLogInteraction
-        canViewCalendar
         onLogReport={onLogReport}
         onLogInteraction={onLogInteraction}
       />,
@@ -42,11 +41,12 @@ describe("MentorPrimaryActions", () => {
 
     const report = screen.getByRole("button", { name: /submit match report/i });
     const interaction = screen.getByRole("button", { name: /log interaction/i });
-    const calendar = screen.getByRole("link", { name: /view calendar/i });
 
-    expect(report.compareDocumentPosition(interaction) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(interaction.compareDocumentPosition(calendar) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(calendar.getAttribute("href")).toBe("/calendar");
+    expect(
+      report.compareDocumentPosition(interaction) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    // The calendar moved to the month panel on the dashboard itself.
+    expect(screen.queryByRole("link", { name: /view calendar/i })).toBeNull();
   });
 
   it("opens the match report and interaction workflows", () => {
@@ -56,7 +56,6 @@ describe("MentorPrimaryActions", () => {
       <MentorPrimaryActions
         canSubmitReport
         canLogInteraction
-        canViewCalendar
         onLogReport={onLogReport}
         onLogInteraction={onLogInteraction}
       />,
@@ -74,7 +73,6 @@ describe("MentorPrimaryActions", () => {
       <MentorPrimaryActions
         canSubmitReport={false}
         canLogInteraction={false}
-        canViewCalendar={false}
         onLogReport={vi.fn()}
         onLogInteraction={vi.fn()}
       />,
@@ -82,6 +80,5 @@ describe("MentorPrimaryActions", () => {
 
     expect(screen.queryByRole("button", { name: /submit match report/i })).toBeNull();
     expect(screen.queryByRole("button", { name: /log interaction/i })).toBeNull();
-    expect(screen.queryByRole("link", { name: /view calendar/i })).toBeNull();
   });
 });
