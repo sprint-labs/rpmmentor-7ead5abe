@@ -69,24 +69,25 @@ type NavItem = {
   perm: Permission;
 };
 const NAV: NavItem[] = [
+  // The order a mentor works in: what happened, who it was about, what is
+  // owed, what is coming. Reference and admin sit under it, and both ways of
+  // getting help sit at the foot of the menu rather than in this list.
   { to: "/", label: "Dashboard", icon: LayoutDashboard, exact: true, perm: "goalkeepers.view" },
   { to: "/bulletins", label: "Bulletin Board", icon: Columns3, perm: "bulletins.view" },
   { to: "/goalkeepers", label: "Goalkeepers", icon: Users, perm: "goalkeepers.view" },
-  { to: "/users", label: "Team Members", icon: UserCog, perm: "mentors.view" },
+  { to: "/reports", label: "Match Reports", icon: FileText, perm: "reports.view" },
   {
     to: "/interactions",
     label: "Interactions Log",
     icon: MessageSquare,
     perm: "interactions.view",
   },
-  { to: "/reports", label: "Match Reports", icon: FileText, perm: "reports.view" },
-
+  { to: "/follow-ups", label: "Follow-ups", icon: ClipboardCheck, perm: "calendar.view" },
+  { to: "/calendar", label: "Calendar", icon: Calendar, perm: "calendar.view" },
   { to: "/media", label: "Media Library", icon: FolderOpen, perm: "media.view" },
+  { to: "/users", label: "Team Members", icon: UserCog, perm: "mentors.view" },
   { to: "/audit", label: "Audit Log", icon: History, perm: "audit.view" },
   { to: "/alerts", label: "Notification Centre", icon: BellRing, perm: "alerts.view" },
-  { to: "/calendar", label: "Calendar", icon: Calendar, perm: "calendar.view" },
-  { to: "/follow-ups", label: "Follow-ups", icon: ClipboardCheck, perm: "calendar.view" },
-  { to: "/support", label: "Help & Messages", icon: LifeBuoy, perm: "support.send" },
   { to: "/executive", label: "Executive", icon: BarChart3, perm: "executive.view" },
   { to: "/system/users", label: "Manage Users", icon: ShieldCheck, perm: "system.manage" },
   {
@@ -798,6 +799,7 @@ export function AppShell() {
           )}
           {canSeeSupport && (
             <HelpUpdatesLauncher
+              showTrigger={false}
               open={helpOpen}
               unreadCount={helpUnread}
               announcements={updateAnnouncements}
@@ -941,6 +943,37 @@ export function AppShell() {
                   </button>
                 )}
               <ThemeToggle menu />
+              {canSeeSupport && (
+                <button
+                  onClick={() => {
+                    setNavOpen(false);
+                    setBellOpen(false);
+                    setHelpOpen(true);
+                  }}
+                  className="w-full min-h-11 flex items-center gap-2 px-3 py-2 rounded-md border border-border text-xs uppercase tracking-[0.06em] font-semibold hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <LifeBuoy className="size-4" />
+                  {/* "Help & updates", verbatim: the dialog's accessible name
+                      spells the ampersand, and the two must match for a speech
+                      user saying what they read. */}
+                  Help &amp; updates
+                  {helpUnread > 0 && (
+                    <span className="ml-auto grid h-[18px] min-w-[18px] place-items-center rounded-full bg-primary px-1 font-mono text-[10px] font-semibold text-primary-foreground">
+                      {helpUnread > 9 ? "9+" : helpUnread}
+                    </span>
+                  )}
+                </button>
+              )}
+              {canSeeSupport && (
+                <Link
+                  to={"/support" as never}
+                  onClick={closeMenu}
+                  className="w-full min-h-11 flex items-center gap-2 px-3 py-2 rounded-md border border-border text-xs uppercase tracking-[0.06em] font-semibold hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <MessageSquare className="size-4" />
+                  Help &amp; Messages
+                </Link>
+              )}
               <Link
                 to={"/account" as never}
                 onClick={closeMenu}

@@ -20,6 +20,7 @@
 import { Link } from "@tanstack/react-router";
 import { ArrowUpRight } from "lucide-react";
 import { SectionTitle } from "@/components/primitives";
+import { bentoSpan } from "@/components/ui/bento-grid";
 import { cn } from "@/lib/utils";
 import { UNASSIGNED_TIER_LABEL, type RosterSnapshot } from "@/lib/roster-snapshot";
 import {
@@ -143,13 +144,16 @@ export function GoalkeeperDistribution({
   roster,
   pending,
   error,
+  className,
 }: {
   roster: RosterSnapshot | undefined;
   pending: boolean;
   error: boolean;
+  /** Placement passed by the page this sits on. Defaults to the `list` token. */
+  className?: string;
 }) {
   return (
-    <div className="col-span-12 self-start command-panel p-4 lg:col-span-4">
+    <div className={cn(bentoSpan("list"), "command-panel p-4", className)}>
       <SectionTitle
         action={
           error ? null : (

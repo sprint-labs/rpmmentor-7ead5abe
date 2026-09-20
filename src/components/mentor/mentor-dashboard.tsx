@@ -40,6 +40,7 @@ import {
 import { formatDateOnly } from "@/lib/interactions/schema";
 import { BulletinDashboardCard } from "@/components/bulletins/dashboard-card";
 import { MentorMonthPanel } from "@/components/calendar/mentor-month-panel";
+import { BentoCell, BentoGrid } from "@/components/ui/bento-grid";
 import { listCalendarEvents } from "@/lib/calendar.functions";
 import { localDateIso } from "@/lib/calendar/month";
 
@@ -224,7 +225,9 @@ export function MentorDashboard({ user }: Props) {
   };
 
   return (
-    <div className="space-y-6">
+    // Capped and centred to match the manager dashboard, so switching roles
+    // does not change the width the page is read at.
+    <div className="mx-auto w-full max-w-[1440px] space-y-6">
       <header>
         {/* Greets by time of day. The subtitle names what is on the page
             rather than stating a priority. */}
@@ -371,199 +374,212 @@ export function MentorDashboard({ user }: Props) {
       <Card className="p-4">
         <SectionTitle>Upcoming Interactions and Matches</SectionTitle>
 
-        {/* The month this mentor is working in, moved off the button
-            stack above and on to the card that already answers "what is
-            coming up". The list below it stays as the detail view. */}
-        {canViewCalendar && (
-          <MentorMonthPanel
-            events={myEvents}
-            pending={calendarPending}
-            error={calendarError}
-            today={todayIso}
-          />
-        )}
+        {/* The month this mentor is working in sits beside the list rather
+            than above it: stacked, the two ran the card past 1000px and the
+            list started below the fold. Side by side they are the same pair,
+            read in one screen. The divider under the grid goes with the
+            stacking — the gap between the cells separates them now. */}
+        <BentoGrid>
+          {canViewCalendar && (
+            <BentoCell size="matrix">
+              <MentorMonthPanel
+                className="mb-0 border-b-0 pb-0"
+                events={myEvents}
+                pending={calendarPending}
+                error={calendarError}
+                today={todayIso}
+              />
+            </BentoCell>
+          )}
 
-        <div className="flex items-center justify-between gap-3 mb-3">
-          <span className="text-xs text-muted-foreground">
-            {isLoading ? "Loading…" : `Next ${rangeDays} days`}
-          </span>
-          <div className="flex items-center gap-1" role="tablist" aria-label="Date range">
-            {[7, 14, 30].map((d) => (
-              <button
-                key={d}
-                role="tab"
-                aria-selected={rangeDays === d}
-                onClick={() => setRangeDays(d)}
-                className={cn(
-                  "px-2.5 py-1 text-[11px] uppercase tracking-wider rounded-md border transition-colors",
-                  rangeDays === d
-                    ? "bg-primary text-primary-foreground border-primary"
-                    : "bg-transparent text-muted-foreground border-border hover:border-primary/50",
-                )}
-              >
-                {/* Named by its own content rather than an aria-label. The
+          {/* Full width when this mentor cannot see the calendar, so the list
+              never renders as a half-width column beside nothing. */}
+          <BentoCell size="detail" className={canViewCalendar ? undefined : "lg:col-span-12"}>
+            <div className="flex items-center justify-between gap-3 mb-3">
+              <span className="text-xs text-muted-foreground">
+                {isLoading ? "Loading…" : `Next ${rangeDays} days`}
+              </span>
+              <div className="flex items-center gap-1" role="tablist" aria-label="Date range">
+                {[7, 14, 30].map((d) => (
+                  <button
+                    key={d}
+                    role="tab"
+                    aria-selected={rangeDays === d}
+                    onClick={() => setRangeDays(d)}
+                    className={cn(
+                      "px-2.5 py-1 text-[11px] uppercase tracking-wider rounded-md border transition-colors",
+                      rangeDays === d
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "bg-transparent text-muted-foreground border-border hover:border-primary/50",
+                    )}
+                  >
+                    {/* Named by its own content rather than an aria-label. The
                     label read "Next 7 days" while the tab read "7d", so the
                     visible text was not part of the accessible name and a
                     speech user could not ask for what they could see. */}
-                {d}d<span className="sr-only"> — next {d} days</span>
-              </button>
-            ))}
-          </div>
-        </div>
+                    {d}d<span className="sr-only"> — next {d} days</span>
+                  </button>
+                ))}
+              </div>
+            </div>
 
-        <div
-          className="flex flex-wrap items-center gap-1 mb-3"
-          role="group"
-          aria-label="Filter by interaction type"
-        >
-          <button
-            onClick={clearFilters}
-            className={cn(
-              "px-2.5 py-1 text-[11px] uppercase tracking-wider rounded-md border transition-colors",
-              filters.length === 0
-                ? "bg-primary text-primary-foreground border-primary"
-                : "bg-transparent text-muted-foreground border-border hover:border-primary/50",
-            )}
-            aria-pressed={filters.length === 0}
-          >
-            All
-          </button>
-          {PLANNED_TYPE_OPTIONS.map(({ value, label }) => {
-            const active = filters.includes(value);
-            return (
+            <div
+              className="flex flex-wrap items-center gap-1 mb-3"
+              role="group"
+              aria-label="Filter by interaction type"
+            >
               <button
-                key={value}
-                onClick={() => toggleFilter(value)}
+                onClick={clearFilters}
                 className={cn(
                   "px-2.5 py-1 text-[11px] uppercase tracking-wider rounded-md border transition-colors",
-                  active
+                  filters.length === 0
                     ? "bg-primary text-primary-foreground border-primary"
                     : "bg-transparent text-muted-foreground border-border hover:border-primary/50",
                 )}
-                aria-pressed={active}
+                aria-pressed={filters.length === 0}
               >
-                {label}
+                All
               </button>
-            );
-          })}
-        </div>
+              {PLANNED_TYPE_OPTIONS.map(({ value, label }) => {
+                const active = filters.includes(value);
+                return (
+                  <button
+                    key={value}
+                    onClick={() => toggleFilter(value)}
+                    className={cn(
+                      "px-2.5 py-1 text-[11px] uppercase tracking-wider rounded-md border transition-colors",
+                      active
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "bg-transparent text-muted-foreground border-border hover:border-primary/50",
+                    )}
+                    aria-pressed={active}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
 
-        {upcomingUnavailable ? (
-          <div className="flex flex-col items-center justify-center gap-3 py-10 text-center">
-            <div className="size-10 rounded-full bg-muted grid place-items-center">
-              <CalendarPlus className="size-5 text-muted-foreground" />
-            </div>
-            <div className="max-w-xs">
-              <p className="text-sm font-medium text-foreground">Your schedule didn't load</p>
-              <p className="text-xs text-muted-foreground mt-1">
-                The report and interaction counts above are still accurate.
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => void refetch()}
-              className="text-xs px-3 py-1.5 rounded-md border border-border hover:bg-accent/40 text-primary-ink"
-            >
-              Retry
-            </button>
-          </div>
-        ) : filteredUpcoming.length === 0 ? (
-          <div className="flex flex-col items-center justify-center gap-3 py-10 text-center">
-            <div className="size-10 rounded-full bg-muted grid place-items-center">
-              <CalendarPlus className="size-5 text-muted-foreground" />
-            </div>
-            <div className="max-w-xs">
-              <p className="text-sm font-medium text-foreground">
-                {isLoading ? "Loading your calendar…" : "Nothing scheduled"}
-              </p>
-              <p className="text-xs text-muted-foreground mt-1">
-                {isLoading
-                  ? "This may take a moment."
-                  : filters.length > 0
-                    ? `Nothing in the next ${rangeDays} days matches these filters.`
-                    : `No interactions or matches in the next ${rangeDays} days.`}
-              </p>
-            </div>
-            {filters.length > 0 ? (
-              <button
-                onClick={clearFilters}
-                className="text-xs px-3 py-1.5 rounded-md border border-border hover:bg-accent/40 text-primary-ink inline-flex items-center gap-1"
-              >
-                Clear filters
-              </button>
-            ) : (
-              <Link
-                to="/calendar"
-                search={{ gkId: "", new: false }}
-                className="text-xs px-3 py-1.5 rounded-md border border-border hover:bg-accent/40 text-primary-ink inline-flex items-center gap-1"
-              >
-                View calendar <ArrowUpRight className="size-3" />
-              </Link>
-            )}
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {UPCOMING_GROUP_ORDER.map((label) => {
-              const list = groupedUpcoming.get(label);
-              if (!list || list.length === 0) return null;
-              return (
-                <div key={label}>
-                  <div className="flex items-center justify-between px-1 mb-2">
-                    <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                      {label}
-                    </h3>
-                    <span className="text-[10px] tabular-nums text-muted-foreground">
-                      {list.length}
-                    </span>
-                  </div>
-                  <div className="divide-y divide-border rounded-lg border border-border overflow-hidden">
-                    {list.map((e) => (
-                      <div key={e.id} className="flex items-center gap-3 py-2.5 px-3">
-                        <Avatar initials={e.gkInitials ?? "—"} />
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-medium text-sm truncate">
-                              {e.gkName ?? "No goalkeeper linked"}
-                            </span>
-                            {e.gkStatus && <TierBadge tier={e.gkStatus as Tier} />}
-                            {e.gkFreeAgent && <Pill tone="warning">Free Agent</Pill>}
-                            {e.gkTierLevel && <TierLevelBadge level={e.gkTierLevel} />}
-                          </div>
-                          <div className="text-xs text-muted-foreground truncate">
-                            {e.gkClub
-                              ? `${e.gkClub}${e.gkLeague ? ` — ${e.gkLeague}` : ""}`
-                              : e.title}
-                          </div>
-                        </div>
-                        <div className="hidden md:block text-sm font-medium text-foreground/90 truncate max-w-[240px]">
-                          {e.plannedType ?? e.type}
-                        </div>
-                        <div className="text-right shrink-0">
-                          <div className="text-xs font-medium tabular-nums font-mono flex items-center gap-1 justify-end">
-                            <CalendarClock className="size-3 text-muted-foreground" />
-                            {formatUpcomingEventDateTime(e.date, e.startTime)}
-                          </div>
-                        </div>
-                        {canLog && (
-                          <button
-                            type="button"
-                            onClick={() => openLog(e.gkId, e.gkName)}
-                            aria-label={
-                              e.gkName ? `Log an interaction for ${e.gkName}` : "Log an interaction"
-                            }
-                            className="shrink-0 text-xs px-2.5 py-1.5 rounded-md border border-border hover:bg-accent/40 text-primary-ink inline-flex items-center gap-1"
-                          >
-                            <Plus className="size-3" /> Log
-                          </button>
-                        )}
-                      </div>
-                    ))}
-                  </div>
+            {upcomingUnavailable ? (
+              <div className="flex flex-col items-center justify-center gap-3 py-10 text-center">
+                <div className="size-10 rounded-full bg-muted grid place-items-center">
+                  <CalendarPlus className="size-5 text-muted-foreground" />
                 </div>
-              );
-            })}
-          </div>
-        )}
+                <div className="max-w-xs">
+                  <p className="text-sm font-medium text-foreground">Your schedule didn't load</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    The report and interaction counts above are still accurate.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void refetch()}
+                  className="text-xs px-3 py-1.5 rounded-md border border-border hover:bg-accent/40 text-primary-ink"
+                >
+                  Retry
+                </button>
+              </div>
+            ) : filteredUpcoming.length === 0 ? (
+              <div className="flex flex-col items-center justify-center gap-3 py-10 text-center">
+                <div className="size-10 rounded-full bg-muted grid place-items-center">
+                  <CalendarPlus className="size-5 text-muted-foreground" />
+                </div>
+                <div className="max-w-xs">
+                  <p className="text-sm font-medium text-foreground">
+                    {isLoading ? "Loading your calendar…" : "Nothing scheduled"}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {isLoading
+                      ? "This may take a moment."
+                      : filters.length > 0
+                        ? `Nothing in the next ${rangeDays} days matches these filters.`
+                        : `No interactions or matches in the next ${rangeDays} days.`}
+                  </p>
+                </div>
+                {filters.length > 0 ? (
+                  <button
+                    onClick={clearFilters}
+                    className="text-xs px-3 py-1.5 rounded-md border border-border hover:bg-accent/40 text-primary-ink inline-flex items-center gap-1"
+                  >
+                    Clear filters
+                  </button>
+                ) : (
+                  <Link
+                    to="/calendar"
+                    search={{ gkId: "", new: false }}
+                    className="text-xs px-3 py-1.5 rounded-md border border-border hover:bg-accent/40 text-primary-ink inline-flex items-center gap-1"
+                  >
+                    View calendar <ArrowUpRight className="size-3" />
+                  </Link>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {UPCOMING_GROUP_ORDER.map((label) => {
+                  const list = groupedUpcoming.get(label);
+                  if (!list || list.length === 0) return null;
+                  return (
+                    <div key={label}>
+                      <div className="flex items-center justify-between px-1 mb-2">
+                        <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                          {label}
+                        </h3>
+                        <span className="text-[10px] tabular-nums text-muted-foreground">
+                          {list.length}
+                        </span>
+                      </div>
+                      <div className="divide-y divide-border rounded-lg border border-border overflow-hidden">
+                        {list.map((e) => (
+                          <div key={e.id} className="flex items-center gap-3 py-2.5 px-3">
+                            <Avatar initials={e.gkInitials ?? "—"} />
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-medium text-sm truncate">
+                                  {e.gkName ?? "No goalkeeper linked"}
+                                </span>
+                                {e.gkStatus && <TierBadge tier={e.gkStatus as Tier} />}
+                                {e.gkFreeAgent && <Pill tone="warning">Free Agent</Pill>}
+                                {e.gkTierLevel && <TierLevelBadge level={e.gkTierLevel} />}
+                              </div>
+                              <div className="text-xs text-muted-foreground truncate">
+                                {e.gkClub
+                                  ? `${e.gkClub}${e.gkLeague ? ` — ${e.gkLeague}` : ""}`
+                                  : e.title}
+                              </div>
+                            </div>
+                            <div className="hidden md:block text-sm font-medium text-foreground/90 truncate max-w-[240px]">
+                              {e.plannedType ?? e.type}
+                            </div>
+                            <div className="text-right shrink-0">
+                              <div className="text-xs font-medium tabular-nums font-mono flex items-center gap-1 justify-end">
+                                <CalendarClock className="size-3 text-muted-foreground" />
+                                {formatUpcomingEventDateTime(e.date, e.startTime)}
+                              </div>
+                            </div>
+                            {canLog && (
+                              <button
+                                type="button"
+                                onClick={() => openLog(e.gkId, e.gkName)}
+                                aria-label={
+                                  e.gkName
+                                    ? `Log an interaction for ${e.gkName}`
+                                    : "Log an interaction"
+                                }
+                                className="shrink-0 text-xs px-2.5 py-1.5 rounded-md border border-border hover:bg-accent/40 text-primary-ink inline-flex items-center gap-1"
+                              >
+                                <Plus className="size-3" /> Log
+                              </button>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </BentoCell>
+        </BentoGrid>
       </Card>
 
       <WorkflowDialog

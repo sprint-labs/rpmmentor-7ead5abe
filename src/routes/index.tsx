@@ -36,6 +36,7 @@ import { getRosterSnapshot } from "@/lib/roster-snapshot.functions";
 import { listPlayers } from "@/lib/players.functions";
 import { goalkeeperByName } from "@/lib/roster/goalkeeper-profile";
 import { GoalkeeperDistribution, MIN_VISIBLE_BAR } from "@/components/goalkeeper-distribution";
+import { BentoCell, BentoGrid, bentoSpan } from "@/components/ui/bento-grid";
 import { wholePercentsSummingTo100 } from "@/lib/roster-snapshot";
 import { listCalendarEvents } from "@/lib/calendar.functions";
 import { listPlayerDutyOfCare } from "@/lib/duty-of-care.functions";
@@ -418,7 +419,12 @@ function Dashboard() {
   return (
     // `pt-2` is the half-line of air the header was missing: the greeting sat
     // hard against the app bar above it.
-    <div className="space-y-4 pt-2">
+    //
+    // Capped, because the tokens below buy width for a reason: unbounded, a
+    // one-sentence activity row is run across 827px on a 2560px monitor. The
+    // cap sits on the page rather than on the cells so all four bands — header,
+    // stats, bulletins and the grid — stay aligned with each other.
+    <div className="mx-auto w-full max-w-[1440px] space-y-4 pt-2">
       <PageHeader
         title={greeting}
         titleClassName="break-words text-2xl leading-tight min-[390px]:text-[1.625rem] sm:text-3xl"
@@ -556,9 +562,9 @@ function Dashboard() {
       <BulletinDashboardCard scope="team" />
 
       {/* Operational grid */}
-      <div className="grid grid-cols-12 gap-4">
+      <BentoGrid>
         {/* Duty of Care monitor */}
-        <div className="col-span-12 self-start command-panel p-4 sm:p-5 lg:col-span-4">
+        <BentoCell size="list" className="command-panel p-4 sm:p-5">
           <SectionTitle
             className="flex-col items-start gap-2 sm:flex-row sm:items-center sm:gap-3"
             action={
@@ -624,259 +630,263 @@ function Dashboard() {
               ))}
             </div>
           )}
-        </div>
+        </BentoCell>
+
+        {/* Tiers and tags, beside duty of care: the same bar-and-count idiom
+            over the same roster, so the two read as one pair rather than
+            bookending the grid. */}
+        <GoalkeeperDistribution roster={roster} pending={rosterPending} error={rosterError} />
 
         {/* Recent activity */}
-        <ErrorBoundary
-          fallback={(reset) => (
-            <div className="col-span-12 self-start lg:col-span-8 command-panel p-5">
-              <SectionTitle>Recent Activity</SectionTitle>
-              <div className="border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive flex items-start gap-2">
-                <AlertTriangle className="size-4 shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium">Recent activity didn't load</p>
-                  <p className="text-destructive/80">
-                    Something went wrong loading the latest activity.
-                  </p>
+        <BentoCell size="list">
+          <ErrorBoundary
+            fallback={(reset) => (
+              <div className="command-panel p-5">
+                <SectionTitle>Recent Activity</SectionTitle>
+                <div className="border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive flex items-start gap-2">
+                  <AlertTriangle className="size-4 shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium">Recent activity didn't load</p>
+                    <p className="text-destructive/80">
+                      Something went wrong loading the latest activity.
+                    </p>
+                  </div>
                 </div>
+                <button
+                  type="button"
+                  onClick={reset}
+                  className="mt-3 inline-flex h-8 items-center justify-center bg-destructive px-3 text-[10px] font-mono uppercase tracking-widest text-destructive-foreground hover:bg-destructive/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  Retry
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={reset}
-                className="mt-3 inline-flex h-8 items-center justify-center bg-destructive px-3 text-[10px] font-mono uppercase tracking-widest text-destructive-foreground hover:bg-destructive/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                Retry
-              </button>
-            </div>
-          )}
-        >
-          <div className="col-span-12 self-start lg:col-span-8 command-panel p-5">
-            <SectionTitle
-              action={
-                can("interactions.log") ? (
-                  <button
-                    type="button"
-                    onClick={() => setWorkflow("interaction")}
-                    className="text-[10px] font-mono uppercase tracking-widest text-primary-ink inline-flex items-center gap-1 hover:underline"
-                  >
-                    <Plus className="size-3" /> Log interaction
-                  </button>
-                ) : undefined
-              }
-            >
-              Recent Activity
-            </SectionTitle>
-
-            {/* Two feeds over one panel. A tablist rather than two links: this
-                swaps what the panel shows without leaving the dashboard, and
-                both feeds read caches the page has already loaded. */}
-            <div
-              role="tablist"
-              aria-label="Recent activity feed"
-              className="mb-4 inline-flex gap-1 rounded-md border border-border p-0.5"
-            >
-              {ACTIVITY_FEEDS.map((feed) => {
-                const selected = activityFeed === feed.id;
-                return (
-                  <button
-                    key={feed.id}
-                    type="button"
-                    role="tab"
-                    aria-selected={selected}
-                    onClick={() => setActivityFeed(feed.id)}
-                    className={`min-h-8 rounded px-2.5 text-[10px] font-mono uppercase tracking-widest transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
-                      selected
-                        ? "bg-accent text-foreground"
-                        : "text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    {feed.label}
-                  </button>
-                );
-              })}
-            </div>
-
-            <div className="space-y-3">
-              {activityFeed === "interactions" ? (
-                interactionsPending ? (
-                  <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground py-6 text-center">
-                    Loading interactions…
-                  </div>
-                ) : interactionsError ? (
-                  <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground py-6 text-center">
-                    Interactions didn't load
-                  </div>
-                ) : recentActivity.length === 0 ? (
-                  <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground py-6 text-center">
-                    No interactions logged recently
-                  </div>
-                ) : (
-                  recentActivity.map((a) => <ActivityRow key={a.id} entry={a} tone="bg-info" />)
-                )
-              ) : reportsLoading ? (
-                <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground py-6 text-center">
-                  Loading match reports…
-                </div>
-              ) : reportsError ? (
-                <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground py-6 text-center">
-                  Match reports didn't load
-                </div>
-              ) : recentReports.length === 0 ? (
-                <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground py-6 text-center">
-                  No match reports submitted recently
-                </div>
-              ) : (
-                recentReports.map((a) => <ActivityRow key={a.id} entry={a} tone="bg-primary" />)
-              )}
-            </div>
-          </div>
-        </ErrorBoundary>
-
-        {/* Calendar and the fixtures in it, as one cell. */}
-        <div className="col-span-12 grid gap-4 self-start lg:col-span-8 xl:grid-cols-2">
-          {/* Month calendar, kept at the width it had as a quarter-width card;
-              the wider cell goes to the fixtures list beside it rather than to
-              a stretched grid. */}
-          <CalendarMonthCard
-            className="self-start"
-            events={teamEvents}
-            interactions={loggedInteractions}
-            pending={calendarPending}
-            error={calendarError}
-            today={todayIso}
-          />
-
-          {/* Upcoming fixtures, beside the month they fall in. Both read the
-              same `["calendar-events"]` cache, so a date on the grid and a
-              row in this list can never disagree. */}
-          <div className="command-panel self-start p-5">
-            <SectionTitle
-              action={
-                <span className="inline-flex items-center gap-3">
-                  {can("calendar.manage") && (
-                    <Link
-                      to="/calendar"
-                      search={{ gkId: "", new: true }}
+            )}
+          >
+            <div className="command-panel p-5">
+              <SectionTitle
+                action={
+                  can("interactions.log") ? (
+                    <button
+                      type="button"
+                      onClick={() => setWorkflow("interaction")}
                       className="text-[10px] font-mono uppercase tracking-widest text-primary-ink inline-flex items-center gap-1 hover:underline"
                     >
-                      <Plus className="size-3" /> New event
-                    </Link>
-                  )}
+                      <Plus className="size-3" /> Log interaction
+                    </button>
+                  ) : undefined
+                }
+              >
+                Recent Activity
+              </SectionTitle>
+
+              {/* Two feeds over one panel. A tablist rather than two links: this
+                swaps what the panel shows without leaving the dashboard, and
+                both feeds read caches the page has already loaded. */}
+              <div
+                role="tablist"
+                aria-label="Recent activity feed"
+                className="mb-4 inline-flex gap-1 rounded-md border border-border p-0.5"
+              >
+                {ACTIVITY_FEEDS.map((feed) => {
+                  const selected = activityFeed === feed.id;
+                  return (
+                    <button
+                      key={feed.id}
+                      type="button"
+                      role="tab"
+                      aria-selected={selected}
+                      onClick={() => setActivityFeed(feed.id)}
+                      className={`min-h-8 rounded px-2.5 text-[10px] font-mono uppercase tracking-widest transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+                        selected
+                          ? "bg-accent text-foreground"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      {feed.label}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="space-y-3">
+                {activityFeed === "interactions" ? (
+                  interactionsPending ? (
+                    <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground py-6 text-center">
+                      Loading interactions…
+                    </div>
+                  ) : interactionsError ? (
+                    <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground py-6 text-center">
+                      Interactions didn't load
+                    </div>
+                  ) : recentActivity.length === 0 ? (
+                    <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground py-6 text-center">
+                      No interactions logged recently
+                    </div>
+                  ) : (
+                    recentActivity.map((a) => <ActivityRow key={a.id} entry={a} tone="bg-info" />)
+                  )
+                ) : reportsLoading ? (
+                  <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground py-6 text-center">
+                    Loading match reports…
+                  </div>
+                ) : reportsError ? (
+                  <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground py-6 text-center">
+                    Match reports didn't load
+                  </div>
+                ) : recentReports.length === 0 ? (
+                  <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground py-6 text-center">
+                    No match reports submitted recently
+                  </div>
+                ) : (
+                  recentReports.map((a) => <ActivityRow key={a.id} entry={a} tone="bg-primary" />)
+                )}
+              </div>
+            </div>
+          </ErrorBoundary>
+        </BentoCell>
+
+        {/* Month calendar. The one panel where extra width is actively
+            harmful: its day cells are aspect-square, so every 100px of width
+            buys ~85px of empty square. Capped rather than stretched. */}
+        <CalendarMonthCard
+          className={bentoSpan("matrix")}
+          events={teamEvents}
+          interactions={loggedInteractions}
+          pending={calendarPending}
+          error={calendarError}
+          today={todayIso}
+        />
+
+        {/* Upcoming fixtures, beside the month they fall in. Both read the
+            same `["calendar-events"]` cache, so a date on the grid and a
+            row in this list can never disagree. Wider than the calendar
+            because each row's third line concatenates type, goalkeeper and
+            location behind `truncate`, and narrowing it loses information. */}
+        <BentoCell size="detail" className="command-panel p-5">
+          <SectionTitle
+            action={
+              <span className="inline-flex items-center gap-3">
+                {can("calendar.manage") && (
                   <Link
-                    to="/insights/$metric"
-                    params={{ metric: "events" }}
-                    search={{ from: period.fromDate, to: period.toDate, level: "", tier: "" }}
-                    className="text-[10px] font-mono uppercase tracking-widest text-primary-ink inline-flex items-center gap-1"
+                    to="/calendar"
+                    search={{ gkId: "", new: true }}
+                    className="text-[10px] font-mono uppercase tracking-widest text-primary-ink inline-flex items-center gap-1 hover:underline"
                   >
-                    All events <ArrowUpRight className="size-3" />
+                    <Plus className="size-3" /> New event
                   </Link>
-                </span>
-              }
-            >
-              Upcoming Fixtures
-            </SectionTitle>
-            {/* An undisclosed cap on a list like this reads as "there are only
+                )}
+                <Link
+                  to="/insights/$metric"
+                  params={{ metric: "events" }}
+                  search={{ from: period.fromDate, to: period.toDate, level: "", tier: "" }}
+                  className="text-[10px] font-mono uppercase tracking-widest text-primary-ink inline-flex items-center gap-1"
+                >
+                  All events <ArrowUpRight className="size-3" />
+                </Link>
+              </span>
+            }
+          >
+            Upcoming Fixtures
+          </SectionTitle>
+          {/* An undisclosed cap on a list like this reads as "there are only
                 six". Live data regularly has several times that in the next week
                 alone, so the count says what is being withheld. */}
-            {!calendarPending && !calendarError && upcomingAll.length > upcoming.length ? (
-              <p className="-mt-2 mb-2 text-[10px] text-muted-foreground">
-                Showing the next {upcoming.length} of {upcomingAll.length} scheduled.
-              </p>
-            ) : null}
-            <div className="divide-y divide-border">
-              {calendarPending ? (
-                <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground py-6 text-center">
-                  Loading calendar…
+          {!calendarPending && !calendarError && upcomingAll.length > upcoming.length ? (
+            <p className="-mt-2 mb-2 text-[10px] text-muted-foreground">
+              Showing the next {upcoming.length} of {upcomingAll.length} scheduled.
+            </p>
+          ) : null}
+          <div className="divide-y divide-border">
+            {calendarPending ? (
+              <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground py-6 text-center">
+                Loading calendar…
+              </div>
+            ) : calendarError ? (
+              <div className="space-y-2 py-6 text-center">
+                <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
+                  Calendar didn't load
                 </div>
-              ) : calendarError ? (
-                <div className="space-y-2 py-6 text-center">
-                  <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
-                    Calendar didn't load
-                  </div>
+                <Link
+                  to="/calendar"
+                  search={{ gkId: "", new: false }}
+                  className="text-[10px] font-mono uppercase tracking-widest text-primary-ink hover:underline"
+                >
+                  Open calendar
+                </Link>
+              </div>
+            ) : upcoming.length === 0 ? (
+              <div className="space-y-2 py-6 text-center">
+                <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
+                  Nothing scheduled
+                </div>
+                <p className="text-[11px] text-muted-foreground px-2">
+                  This reads the shared team calendar. Schedule a visit or catch-up to fill it.
+                </p>
+                {can("calendar.manage") ? (
+                  <Link
+                    to="/calendar"
+                    search={{ gkId: "", new: true }}
+                    className="text-[10px] font-mono uppercase tracking-widest text-primary-ink hover:underline"
+                  >
+                    Schedule an event
+                  </Link>
+                ) : (
                   <Link
                     to="/calendar"
                     search={{ gkId: "", new: false }}
                     className="text-[10px] font-mono uppercase tracking-widest text-primary-ink hover:underline"
                   >
-                    Open calendar
+                    View calendar
                   </Link>
-                </div>
-              ) : upcoming.length === 0 ? (
-                <div className="space-y-2 py-6 text-center">
-                  <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
-                    Nothing scheduled
-                  </div>
-                  <p className="text-[11px] text-muted-foreground px-2">
-                    This reads the shared team calendar. Schedule a visit or catch-up to fill it.
-                  </p>
-                  {can("calendar.manage") ? (
-                    <Link
-                      to="/calendar"
-                      search={{ gkId: "", new: true }}
-                      className="text-[10px] font-mono uppercase tracking-widest text-primary-ink hover:underline"
-                    >
-                      Schedule an event
-                    </Link>
-                  ) : (
-                    <Link
-                      to="/calendar"
-                      search={{ gkId: "", new: false }}
-                      className="text-[10px] font-mono uppercase tracking-widest text-primary-ink hover:underline"
-                    >
-                      View calendar
-                    </Link>
-                  )}
-                </div>
-              ) : (
-                upcoming.map((e) => {
-                  // Resolved against the live roster, so an event for a
-                  // goalkeeper signed since the seed was captured still links to
-                  // their profile and still shows their real tier.
-                  const gk = e.goalkeeper_name
-                    ? goalkeeperByName(e.goalkeeper_name, rosterRows)
-                    : null;
-                  const content = (
-                    <>
-                      <div className="flex-1 min-w-0">
-                        <div className="text-[10px] font-mono text-primary-ink mb-1 uppercase tracking-widest">
-                          {formatRelative(e.event_date)}
-                          {e.start_time ? ` · ${e.start_time.slice(0, 5)}` : ""}
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-medium truncate">{e.title}</span>
-                          {gk ? <TierBadge tier={gk.tier} /> : null}
-                        </div>
-                        <div className="text-[10px] text-muted-foreground truncate">
-                          {e.event_type}
-                          {e.goalkeeper_name ? ` · ${e.goalkeeper_name}` : ""}
-                          {e.location ? ` · ${e.location}` : ""}
-                        </div>
+                )}
+              </div>
+            ) : (
+              upcoming.map((e) => {
+                // Resolved against the live roster, so an event for a
+                // goalkeeper signed since the seed was captured still links to
+                // their profile and still shows their real tier.
+                const gk = e.goalkeeper_name
+                  ? goalkeeperByName(e.goalkeeper_name, rosterRows)
+                  : null;
+                const content = (
+                  <>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[10px] font-mono text-primary-ink mb-1 uppercase tracking-widest">
+                        {formatRelative(e.event_date)}
+                        {e.start_time ? ` · ${e.start_time.slice(0, 5)}` : ""}
                       </div>
-                      <CalendarClock className="size-3.5 text-muted-foreground shrink-0" />
-                    </>
-                  );
-                  return gk ? (
-                    <Link
-                      key={e.id}
-                      to="/goalkeepers/$gkId"
-                      params={{ gkId: gk.id }}
-                      className="flex items-start gap-3 py-3 hover:bg-accent/30 -mx-2 px-2 transition-colors"
-                    >
-                      {content}
-                    </Link>
-                  ) : (
-                    <div key={e.id} className="flex items-start gap-3 py-3 -mx-2 px-2">
-                      {content}
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-medium truncate">{e.title}</span>
+                        {gk ? <TierBadge tier={gk.tier} /> : null}
+                      </div>
+                      <div className="text-[10px] text-muted-foreground truncate">
+                        {e.event_type}
+                        {e.goalkeeper_name ? ` · ${e.goalkeeper_name}` : ""}
+                        {e.location ? ` · ${e.location}` : ""}
+                      </div>
                     </div>
-                  );
-                })
-              )}
-            </div>
+                    <CalendarClock className="size-3.5 text-muted-foreground shrink-0" />
+                  </>
+                );
+                return gk ? (
+                  <Link
+                    key={e.id}
+                    to="/goalkeepers/$gkId"
+                    params={{ gkId: gk.id }}
+                    className="flex items-start gap-3 py-3 hover:bg-accent/30 -mx-2 px-2 transition-colors"
+                  >
+                    {content}
+                  </Link>
+                ) : (
+                  <div key={e.id} className="flex items-start gap-3 py-3 -mx-2 px-2">
+                    {content}
+                  </div>
+                );
+              })
+            )}
           </div>
-        </div>
-
-        <GoalkeeperDistribution roster={roster} pending={rosterPending} error={rosterError} />
-      </div>
+        </BentoCell>
+      </BentoGrid>
 
       <WorkflowDialog kind={workflow} onClose={() => setWorkflow(null)} />
     </div>

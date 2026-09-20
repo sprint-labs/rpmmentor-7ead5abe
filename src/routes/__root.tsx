@@ -6,6 +6,7 @@ import { Analytics } from "@vercel/analytics/react";
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { AppShell } from "@/components/app-shell";
+import { BootSplash, bootSplashCss, bootSplashHideScript } from "@/components/boot-splash";
 import { AuthProvider } from "@/lib/auth";
 import { NotificationsProvider } from "@/lib/notifications";
 import { ThemeProvider, themeInitScript } from "@/lib/theme";
@@ -72,6 +73,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       { rel: "stylesheet", href: "https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@500;600;700;800&family=Saira:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700;800&display=swap" },
       { rel: "stylesheet", href: appCss },
+      { rel: "preload", as: "image", href: "/gkhq-mark.png" },
       { rel: "icon", type: "image/png", href: "/favicon.png" },
       { rel: "apple-touch-icon", sizes: "180x180", href: "/apple-touch-icon.png" },
       { rel: "manifest", href: "/manifest.webmanifest" },
@@ -97,21 +99,6 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
   errorComponent: ErrorComponent,
 });
 
-const bootSplashCss = `
-#boot-splash{position:fixed;inset:0;z-index:2147483646;display:flex;align-items:center;justify-content:center;background:#0D0D0D;transition:opacity .35s ease-out;opacity:1;pointer-events:auto}
-#boot-splash[data-hide="1"]{opacity:0;pointer-events:none}
-#boot-splash .bs-wrap{display:flex;flex-direction:column;align-items:center;gap:18px}
-#boot-splash .bs-mark{width:64px;height:64px;border-radius:16px;background:linear-gradient(135deg,#12C400 0%,#0A7A00 100%);display:flex;align-items:center;justify-content:center;color:#0A0A0A;font-family:'Be Vietnam Pro',system-ui,sans-serif;font-weight:700;font-size:26px;letter-spacing:-.014em;box-shadow:0 10px 40px rgba(18,196,0,.25);animation:bs-pulse 1.6s ease-in-out infinite}
-#boot-splash .bs-bar{width:120px;height:2px;background:rgba(255,255,255,.08);border-radius:2px;overflow:hidden;position:relative}
-#boot-splash .bs-bar::after{content:"";position:absolute;top:0;left:0;height:100%;width:40%;background:linear-gradient(90deg,transparent,#12C400,transparent);animation:bs-slide 1.1s ease-in-out infinite}
-#boot-splash .bs-label{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10px;letter-spacing:.24em;text-transform:uppercase;color:rgba(255,255,255,.5)}
-@keyframes bs-pulse{0%,100%{transform:scale(1);box-shadow:0 10px 40px rgba(18,196,0,.25)}50%{transform:scale(1.05);box-shadow:0 14px 56px rgba(18,196,0,.45)}}
-@keyframes bs-slide{0%{left:-40%}100%{left:100%}}
-@media (prefers-reduced-motion:reduce){#boot-splash .bs-mark,#boot-splash .bs-bar::after{animation:none}}
-`;
-
-const bootSplashHideScript = `(()=>{const el=document.getElementById('boot-splash');if(!el)return;const hide=()=>{el.setAttribute('data-hide','1');setTimeout(()=>el.remove(),400)};if(document.readyState==='complete'){setTimeout(hide,150)}else{window.addEventListener('load',()=>setTimeout(hide,150),{once:true})}setTimeout(hide,4000)})();`;
-
 function RootShell({ children }: { children: ReactNode }) {
   return (
     <html lang="en" className="dark" data-theme="dark" suppressHydrationWarning>
@@ -123,13 +110,7 @@ function RootShell({ children }: { children: ReactNode }) {
       </head>
       <body>
         <a className="skip-link" href="#main-content">Skip to main content</a>
-        <div id="boot-splash" aria-hidden="true">
-          <div className="bs-wrap">
-            <div className="bs-mark">GK</div>
-            <div className="bs-bar" />
-            <div className="bs-label">Mentor Hub</div>
-          </div>
-        </div>
+        <BootSplash />
         {children}
         <ScriptOnce>{bootSplashHideScript}</ScriptOnce>
         <Scripts />

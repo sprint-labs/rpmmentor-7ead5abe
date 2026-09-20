@@ -22,6 +22,11 @@ interface HelpUpdatesLauncherProps {
   announcementsPending: boolean;
   announcementsError: boolean;
   introVisible?: boolean;
+  /**
+   * Whether this renders its own header button. False when the entry point
+   * lives elsewhere — the nav menu — and this only supplies the dialog.
+   */
+  showTrigger?: boolean;
   onOpenChange: (open: boolean) => void;
   onAskQuestion: () => void;
   onReportProblem: () => void;
@@ -36,6 +41,7 @@ export function HelpUpdatesLauncher({
   announcementsPending,
   announcementsError,
   introVisible = true,
+  showTrigger = true,
   onOpenChange,
   onAskQuestion,
   onReportProblem,
@@ -89,7 +95,7 @@ export function HelpUpdatesLauncher({
    * long enough to read, it is spent.
    */
   useEffect(() => {
-    if (!introVisible || !showIntro || open) return;
+    if (!showTrigger || !introVisible || !showIntro || open) return;
     const timer = window.setTimeout(() => {
       try {
         window.localStorage.setItem(HELP_UPDATES_HINT_STORAGE_KEY, "seen");
@@ -98,7 +104,7 @@ export function HelpUpdatesLauncher({
       }
     }, HELP_UPDATES_HINT_DWELL_MS);
     return () => window.clearTimeout(timer);
-  }, [introVisible, showIntro, open]);
+  }, [showTrigger, introVisible, showIntro, open]);
 
   function handleOpenChange(next: boolean) {
     if (next) rememberIntro();
@@ -115,34 +121,36 @@ export function HelpUpdatesLauncher({
   return (
     <div className="relative shrink-0">
       <DialogPrimitive.Root open={open} onOpenChange={handleOpenChange}>
-        <DialogPrimitive.Trigger asChild>
-          <button
-            type="button"
-            // "Help & updates", verbatim — the ampersand included. From `lg` up
-            // this button shows that text, and WCAG 2.5.3 (Label in Name) wants
-            // the visible label to appear in the accessible name so a speech
-            // user can say what they read. Spelling it "and" broke that match,
-            // which axe flags as a serious failure on the live page.
-            aria-label={
-              unreadCount > 0
-                ? `${open ? "Close" : "Open"} Help & updates, ${cappedUnread} new`
-                : `${open ? "Close" : "Open"} Help & updates`
-            }
-            aria-controls="help-updates-dialog"
-            className="relative inline-flex size-11 shrink-0 items-center justify-center gap-1.5 rounded-md border border-border text-xs font-semibold uppercase tracking-[0.06em] hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 md:size-9 lg:w-auto lg:px-3"
-          >
-            <LifeBuoy className="size-4" aria-hidden="true" />
-            <span className="hidden lg:inline">Help & updates</span>
-            {unreadCount > 0 && (
-              <span
-                className="absolute -right-1 -top-1 grid h-[18px] min-w-[18px] place-items-center rounded-full bg-primary px-1 font-mono text-[10px] font-semibold text-primary-foreground"
-                aria-hidden="true"
-              >
-                {cappedUnread}
-              </span>
-            )}
-          </button>
-        </DialogPrimitive.Trigger>
+        {showTrigger && (
+          <DialogPrimitive.Trigger asChild>
+            <button
+              type="button"
+              // "Help & updates", verbatim — the ampersand included. From `lg` up
+              // this button shows that text, and WCAG 2.5.3 (Label in Name) wants
+              // the visible label to appear in the accessible name so a speech
+              // user can say what they read. Spelling it "and" broke that match,
+              // which axe flags as a serious failure on the live page.
+              aria-label={
+                unreadCount > 0
+                  ? `${open ? "Close" : "Open"} Help & updates, ${cappedUnread} new`
+                  : `${open ? "Close" : "Open"} Help & updates`
+              }
+              aria-controls="help-updates-dialog"
+              className="relative inline-flex size-11 shrink-0 items-center justify-center gap-1.5 rounded-md border border-border text-xs font-semibold uppercase tracking-[0.06em] hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 md:size-9 lg:w-auto lg:px-3"
+            >
+              <LifeBuoy className="size-4" aria-hidden="true" />
+              <span className="hidden lg:inline">Help & updates</span>
+              {unreadCount > 0 && (
+                <span
+                  className="absolute -right-1 -top-1 grid h-[18px] min-w-[18px] place-items-center rounded-full bg-primary px-1 font-mono text-[10px] font-semibold text-primary-foreground"
+                  aria-hidden="true"
+                >
+                  {cappedUnread}
+                </span>
+              )}
+            </button>
+          </DialogPrimitive.Trigger>
+        )}
 
         <DialogPrimitive.Portal>
           <DialogPrimitive.Overlay className="fixed inset-0 z-40 bg-black/35 backdrop-blur-[1px] data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
@@ -294,7 +302,9 @@ export function HelpUpdatesLauncher({
         </DialogPrimitive.Portal>
       </DialogPrimitive.Root>
 
-      {introVisible && showIntro && !open && (
+      {/* The hint points at the trigger. With the entry point moved into the
+          nav menu there is nothing here to point at, so it stays away. */}
+      {showTrigger && introVisible && showIntro && !open && (
         <div
           role="status"
           className="fixed right-3 top-[4.25rem] z-30 w-[min(18rem,calc(100vw-1.5rem))] rounded-md border border-primary/40 bg-popover p-3 shadow-xl lg:absolute lg:right-0 lg:top-full lg:mt-2"
