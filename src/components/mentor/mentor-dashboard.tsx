@@ -2,17 +2,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import {
-  ArrowUpRight,
-  CalendarClock,
-  CalendarPlus,
-  ChevronDown,
-  ChevronRight,
-  FileText,
-  Video,
-  AlertTriangle,
-  Plus,
-} from "lucide-react";
+import { ArrowUpRight, CalendarClock, CalendarPlus, Plus } from "lucide-react";
 import { MentorPrimaryActions } from "./mentor-primary-actions";
 import { cn } from "@/lib/utils";
 import {
@@ -34,6 +24,7 @@ import {
 import { mentors } from "@/lib/mock-data";
 import type { Tier } from "@/lib/mock-data";
 import type { SessionUser } from "@/lib/auth";
+import { greetingFor } from "@/lib/greeting";
 import { logDashboardClick } from "@/lib/analytics.functions";
 import { mentorDashboardMetricCardLabels } from "./mentor-dashboard-cards";
 import { WorkflowDialog, type WorkflowKind } from "@/components/workflows";
@@ -48,28 +39,15 @@ import {
 } from "@/components/events/follow-up-status";
 import { formatDateOnly } from "@/lib/interactions/schema";
 import { BulletinDashboardCard } from "@/components/bulletins/dashboard-card";
+import { MentorMonthPanel } from "@/components/calendar/mentor-month-panel";
+import { listCalendarEvents } from "@/lib/calendar.functions";
+import { localDateIso } from "@/lib/calendar/month";
 
 import { lastNDaysPeriod } from "@/lib/dashboard-period";
 
 interface Props {
   user: SessionUser;
   mentorProfileId: string;
-}
-
-function formatEventDateTime(iso: string) {
-  const d = new Date(iso);
-  const day = d.getDate();
-  const suffix =
-    day % 10 === 1 && day !== 11
-      ? "st"
-      : day % 10 === 2 && day !== 12
-        ? "nd"
-        : day % 10 === 3 && day !== 13
-          ? "rd"
-          : "th";
-  const month = d.toLocaleString("en-GB", { month: "long" });
-  const time = d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
-  return `${month} ${day}${suffix} · ${time}`;
 }
 
 function formatRelativeTime(iso: string) {
@@ -133,6 +111,32 @@ export function MentorDashboard({ user }: Props) {
     return () => window.removeEventListener("rpm:report-submitted", handleReportSubmitted);
   }, [queryClient]);
 
+  // The shared team calendar, for the month panel. Same `["calendar-events"]`
+  // cache the calendar page and the manager home read, so this is one query
+  // rather than a mentor-specific endpoint. It is narrowed below to the events
+  // assigned to this mentor — the same predicate `getMentorDashboardStats`
+  // applies server-side for the upcoming list, so the grid and the list under
+  // it can never describe different diaries.
+  const fetchCalendarEvents = useServerFn(listCalendarEvents);
+  const {
+    data: teamEvents,
+    isPending: calendarPending,
+    isError: calendarError,
+  } = useQuery({
+    queryKey: ["calendar-events"],
+    queryFn: () => fetchCalendarEvents(),
+    enabled: canViewCalendar,
+    staleTime: 30_000,
+  });
+  const myEvents = useMemo(
+    () => (teamEvents ?? []).filter((e) => e.assigned_mentor_id === user.id),
+    [teamEvents, user.id],
+  );
+  // Local calendar date, not `toISOString()`. The ISO form is UTC, so between
+  // midnight and 01:00 BST it still reads as yesterday and today's square is
+  // ringed on the wrong day.
+  const todayIso = localDateIso(new Date());
+
   // Write-ups this mentor owes after an event that has already happened. Read
   // from the database, so a saved Match Report or Interaction clears it.
   const fetchFollowUps = useServerFn(listEventFollowUps);
@@ -158,14 +162,10 @@ export function MentorDashboard({ user }: Props) {
     [followUpData],
   );
 
-  const firstName = user.name.split(" ")[0];
   const upcoming = useMemo(() => data?.upcomingList ?? [], [data?.upcomingList]);
-  const outstanding = data?.outstandingItems ?? [];
-  const outstandingUnavailable = !isLoading && !isError && data?.outstandingAvailable === false;
   const upcomingUnavailable = !isLoading && !isError && data?.upcomingAvailable === false;
   const updatedAt = data?.lastUpdatedAt ? formatRelativeTime(data.lastUpdatedAt) : undefined;
   const period = `Last ${rangeDays} days`;
-  const [showOutstanding, setShowOutstanding] = useState(false);
 
   const filteredUpcoming = useMemo(() => {
     if (filters.length === 0) return upcoming;
@@ -226,20 +226,22 @@ export function MentorDashboard({ user }: Props) {
   return (
     <div className="space-y-6">
       <header>
+        {/* Greets by time of day. The subtitle names what is on the page
+            rather than stating a priority. */}
         <h1 className="text-3xl font-display font-bold uppercase tracking-[0.02em]">
-          Hello, {firstName}
+          {greetingFor(user.name)}
         </h1>
         <p className="text-xs uppercase tracking-wider text-muted-foreground mt-2">
           {isLoading
             ? "Loading your dashboard…"
             : isError
               ? "Your dashboard didn't load."
-              : "Match reports and interactions come first"}
+              : "Your match reports, interactions and what's coming up"}
         </p>
         {isError && (
           <button
             onClick={() => refetch()}
-            className="mt-2 text-xs uppercase tracking-wider text-primary underline"
+            className="mt-2 text-xs uppercase tracking-wider text-primary-ink underline"
           >
             Retry
           </button>
@@ -249,14 +251,21 @@ export function MentorDashboard({ user }: Props) {
       <MentorPrimaryActions
         canSubmitReport={canSubmitReport}
         canLogInteraction={canLog}
-        canViewCalendar={canViewCalendar}
         onLogReport={() => setWorkflow("report")}
         onLogInteraction={() => openLog()}
       />
 
       <BulletinDashboardCard scope="team" />
 
-      <section aria-label="Your activity">
+      <section aria-labelledby="mentor-activity-heading">
+        {/* A visible heading, not only an aria-label: without it the two
+            cards read as team totals, and they are this mentor's own. */}
+        <h2
+          id="mentor-activity-heading"
+          className="mb-2 text-[10px] font-mono uppercase tracking-[0.14em] text-muted-foreground"
+        >
+          Your activity · {period.toLowerCase()}
+        </h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Link
             to="/reports"
@@ -268,7 +277,7 @@ export function MentorDashboard({ user }: Props) {
             <StatCard
               label={mentorDashboardMetricCardLabels.matchReportsSubmitted}
               value={isLoading ? "…" : isError ? "—" : (data?.reportsLast14 ?? "—")}
-              hint={isError ? "Count unavailable" : `${period} · by match date`}
+              hint={isError ? "Count unavailable" : period}
               accent="primary"
               updatedAt={updatedAt}
             />
@@ -283,7 +292,7 @@ export function MentorDashboard({ user }: Props) {
             <StatCard
               label={mentorDashboardMetricCardLabels.interactionsLogged}
               value={isLoading ? "…" : isError ? "—" : (data?.interactionsLast14 ?? "—")}
-              hint={isError ? "Count unavailable" : `${period} · by interaction date`}
+              hint={isError ? "Count unavailable" : period}
               accent="info"
               updatedAt={updatedAt}
             />
@@ -291,142 +300,12 @@ export function MentorDashboard({ user }: Props) {
         </div>
       </section>
 
-      <Card className="p-4">
-        <button
-          onClick={() => setShowOutstanding((v) => !v)}
-          className="w-full flex items-center justify-between gap-3 text-left"
-          aria-expanded={showOutstanding}
-        >
-          <div className="flex items-center gap-2">
-            {showOutstanding ? (
-              <ChevronDown className="size-4 text-muted-foreground" />
-            ) : (
-              <ChevronRight className="size-4 text-muted-foreground" />
-            )}
-            <h2 className="text-sm font-semibold tracking-tight uppercase text-muted-foreground">
-              Outstanding Actions
-            </h2>
-            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium border bg-destructive/15 text-destructive border-destructive/40 tabular-nums font-mono">
-              {isLoading ? "…" : isError || outstandingUnavailable ? "—" : outstanding.length}
-            </span>
-          </div>
-          <span className="text-[11px] uppercase tracking-wider text-muted-foreground">
-            {showOutstanding ? "Hide" : "Show"}
-          </span>
-        </button>
-
-        {showOutstanding &&
-          (isLoading ? (
-            <div className="text-xs text-muted-foreground py-6 text-center">
-              Loading outstanding actions…
-            </div>
-          ) : isError || outstandingUnavailable ? (
-            <div className="text-xs text-muted-foreground py-6 text-center">
-              Outstanding actions didn't load — try again shortly.
-            </div>
-          ) : outstanding.length === 0 ? (
-            <div className="text-xs text-muted-foreground py-6 text-center">
-              All caught up — nothing overdue.
-            </div>
-          ) : (
-            <div className="mt-3 divide-y divide-border">
-              {outstanding.map((item) => {
-                const isReport = item.kind === "missing_report";
-                const Icon = isReport ? FileText : Video;
-                const toneClass = isReport
-                  ? "bg-destructive/15 text-destructive border-destructive/30"
-                  : "bg-warning/15 text-warning border-warning/30";
-                const actionHref = isReport ? "/reports" : "/media";
-                const actionSearch = isReport
-                  ? {
-                      from: "",
-                      to: "",
-                      coach: mentorName ?? "",
-                      mentorProfileId: effectiveMentorId,
-                      source: "outstanding-report",
-                    }
-                  : {
-                      from: "",
-                      to: "",
-                      uploaderName: mentorName ?? "",
-                      mentorProfileId: effectiveMentorId,
-                      kind: "video",
-                      source: "outstanding-clip",
-                    };
-                return (
-                  <div key={item.id} className="flex items-center gap-3 py-2.5">
-                    <Avatar initials={item.gkInitials ?? "—"} />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span
-                          className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium border ${toneClass}`}
-                        >
-                          <Icon className="size-3" />
-                          {isReport ? "Missing report" : "Missing clip"}
-                        </span>
-                        <span className="font-medium text-sm truncate">
-                          {item.gkName ?? "No goalkeeper linked"}
-                        </span>
-                        {item.gkStatus && <TierBadge tier={item.gkStatus as Tier} />}
-                        {item.gkTierLevel && <TierLevelBadge level={item.gkTierLevel} />}
-                        {item.daysOverdue > 0 && (
-                          <Pill tone="destructive">
-                            <AlertTriangle className="size-3 mr-0.5" />
-                            {item.daysOverdue}d overdue
-                          </Pill>
-                        )}
-                      </div>
-                      {item.gkClub && (
-                        <div className="text-xs text-muted-foreground truncate mt-0.5">
-                          {item.gkClub}
-                        </div>
-                      )}
-                      <div className="text-[10px] text-muted-foreground/80 mt-0.5 font-mono tabular-nums">
-                        Observed {formatEventDateTime(item.observationDate)} · Due{" "}
-                        {formatEventDateTime(item.dueDate)} ·{" "}
-                        {item.actionableByRole === "self"
-                          ? "Yours to complete"
-                          : `${item.actionableBy} to complete`}
-                      </div>
-                    </div>
-                    <Link
-                      to={actionHref}
-                      search={actionSearch}
-                      onClick={() =>
-                        trackClick(isReport ? "outstanding-report" : "outstanding-clip", actionHref)
-                      }
-                      className="shrink-0 text-xs px-2.5 py-1.5 rounded-md border border-border hover:bg-accent/40 text-primary inline-flex items-center gap-1"
-                    >
-                      {isReport ? "Submit report" : "Upload clip"}
-                      <ArrowUpRight className="size-3" />
-                    </Link>
-                    {canLog && (
-                      <button
-                        type="button"
-                        onClick={() => openLog(item.gkId, item.gkName)}
-                        aria-label={
-                          item.gkName
-                            ? `Log an interaction for ${item.gkName}`
-                            : "Log an interaction"
-                        }
-                        className="shrink-0 text-xs px-2.5 py-1.5 rounded-md border border-border hover:bg-accent/40 text-primary inline-flex items-center gap-1"
-                      >
-                        <Plus className="size-3" /> Log
-                      </button>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          ))}
-      </Card>
-
       {(isFollowUpsError || writeUpsDue.length > 0) && (
         <Card className="p-4">
           <div className="flex items-center justify-between gap-2">
             <SectionTitle>Write-ups Due</SectionTitle>
             {!isFollowUpsError && (
-              <Link to="/follow-ups" className="text-[11px] text-primary hover:underline">
+              <Link to="/follow-ups" className="text-[11px] text-primary-ink hover:underline">
                 See all follow-ups
               </Link>
             )}
@@ -437,7 +316,7 @@ export function MentorDashboard({ user }: Props) {
               <button
                 type="button"
                 onClick={() => void refetchFollowUps()}
-                className="mt-2 uppercase tracking-wider text-primary underline"
+                className="mt-2 uppercase tracking-wider text-primary-ink underline"
               >
                 Retry
               </button>
@@ -492,6 +371,18 @@ export function MentorDashboard({ user }: Props) {
       <Card className="p-4">
         <SectionTitle>Upcoming Interactions and Matches</SectionTitle>
 
+        {/* The month this mentor is working in, moved off the button
+            stack above and on to the card that already answers "what is
+            coming up". The list below it stays as the detail view. */}
+        {canViewCalendar && (
+          <MentorMonthPanel
+            events={myEvents}
+            pending={calendarPending}
+            error={calendarError}
+            today={todayIso}
+          />
+        )}
+
         <div className="flex items-center justify-between gap-3 mb-3">
           <span className="text-xs text-muted-foreground">
             {isLoading ? "Loading…" : `Next ${rangeDays} days`}
@@ -502,7 +393,6 @@ export function MentorDashboard({ user }: Props) {
                 key={d}
                 role="tab"
                 aria-selected={rangeDays === d}
-                aria-label={`Next ${d} days`}
                 onClick={() => setRangeDays(d)}
                 className={cn(
                   "px-2.5 py-1 text-[11px] uppercase tracking-wider rounded-md border transition-colors",
@@ -511,7 +401,11 @@ export function MentorDashboard({ user }: Props) {
                     : "bg-transparent text-muted-foreground border-border hover:border-primary/50",
                 )}
               >
-                {d}d
+                {/* Named by its own content rather than an aria-label. The
+                    label read "Next 7 days" while the tab read "7d", so the
+                    visible text was not part of the accessible name and a
+                    speech user could not ask for what they could see. */}
+                {d}d<span className="sr-only"> — next {d} days</span>
               </button>
             ))}
           </div>
@@ -568,7 +462,7 @@ export function MentorDashboard({ user }: Props) {
             <button
               type="button"
               onClick={() => void refetch()}
-              className="text-xs px-3 py-1.5 rounded-md border border-border hover:bg-accent/40 text-primary"
+              className="text-xs px-3 py-1.5 rounded-md border border-border hover:bg-accent/40 text-primary-ink"
             >
               Retry
             </button>
@@ -593,7 +487,7 @@ export function MentorDashboard({ user }: Props) {
             {filters.length > 0 ? (
               <button
                 onClick={clearFilters}
-                className="text-xs px-3 py-1.5 rounded-md border border-border hover:bg-accent/40 text-primary inline-flex items-center gap-1"
+                className="text-xs px-3 py-1.5 rounded-md border border-border hover:bg-accent/40 text-primary-ink inline-flex items-center gap-1"
               >
                 Clear filters
               </button>
@@ -601,7 +495,7 @@ export function MentorDashboard({ user }: Props) {
               <Link
                 to="/calendar"
                 search={{ gkId: "", new: false }}
-                className="text-xs px-3 py-1.5 rounded-md border border-border hover:bg-accent/40 text-primary inline-flex items-center gap-1"
+                className="text-xs px-3 py-1.5 rounded-md border border-border hover:bg-accent/40 text-primary-ink inline-flex items-center gap-1"
               >
                 View calendar <ArrowUpRight className="size-3" />
               </Link>
@@ -618,7 +512,7 @@ export function MentorDashboard({ user }: Props) {
                     <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                       {label}
                     </h3>
-                    <span className="text-[10px] tabular-nums text-muted-foreground/70">
+                    <span className="text-[10px] tabular-nums text-muted-foreground">
                       {list.length}
                     </span>
                   </div>
@@ -657,7 +551,7 @@ export function MentorDashboard({ user }: Props) {
                             aria-label={
                               e.gkName ? `Log an interaction for ${e.gkName}` : "Log an interaction"
                             }
-                            className="shrink-0 text-xs px-2.5 py-1.5 rounded-md border border-border hover:bg-accent/40 text-primary inline-flex items-center gap-1"
+                            className="shrink-0 text-xs px-2.5 py-1.5 rounded-md border border-border hover:bg-accent/40 text-primary-ink inline-flex items-center gap-1"
                           >
                             <Plus className="size-3" /> Log
                           </button>

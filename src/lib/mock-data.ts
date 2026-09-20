@@ -106,7 +106,8 @@ export interface Goalkeeper {
   mentorId: string;
   club: string;
   league: string;
-  age: number;
+  /** Null when no date of birth is recorded anywhere for this goalkeeper. */
+  age: number | null;
   dob: string;
   nationality: string;
   contractUntil: string;

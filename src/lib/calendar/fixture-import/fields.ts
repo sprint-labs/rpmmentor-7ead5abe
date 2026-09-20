@@ -148,13 +148,30 @@ export function buildFixtureDuplicateKey(input: {
 /** Marker embedded in notes so re-imports can recognise prior fixture rows. */
 export const FIXTURE_IMPORT_KEY_PREFIX = "fixture-key:";
 
-export function embedFixtureDuplicateKey(notes: string, duplicateKey: string): string {
-  const marker = `${FIXTURE_IMPORT_KEY_PREFIX}${duplicateKey}`;
-  const cleaned = notes
+/**
+ * The notes with the import marker taken out.
+ *
+ * The marker is machinery: `extractFixtureDuplicateKey` reads it so a re-import
+ * recognises rows it created before, which is the only thing standing between a
+ * second import and a duplicate of every fixture. It therefore has to stay in
+ * the stored notes — but it is a line of opaque identifiers in the middle of a
+ * human's notes, and nobody reading the calendar needs to see it.
+ *
+ * Display surfaces call this. The notes editor deliberately does not: what a
+ * manager edits there is saved back verbatim, so hiding the marker from the
+ * textarea would drop it on the first edit and silently break dedupe.
+ */
+export function stripFixtureDuplicateKey(notes: string): string {
+  return notes
     .split("\n")
     .filter((line) => !line.trim().toLowerCase().startsWith(FIXTURE_IMPORT_KEY_PREFIX))
     .join("\n")
     .trim();
+}
+
+export function embedFixtureDuplicateKey(notes: string, duplicateKey: string): string {
+  const marker = `${FIXTURE_IMPORT_KEY_PREFIX}${duplicateKey}`;
+  const cleaned = stripFixtureDuplicateKey(notes);
   return cleaned ? `${cleaned}\n\n${marker}` : marker;
 }
 

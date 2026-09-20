@@ -153,7 +153,7 @@ function UsersAndRolesPage() {
                         matchDate: "",
                         opponent: "",
                       }}
-                      className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-md px-1.5 py-1 text-sm font-semibold tabular-nums text-primary hover:bg-accent/40 hover:underline"
+                      className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-md px-1.5 py-1 text-sm font-semibold tabular-nums text-primary-ink hover:bg-accent/40 hover:underline"
                       title={`See all match reports ${fullName} submitted`}
                     >
                       <FileText className="size-3.5 shrink-0" />
@@ -177,7 +177,7 @@ function UsersAndRolesPage() {
                         date: "",
                         eventId: "",
                       }}
-                      className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-md px-1.5 py-1 text-sm font-semibold tabular-nums text-primary hover:bg-accent/40 hover:underline"
+                      className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-md px-1.5 py-1 text-sm font-semibold tabular-nums text-primary-ink hover:bg-accent/40 hover:underline"
                       title={`See all interactions ${fullName} logged`}
                     >
                       <MessageSquare className="size-3.5 shrink-0" />

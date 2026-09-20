@@ -72,7 +72,6 @@ const NAV: NavItem[] = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, exact: true, perm: "goalkeepers.view" },
   { to: "/bulletins", label: "Bulletin Board", icon: Columns3, perm: "bulletins.view" },
   { to: "/goalkeepers", label: "Goalkeepers", icon: Users, perm: "goalkeepers.view" },
-  { to: "/system/players", label: "Player Records", icon: Database, perm: "players.edit_club" },
   { to: "/users", label: "Team Members", icon: UserCog, perm: "mentors.view" },
   {
     to: "/interactions",
@@ -122,6 +121,37 @@ export function AppShell() {
   const menuDialogRef = useRef<HTMLElement>(null);
   const wasMenuOpenRef = useRef(false);
   const notif = useNotifications();
+
+  /**
+   * Dismiss the notifications panel by clicking away from it, or with Escape.
+   *
+   * This used to be a `fixed inset-0` backdrop rendered inside the panel, which
+   * never covered the page: the header it sits in carries `backdrop-blur`, and
+   * a backdrop filter makes an element the containing block for its fixed-
+   * position descendants. The backdrop was therefore sized to the header, so
+   * every click below the top bar missed it and the only way out was the bell
+   * itself. Listening on the document instead is independent of any ancestor's
+   * stacking or filters. `bellRef` wraps the trigger and the panel together, so
+   * a click on either still counts as inside.
+   */
+  useEffect(() => {
+    if (!bellOpen) return;
+    const onPointerDown = (event: MouseEvent | TouchEvent) => {
+      if (!bellRef.current?.contains(event.target as Node)) setBellOpen(false);
+    };
+    // `KeyboardEvent` is React's in this file, so name the DOM one explicitly.
+    const onKeyDown = (event: globalThis.KeyboardEvent) => {
+      if (event.key === "Escape") setBellOpen(false);
+    };
+    document.addEventListener("mousedown", onPointerDown);
+    document.addEventListener("touchstart", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+      document.removeEventListener("touchstart", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [bellOpen]);
 
   /**
    * The durable inbox. Available to every role that can see the calendar, not
@@ -400,11 +430,19 @@ export function AppShell() {
         <header className="h-16 md:h-14 flex items-center gap-1.5 sm:gap-2 md:gap-3 px-3 sm:px-4 md:px-6 border-b border-border bg-sidebar/95 backdrop-blur sticky top-0 z-10">
           <Link
             to="/"
-            aria-label="Mentor Hub"
+            // "GKHQ Mentor Hub", not "Mentor Hub": the wordmark beside the text
+            // is visible content too (its alt reads "GKHQ"), and WCAG 2.5.3
+            // wants everything visible to appear in the accessible name. The
+            // shorter label left "GKHQ" out of it.
+            aria-label="GKHQ Mentor Hub"
             className="size-11 md:w-auto md:h-auto flex items-center justify-center md:justify-start gap-2.5 shrink-0 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           >
             <GkhqMark className="size-9 shrink-0" />
-            <GkhqWordmark className="hidden h-5 w-auto shrink-0 sm:block" alt="GKHQ" />
+            <GkhqWordmark
+              wrapperClassName="hidden shrink-0 sm:inline-flex"
+              className="h-5 w-auto"
+              alt="GKHQ"
+            />
             <span
               className="hidden font-medium tracking-tight text-muted-foreground md:inline"
               aria-hidden="true"
@@ -416,7 +454,7 @@ export function AppShell() {
 
           {user.actualRole === "super_admin" || user.actualRole === "mentor_manager" ? (
             <div
-              className="hidden md:inline-flex items-center gap-1.5 h-7 pl-2 pr-1 rounded-md bg-primary/10 border border-primary/30 text-primary text-[10px] font-medium uppercase tracking-wider"
+              className="hidden md:inline-flex items-center gap-1.5 h-7 pl-2 pr-1 rounded-md border border-primary/30 text-primary-ink text-[10px] font-medium uppercase tracking-wider"
               title="Interface only — server permissions are unchanged. This preview does not grant or restrict backend access."
             >
               <ShieldCheck className="size-3" />
@@ -432,7 +470,7 @@ export function AppShell() {
                 id="view-as-role"
                 value={user.role}
                 onChange={(e) => setViewAsRole(e.target.value as Role)}
-                className="h-6 bg-transparent text-primary text-[10px] font-medium uppercase tracking-wider focus:outline-none cursor-pointer"
+                className="h-6 bg-transparent text-primary-ink text-[10px] font-medium uppercase tracking-wider focus:outline-none cursor-pointer"
               >
                 {user.actualRole === "super_admin" ? (
                   <>
@@ -464,7 +502,7 @@ export function AppShell() {
               )}
             </div>
           ) : (
-            <div className="hidden md:inline-flex items-center gap-1.5 h-7 px-2 rounded-md bg-primary/10 border border-primary/30 text-primary text-[10px] font-medium uppercase tracking-wider">
+            <div className="hidden md:inline-flex items-center gap-1.5 h-7 px-2 rounded-md border border-primary/30 text-primary-ink text-[10px] font-medium uppercase tracking-wider">
               <ShieldCheck className="size-3" />
               {ROLE_LABEL[user.role]}
             </div>
@@ -500,7 +538,6 @@ export function AppShell() {
               </button>
               {bellOpen && (
                 <>
-                  <div className="fixed inset-0 z-20" onClick={() => setBellOpen(false)} />
                   <div
                     id="duty-notifications"
                     role="region"
@@ -625,7 +662,7 @@ export function AppShell() {
                                   )}
                                   <button
                                     type="button"
-                                    className="mt-1 text-[11px] text-primary hover:underline"
+                                    className="mt-1 text-[11px] text-primary-ink hover:underline"
                                     onClick={() => void markAnnouncementAsRead(a.id)}
                                   >
                                     Dismiss
@@ -739,7 +776,7 @@ export function AppShell() {
                         <Link
                           to="/alerts"
                           onClick={() => setBellOpen(false)}
-                          className="block px-3 py-2 border-t border-border text-center text-xs text-primary hover:bg-accent/40"
+                          className="block px-3 py-2 border-t border-border text-center text-xs text-primary-ink hover:bg-accent/40"
                         >
                           Open alerts & email settings →
                         </Link>
@@ -749,7 +786,7 @@ export function AppShell() {
                       <Link
                         to="/follow-ups"
                         onClick={() => setBellOpen(false)}
-                        className="block px-3 py-2 border-t border-border text-center text-xs text-primary hover:bg-accent/40"
+                        className="block px-3 py-2 border-t border-border text-center text-xs text-primary-ink hover:bg-accent/40"
                       >
                         Open follow-ups →
                       </Link>

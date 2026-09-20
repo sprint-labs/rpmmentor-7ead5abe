@@ -42,6 +42,10 @@
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
   --color-primary-ink: var(--primary-ink);
+  /* Display grade: large bold numerals only. See the theme-contrast test. */
+  --color-primary-display: var(--primary-display);
+  --color-warning-display: var(--warning-display);
+  --color-info-display: var(--info-display);
   --color-primary-fill: var(--primary-fill);
   --color-primary-line: var(--primary-line);
   --color-secondary: var(--secondary);
@@ -70,6 +74,11 @@
   --color-warning-line: var(--warning-line);
 
   /* Tags — category and classification, never a state */
+  /* Calendar event types. Match day is the one hue the semantic set had no
+     room for: green, amber and red already carry duty-of-care meaning on
+     the same screens, and blue is taken by interactions. */
+  --color-event-match: var(--event-match);
+
   --color-info: var(--info);
   --color-info-foreground: var(--info-foreground);
   --color-info-fill: var(--info-fill);
@@ -181,6 +190,9 @@
   --primary-foreground: #0a0a0a;
   --primary-hover: var(--gk-green-deep);
   --primary-press: #086200;
+  --primary-display: #0fa400;
+  --warning-display: #bd7c00;
+  --info-display: #0d8fe0;
   --primary-ink: var(--gk-green-deep);
   --primary-fill: rgba(18, 196, 0, 0.14);
   --primary-line: rgba(18, 196, 0, 0.38);
@@ -206,6 +218,8 @@
   --destructive-fill: #fdefee;
   --destructive-line: #f2d2cf;
   --destructive-foreground: #ffffff;
+  --event-match: #7c3aed;
+
   --info: #0077b6;
   --info-fill: #e8f1fc;
   --info-line: #cfe2f7;
@@ -218,11 +232,11 @@
      tier, the more contact it demands. Tier 4 is neutral — no formal duty. */
   --tier-1: #0a7a00;
   --tier-2: #3e7d57;
-  --tier-3: #5c7a63;
+  --tier-3: #8a5b12;
   --tier-4: #6b756b;
 
   --rating-elite: #0a7a00;
-  --rating-strong: #4e8c00;
+  --rating-strong: #477d00;
   --rating-average: #8a5b12;
   --rating-developing: #a4430a;
   --rating-poor: #b02219;
@@ -304,6 +318,9 @@
   --primary-foreground: #0a0a0a;
   --primary-hover: var(--gk-green-bright);
   --primary-press: var(--gk-green-press);
+  --primary-display: var(--gk-green);
+  --warning-display: var(--warning);
+  --info-display: var(--info);
   --primary-ink: var(--gk-green);
   --primary-fill: rgba(18, 196, 0, 0.13);
   --primary-line: rgba(18, 196, 0, 0.32);
@@ -323,10 +340,17 @@
   --warning-fill: rgba(240, 180, 41, 0.11);
   --warning-line: rgba(240, 180, 41, 0.26);
   --warning-foreground: #0a0a0a;
-  --destructive: #ff1105;
-  --destructive-fill: rgba(255, 17, 5, 0.13);
-  --destructive-line: rgba(255, 17, 5, 0.32);
+  /* #FF1105 reads at only 4.33:1 on the card, so every "3 overdue" chip and
+     error line set in it failed AA while looking perfectly urgent. Lightened
+     until it clears 4.5:1 as text even on its own 15% fill (4.57:1), and
+     5.54:1 on the plain card. Solid `bg-destructive` only gains contrast
+     against its near-black foreground. */
+  --destructive: #ff5a4f;
+  --destructive-fill: rgba(255, 90, 79, 0.13);
+  --destructive-line: rgba(255, 90, 79, 0.32);
   --destructive-foreground: #0d0d0d;
+  --event-match: #b388ff;
+
   --info: #238aff;
   --info-fill: rgba(35, 138, 255, 0.12);
   --info-line: rgba(35, 138, 255, 0.3);
@@ -337,14 +361,14 @@
 
   --tier-1: #12c400;
   --tier-2: #4fb86e;
-  --tier-3: #6e9a78;
+  --tier-3: #f0b429;
   --tier-4: #8a968a;
 
   --rating-elite: #12c400;
   --rating-strong: #8acf2e;
   --rating-average: #f0b429;
   --rating-developing: #e8791a;
-  --rating-poor: #ff1105;
+  --rating-poor: #ff5a4f;
   --rating-none: #8a968a;
   --rating-ink: #0a0a0a;
 
@@ -415,6 +439,9 @@
   --primary-hover: var(--gk-green-deep);
   --primary-press: var(--gk-green-deep);
   --primary-ink: var(--gk-green-deep);
+  --primary-display: var(--gk-green-deep);
+  --warning-display: var(--warning);
+  --info-display: var(--info);
   --primary-fill: #e8f5e4;
   --primary-line: #a9d69c;
   --ring: var(--gk-green-deep);
@@ -447,7 +474,7 @@
 
   --tier-1: #0a7a00;
   --tier-2: #2f6448;
-  --tier-3: #4d6552;
+  --tier-3: #7a5200;
   --tier-4: #55554f;
 
   --rating-elite: #0a7a00;
@@ -513,6 +540,9 @@
     --primary: var(--gk-green-deep);
     --primary-foreground: #ffffff;
     --primary-ink: var(--gk-green-deep);
+    --primary-display: var(--gk-green-deep);
+    --warning-display: var(--warning);
+    --info-display: var(--info);
     --primary-fill: #e8f5e4;
     --primary-line: #a9d69c;
     --success: #0a7a00;

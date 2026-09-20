@@ -184,7 +184,7 @@ export function BulletinBoardSelector({
                   className={cn(
                     "grid size-8 shrink-0 place-items-center rounded-md border",
                     selected
-                      ? "border-primary/40 bg-primary/15 text-primary"
+                      ? "border-primary/40 bg-primary/15 text-primary-ink"
                       : "border-border bg-background text-muted-foreground",
                   )}
                 >

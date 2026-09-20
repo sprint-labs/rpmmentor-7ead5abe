@@ -3,6 +3,7 @@ import {
   buildRosterSnapshot,
   sharePercent,
   UNASSIGNED_TIER_LABEL,
+  wholePercentsSummingTo100,
   type RosterCategoryCount,
 } from "./roster-snapshot";
 
@@ -165,5 +166,65 @@ describe("sharePercent", () => {
     expect(sharePercent(32, 116)).toBe(27.6);
     expect(sharePercent(8, 116)).toBe(6.9);
     expect(sharePercent(1, 116)).toBe(0.9);
+  });
+});
+
+describe("whole percentages that actually add up", () => {
+  it("sums to 100 on the live roster's real split", () => {
+    // 32 / 36 / 31 / 15 / 2 out of 116. Rounding each on its own gives
+    // 28 + 31 + 27 + 13 + 2 = 101%, which a panel calling itself a
+    // distribution cannot show.
+    const percents = wholePercentsSummingTo100([32, 36, 31, 15, 2]);
+
+    expect(percents.reduce((sum, n) => sum + n, 0)).toBe(100);
+  });
+
+  it("keeps every row within a point of its true share", () => {
+    const counts = [32, 36, 31, 15, 2];
+    const total = counts.reduce((sum, n) => sum + n, 0);
+    const percents = wholePercentsSummingTo100(counts);
+
+    percents.forEach((percent, index) => {
+      expect(Math.abs(percent - (counts[index] / total) * 100)).toBeLessThan(1);
+    });
+  });
+
+  it.each([
+    [[1, 1, 1]],
+    [[2, 2, 2, 2, 2, 2]],
+    [[1, 1, 1, 1, 1, 1, 1]],
+    [[10, 20, 30, 40]],
+    [[1, 0, 0, 0, 115]],
+    [[58, 58]],
+  ])("sums to 100 for %j", (counts) => {
+    expect(wholePercentsSummingTo100(counts).reduce((sum, n) => sum + n, 0)).toBe(100);
+  });
+
+  it("gives an all-zero roster all zeroes rather than dividing by nothing", () => {
+    expect(wholePercentsSummingTo100([0, 0, 0])).toEqual([0, 0, 0]);
+    expect(wholePercentsSummingTo100([])).toEqual([]);
+  });
+
+  it("never hands a point to a row that has nobody in it", () => {
+    // An empty tier showing 1% would be worse than the rounding it fixes.
+    const percents = wholePercentsSummingTo100([115, 1, 0, 0, 0]);
+
+    expect(percents[2]).toBe(0);
+    expect(percents[3]).toBe(0);
+    expect(percents[4]).toBe(0);
+    expect(percents.reduce((sum, n) => sum + n, 0)).toBe(100);
+  });
+
+  it("makes the snapshot's own tier rows sum to 100", () => {
+    const snapshot = buildRosterSnapshot([
+      ...Array.from({ length: 32 }, () => ({ tier: "Tier 1" })),
+      ...Array.from({ length: 36 }, () => ({ tier: "Tier 2" })),
+      ...Array.from({ length: 31 }, () => ({ tier: "Tier 3" })),
+      ...Array.from({ length: 15 }, () => ({ tier: "Tier 4" })),
+      ...Array.from({ length: 2 }, () => ({ tier: null })),
+    ]);
+
+    expect(snapshot.total).toBe(116);
+    expect(snapshot.tiers.reduce((sum, row) => sum + row.percent, 0)).toBe(100);
   });
 });

@@ -23,6 +23,49 @@ export type IssueCode =
   | "age_dob_mismatch"
   | "missing_profile_image";
 
+/**
+ * The checks that need a column `public.players` does not have.
+ *
+ * Date of birth, age, height, shirt number, preferred foot and portrait are
+ * quarantined in `roster/seed-presentation.ts`: the live roster carries them
+ * from the seed snapshot, so a goalkeeper signed since that snapshot has none
+ * of them. Running these against the live roster would flag most of the roster
+ * for "missing date of birth" — true, and useless, because there is no field
+ * for anyone to go and fill in. They are reported as one aggregate count
+ * instead. Delete this split once the columns exist.
+ */
+export const NOT_CAPTURED_CODES = [
+  "missing_dob",
+  "age_dob_mismatch",
+  "missing_profile_image",
+] as const satisfies readonly IssueCode[];
+
+/** The six fields behind `NOT_CAPTURED_CODES`, in the order the page lists them. */
+export const NOT_CAPTURED_FIELDS = [
+  "date of birth",
+  "age",
+  "height",
+  "shirt number",
+  "preferred foot",
+  "portrait",
+] as const;
+
+const NOT_CAPTURED: ReadonlySet<IssueCode> = new Set(NOT_CAPTURED_CODES);
+
+/** True for a check `public.players` can answer on its own today. */
+export function isDatabaseBacked(code: IssueCode): boolean {
+  return !NOT_CAPTURED.has(code);
+}
+
+export interface AuditOptions {
+  /**
+   * Drop `NOT_CAPTURED_CODES` from the result. The live roster audit sets this,
+   * so the page reports one "not captured in the database yet" count rather
+   * than the same unfixable issue against every goalkeeper.
+   */
+  databaseBackedOnly?: boolean;
+}
+
 export interface RosterIssue {
   code: IssueCode;
   severity: IssueSeverity;
@@ -51,27 +94,80 @@ const MONTHS: Record<string, number> = {
   december: 11,
 };
 
-/** Parse "June 2027" → Date at month end, or null. */
+/**
+ * A local `Date` for a calendar day, or null when the parts are not a real one.
+ * `new Date(2027, 1, 31)` silently becomes 3 March, so the round trip is
+ * checked rather than trusted — a nonsense date should fail the check, not
+ * quietly report the wrong month.
+ */
+function calendarDate(year: number, monthIndex: number, day: number): Date | null {
+  const date = new Date(year, monthIndex, day);
+  const survived =
+    date.getFullYear() === year && date.getMonth() === monthIndex && date.getDate() === day;
+  return survived ? date : null;
+}
+
+/** Day 0 of the next month is the last day of this one. */
+function lastDayOfMonth(year: number, monthIndex: number): number {
+  return new Date(year, monthIndex + 1, 0).getDate();
+}
+
+/**
+ * Parse a contract end date, or null when it cannot be read.
+ *
+ * Two forms reach this. `Goalkeeper.contractUntil` is ISO, because `contractISO`
+ * converts the stored value on the way into the view model, while
+ * `players.contract_until` and the club-corrections form both still hold the
+ * "June 2027" month-and-year form. Reading both means the check gives the same
+ * answer wherever the value came from.
+ */
 export function parseContractDate(input: string | undefined | null): Date | null {
-  if (!input) return null;
-  const m = input.trim().match(/^([A-Za-z]+)\s+(\d{4})$/);
-  if (!m) return null;
-  const month = MONTHS[m[1].toLowerCase()];
-  const year = Number(m[2]);
+  const raw = input?.trim();
+  if (!raw) return null;
+
+  const iso = raw.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if (iso) {
+    const year = Number(iso[1]);
+    const monthIndex = Number(iso[2]) - 1;
+    const day = Number(iso[3]);
+    if (monthIndex < 0 || monthIndex > 11 || day < 1 || day > 31) return null;
+    // A contract is month-granular, and `contractISO` writes day 30 for every
+    // month — so "February 2027" arrives here as `2027-02-30`. The day carries
+    // no meaning, and rejecting it as an impossible date would report every
+    // February contract as unreadable. Clamped to the month end, which is what
+    // the month-and-year branch below returns anyway.
+    return new Date(year, monthIndex, Math.min(day, lastDayOfMonth(year, monthIndex)));
+  }
+
+  const monthYear = raw.match(/^([A-Za-z]+)\s+(\d{4})$/);
+  if (!monthYear) return null;
+  const month = MONTHS[monthYear[1].toLowerCase()];
+  const year = Number(monthYear[2]);
   if (month === undefined || !Number.isFinite(year)) return null;
   // End of month
   return new Date(year, month + 1, 0);
 }
 
-function parseDob(input: string | undefined | null): Date | null {
-  if (!input) return null;
-  const m = input.trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-  if (!m) return null;
-  const d = Number(m[1]);
-  const mo = Number(m[2]) - 1;
-  const y = Number(m[3]);
-  const date = new Date(y, mo, d);
-  return Number.isNaN(date.getTime()) ? null : date;
+/**
+ * Parse a date of birth, or null when it cannot be read.
+ *
+ * `Goalkeeper.dob` is ISO: `mock-data` converts the seed's `dd/mm/yyyy` on the
+ * way out, and every consumer since has assumed `yyyy-mm-dd`. This accepted
+ * only the pre-conversion form, so the DOB check failed for the entire roster.
+ * ISO is canonical now; `dd/mm/yyyy` stays readable so a hand-typed value is
+ * not rejected.
+ */
+export function parseDob(input: string | undefined | null): Date | null {
+  const raw = input?.trim();
+  if (!raw) return null;
+
+  const iso = raw.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if (iso) return calendarDate(Number(iso[1]), Number(iso[2]) - 1, Number(iso[3]));
+
+  const dmy = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (dmy) return calendarDate(Number(dmy[3]), Number(dmy[2]) - 1, Number(dmy[1]));
+
+  return null;
 }
 
 function ageFromDob(dob: Date, now = new Date()): number {
@@ -85,7 +181,11 @@ function ageFromDob(dob: Date, now = new Date()): number {
 
 const EXPIRING_DAYS = 90;
 
-export function checkGoalkeeper(gk: Goalkeeper, now: Date = new Date()): RosterIssue[] {
+export function checkGoalkeeper(
+  gk: Goalkeeper,
+  now: Date = new Date(),
+  options: AuditOptions = {},
+): RosterIssue[] {
   const issues: RosterIssue[] = [];
   // Free Agent is its own attribute now, not a value the tier column holds,
   // so it is read from the tags rather than from the tier.
@@ -165,8 +265,10 @@ export function checkGoalkeeper(gk: Goalkeeper, now: Date = new Date()): RosterI
 
   // Contract
   if (!isFreeAgent) {
+    // "—" is how the roster renders "none recorded", so it is a missing
+    // contract, not an unreadable one.
     const raw = gk.contractUntil?.trim();
-    if (!raw) {
+    if (!raw || raw === "—" || raw === "-") {
       issues.push({
         code: "missing_contract",
         severity: "error",
@@ -180,7 +282,7 @@ export function checkGoalkeeper(gk: Goalkeeper, now: Date = new Date()): RosterI
           code: "unparseable_contract",
           severity: "warning",
           field: "contractUntil",
-          message: `Contract "${raw}" is not in the expected "Month YYYY" format.`,
+          message: `Contract "${raw}" could not be read as a date.`,
         });
       } else {
         const diffMs = parsed.getTime() - now.getTime();
@@ -213,7 +315,7 @@ export function checkGoalkeeper(gk: Goalkeeper, now: Date = new Date()): RosterI
       field: "dob",
       message: "Date of birth is missing or malformed.",
     });
-  } else if (Number.isFinite(gk.age)) {
+  } else if (gk.age != null && Number.isFinite(gk.age)) {
     const computed = ageFromDob(dob, now);
     if (Math.abs(computed - gk.age) > 1) {
       issues.push({
@@ -234,7 +336,9 @@ export function checkGoalkeeper(gk: Goalkeeper, now: Date = new Date()): RosterI
     });
   }
 
-  return issues;
+  // Filtered once at the end rather than guarded at each check, so a new check
+  // cannot quietly escape the split by forgetting the guard.
+  return options.databaseBackedOnly ? issues.filter((i) => isDatabaseBacked(i.code)) : issues;
 }
 
 const SEVERITY_WEIGHT: Record<IssueSeverity, number> = { error: 20, warning: 8, info: 2 };
@@ -245,11 +349,12 @@ export function scoreIssues(issues: RosterIssue[]): number {
 }
 
 export function auditRoster(
-  roster: Goalkeeper[],
+  roster: readonly Goalkeeper[],
   now: Date = new Date(),
+  options: AuditOptions = {},
 ): GoalkeeperQualityReport[] {
   return roster.map((gk) => {
-    const issues = checkGoalkeeper(gk, now);
+    const issues = checkGoalkeeper(gk, now, options);
     return { gk, issues, score: scoreIssues(issues) };
   });
 }
@@ -336,7 +441,7 @@ export const ISSUE_REMEDIATION: Record<IssueCode, Remediation> = {
   unparseable_contract: {
     action: 'Reformat the contract end date as "Month YYYY".',
     fields: ["contractUntil"],
-    hint: 'Example: "June 2027". Avoid abbreviations, day numbers, or slashes.',
+    hint: 'Club corrections stores "June 2027"; a full ISO date (2027-06-30) is also read.',
   },
   contract_expired: {
     action: "Confirm renewal and update the contract end date, or set status to Free Agent.",
@@ -364,8 +469,9 @@ export const ISSUE_REMEDIATION: Record<IssueCode, Remediation> = {
     fields: ["status", "club"],
   },
   missing_dob: {
-    action: "Add date of birth in DD/MM/YYYY format.",
+    action: "Add date of birth as YYYY-MM-DD.",
     fields: ["dob"],
+    hint: "There is no column for this yet — see the not-captured note on the audit page.",
   },
   age_dob_mismatch: {
     action: "Update the age to match the DOB, or correct the DOB if wrong.",

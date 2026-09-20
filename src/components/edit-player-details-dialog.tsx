@@ -91,7 +91,7 @@ export function EditDetailsButton({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+        className="inline-flex items-center gap-1 text-xs text-primary-ink hover:underline"
       >
         <Pencil className="size-3" /> Edit Details
       </button>

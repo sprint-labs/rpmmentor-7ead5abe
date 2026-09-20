@@ -68,6 +68,47 @@ export function sharePercent(count: number, total: number): number {
   return Math.round((count / total) * 1000) / 10;
 }
 
+/**
+ * Whole percentages that sum to exactly 100.
+ *
+ * Rounding each share on its own is what people usually do and it does not add
+ * up: 32, 36, 31, 15 and 2 out of 116 round to 28 + 31 + 27 + 13 + 2 = 101%.
+ * A panel that promises a distribution and then shows 101% is simply wrong on
+ * its own terms.
+ *
+ * This is the largest-remainder method: floor every share, then hand the
+ * leftover points to whichever rows were cut by the most. Each row still lands
+ * within a point of its true share, and the column totals what it claims to.
+ *
+ * Only meaningful for a set of parts of one whole, so it is used for the tier
+ * rows and deliberately NOT for Academy and Free Agent, which are independent
+ * counts over the same total and are not a distribution at all.
+ */
+export function wholePercentsSummingTo100(counts: readonly number[]): number[] {
+  const total = counts.reduce((sum, n) => sum + n, 0);
+  if (!total) return counts.map(() => 0);
+
+  const exact = counts.map((count) => (count / total) * 100);
+  const floors = exact.map(Math.floor);
+  let remaining = 100 - floors.reduce((sum, n) => sum + n, 0);
+
+  // Biggest fractional part first; ties go to the bigger row, then to the
+  // earlier one, so the result is stable rather than dependent on sort order.
+  const order = exact
+    .map((value, index) => ({ index, remainder: value - Math.floor(value) }))
+    .sort(
+      (a, b) => b.remainder - a.remainder || counts[b.index] - counts[a.index] || a.index - b.index,
+    );
+
+  const result = [...floors];
+  for (const { index } of order) {
+    if (remaining <= 0) break;
+    result[index] += 1;
+    remaining -= 1;
+  }
+  return result;
+}
+
 /** Count live goalkeeper rows into the distribution's buckets. */
 export function buildRosterSnapshot(players: ReadonlyArray<RosterSnapshotPlayer>): RosterSnapshot {
   // Defensive: the dashboard is a whole page, and a malformed response should
@@ -95,15 +136,17 @@ export function buildRosterSnapshot(players: ReadonlyArray<RosterSnapshotPlayer>
     tierCounts.set(tier, (tierCounts.get(tier) ?? 0) + 1);
   }
 
-  const tiers: RosterCategoryCount<RosterTierRowLabel>[] = ROSTER_TIER_LABELS.map((label) => {
-    const count = tierCounts.get(label) ?? 0;
-    return { label, count, percent: sharePercent(count, total) };
-  });
-  tiers.push({
-    label: UNASSIGNED_TIER_LABEL,
-    count: unassigned,
-    percent: sharePercent(unassigned, total),
-  });
+  const tierRowCounts = [
+    ...ROSTER_TIER_LABELS.map((label) => tierCounts.get(label) ?? 0),
+    unassigned,
+  ];
+  const tierRowPercents = wholePercentsSummingTo100(tierRowCounts);
+  const tierRowLabels: RosterTierRowLabel[] = [...ROSTER_TIER_LABELS, UNASSIGNED_TIER_LABEL];
+  const tiers: RosterCategoryCount<RosterTierRowLabel>[] = tierRowLabels.map((label, index) => ({
+    label,
+    count: tierRowCounts[index],
+    percent: tierRowPercents[index],
+  }));
 
   return {
     tiers,

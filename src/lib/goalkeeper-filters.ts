@@ -1,5 +1,6 @@
 import { type DutyLevel, type Goalkeeper } from "./mock-data";
 import { UNASSIGNED_TIER_LABEL } from "./roster-snapshot";
+import { normalisePersonName } from "./goalkeeper-player-link";
 
 export type GoalkeeperFilterState = {
   q: string;
@@ -32,8 +33,18 @@ const LEGACY_TIER_CATEGORY_TIERS = {
   "Tier 3-4": ["Tier 3", "Tier 4"],
 } as const;
 
+/**
+ * Fold a goalkeeper name for keying across tables.
+ *
+ * Delegates to `normalisePersonName` rather than lowercasing alone: every
+ * caller keys one table's spelling against another's — roster names against
+ * report names, duty rows, stored event names — and `public.players` spells
+ * an apostrophe straight (`Rich O'Donnell`) where `match_reports_cache`
+ * spells it curly (`Max O\u2019Leary`). A fold that ignores that silently
+ * drops the row it was asked to find.
+ */
 export function normaliseGoalkeeperName(value: string): string {
-  return value.trim().toLowerCase().replace(/\s+/g, " ");
+  return normalisePersonName(value);
 }
 
 export function clearGoalkeeperFilters(filters: GoalkeeperFilterState): GoalkeeperFilterState {

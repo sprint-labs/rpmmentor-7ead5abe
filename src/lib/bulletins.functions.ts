@@ -34,6 +34,7 @@ import {
 import {
   bulletinAccessForRoles,
   BULLETIN_MANAGE_ROLES,
+  bulletinAttentionFilters,
   getLondonAttentionWindow,
   sanitiseBulletinSearch,
   type BulletinAccess,
@@ -193,14 +194,22 @@ export const listBulletins = createServerFn({ method: "GET" })
     const client = asBulletinClient(context.supabase);
     const from = (data.page - 1) * data.pageSize;
 
-    let query = client
-      .from("bulletin_items")
-      .select(BULLETIN_ITEM_COLUMNS, { count: "exact" })
-      .eq("kind", data.kind);
+    let query = client.from("bulletin_items").select(BULLETIN_ITEM_COLUMNS, { count: "exact" });
+    // Attention lists cut across the boards, so `kind` narrows the query only
+    // when the caller asked for one board.
+    if (data.kind) query = query.eq("kind", data.kind);
     if (access.restrictToUser) {
       query = query.eq("owner_id", context.userId);
     }
     if (data.status) query = query.eq("status", data.status);
+    if (data.attention) {
+      const bounds = bulletinAttentionFilters(data.attention, getLondonAttentionWindow());
+      query = query.neq("status", "closed");
+      if (bounds.ownerIsNull) query = query.is("owner_id", null);
+      if (bounds.dueBefore) query = query.lt("due_date", bounds.dueBefore);
+      if (bounds.dueOnOrAfter) query = query.gte("due_date", bounds.dueOnOrAfter);
+      if (bounds.dueOnOrBefore) query = query.lte("due_date", bounds.dueOnOrBefore);
+    }
     const search = sanitiseBulletinSearch(data.search);
     if (search) {
       query = query.or(
@@ -288,19 +297,24 @@ export const getBulletinSummary = createServerFn({ method: "GET" })
           return { kind, total, open, blocked };
         }),
       ),
-      countBulletins(client, context.userId, access, {
-        excludeClosed: true,
-        dueBefore: today,
-      }),
-      countBulletins(client, context.userId, access, {
-        excludeClosed: true,
-        dueOnOrAfter: today,
-        dueOnOrBefore: dueSoonThrough,
-      }),
-      countBulletins(client, context.userId, access, {
-        excludeClosed: true,
-        ownerIsNull: true,
-      }),
+      countBulletins(
+        client,
+        context.userId,
+        access,
+        bulletinAttentionFilters("overdue", { today, dueSoonThrough }),
+      ),
+      countBulletins(
+        client,
+        context.userId,
+        access,
+        bulletinAttentionFilters("due_soon", { today, dueSoonThrough }),
+      ),
+      countBulletins(
+        client,
+        context.userId,
+        access,
+        bulletinAttentionFilters("unassigned", { today, dueSoonThrough }),
+      ),
     ]);
 
     return {

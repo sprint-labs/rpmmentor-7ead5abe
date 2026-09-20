@@ -21,6 +21,8 @@ import {
   type DutyStatus,
   type Goalkeeper,
 } from "@/lib/mock-data";
+import { londonToday } from "@/lib/time/london";
+import { legacyGkSlugForName } from "@/lib/goalkeeper-player-link";
 
 /**
  * The remaining insight drilldowns, each on the shared workbench shell. Yellow
@@ -261,9 +263,11 @@ export function PlayerRecordWorkbench({
 
           {canSetTier ? <PlayerTierEditor key={player.id} player={player} /> : null}
 
+          {/* The profile is addressed by the legacy `gk-…` slug, not by
+              `players.id`, so the name is what bridges the two. */}
           <Link
-            to="/system/players/$playerId"
-            params={{ playerId: player.id }}
+            to="/goalkeepers/$gkId"
+            params={{ gkId: legacyGkSlugForName(player.full_name) }}
             className="mt-5 inline-flex min-h-10 items-center gap-1.5 rounded-md border border-border px-3 text-xs font-medium hover:bg-accent/40"
           >
             Open player record <ArrowRight className="size-3.5" aria-hidden="true" />
@@ -561,10 +565,17 @@ export function ActiveMentorWorkbench({ mentors }: { mentors: ActiveMentorInsigh
 // Scheduled Events
 // ---------------------------------------------------------------------------
 
-/** Today and tomorrow are the ones worth flagging in the list. */
-function isImminent(eventDate: string): boolean {
-  const today = new Date().toISOString().slice(0, 10);
-  const tomorrow = new Date(Date.now() + 86_400_000).toISOString().slice(0, 10);
+/**
+ * Today and tomorrow are the ones worth flagging in the list.
+ *
+ * Counted in London, because that is the clock the row's own label is named
+ * from. Reading the boundary in UTC instead let the two disagree for the hour
+ * British Summer Time puts between them: at 23:30 UTC the label already said
+ * "Tomorrow" while this still called it today.
+ */
+function isImminent(eventDate: string, now: number = Date.now()): boolean {
+  const today = londonToday(now);
+  const tomorrow = londonToday(now + 86_400_000);
   return eventDate === today || eventDate === tomorrow;
 }
 

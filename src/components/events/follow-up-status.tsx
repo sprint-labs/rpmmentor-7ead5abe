@@ -116,7 +116,7 @@ export function FollowUpActionLink({
   if (followUp.status === "confirmation_needed") {
     if (!canConfirmParticipation) return null;
     return (
-      <Link to="/calendar" className="text-xs font-medium text-primary hover:underline">
+      <Link to="/calendar" className="text-xs font-medium text-primary-ink hover:underline">
         Confirm participation
       </Link>
     );
@@ -134,7 +134,7 @@ export function FollowUpActionLink({
   const [to, query] = path.split("?");
   const search = Object.fromEntries(new URLSearchParams(query ?? ""));
   return (
-    <Link to={to} search={search} className="text-xs font-medium text-primary hover:underline">
+    <Link to={to} search={search} className="text-xs font-medium text-primary-ink hover:underline">
       {label ?? `Submit ${followUpRequirementLabel(followUp.kind)}`}
     </Link>
   );

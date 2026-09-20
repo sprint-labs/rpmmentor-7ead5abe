@@ -5,6 +5,7 @@ import {
   buildFixtureDuplicateKey,
   embedFixtureDuplicateKey,
   extractFixtureDuplicateKey,
+  stripFixtureDuplicateKey,
   findDuplicateEventId,
   indexExistingFixtureKeys,
   matchGoalkeeperName,
@@ -175,6 +176,12 @@ describe("duplicate detection", () => {
     });
     const notes = embedFixtureDuplicateKey("Imported fixture\nOpponent: Leyton Orient", key);
     expect(extractFixtureDuplicateKey(notes)).toBe(key);
+
+    // What a reader sees keeps the notes and loses the machinery, while the
+    // stored string keeps the marker that stops a re-import duplicating the
+    // fixture. Both have to stay true of the same value.
+    expect(stripFixtureDuplicateKey(notes)).toBe("Imported fixture\nOpponent: Leyton Orient");
+    expect(stripFixtureDuplicateKey(notes)).not.toContain("fixture-key:");
 
     const index = indexExistingFixtureKeys([
       {

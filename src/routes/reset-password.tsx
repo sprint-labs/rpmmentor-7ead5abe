@@ -122,8 +122,8 @@ function ResetPasswordPage() {
   return (
     <main id="main-content" tabIndex={-1} className="min-h-screen flex items-center justify-center bg-background p-6">
       <div className="w-full max-w-md">
-        <div className="mb-10">
-          <GkhqLockup stacked markClassName="size-20" wordmarkClassName="h-10 w-auto" alt="GKHQ Mentor Hub" />
+        <div className="mb-8">
+          <GkhqLockup className="gap-3" markClassName="size-11" wordmarkClassName="h-6 w-auto" alt="GKHQ Mentor Hub" />
         </div>
 
         {status === "checking" && (
@@ -133,7 +133,7 @@ function ResetPasswordPage() {
         {status === "invalid" && (
           <>
             <div className="mb-8">
-              <h1 className="text-4xl font-display font-bold uppercase tracking-[0.02em] leading-tight">
+              <h1 className="text-2xl font-display font-bold uppercase tracking-[0.02em] leading-tight">
                 Link expired
               </h1>
               <p className="text-sm text-muted-foreground mt-3 leading-relaxed">
@@ -155,7 +155,7 @@ function ResetPasswordPage() {
         {status === "ready" && (
           <>
             <div className="mb-8">
-              <h1 className="text-4xl font-display font-bold uppercase tracking-[0.02em] leading-tight">
+              <h1 className="text-2xl font-display font-bold uppercase tracking-[0.02em] leading-tight">
                 Set a new password
               </h1>
               <p className="text-sm text-muted-foreground mt-3 leading-relaxed">
@@ -230,9 +230,9 @@ function ResetPasswordPage() {
           <>
             <div className="mb-8">
               <div className="size-12 rounded-xl bg-secondary grid place-items-center mb-5">
-                <CheckCircle2 className="size-6 text-primary" />
+                <CheckCircle2 className="size-6 text-primary-ink" />
               </div>
-              <h1 className="text-4xl font-display font-bold uppercase tracking-[0.02em] leading-tight">
+              <h1 className="text-2xl font-display font-bold uppercase tracking-[0.02em] leading-tight">
                 Password updated
               </h1>
               <p className="text-sm text-muted-foreground mt-3 leading-relaxed">

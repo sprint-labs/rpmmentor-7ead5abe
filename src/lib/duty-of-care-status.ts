@@ -25,3 +25,19 @@ export function dutyLevelFromState(state: DutyOfCareState | string | null | unde
       return "not_enough_data";
   }
 }
+
+/**
+ * Worst first: the order a mentor means when they sort by Duty of Care.
+ *
+ * The status is a five-point severity scale, not a word. Sorting on the label
+ * instead sorts it alphabetically — "Due soon", "Not enough data", "Not
+ * required", "Overdue", "Up to date" — which buries Overdue in fourth place and
+ * moves rows around again whenever the view's `status_label` text changes.
+ */
+export const DUTY_SEVERITY: Record<DutyLevel, number> = {
+  overdue: 0,
+  due_soon: 1,
+  up_to_date: 2,
+  not_enough_data: 3,
+  not_required: 4,
+};

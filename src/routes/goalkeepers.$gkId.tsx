@@ -3,7 +3,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Card, TierBadge, Avatar, Pill, SectionTitle, ProgressBar } from "@/components/primitives";
-import { goalkeepers, formatDate, formatRelative, type Tier } from "@/lib/mock-data";
+import { formatDate, formatRelative, type Goalkeeper, type Tier } from "@/lib/mock-data";
 import { useLoggedInteractions } from "@/lib/interactions/use-interactions";
 import {
   ArrowLeft,
@@ -31,8 +31,13 @@ import { listMedia, openAsset, formatBytes, type MediaAsset } from "@/lib/media-
 import { buildHighlightReelItems } from "@/lib/goalkeeper-highlight-reel";
 import { EditDetailsButton } from "@/components/edit-player-details-dialog";
 import { DutyOfCarePanel } from "@/components/duty-of-care-panel";
-import { listPlayers } from "@/lib/players.functions";
-import { findPlayerByName, interactionBelongsToGoalkeeper } from "@/lib/goalkeeper-player-link";
+import { listPlayers, type PlayerRosterRow } from "@/lib/players.functions";
+import { interactionBelongsToGoalkeeper, normalisePersonName } from "@/lib/goalkeeper-player-link";
+import { cn } from "@/lib/utils";
+import { scoreTone } from "@/lib/score-band";
+import { flagFor } from "@/lib/nationality-flag";
+import { rosterRowForLegacySlug, toGoalkeeper } from "@/lib/roster/live-goalkeepers";
+import { withSeedNarrative } from "@/lib/roster/goalkeeper-profile";
 import {
   compareInteractionsByAlertThenDate,
   interactionOutcomeAlertRank,
@@ -44,11 +49,6 @@ function isValidScore(v: unknown): v is number {
 }
 
 export const Route = createFileRoute("/goalkeepers/$gkId")({
-  loader: ({ params }) => {
-    const gk = goalkeepers.find((g) => g.id === params.gkId);
-    if (!gk) throw notFound();
-    return { gk };
-  },
   component: GkDetail,
   notFoundComponent: () => (
     <div className="p-8 text-sm text-muted-foreground">Goalkeeper not found.</div>
@@ -81,10 +81,6 @@ const PILLAR_SHORT_LABELS: Record<PillarId, string> = {
   physical: "Physical",
 };
 
-function normaliseName(s: string): string {
-  return s.trim().toLowerCase().replace(/\s+/g, " ");
-}
-
 function formatDob(iso: string): string {
   if (!iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return "Not recorded";
   const [year, month, day] = iso.split("-").map(Number);
@@ -115,36 +111,88 @@ function compareMatchDatesNewestFirst(a: string | null, b: string | null): numbe
   return b.localeCompare(a);
 }
 
+/**
+ * Resolve `/goalkeepers/gk-…` against the live roster.
+ *
+ * The lookup lives here rather than in the route loader on purpose: the roster
+ * is a client-side React Query read and a loader cannot await one. It uses the
+ * `["players", "roster"]` key the list page already populates, so arriving from
+ * the list costs no extra request.
+ *
+ * Three outcomes, deliberately rendered differently — a goalkeeper whose row is
+ * still in flight must never read as one who does not exist:
+ *
+ *   - roster pending   → "Loading goalkeeper…"
+ *   - roster unreachable → an explicit failure, retryable by refreshing
+ *   - roster here, no row for this slug → a genuine `notFound()`
+ */
 function GkDetail() {
-  const { gk } = Route.useLoaderData();
-  const { can, user } = useAuth();
-  const { data: loggedInteractions } = useLoggedInteractions();
+  const { gkId } = Route.useParams();
   const listPlayersFn = useServerFn(listPlayers);
-  const { data: players } = useQuery({
+  const {
+    data: players,
+    isPending: rosterPending,
+    isError: rosterUnavailable,
+  } = useQuery({
     queryKey: ["players", "roster"],
     queryFn: () => listPlayersFn(),
     staleTime: 5 * 60_000,
   });
-  const linkedPlayer = useMemo(() => findPlayerByName(players, gk.name), [players, gk.name]);
-  const linkedPlayerId = linkedPlayer?.id ?? (gk as { playerId?: string | null }).playerId ?? null;
+  const player = useMemo(() => rosterRowForLegacySlug(players, gkId), [players, gkId]);
+  // The database has no column for a biography, a development plan or the
+  // highlight-reel links, so `toGoalkeeper` cannot carry them. Layering them
+  // back on keeps this page from blanking all three for every goalkeeper who
+  // has them. See `withSeedNarrative`.
+  const gk = useMemo(() => (player ? withSeedNarrative(toGoalkeeper(player)) : null), [player]);
+
+  if (rosterPending) {
+    return (
+      <div className="p-8 text-sm text-muted-foreground" role="status">
+        Loading goalkeeper…
+      </div>
+    );
+  }
+
+  // `isError` stays true after a failed background refetch — including the one
+  // Edit Details triggers by invalidating ["players"] — even though the rows
+  // are still in cache. Only call the roster unavailable when there is nothing
+  // to resolve against, or a working profile flips to the failure copy.
+  if (rosterUnavailable && !players) {
+    return (
+      <div className="p-8 text-sm text-destructive" role="status">
+        The roster could not be loaded. Refresh the page to try again.
+      </div>
+    );
+  }
+
+  if (!gk || !player) throw notFound();
+
+  return <GkProfile gk={gk} player={player} />;
+}
+
+function GkProfile({ gk, player }: { gk: Goalkeeper; player: PlayerRosterRow }) {
+  const { can, user } = useAuth();
+  const { data: loggedInteractions } = useLoggedInteractions();
+  // The row this profile was resolved from is the canonical `players` record,
+  // so there is no second name match to make: club edits, Duty of Care and
+  // media all key off it directly.
+  const linkedPlayerId = player.id;
   const mediaGoalkeeperIds = useMemo(
     () => Array.from(new Set([gk.id, linkedPlayerId].filter((id): id is string => !!id))),
     [gk.id, linkedPlayerId],
   );
-  const displayClub = linkedPlayer?.current_club || gk.club;
-  const displayLeague = linkedPlayer?.league || gk.league;
-  /**
-   * Citizenship is `players.nationality` — the canonical roster row first, the
-   * legacy profile only as a fallback. It is shown in exactly one place on this
-   * page: its own stat box below.
-   */
-  const displayNationality = linkedPlayer?.nationality || gk.nationality;
+  // Club, league and citizenship are read straight off the canonical row.
+  // `gk` is a mapping of that same row, so there is no second opinion to fall
+  // back to. Citizenship is shown in exactly one place: its stat box below.
+  const displayClub = player.current_club;
+  const displayLeague = player.league;
+  const displayNationality = player.nationality;
+  // Club and league only. Age, height and preferred foot each have their own
+  // stat box a few rows below, and repeating them here pushed the two facts
+  // that are not shown anywhere else to the end of a long line.
   const profileSummary = [
     gk.tags.includes("Free Agent") ? "Free Agent" : displayClub || "Club not recorded",
     !gk.tags.includes("Free Agent") ? displayLeague : null,
-    `${gk.age} yrs`,
-    gk.height,
-    gk.foot ? `${gk.foot} foot` : null,
   ].filter((value): value is string => Boolean(value));
   const gkInteractions = useMemo(
     () =>
@@ -205,11 +253,16 @@ function GkDetail() {
     return () => window.removeEventListener("rpm:report-submitted", h);
   }, [queryClient]);
 
+  // `normalisePersonName`, not a local lowercase: `gk.name` is
+  // `players.full_name` and the two tables disagree about apostrophes —
+  // `Rich O'Donnell` is stored straight on the roster, `Max O’Leary` curly on
+  // his reports. Interactions already fold both; matching reports any other
+  // way silently loses a goalkeeper's whole history.
   const gkReports = useMemo<MatchReportRow[]>(() => {
-    const target = normaliseName(gk.name);
+    const target = normalisePersonName(gk.name);
     const all = data?.reports ?? [];
     return all
-      .filter((r) => normaliseName(r.goalkeeper) === target)
+      .filter((r) => normalisePersonName(r.goalkeeper) === target)
       .sort((a, b) => compareMatchDatesNewestFirst(a.match_date, b.match_date));
   }, [data, gk.name]);
 
@@ -365,22 +418,16 @@ function GkDetail() {
             <div className="mt-1 text-sm leading-snug text-muted-foreground">
               {profileSummary.join(" · ")}
             </div>
-            {/* Prefer a name-matched players row so club corrections work even
-                when the legacy profile has no stored playerId. */}
-            {linkedPlayerId ? (
-              <div className="mt-1 flex flex-wrap items-center gap-3 text-xs">
-                <EditDetailsButton
-                  player={linkedPlayer ?? null}
-                  playerId={linkedPlayerId}
-                  playerName={gk.name}
-                  currentClub={displayClub ?? ""}
-                />
-              </div>
-            ) : (
-              <div className="mt-1 text-xs text-muted-foreground">
-                Player record not linked — this profile is read-only.
-              </div>
-            )}
+            {/* The profile is resolved from the roster row itself, so club
+                corrections always have a canonical record to write back to. */}
+            <div className="mt-1 flex flex-wrap items-center gap-3 text-xs">
+              <EditDetailsButton
+                player={player}
+                playerId={linkedPlayerId}
+                playerName={gk.name}
+                currentClub={displayClub ?? ""}
+              />
+            </div>
 
             {gk.instagram && (
               <div className="mt-1 text-xs">
@@ -388,7 +435,7 @@ function GkDetail() {
                   href={gk.instagram}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-primary hover:underline inline-flex items-center gap-1"
+                  className="text-primary-ink hover:underline inline-flex items-center gap-1"
                   aria-label={`${gk.name} on Instagram (opens in new tab)`}
                 >
                   @
@@ -433,7 +480,11 @@ function GkDetail() {
         {(
           [
             {
-              label: "Rating",
+              // "Av." because it is the mean of the reports behind it, not a
+              // single verdict. The report count that used to sit under it is
+              // gone: it made this one box taller than the seven beside it,
+              // and the same figure is on the reports panel below.
+              label: "Av. Rating",
               value: isLoading
                 ? "…"
                 : isError
@@ -441,30 +492,34 @@ function GkDetail() {
                   : averageRating != null
                     ? `${averageRating.toFixed(1)}/5`
                     : "—",
-              hint:
-                !isLoading && !isError && averageRating != null
-                  ? `${ratingContributors.length} report${ratingContributors.length === 1 ? "" : "s"}`
-                  : undefined,
             },
             { label: "Contract expiry", value: formatContractExpiry(gk.contractUntil) },
             { label: "DOB", value: formatDob(gk.dob) },
-            { label: "Age", value: String(gk.age) },
-            { label: "Citizenship", value: displayNationality || "—" },
+            { label: "Age", value: gk.age != null ? String(gk.age) : "Not recorded" },
+            {
+              label: "Citizenship",
+              value: displayNationality || "—",
+              // Decorative: the country name beside it already carries the
+              // meaning, and not every nationality has a flag to show.
+              flag: flagFor(displayNationality),
+            },
             { label: "Height", value: gk.height || "—" },
             { label: "Shirt number", value: gk.shirtNumber != null ? String(gk.shirtNumber) : "—" },
             { label: "Preferred foot", value: gk.foot || "—" },
           ] as const
         ).map((metric) => (
-          <Card key={metric.label} className="px-3 py-2.5">
+          <Card key={metric.label} className="px-3 py-2">
             <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
               {metric.label}
             </div>
-            <div className="mt-0.5 text-sm font-semibold tabular-nums leading-tight">
-              {metric.value}
+            <div className="mt-0.5 flex items-center gap-1.5 text-sm font-semibold tabular-nums leading-tight">
+              {"flag" in metric && metric.flag ? (
+                <span aria-hidden="true" className="text-base leading-none">
+                  {metric.flag}
+                </span>
+              ) : null}
+              <span>{metric.value}</span>
             </div>
-            {"hint" in metric && metric.hint ? (
-              <div className="mt-0.5 text-[10px] text-muted-foreground">{metric.hint}</div>
-            ) : null}
           </Card>
         ))}
       </div>
@@ -483,6 +538,8 @@ function GkDetail() {
           {PILLAR_IDS.map((id) => {
             const v = pillarAverages[id];
             const contributors = pillarContributors[id];
+            // 4+ elite green, 3–4 yellow-green, 2–3 amber, below 2 red.
+            const tone = scoreTone(isLoading || isError ? null : v);
             return (
               <Card key={id} className="px-3 py-2.5">
                 <div
@@ -491,14 +548,22 @@ function GkDetail() {
                 >
                   {PILLAR_SHORT_LABELS[id]}
                 </div>
-                <div className="mt-0.5 text-xl font-semibold tabular-nums font-mono leading-tight">
+                <div
+                  className={cn(
+                    "mt-0.5 text-xl font-semibold tabular-nums font-mono leading-tight",
+                    isLoading || isError ? "text-foreground" : tone.ink,
+                  )}
+                >
                   {isLoading ? "…" : isError || v == null ? "—" : v.toFixed(1)}
                   {!isLoading && !isError && v != null && (
                     <span className="ml-0.5 text-xs font-normal text-muted-foreground">/5</span>
                   )}
                 </div>
                 <div className="mt-1">
-                  <ProgressBar value={v != null ? (v / 5) * 100 : 0} />
+                  <ProgressBar
+                    value={v != null ? (v / 5) * 100 : 0}
+                    barClassName={isLoading || isError ? undefined : tone.bar}
+                  />
                 </div>
                 <div className="mt-1 text-[10px] text-muted-foreground">
                   {isLoading
@@ -614,7 +679,7 @@ function GkDetail() {
                     gk: gk.name,
                     openSubmit: "1",
                   }}
-                  className="text-[11px] text-primary hover:underline inline-flex items-center gap-0.5"
+                  className="text-[11px] text-primary-ink hover:underline inline-flex items-center gap-0.5"
                 >
                   Submit a Match Report for {gk.name}
                 </Link>
@@ -623,7 +688,7 @@ function GkDetail() {
               <div className="space-y-3">
                 <div className="text-[10px] uppercase text-muted-foreground">
                   Pool of last {last5.length} report{last5.length === 1 ? "" : "s"}:
-                  <span className="ml-1 normal-case text-muted-foreground/80 tracking-normal">
+                  <span className="ml-1 normal-case text-muted-foreground tracking-normal">
                     {last5.map(reportRef).join(" · ")}
                   </span>
                 </div>
@@ -696,7 +761,7 @@ function GkDetail() {
                               {Array.from({ length: 5 - contributors.length }).map((_, i) => (
                                 <span
                                   key={`missing-${id}-${i}`}
-                                  className="px-1.5 py-0.5 rounded border border-dashed border-border/60 text-[10px] text-muted-foreground/70 italic"
+                                  className="px-1.5 py-0.5 rounded border border-dashed border-border/60 text-[10px] text-muted-foreground italic"
                                   title={`Missing report with a valid ${PILLAR_LABELS[id]} score`}
                                 >
                                   missing report
@@ -717,7 +782,7 @@ function GkDetail() {
                                 openSubmit: "1",
                                 last5Gk: "",
                               }}
-                              className="text-primary hover:underline inline-flex items-center gap-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
+                              className="text-primary-ink hover:underline inline-flex items-center gap-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
                             >
                               Submit a Match Report for {gk.name}
                             </Link>
@@ -768,7 +833,7 @@ function GkDetail() {
                         gk: gk.name,
                         openSubmit: "1",
                       }}
-                      className="ml-1 text-primary hover:underline"
+                      className="ml-1 text-primary-ink hover:underline"
                     >
                       Submit a Match Report for {gk.name}
                     </Link>
@@ -801,7 +866,7 @@ function GkDetail() {
             {highlightReelItems.length === 0 ? (
               <div className="rounded-md border border-dashed border-border/80 bg-muted/20 px-3 py-4 text-center">
                 <p className="text-xs text-muted-foreground">No highlight reel uploaded yet.</p>
-                <p className="mt-1 text-[11px] text-muted-foreground/80">
+                <p className="mt-1 text-[11px] text-muted-foreground">
                   Slot reserved for {gk.name} — upload a clip via Media and tag it Highlight.
                 </p>
               </div>
@@ -892,7 +957,7 @@ function GkDetail() {
                       openSubmit: "",
                       last5Gk: gk.name,
                     }}
-                    className="text-[11px] text-primary hover:underline"
+                    className="text-[11px] text-primary-ink hover:underline"
                   >
                     View last 5 in Reports →
                   </Link>
@@ -900,7 +965,7 @@ function GkDetail() {
                 {isError && (
                   <button
                     onClick={() => refetch()}
-                    className="text-[11px] text-primary hover:underline"
+                    className="text-[11px] text-primary-ink hover:underline"
                   >
                     Retry
                   </button>

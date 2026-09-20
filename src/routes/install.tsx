@@ -79,7 +79,7 @@ function InstallPage() {
   return (
     <main id="main-content" tabIndex={-1} className="mx-auto max-w-2xl space-y-6">
       <header className="space-y-2">
-        <div className="flex size-12 items-center justify-center rounded-lg bg-primary/15 text-primary">
+        <div className="flex size-12 items-center justify-center rounded-lg bg-primary/15 text-primary-ink">
           <Download className="size-6" />
         </div>
         <h1 className="text-2xl font-semibold tracking-tight text-foreground">Install Mentor Hub</h1>
@@ -90,7 +90,7 @@ function InstallPage() {
 
       {installed && (
         <div className="flex items-center gap-2 rounded-md border border-primary/40 bg-primary/10 p-3 text-sm text-foreground">
-          <CheckCircle2 className="size-4 text-primary" />
+          <CheckCircle2 className="size-4 text-primary-ink" />
           You're using the installed app. Nothing more to do.
         </div>
       )}
@@ -171,10 +171,10 @@ function InstallPage() {
 
       <Section title="What you get">
         <ul className="space-y-2 text-sm text-muted-foreground">
-          <li className="flex gap-2"><CheckCircle2 className="mt-0.5 size-4 shrink-0 text-primary" /> Fullscreen app window without browser chrome</li>
-          <li className="flex gap-2"><CheckCircle2 className="mt-0.5 size-4 shrink-0 text-primary" /> Offline access to core dashboards during brief outages</li>
-          <li className="flex gap-2"><CheckCircle2 className="mt-0.5 size-4 shrink-0 text-primary" /> Faster launch from your home screen or dock</li>
-          <li className="flex gap-2"><CheckCircle2 className="mt-0.5 size-4 shrink-0 text-primary" /> Automatic updates when a new version ships</li>
+          <li className="flex gap-2"><CheckCircle2 className="mt-0.5 size-4 shrink-0 text-primary-ink" /> Fullscreen app window without browser chrome</li>
+          <li className="flex gap-2"><CheckCircle2 className="mt-0.5 size-4 shrink-0 text-primary-ink" /> Offline access to core dashboards during brief outages</li>
+          <li className="flex gap-2"><CheckCircle2 className="mt-0.5 size-4 shrink-0 text-primary-ink" /> Faster launch from your home screen or dock</li>
+          <li className="flex gap-2"><CheckCircle2 className="mt-0.5 size-4 shrink-0 text-primary-ink" /> Automatic updates when a new version ships</li>
         </ul>
       </Section>
     </main>
@@ -201,7 +201,7 @@ function Steps({ children }: { children: React.ReactNode }) {
 function Step({ n, label, description, children }: { n: number; label: string; description?: string; children?: React.ReactNode }) {
   return (
     <li className="flex gap-3">
-      <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary/15 text-[11px] font-semibold text-primary">{n}</span>
+      <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary/15 text-[11px] font-semibold text-primary-ink">{n}</span>
       <div className="min-w-0 space-y-1 text-sm">
         <p className="font-medium text-foreground">{label}</p>
         {children && <div className="text-xs">{children}</div>}

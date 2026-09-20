@@ -5,6 +5,7 @@ import {
   clearGoalkeeperFilters,
   countActiveGoalkeeperFilters,
   filterGoalkeepers,
+  normaliseGoalkeeperName,
   type GoalkeeperFilterState,
 } from "./goalkeeper-filters";
 
@@ -204,5 +205,31 @@ describe("the duty filter reads the live view", () => {
     expect(
       filterGoalkeepers(goalkeepers, { ...defaultFilters, duty: "all" }, noRatings, dutyLevelFor),
     ).toHaveLength(goalkeepers.length);
+  });
+});
+
+describe("normaliseGoalkeeperName folds the two apostrophes", () => {
+  // Every caller keys one table's spelling against another's, and the live
+  // database uses both forms: `public.players` holds `Rich O'Donnell` straight,
+  // `match_reports_cache` holds `Max O\u2019Leary` curly. A fold that only
+  // lowercases silently drops the row it was asked to find — a goalkeeper's
+  // rating, their duty status, their reports link.
+  it("treats a straight and a curly apostrophe as the same name", () => {
+    expect(normaliseGoalkeeperName("Rich O\u2019Donnell")).toBe(
+      normaliseGoalkeeperName("Rich O'Donnell"),
+    );
+    expect(normaliseGoalkeeperName("Max O\u2019Leary")).toBe(
+      normaliseGoalkeeperName("Max O'Leary"),
+    );
+  });
+
+  it("still folds case and collapses whitespace", () => {
+    expect(normaliseGoalkeeperName("  JAMES   Beadle ")).toBe("james beadle");
+  });
+
+  it("keeps different people apart", () => {
+    expect(normaliseGoalkeeperName("Rich O'Donnell")).not.toBe(
+      normaliseGoalkeeperName("Joe McDonnell"),
+    );
   });
 });

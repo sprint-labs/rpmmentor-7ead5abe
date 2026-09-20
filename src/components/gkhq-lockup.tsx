@@ -12,9 +12,28 @@ import { BRAND_MARK_SRC, BRAND_WORDMARK_DARK_SRC, BRAND_WORDMARK_LIGHT_SRC } fro
  *
  * Only one is announced; the other is decorative to a screen reader.
  */
-export function GkhqWordmark({ className, alt = "GKHQ" }: { className?: string; alt?: string }) {
+export function GkhqWordmark({
+  className,
+  wrapperClassName,
+  alt = "GKHQ",
+}: {
+  className?: string;
+  /**
+   * Layout and responsive visibility for the pair — anything that decides
+   * whether the wordmark shows at all.
+   *
+   * It is separate from `className` on purpose. `className` reaches both
+   * `<img>`s, and a display utility passed there fights the theme switch
+   * below: the header passed `hidden sm:block`, tailwind-merge kept that
+   * `sm:block` over each image's own `hidden`, and from `sm` up BOTH cuts
+   * rendered — the black-on-light one beside the white-on-dark one, which is
+   * the ghosted second wordmark seen in light mode.
+   */
+  wrapperClassName?: string;
+  alt?: string;
+}) {
   return (
-    <>
+    <span className={cn("inline-flex", wrapperClassName)}>
       <img
         src={BRAND_WORDMARK_LIGHT_SRC}
         alt={alt}
@@ -28,7 +47,7 @@ export function GkhqWordmark({ className, alt = "GKHQ" }: { className?: string; 
         draggable={false}
         className={cn("hidden dark:block", className)}
       />
-    </>
+    </span>
   );
 }
 
@@ -46,32 +65,31 @@ export function GkhqMark({ className, alt = "" }: { className?: string; alt?: st
 }
 
 /**
- * Mark plus wordmark, the full lockup.
+ * Mark plus wordmark, the full lockup: the G beside the word, never above it.
  *
- * `stacked` is for the sign-in page, where the brand has room to breathe;
- * the inline arrangement is for the header rail.
+ * Every surface draws the same arrangement and differs only in how large the
+ * pair is set — the header rail small, the sign-in and reset screens large.
+ *
+ * Callers size the gap through `className` rather than taking the default,
+ * because it does not scale with the mark on its own. The mark art is taller
+ * than it is wide (996 x 1145), so `object-contain` inside `GkhqMark`'s square
+ * box leaves slack at each side that already reads as space between the two;
+ * the larger the mark, the more of the gap is spoken for before `gap-*` is
+ * applied at all.
  */
 export function GkhqLockup({
   className,
   markClassName,
   wordmarkClassName,
-  stacked = false,
   alt = "GKHQ",
 }: {
   className?: string;
   markClassName?: string;
   wordmarkClassName?: string;
-  stacked?: boolean;
   alt?: string;
 }) {
   return (
-    <span
-      className={cn(
-        "inline-flex",
-        stacked ? "flex-col items-start gap-4" : "items-center gap-2.5",
-        className,
-      )}
-    >
+    <span className={cn("inline-flex items-center gap-2.5", className)}>
       <GkhqMark className={markClassName} />
       <GkhqWordmark className={wordmarkClassName} alt={alt} />
     </span>

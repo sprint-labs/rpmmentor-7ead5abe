@@ -32,6 +32,7 @@ import {
   updateBulletin,
 } from "@/lib/bulletins.functions";
 import {
+  BULLETIN_ATTENTION,
   BULLETIN_KINDS,
   BULLETIN_PAGE_SIZE,
   BULLETIN_STATUSES,
@@ -43,6 +44,13 @@ import {
 
 const BOARD_VALUES = BULLETIN_KINDS;
 const STATUS_FILTER_VALUES = ["all", ...BULLETIN_STATUSES] as const;
+/** "" is "no attention filter", so the board behaves exactly as it always has. */
+const ATTENTION_FILTER_VALUES = ["", ...BULLETIN_ATTENTION] as const;
+const ATTENTION_LABELS = {
+  overdue: "overdue work",
+  due_soon: "work due in the next 7 days",
+  unassigned: "unassigned work",
+} as const;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const bulletinSearchSchema = z.object({
@@ -51,6 +59,11 @@ const bulletinSearchSchema = z.object({
   status: z.enum(STATUS_FILTER_VALUES).catch("all").default("all"),
   page: fallback(z.number().int().min(1), 1).default(1),
   item: fallback(z.string(), "").default(""),
+  /**
+   * Set by the dashboard's overdue / due-soon / unassigned chips. It lists
+   * across every board, because that is what those counts add up.
+   */
+  attention: z.enum(ATTENTION_FILTER_VALUES).catch("").default(""),
 });
 
 export const Route = createFileRoute("/bulletins")({
@@ -73,6 +86,7 @@ function BulletinsPage() {
   const status = search.status as "all" | BulletinStatus;
   const safePage = Math.max(1, search.page);
   const selectedId = UUID.test(search.item) ? search.item : "";
+  const attention = search.attention || null;
   const userId = user?.id ?? "anonymous";
   const scope = can("bulletins.manage") ? "team" : "mine";
   const [updatesPage, setUpdatesPage] = useState(1);
@@ -94,11 +108,24 @@ function BulletinsPage() {
   });
 
   const listQuery = useQuery({
-    queryKey: ["bulletins", userId, scope, "list", board, status, search.q, safePage],
+    queryKey: [
+      "bulletins",
+      userId,
+      scope,
+      "list",
+      board,
+      status,
+      search.q,
+      safePage,
+      attention ?? "",
+    ],
     queryFn: () =>
       fetchList({
         data: {
-          kind: board,
+          // An attention filter spans the boards, so it drops `kind` rather
+          // than intersecting with whichever tab happens to be selected.
+          kind: attention ? undefined : board,
+          attention: attention ?? undefined,
           scope,
           status: status === "all" ? undefined : status,
           search: search.q.trim() || undefined,
@@ -192,7 +219,7 @@ function BulletinsPage() {
       setEditorItem(undefined);
       toast.success(variables.item ? "Bulletin item updated" : "Bulletin item created");
       void navigate({
-        search: { board: saved.kind, q: "", status: "all", page: 1, item: saved.id },
+        search: { board: saved.kind, q: "", status: "all", page: 1, item: saved.id, attention: "" },
         replace: true,
       });
     },
@@ -290,12 +317,41 @@ function BulletinsPage() {
         </div>
       ) : null}
 
+      {attention ? (
+        /* Without this the tabs would highlight one board while the list
+           showed every board, and nothing on screen would explain why. */
+        <div
+          role="status"
+          className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-md border border-border bg-background/40 px-3 py-2"
+        >
+          <p className="text-sm text-muted-foreground">
+            Showing{" "}
+            <span className="font-medium text-foreground">{ATTENTION_LABELS[attention]}</span>{" "}
+            across every board.
+          </p>
+          <button
+            type="button"
+            onClick={() => changeSearch({ attention: "", page: 1, item: "" })}
+            className="min-h-11 rounded-md px-3 text-xs font-semibold uppercase tracking-wider text-primary-ink hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          >
+            Clear filter
+          </button>
+        </div>
+      ) : null}
+
       <BulletinBoardSelector
         current={board}
         summary={summaryQuery.data}
         onChange={(nextBoard) => {
           setSearchDraft("");
-          changeSearch({ board: nextBoard, q: "", status: "all", page: 1, item: "" });
+          changeSearch({
+            board: nextBoard,
+            q: "",
+            status: "all",
+            page: 1,
+            item: "",
+            attention: "",
+          });
         }}
       />
 
@@ -332,7 +388,7 @@ function BulletinsPage() {
         onRetryDetail={() => void detailQuery.refetch()}
         onEdit={(item) => setEditorItem(item)}
         onOpenBoard={(nextBoard) =>
-          changeSearch({ board: nextBoard, q: "", status: "all", page: 1, item: "" })
+          changeSearch({ board: nextBoard, q: "", status: "all", page: 1, item: "", attention: "" })
         }
         onAddUpdate={(body) =>
           updateMutation

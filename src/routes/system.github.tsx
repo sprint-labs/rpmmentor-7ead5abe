@@ -81,7 +81,7 @@ function GithubSyncPage() {
           <h1 className="text-2xl font-semibold tracking-tight">GitHub sync</h1>
           <p className="text-sm text-muted-foreground mt-1">
             Repository sync state for this project.{" "}
-            <Link to="/system/integrations" className="text-primary hover:underline">
+            <Link to="/system/integrations" className="text-primary-ink hover:underline">
               All integrations
             </Link>
           </p>
@@ -101,7 +101,7 @@ function GithubSyncPage() {
         <div className="flex items-center justify-between gap-4 border-b border-border p-4">
           <div className="flex items-center gap-3">
             <div className="rounded-md bg-accent p-2">
-              <Github className="h-5 w-5 text-primary" />
+              <Github className="h-5 w-5 text-primary-ink" />
             </div>
             <div>
               <h2 className="font-medium leading-tight">
@@ -126,7 +126,7 @@ function GithubSyncPage() {
                 href={s.repoUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex items-center gap-1.5 text-primary hover:underline"
+                className="inline-flex items-center gap-1.5 text-primary-ink hover:underline"
               >
                 {s.owner}/{s.repo}
                 <ExternalLink className="h-3.5 w-3.5" />
@@ -159,7 +159,7 @@ function GithubSyncPage() {
                 href={s.head.url}
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex items-center gap-1.5 font-mono text-xs text-primary hover:underline"
+                className="inline-flex items-center gap-1.5 font-mono text-xs text-primary-ink hover:underline"
               >
                 {s.head.shortSha}
                 <ExternalLink className="h-3.5 w-3.5" />
@@ -223,7 +223,7 @@ function GithubSyncPage() {
                   href={c.url}
                   target="_blank"
                   rel="noreferrer"
-                  className="shrink-0 font-mono text-xs text-primary hover:underline"
+                  className="shrink-0 font-mono text-xs text-primary-ink hover:underline"
                 >
                   {c.shortSha}
                 </a>

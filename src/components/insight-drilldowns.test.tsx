@@ -15,6 +15,7 @@ import type { PlayerRosterRow } from "@/lib/players.functions";
 import type { TeamCalendarEvent } from "@/lib/calendar.functions";
 import type { ActiveMentorInsightRow } from "@/lib/active-mentor-insights";
 import { DUTY_LABELS, type Goalkeeper } from "@/lib/mock-data";
+import { londonToday } from "@/lib/time/london";
 
 const authState = vi.hoisted(() => ({ canSetTier: true }));
 
@@ -211,7 +212,7 @@ describe("PlayerRecordWorkbench", () => {
     expect(detail.getByRole("heading", { name: "Christian Walton" })).toBeTruthy();
     expect(detail.getByText("On loan from Brighton")).toBeTruthy();
     expect(detail.getByRole("link", { name: /Open player record/ }).getAttribute("href")).toBe(
-      "/system/players/11111111-1111-4111-8111-111111111111",
+      "/goalkeepers/gk-christian-walton",
     );
 
     const row = screen.getByRole("button", { name: "Show details for Christian Walton" });
@@ -304,7 +305,9 @@ describe("ActiveMentorWorkbench", () => {
 
 describe("ScheduledEventWorkbench", () => {
   it("highlights an event happening today and leaves later ones muted", () => {
-    const today = new Date().toISOString().slice(0, 10);
+    // London, not UTC: the row names its day from a London clock, so seeding
+    // this in UTC made the test fail for the hour BST holds the two apart.
+    const today = londonToday();
     render(
       <ScheduledEventWorkbench
         events={[
@@ -324,5 +327,30 @@ describe("ScheduledEventWorkbench", () => {
     expect(
       within(panel("selected-event-detail")).getByRole("heading", { name: "Today session" }),
     ).toBeTruthy();
+  });
+
+  it("highlights tomorrow's event in the hour BST puts London a date ahead of UTC", () => {
+    // 23:30 UTC on 19 Sept is already 00:30 on the 20th in London, so the 21st
+    // is tomorrow to a reader and two days out to a UTC clock. The label and the
+    // highlight are decided by separate helpers: while one counted in UTC the
+    // row read "Tomorrow" with none of the urgency styling that word is for.
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date("2026-09-19T23:30:00Z"));
+      expect(londonToday()).toBe("2026-09-20");
+
+      render(
+        <ScheduledEventWorkbench
+          events={[
+            calendarEvent({ id: "soon", title: "Tomorrow session", event_date: "2026-09-21" }),
+          ]}
+        />,
+      );
+
+      const row = screen.getByRole("button", { name: /Show details for Tomorrow session/ });
+      expect(within(row).getByText("Tomorrow").className).toContain("text-warning");
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

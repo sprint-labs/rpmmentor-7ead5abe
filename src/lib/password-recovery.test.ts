@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   hasAuthCallback,
+  isPasswordRecoveryLanding,
   isRecoveryCallback,
   parseRecoveryCallback,
   passwordRecoveryRedirectUrl,
@@ -91,5 +92,75 @@ describe("parseRecoveryCallback", () => {
     expect(parseRecoveryCallback({ hash: "#access_token=head.body.sig", search: "" })).toEqual({
       kind: "none",
     });
+  });
+});
+
+describe("isPasswordRecoveryLanding", () => {
+  it("does not mistake a Google sign-in for a reset", () => {
+    // Supabase returns a signed-in caller to the app root carrying the same
+    // `?code=` a reset link carries. Reading it as a reset used to route them
+    // to /reset-password without the code, which then reported an expired link.
+    expect(isPasswordRecoveryLanding({ pathname: "/", hash: "", search: "?code=oauth-code" })).toBe(
+      false,
+    );
+  });
+
+  it("does not mistake a Google sign-in onto a deep link for a reset", () => {
+    expect(
+      isPasswordRecoveryLanding({ pathname: "/calendar", hash: "", search: "?code=oauth-code" }),
+    ).toBe(false);
+  });
+
+  it("reads a browser-initiated reset landing on the reset route", () => {
+    expect(
+      isPasswordRecoveryLanding({
+        pathname: "/reset-password",
+        hash: "",
+        search: "?code=reset-code",
+      }),
+    ).toBe(true);
+  });
+
+  it("tolerates a trailing slash on the reset route", () => {
+    expect(
+      isPasswordRecoveryLanding({
+        pathname: "/reset-password/",
+        hash: "",
+        search: "?code=reset-code",
+      }),
+    ).toBe(true);
+  });
+
+  it("reads an invite token hash wherever it lands", () => {
+    expect(
+      isPasswordRecoveryLanding({
+        pathname: "/",
+        hash: "",
+        search: "?token_hash=abc123&type=invite",
+      }),
+    ).toBe(true);
+  });
+
+  it("reads a bare token hash wherever it lands", () => {
+    expect(
+      isPasswordRecoveryLanding({ pathname: "/", hash: "", search: "?token_hash=abc123" }),
+    ).toBe(true);
+  });
+
+  it("reads fragment recovery tokens wherever they land", () => {
+    expect(
+      isPasswordRecoveryLanding({
+        pathname: "/",
+        hash: "#access_token=head.body.sig&refresh_token=r3fr35h&type=recovery",
+        search: "",
+      }),
+    ).toBe(true);
+  });
+
+  it("ignores an ordinary page load", () => {
+    expect(isPasswordRecoveryLanding({ pathname: "/", hash: "", search: "" })).toBe(false);
+    expect(isPasswordRecoveryLanding({ pathname: "/reset-password", hash: "", search: "" })).toBe(
+      false,
+    );
   });
 });
