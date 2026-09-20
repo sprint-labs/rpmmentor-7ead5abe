@@ -37,6 +37,7 @@ import { Route as ReportsReportIdRouteImport } from './routes/reports.$reportId'
 import { Route as InsightsMetricRouteImport } from './routes/insights.$metric'
 import { Route as GoalkeepersGkIdRouteImport } from './routes/goalkeepers.$gkId'
 import { Route as DesignGkhqRouteImport } from './routes/design.gkhq'
+import { Route as DesignAnimatedSidebarRouteImport } from './routes/design.animated-sidebar'
 import { Route as DesignAccentProposalRouteImport } from './routes/design.accent-proposal'
 import { Route as Char91DotwellKnownChar93OauthProtectedResourceRouteImport } from './routes/[.well-known]/oauth-protected-resource'
 import { Route as Char91DotmcpChar93ListToolsRouteImport } from './routes/[.mcp]/list-tools'
@@ -185,6 +186,11 @@ const DesignGkhqRoute = DesignGkhqRouteImport.update({
   path: '/design/gkhq',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DesignAnimatedSidebarRoute = DesignAnimatedSidebarRouteImport.update({
+  id: '/design/animated-sidebar',
+  path: '/design/animated-sidebar',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DesignAccentProposalRoute = DesignAccentProposalRouteImport.update({
   id: '/design/accent-proposal',
   path: '/design/accent-proposal',
@@ -245,6 +251,7 @@ export interface FileRoutesByFullPath {
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/design/accent-proposal': typeof DesignAccentProposalRoute
+  '/design/animated-sidebar': typeof DesignAnimatedSidebarRoute
   '/design/gkhq': typeof DesignGkhqRoute
   '/goalkeepers/$gkId': typeof GoalkeepersGkIdRoute
   '/insights/$metric': typeof InsightsMetricRoute
@@ -282,6 +289,7 @@ export interface FileRoutesByTo {
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/design/accent-proposal': typeof DesignAccentProposalRoute
+  '/design/animated-sidebar': typeof DesignAnimatedSidebarRoute
   '/design/gkhq': typeof DesignGkhqRoute
   '/goalkeepers/$gkId': typeof GoalkeepersGkIdRoute
   '/insights/$metric': typeof InsightsMetricRoute
@@ -320,6 +328,7 @@ export interface FileRoutesById {
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/design/accent-proposal': typeof DesignAccentProposalRoute
+  '/design/animated-sidebar': typeof DesignAnimatedSidebarRoute
   '/design/gkhq': typeof DesignGkhqRoute
   '/goalkeepers/$gkId': typeof GoalkeepersGkIdRoute
   '/insights/$metric': typeof InsightsMetricRoute
@@ -359,6 +368,7 @@ export interface FileRouteTypes {
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
     | '/design/accent-proposal'
+    | '/design/animated-sidebar'
     | '/design/gkhq'
     | '/goalkeepers/$gkId'
     | '/insights/$metric'
@@ -396,6 +406,7 @@ export interface FileRouteTypes {
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
     | '/design/accent-proposal'
+    | '/design/animated-sidebar'
     | '/design/gkhq'
     | '/goalkeepers/$gkId'
     | '/insights/$metric'
@@ -433,6 +444,7 @@ export interface FileRouteTypes {
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
     | '/design/accent-proposal'
+    | '/design/animated-sidebar'
     | '/design/gkhq'
     | '/goalkeepers/$gkId'
     | '/insights/$metric'
@@ -471,6 +483,7 @@ export interface RootRouteChildren {
   Char91DotmcpChar93ListToolsRoute: typeof Char91DotmcpChar93ListToolsRoute
   Char91DotwellKnownChar93OauthProtectedResourceRoute: typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   DesignAccentProposalRoute: typeof DesignAccentProposalRoute
+  DesignAnimatedSidebarRoute: typeof DesignAnimatedSidebarRoute
   DesignGkhqRoute: typeof DesignGkhqRoute
   InsightsMetricRoute: typeof InsightsMetricRoute
   ReportsReportIdRoute: typeof ReportsReportIdRoute
@@ -685,6 +698,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DesignGkhqRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/design/animated-sidebar': {
+      id: '/design/animated-sidebar'
+      path: '/design/animated-sidebar'
+      fullPath: '/design/animated-sidebar'
+      preLoaderRoute: typeof DesignAnimatedSidebarRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/design/accent-proposal': {
       id: '/design/accent-proposal'
       path: '/design/accent-proposal'
@@ -771,6 +791,7 @@ const rootRouteChildren: RootRouteChildren = {
   Char91DotwellKnownChar93OauthProtectedResourceRoute:
     Char91DotwellKnownChar93OauthProtectedResourceRoute,
   DesignAccentProposalRoute: DesignAccentProposalRoute,
+  DesignAnimatedSidebarRoute: DesignAnimatedSidebarRoute,
   DesignGkhqRoute: DesignGkhqRoute,
   InsightsMetricRoute: InsightsMetricRoute,
   ReportsReportIdRoute: ReportsReportIdRoute,
