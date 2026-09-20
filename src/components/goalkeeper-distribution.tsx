@@ -158,14 +158,12 @@ export function GoalkeeperDistribution({
                it look like a separate fact; naming the unit says what the
                brackets mean instead, and does not go stale while loading. */
             <span className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
-              count · % of roster
+              by % on the roster
             </span>
           )
         }
       >
-        {/* "Tags" appears nowhere else in the app; the two groups below are
-            headed "By tier" and "By status", so the title uses those words. */}
-        Goalkeepers by Tier &amp; Status
+        Tiers &amp; Tags Distribution
       </SectionTitle>
 
       {error ? (

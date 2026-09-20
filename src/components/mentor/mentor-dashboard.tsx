@@ -226,9 +226,8 @@ export function MentorDashboard({ user }: Props) {
   return (
     <div className="space-y-6">
       <header>
-        {/* Same greeting as the manager home, so the two screens read as one
-            product. The subtitle names what is on the page rather than
-            stating a priority. */}
+        {/* Greets by time of day. The subtitle names what is on the page
+            rather than stating a priority. */}
         <h1 className="text-3xl font-display font-bold uppercase tracking-[0.02em]">
           {greetingFor(user.name)}
         </h1>
