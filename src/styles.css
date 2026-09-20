@@ -74,6 +74,11 @@
   --color-warning-line: var(--warning-line);
 
   /* Tags — category and classification, never a state */
+  /* Calendar event types. Match day is the one hue the semantic set had no
+     room for: green, amber and red already carry duty-of-care meaning on
+     the same screens, and blue is taken by interactions. */
+  --color-event-match: var(--event-match);
+
   --color-info: var(--info);
   --color-info-foreground: var(--info-foreground);
   --color-info-fill: var(--info-fill);
@@ -213,6 +218,8 @@
   --destructive-fill: #fdefee;
   --destructive-line: #f2d2cf;
   --destructive-foreground: #ffffff;
+  --event-match: #7c3aed;
+
   --info: #0077b6;
   --info-fill: #e8f1fc;
   --info-line: #cfe2f7;
@@ -342,6 +349,8 @@
   --destructive-fill: rgba(255, 90, 79, 0.13);
   --destructive-line: rgba(255, 90, 79, 0.32);
   --destructive-foreground: #0d0d0d;
+  --event-match: #b388ff;
+
   --info: #238aff;
   --info-fill: rgba(35, 138, 255, 0.12);
   --info-line: rgba(35, 138, 255, 0.3);

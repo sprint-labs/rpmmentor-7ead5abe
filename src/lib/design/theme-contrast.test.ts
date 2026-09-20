@@ -79,6 +79,9 @@ const ACCENT_TOKENS = [
   "--tier-2",
   "--tier-3",
   "--tier-4",
+  // The calendar's match-day violet. A dot fill today, but it entered the
+  // system as a hue anyone may later set text in, so it is proved now.
+  "--event-match",
   // The skill-score ramp. These are numerals on a card, not just bar fills, so
   // they carry the same floor as every other text token. Two of them failed it
   // when the profile's skill scores first used them.
