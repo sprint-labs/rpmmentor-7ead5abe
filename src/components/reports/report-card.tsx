@@ -187,8 +187,7 @@ export function ReportCard({
               className="inline-flex min-h-8 items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
             >
               <NotebookPen className="size-3" />
-              <span className="sr-only">Log an interaction for {report.goalkeeper}</span>
-              <span aria-hidden="true">Log</span>
+              Log<span className="sr-only"> — an interaction for {report.goalkeeper}</span>
             </button>
           )}
           <Link
@@ -196,8 +195,7 @@ export function ReportCard({
             params={{ reportId: report.report_id }}
             className="inline-flex min-h-8 items-center gap-0.5 text-xs font-semibold text-primary-ink hover:underline"
           >
-            <span className="sr-only">Open the report for {report.goalkeeper}</span>
-            <span aria-hidden="true">Open</span>
+            Open<span className="sr-only"> — the report for {report.goalkeeper}</span>
             <ChevronRight className="size-3" />
           </Link>
         </span>

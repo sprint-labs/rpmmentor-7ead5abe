@@ -140,7 +140,7 @@ describe("ReportCard", () => {
         onLogInteraction={onLogInteraction}
       />,
     );
-    fireEvent.click(screen.getByRole("button", { name: /log an interaction for Joe Lumley/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^Log.*an interaction for Joe Lumley$/ }));
     expect(onLogInteraction).toHaveBeenCalledTimes(1);
   });
 
@@ -154,7 +154,10 @@ describe("ReportCard", () => {
       />,
     );
 
-    const open = screen.getByRole("link", { name: /open the report for Joe Lumley/i });
+    // Visible "Open" stays in the name; the goalkeeper is appended, not a
+    // substitute. An aria-hidden "Open" plus a paraphrased sr-only phrase
+    // would hide the word a voice-control user can see.
+    const open = screen.getByRole("link", { name: /^Open.*the report for Joe Lumley$/ });
     expect(open.getAttribute("href")).toContain("r1");
   });
 });

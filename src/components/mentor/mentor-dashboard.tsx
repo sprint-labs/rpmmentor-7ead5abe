@@ -40,8 +40,8 @@ import {
 import { formatDateOnly } from "@/lib/interactions/schema";
 import { BulletinDashboardCard } from "@/components/bulletins/dashboard-card";
 import { MentorMonthPanel } from "@/components/calendar/mentor-month-panel";
-import { listCalendarEvents } from "@/lib/calendar.functions";
-import { localDateIso } from "@/lib/calendar/month";
+import { listAssignedCalendarEvents } from "@/lib/calendar.functions";
+import { formatMonthParam, localDateIso, shiftMonth } from "@/lib/calendar/month";
 
 import { lastNDaysPeriod } from "@/lib/dashboard-period";
 
@@ -111,32 +111,34 @@ export function MentorDashboard({ user }: Props) {
     return () => window.removeEventListener("rpm:report-submitted", handleReportSubmitted);
   }, [queryClient]);
 
-  // The shared team calendar, for the month panel. Same `["calendar-events"]`
-  // cache the calendar page and the manager home read, so this is one query
-  // rather than a mentor-specific endpoint. It is narrowed below to the events
-  // assigned to this mentor — the same predicate `getMentorDashboardStats`
-  // applies server-side for the upcoming list, so the grid and the list under
-  // it can never describe different diaries.
-  const fetchCalendarEvents = useServerFn(listCalendarEvents);
+  // This mentor's diary, not the shared team feed. `listCalendarEvents` is the
+  // oldest 1000 team rows with no assignee or date window, so a season of
+  // imported fixtures can fill that cap and leave this month empty while the
+  // upcoming list (assigned, date-bounded) still has next week's matches.
+  // Same assigned-mentor + not-cancelled predicate as `getMentorDashboardStats`,
+  // from a year back so paging nearby months still has something to show.
+  // Local calendar date, not `toISOString()`: UTC midnight would shift the day
+  // for anyone west of UTC, and today's square would ring yesterday.
+  const todayIso = localDateIso(new Date());
+  const assignedFromDate = useMemo(() => {
+    const [year, month] = todayIso.split("-").map(Number);
+    return year && month ? `${formatMonthParam(shiftMonth({ year, month }, -12))}-01` : todayIso;
+  }, [todayIso]);
+  const fetchAssignedEvents = useServerFn(listAssignedCalendarEvents);
   const {
-    data: teamEvents,
+    data: assignedEvents,
     isPending: calendarPending,
     isError: calendarError,
   } = useQuery({
-    queryKey: ["calendar-events"],
-    queryFn: () => fetchCalendarEvents(),
+    queryKey: ["calendar-events", "assigned", user.id, assignedFromDate],
+    queryFn: () => fetchAssignedEvents({ data: { fromDate: assignedFromDate } }),
     enabled: canViewCalendar,
     staleTime: 30_000,
   });
   const myEvents = useMemo(
-    () => (teamEvents ?? []).filter((e) => e.assigned_mentor_id === user.id),
-    [teamEvents, user.id],
+    () => (assignedEvents ?? []).filter((e) => e.assigned_mentor_id === user.id),
+    [assignedEvents, user.id],
   );
-  // Local calendar date, not `toISOString()`. The ISO form is UTC, so between
-  // midnight and 01:00 BST it still reads as yesterday and today's square is
-  // ringed on the wrong day.
-  const todayIso = localDateIso(new Date());
-
   // Write-ups this mentor owes after an event that has already happened. Read
   // from the database, so a saved Match Report or Interaction clears it.
   const fetchFollowUps = useServerFn(listEventFollowUps);

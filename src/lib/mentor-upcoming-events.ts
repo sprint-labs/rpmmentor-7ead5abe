@@ -35,6 +35,8 @@ export interface UpcomingCalendarEventRow {
   /** Clock time, "HH:MM[:SS]", or null when the event has no set time. */
   start_time: string | null;
   goalkeeper_name: string | null;
+  /** Present when the read selects it; cancelled rows are dropped either way. */
+  status?: string;
 }
 
 /** The roster fields used to decorate a row. Display only. */
@@ -172,7 +174,9 @@ export function mapUpcomingCalendarEvents(
   roster: readonly UpcomingRosterGoalkeeper[],
 ): MentorUpcomingInteraction[] {
   const rosterByName = buildRosterNameIndex(roster);
-  return rows.map((row) => toUpcomingInteraction(row, rosterByName));
+  return rows
+    .filter((row) => row.status !== "cancelled")
+    .map((row) => toUpcomingInteraction(row, rosterByName));
 }
 
 /**

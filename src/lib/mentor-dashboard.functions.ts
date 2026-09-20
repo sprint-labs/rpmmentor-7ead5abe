@@ -152,13 +152,15 @@ export const getMentorDashboardStats = createServerFn({ method: "GET" })
       // Events a manager has booked this mentor in to attend, bounded to the
       // forward window so this never reads the whole table. Scoped by the
       // assigned profile, so a mentor sees their own diary rather than the
-      // whole team's. Events scheduled before mentors were assignable have no
-      // assignee and therefore reach nobody: they need reassigning on
+      // whole team's. Cancelled fixtures are dropped so this list matches the
+      // month grid above it. Events scheduled before mentors were assignable
+      // have no assignee and therefore reach nobody: they need reassigning on
       // `/calendar` to reappear here.
       supabase
         .from("calendar_events")
-        .select("id, title, event_type, event_date, start_time, goalkeeper_name")
+        .select("id, title, event_type, event_date, start_time, goalkeeper_name, status")
         .eq("assigned_mentor_id", userId)
+        .neq("status", "cancelled")
         .gte("event_date", upcoming.fromDate)
         .lte("event_date", upcoming.toDate)
         .order("event_date", { ascending: true })

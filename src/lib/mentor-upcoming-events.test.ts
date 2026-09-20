@@ -116,6 +116,15 @@ describe("goalkeeper decoration", () => {
     });
   });
 
+  it("drops cancelled events so the list matches the month grid", () => {
+    expect(
+      mapUpcomingCalendarEvents(
+        [event({ status: "cancelled" }), event({ id: "event-2", status: "scheduled" })],
+        ROSTER,
+      ).map((row) => row.id),
+    ).toEqual(["event-2"]);
+  });
+
   it("handles an event with no goalkeeper at all", () => {
     const [item] = mapUpcomingCalendarEvents([event({ goalkeeper_name: null })], ROSTER);
 

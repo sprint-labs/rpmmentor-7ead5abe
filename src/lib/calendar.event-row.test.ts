@@ -146,6 +146,17 @@ describe("calendar event query columns", () => {
     expect(source).toContain('participationUpdate.is("player_id", null)');
   });
 
+  it("lists a mentor's assigned diary from a start date, not the oldest 1000 team rows", () => {
+    const source = readFileSync(new URL("./calendar.functions.ts", import.meta.url), "utf8");
+    const assigned = source.slice(
+      source.indexOf("export const listAssignedCalendarEvents"),
+      source.indexOf("export const createCalendarEvent"),
+    );
+    expect(assigned).toMatch(/\.eq\("assigned_mentor_id", context.userId\)/);
+    expect(assigned).toMatch(/\.gte\("event_date", data.fromDate\)/);
+    expect(assigned).toMatch(/\.neq\("status", "cancelled"\)/);
+  });
+
   it("fails closed when the existing event cannot be read before an edit", () => {
     const source = readFileSync(new URL("./calendar.functions.ts", import.meta.url), "utf8");
     const updateSource = source.slice(

@@ -276,6 +276,41 @@ export const listCalendarEvents = createServerFn({ method: "GET" })
     return (data ?? []).map(toTeamCalendarEvent);
   });
 
+const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * The signed-in mentor's own diary, from `fromDate` forward.
+ *
+ * `listCalendarEvents` is the shared team feed: oldest 1000 rows, no assignee
+ * and no date window. A season of imported fixtures fills that cap, so the
+ * current month can drop off it while a date-bounded assigned query still
+ * returns next week's matches. This read is that assigned query — the same
+ * predicate the mentor dashboard upcoming list uses — so the month grid and
+ * the list under it describe one diary.
+ */
+export const listAssignedCalendarEvents = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .validator((data: { fromDate: string }) => {
+    const fromDate = data?.fromDate?.trim() ?? "";
+    if (!DATE_ONLY.test(fromDate)) {
+      throw new Error("A calendar start date is required.");
+    }
+    return { fromDate };
+  })
+  .handler(async ({ context, data }): Promise<TeamCalendarEvent[]> => {
+    const { data: rows, error } = await context.supabase
+      .from("calendar_events")
+      .select(COLUMNS)
+      .eq("assigned_mentor_id", context.userId)
+      .gte("event_date", data.fromDate)
+      .neq("status", "cancelled")
+      .order("event_date", { ascending: true })
+      .order("start_time", { ascending: true, nullsFirst: true })
+      .limit(1000);
+    if (error) throw new Error(error.message);
+    return (rows ?? []).map(toTeamCalendarEvent);
+  });
+
 export const createCalendarEvent = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((data: EventInput) => validateEvent(data))
