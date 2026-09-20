@@ -581,6 +581,28 @@ function CalendarPage() {
         })}
       </div>
 
+      {/* What the colours mean. The grid tells you at a glance which fixtures
+          are still waiting on a result, which is the whole point of the tone —
+          but only if the tone is explained somewhere. */}
+      <div
+        className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[11px] text-muted-foreground"
+        aria-label="Colour key"
+      >
+        {[
+          { tone: "success" as const, label: "Fixture played" },
+          { tone: "warning" as const, label: "Fixture to come" },
+          { tone: "info" as const, label: "Interaction or visit" },
+        ].map((entry) => (
+          <span key={entry.tone} className="inline-flex items-center gap-1.5">
+            <span
+              aria-hidden="true"
+              className={`inline-block size-2.5 rounded-sm border ${CHIP[entry.tone]}`}
+            />
+            {entry.label}
+          </span>
+        ))}
+      </div>
+
       {filteredGoalkeeper && (
         <div className="flex items-center justify-between gap-3 rounded-md border border-border/60 bg-accent/30 px-3 py-2.5">
           <div className="text-sm">
@@ -724,12 +746,17 @@ function CalendarPage() {
         <Card className="p-3">
           <div className="grid grid-cols-7 gap-2">
             {weekDays.map((d) => {
-              const dayEvents = eventsByDay.get(d.toDateString()) ?? [];
-              const isToday = d.toDateString() === today.toDateString();
+              // Keyed by the same local ISO day the map is built on. This read
+              // still asked for `toDateString()` after the map moved to ISO
+              // keys, so every lookup missed and the week showed no events at
+              // all — the month view beside it was right the whole time.
+              const iso = localDateIso(d);
+              const dayEvents = eventsByDay.get(iso) ?? [];
+              const isToday = iso === todayIso;
               return (
                 <div
                   key={d.toISOString()}
-                  className={`min-h-72 rounded-md border border-border p-2 ${isToday ? "ring-1 ring-primary" : ""}`}
+                  className={`min-h-40 rounded-md border border-border p-2 ${isToday ? "ring-1 ring-primary" : ""}`}
                 >
                   <div className="text-[10px] uppercase text-muted-foreground">
                     {d.toLocaleDateString("en", { weekday: "short" })}

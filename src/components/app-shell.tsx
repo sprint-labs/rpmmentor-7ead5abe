@@ -798,6 +798,7 @@ export function AppShell() {
           )}
           {canSeeSupport && (
             <HelpUpdatesLauncher
+              showTrigger={false}
               open={helpOpen}
               unreadCount={helpUnread}
               announcements={updateAnnouncements}
@@ -941,6 +942,27 @@ export function AppShell() {
                   </button>
                 )}
               <ThemeToggle menu />
+              {canSeeSupport && (
+                <button
+                  onClick={() => {
+                    setNavOpen(false);
+                    setBellOpen(false);
+                    setHelpOpen(true);
+                  }}
+                  className="w-full min-h-11 flex items-center gap-2 px-3 py-2 rounded-md border border-border text-xs uppercase tracking-[0.06em] font-semibold hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <LifeBuoy className="size-4" />
+                  {/* "Help & updates", verbatim: the dialog's accessible name
+                      spells the ampersand, and the two must match for a speech
+                      user saying what they read. */}
+                  Help &amp; updates
+                  {helpUnread > 0 && (
+                    <span className="ml-auto grid h-[18px] min-w-[18px] place-items-center rounded-full bg-primary px-1 font-mono text-[10px] font-semibold text-primary-foreground">
+                      {helpUnread > 9 ? "9+" : helpUnread}
+                    </span>
+                  )}
+                </button>
+              )}
               <Link
                 to={"/account" as never}
                 onClick={closeMenu}

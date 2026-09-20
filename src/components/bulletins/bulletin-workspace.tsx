@@ -313,7 +313,10 @@ export function BulletinWorkspace({
         <p className="mt-0.5 text-xs text-muted-foreground">{board.description}</p>
       </div>
 
-      <div className="grid min-w-0 lg:grid-cols-[minmax(19rem,0.78fr)_minmax(0,1.22fr)]">
+      {/* The list is an index — a title, a date and a one-line summary that
+          truncates either way — while the detail beside it holds the update
+          itself. The split favours the side that has something to say. */}
+      <div className="grid min-w-0 lg:grid-cols-[minmax(17rem,0.62fr)_minmax(0,1.38fr)]">
         <section
           aria-label={`${board.label} list`}
           className="min-w-0 border-b border-border lg:border-b-0 lg:border-r"
