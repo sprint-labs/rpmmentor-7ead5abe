@@ -252,10 +252,20 @@ describe("dashboard operational grid", () => {
     expect(cellFor("Tiers & Tags Distribution").className).toContain("lg:col-span-4");
 
     // One-sentence rows; a wide measure makes them harder to scan, not easier.
-    expect(cellFor("Recent Activity").className).toContain("lg:col-span-8");
+    expect(cellFor("Recent Activity").className).toContain("lg:col-span-4");
 
     // The calendar and the fixtures that fall in it currently share one cell.
     expect(cellFor("Calendar").className).toContain("lg:col-span-8");
     expect(cellFor("Upcoming Fixtures")).toBe(cellFor("Calendar"));
+  });
+
+  it("places Recent Activity from one cell, so it cannot resize when it errors", async () => {
+    await renderDashboard();
+
+    // The live panel and the ErrorBoundary fallback used to carry the span
+    // string separately, so changing one silently resized the other. The
+    // placement now sits on the cell that wraps the boundary itself.
+    const cell = cellFor("Recent Activity");
+    expect(cell.querySelectorAll("[class*='col-span-']")).toHaveLength(0);
   });
 });

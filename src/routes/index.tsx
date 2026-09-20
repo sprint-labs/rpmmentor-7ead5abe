@@ -36,6 +36,7 @@ import { getRosterSnapshot } from "@/lib/roster-snapshot.functions";
 import { listPlayers } from "@/lib/players.functions";
 import { goalkeeperByName } from "@/lib/roster/goalkeeper-profile";
 import { GoalkeeperDistribution, MIN_VISIBLE_BAR } from "@/components/goalkeeper-distribution";
+import { BentoCell, BentoGrid } from "@/components/ui/bento-grid";
 import { wholePercentsSummingTo100 } from "@/lib/roster-snapshot";
 import { listCalendarEvents } from "@/lib/calendar.functions";
 import { listPlayerDutyOfCare } from "@/lib/duty-of-care.functions";
@@ -556,9 +557,9 @@ function Dashboard() {
       <BulletinDashboardCard scope="team" />
 
       {/* Operational grid */}
-      <div className="grid grid-cols-12 gap-4">
+      <BentoGrid>
         {/* Duty of Care monitor */}
-        <div className="col-span-12 self-start command-panel p-4 sm:p-5 lg:col-span-4">
+        <BentoCell size="list" className="command-panel p-4 sm:p-5">
           <SectionTitle
             className="flex-col items-start gap-2 sm:flex-row sm:items-center sm:gap-3"
             action={
@@ -624,113 +625,120 @@ function Dashboard() {
               ))}
             </div>
           )}
-        </div>
+        </BentoCell>
+
+        {/* Tiers and tags, beside duty of care: the same bar-and-count idiom
+            over the same roster, so the two read as one pair rather than
+            bookending the grid. */}
+        <GoalkeeperDistribution roster={roster} pending={rosterPending} error={rosterError} />
 
         {/* Recent activity */}
-        <ErrorBoundary
-          fallback={(reset) => (
-            <div className="col-span-12 self-start lg:col-span-8 command-panel p-5">
-              <SectionTitle>Recent Activity</SectionTitle>
-              <div className="border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive flex items-start gap-2">
-                <AlertTriangle className="size-4 shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium">Recent activity didn't load</p>
-                  <p className="text-destructive/80">
-                    Something went wrong loading the latest activity.
-                  </p>
+        <BentoCell size="list">
+          <ErrorBoundary
+            fallback={(reset) => (
+              <div className="command-panel p-5">
+                <SectionTitle>Recent Activity</SectionTitle>
+                <div className="border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive flex items-start gap-2">
+                  <AlertTriangle className="size-4 shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium">Recent activity didn't load</p>
+                    <p className="text-destructive/80">
+                      Something went wrong loading the latest activity.
+                    </p>
+                  </div>
                 </div>
+                <button
+                  type="button"
+                  onClick={reset}
+                  className="mt-3 inline-flex h-8 items-center justify-center bg-destructive px-3 text-[10px] font-mono uppercase tracking-widest text-destructive-foreground hover:bg-destructive/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  Retry
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={reset}
-                className="mt-3 inline-flex h-8 items-center justify-center bg-destructive px-3 text-[10px] font-mono uppercase tracking-widest text-destructive-foreground hover:bg-destructive/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            )}
+          >
+            <div className="command-panel p-5">
+              <SectionTitle
+                action={
+                  can("interactions.log") ? (
+                    <button
+                      type="button"
+                      onClick={() => setWorkflow("interaction")}
+                      className="text-[10px] font-mono uppercase tracking-widest text-primary-ink inline-flex items-center gap-1 hover:underline"
+                    >
+                      <Plus className="size-3" /> Log interaction
+                    </button>
+                  ) : undefined
+                }
               >
-                Retry
-              </button>
-            </div>
-          )}
-        >
-          <div className="col-span-12 self-start lg:col-span-8 command-panel p-5">
-            <SectionTitle
-              action={
-                can("interactions.log") ? (
-                  <button
-                    type="button"
-                    onClick={() => setWorkflow("interaction")}
-                    className="text-[10px] font-mono uppercase tracking-widest text-primary-ink inline-flex items-center gap-1 hover:underline"
-                  >
-                    <Plus className="size-3" /> Log interaction
-                  </button>
-                ) : undefined
-              }
-            >
-              Recent Activity
-            </SectionTitle>
+                Recent Activity
+              </SectionTitle>
 
-            {/* Two feeds over one panel. A tablist rather than two links: this
+              {/* Two feeds over one panel. A tablist rather than two links: this
                 swaps what the panel shows without leaving the dashboard, and
                 both feeds read caches the page has already loaded. */}
-            <div
-              role="tablist"
-              aria-label="Recent activity feed"
-              className="mb-4 inline-flex gap-1 rounded-md border border-border p-0.5"
-            >
-              {ACTIVITY_FEEDS.map((feed) => {
-                const selected = activityFeed === feed.id;
-                return (
-                  <button
-                    key={feed.id}
-                    type="button"
-                    role="tab"
-                    aria-selected={selected}
-                    onClick={() => setActivityFeed(feed.id)}
-                    className={`min-h-8 rounded px-2.5 text-[10px] font-mono uppercase tracking-widest transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
-                      selected
-                        ? "bg-accent text-foreground"
-                        : "text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    {feed.label}
-                  </button>
-                );
-              })}
-            </div>
+              <div
+                role="tablist"
+                aria-label="Recent activity feed"
+                className="mb-4 inline-flex gap-1 rounded-md border border-border p-0.5"
+              >
+                {ACTIVITY_FEEDS.map((feed) => {
+                  const selected = activityFeed === feed.id;
+                  return (
+                    <button
+                      key={feed.id}
+                      type="button"
+                      role="tab"
+                      aria-selected={selected}
+                      onClick={() => setActivityFeed(feed.id)}
+                      className={`min-h-8 rounded px-2.5 text-[10px] font-mono uppercase tracking-widest transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+                        selected
+                          ? "bg-accent text-foreground"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      {feed.label}
+                    </button>
+                  );
+                })}
+              </div>
 
-            <div className="space-y-3">
-              {activityFeed === "interactions" ? (
-                interactionsPending ? (
+              <div className="space-y-3">
+                {activityFeed === "interactions" ? (
+                  interactionsPending ? (
+                    <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground py-6 text-center">
+                      Loading interactions…
+                    </div>
+                  ) : interactionsError ? (
+                    <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground py-6 text-center">
+                      Interactions didn't load
+                    </div>
+                  ) : recentActivity.length === 0 ? (
+                    <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground py-6 text-center">
+                      No interactions logged recently
+                    </div>
+                  ) : (
+                    recentActivity.map((a) => <ActivityRow key={a.id} entry={a} tone="bg-info" />)
+                  )
+                ) : reportsLoading ? (
                   <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground py-6 text-center">
-                    Loading interactions…
+                    Loading match reports…
                   </div>
-                ) : interactionsError ? (
+                ) : reportsError ? (
                   <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground py-6 text-center">
-                    Interactions didn't load
+                    Match reports didn't load
                   </div>
-                ) : recentActivity.length === 0 ? (
+                ) : recentReports.length === 0 ? (
                   <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground py-6 text-center">
-                    No interactions logged recently
+                    No match reports submitted recently
                   </div>
                 ) : (
-                  recentActivity.map((a) => <ActivityRow key={a.id} entry={a} tone="bg-info" />)
-                )
-              ) : reportsLoading ? (
-                <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground py-6 text-center">
-                  Loading match reports…
-                </div>
-              ) : reportsError ? (
-                <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground py-6 text-center">
-                  Match reports didn't load
-                </div>
-              ) : recentReports.length === 0 ? (
-                <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground py-6 text-center">
-                  No match reports submitted recently
-                </div>
-              ) : (
-                recentReports.map((a) => <ActivityRow key={a.id} entry={a} tone="bg-primary" />)
-              )}
+                  recentReports.map((a) => <ActivityRow key={a.id} entry={a} tone="bg-primary" />)
+                )}
+              </div>
             </div>
-          </div>
-        </ErrorBoundary>
+          </ErrorBoundary>
+        </BentoCell>
 
         {/* Calendar and the fixtures in it, as one cell. */}
         <div className="col-span-12 grid gap-4 self-start lg:col-span-8 xl:grid-cols-2">
@@ -874,9 +882,7 @@ function Dashboard() {
             </div>
           </div>
         </div>
-
-        <GoalkeeperDistribution roster={roster} pending={rosterPending} error={rosterError} />
-      </div>
+      </BentoGrid>
 
       <WorkflowDialog kind={workflow} onClose={() => setWorkflow(null)} />
     </div>
