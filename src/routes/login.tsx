@@ -220,7 +220,7 @@ function LoginPage() {
                   className="w-full flex items-center justify-center gap-2.5 py-2.5 rounded-xl border border-border bg-card text-sm font-medium hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-colors disabled:opacity-60"
                 >
                   <GoogleMark className="size-4 shrink-0" />
-                  {googleSubmitting ? "Redirecting to Google…" : "Sign in with Google"}
+                  {googleSubmitting ? "Redirecting to Google…" : "Continue with Google"}
                 </button>
               </>
             )}
