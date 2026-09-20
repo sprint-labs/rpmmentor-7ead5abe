@@ -29,13 +29,8 @@ export function MentorPrimaryActions({
             className="min-h-[7.5rem] rounded-lg bg-primary text-primary-foreground px-5 py-4 text-left flex flex-col justify-between gap-4 hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           >
             <FileText className="size-8" aria-hidden="true" />
-            <span>
-              <span className="block text-xl font-display font-bold uppercase tracking-[0.02em]">
-                {mentorPrimaryActionLabels.logMatchReport}
-              </span>
-              <span className="mt-1 block text-xs text-primary-foreground/80">
-                Score a goalkeeper you watched
-              </span>
+            <span className="block text-xl font-display font-bold uppercase tracking-[0.02em]">
+              {mentorPrimaryActionLabels.logMatchReport}
             </span>
           </button>
         )}
@@ -46,13 +41,8 @@ export function MentorPrimaryActions({
             className="min-h-[7.5rem] rounded-lg border-2 border-primary bg-primary/10 text-foreground px-5 py-4 text-left flex flex-col justify-between gap-4 hover:bg-primary/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           >
             <Plus className="size-8 text-primary-ink" aria-hidden="true" />
-            <span>
-              <span className="block text-xl font-display font-bold uppercase tracking-[0.02em]">
-                {mentorPrimaryActionLabels.logInteraction}
-              </span>
-              <span className="mt-1 block text-xs text-muted-foreground">
-                Log a call, visit or catch-up
-              </span>
+            <span className="block text-xl font-display font-bold uppercase tracking-[0.02em]">
+              {mentorPrimaryActionLabels.logInteraction}
             </span>
           </button>
         )}

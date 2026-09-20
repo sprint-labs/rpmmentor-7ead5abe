@@ -278,7 +278,7 @@ export function MentorDashboard({ user }: Props) {
             <StatCard
               label={mentorDashboardMetricCardLabels.matchReportsSubmitted}
               value={isLoading ? "…" : isError ? "—" : (data?.reportsLast14 ?? "—")}
-              hint={isError ? "Count unavailable" : `${period} · by match date`}
+              hint={isError ? "Count unavailable" : period}
               accent="primary"
               updatedAt={updatedAt}
             />
@@ -293,7 +293,7 @@ export function MentorDashboard({ user }: Props) {
             <StatCard
               label={mentorDashboardMetricCardLabels.interactionsLogged}
               value={isLoading ? "…" : isError ? "—" : (data?.interactionsLast14 ?? "—")}
-              hint={isError ? "Count unavailable" : `${period} · by interaction date`}
+              hint={isError ? "Count unavailable" : period}
               accent="info"
               updatedAt={updatedAt}
             />
