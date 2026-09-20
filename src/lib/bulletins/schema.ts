@@ -16,6 +16,16 @@ export type BulletinKind = (typeof BULLETIN_KINDS)[number];
 export const BULLETIN_STATUSES = ["open", "working", "blocked", "closed"] as const;
 export type BulletinStatus = (typeof BULLETIN_STATUSES)[number];
 
+/**
+ * The three things the dashboard calls out as needing attention.
+ *
+ * They cut across the boards rather than sitting inside one — an overdue lead
+ * and an overdue mandate are the same problem to whoever is clearing the
+ * backlog — so a list filtered by one of these leaves `kind` unset.
+ */
+export const BULLETIN_ATTENTION = ["overdue", "due_soon", "unassigned"] as const;
+export type BulletinAttention = (typeof BULLETIN_ATTENTION)[number];
+
 export const BULLETIN_SUBJECT_TYPES = ["club", "player", "other"] as const;
 export type BulletinSubjectType = (typeof BULLETIN_SUBJECT_TYPES)[number];
 
@@ -56,7 +66,9 @@ export const createBulletinInput = bulletinDraftInput.extend({
 
 export const listBulletinsQuery = z.object({
   scope: z.enum(BULLETIN_SCOPES),
-  kind: z.enum(BULLETIN_KINDS),
+  /** Omitted when `attention` is set, which lists across every board. */
+  kind: z.enum(BULLETIN_KINDS).optional(),
+  attention: z.enum(BULLETIN_ATTENTION).optional(),
   status: z.enum(BULLETIN_STATUSES).optional(),
   search: z.string().trim().max(120).optional(),
   page: z.coerce.number().int().min(1).default(1),

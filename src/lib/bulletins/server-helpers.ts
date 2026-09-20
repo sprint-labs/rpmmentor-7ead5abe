@@ -1,5 +1,5 @@
 import type { AppRole } from "@/lib/roles.server";
-import type { BulletinScope } from "./schema";
+import type { BulletinAttention, BulletinScope } from "./schema";
 
 export const BULLETIN_VIEW_ROLES: readonly AppRole[] = [
   "super_admin",
@@ -94,4 +94,41 @@ export function getLondonAttentionWindow(now: Date = new Date()): {
 } {
   const today = dateOnlyInZone(now, "Europe/London");
   return { today, dueSoonThrough: addDateOnlyDays(today, 7) };
+}
+
+/** The date and owner bounds a `BulletinAttention` stands for. */
+export interface BulletinAttentionFilters {
+  excludeClosed: true;
+  ownerIsNull?: true;
+  dueBefore?: string;
+  dueOnOrAfter?: string;
+  dueOnOrBefore?: string;
+}
+
+/**
+ * One definition of overdue, due-soon and unassigned, for every caller.
+ *
+ * The dashboard counts these and the board lists them. Expressing the bounds
+ * twice is how a chip ends up promising a number the list it opens cannot
+ * show, so both read them from here.
+ *
+ * Closed work is excluded throughout: an overdue item that has been closed is
+ * finished, not outstanding.
+ */
+export function bulletinAttentionFilters(
+  attention: BulletinAttention,
+  window: { today: string; dueSoonThrough: string },
+): BulletinAttentionFilters {
+  switch (attention) {
+    case "overdue":
+      return { excludeClosed: true, dueBefore: window.today };
+    case "due_soon":
+      return {
+        excludeClosed: true,
+        dueOnOrAfter: window.today,
+        dueOnOrBefore: window.dueSoonThrough,
+      };
+    case "unassigned":
+      return { excludeClosed: true, ownerIsNull: true };
+  }
 }
