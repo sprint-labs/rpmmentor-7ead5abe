@@ -13,9 +13,17 @@
  *   3. `https://www.rpmmentor.com/**` in Supabase → Authentication →
  *      URL Configuration → Redirect URLs.
  *
- * Until all three are true, pressing the button reaches Supabase, finds no
- * Google provider, and returns an error. A button that always fails is worse
- * than no button: it reads as a broken app rather than an unfinished setup.
+ * Until all three are true the button fails, and how it fails depends on how
+ * far the setup got. With the provider off, Supabase rejects the call and the
+ * error surfaces on our own page. With the provider on but holding credentials
+ * that are not real — which is how this project was found on 2026-09-20, with
+ * a placeholder client id — the browser is handed to Google, which answers
+ * `Error 401: invalid_client / Unrecognized client_id` on a page of its own.
+ *
+ * The second is the worse of the two: it takes someone off the site entirely,
+ * to an error in Google's words, from the one screen they see before they are
+ * signed in. Either way a button that always fails reads as a broken app
+ * rather than an unfinished setup.
  *
  * TO TURN IT BACK ON: complete the three steps above, then change this to
  * `true` and deploy. Nothing else needs to change.
