@@ -195,6 +195,7 @@ export function BroadcastCentre() {
     startsAt: string;
     expiryMode: ExpiryMode;
     endsAt: string;
+    attachmentFile: File | null;
     scheduleTimeSource: BroadcastScheduleTimeSource;
   } | null>(null);
 
@@ -306,6 +307,9 @@ export function BroadcastCentre() {
   const recent = data.filter((announcement) => statusOf(announcement, now) === "ended").slice(0, 8);
 
   const previewAttachment = useMemo<AnnouncementAttachment | null>(() => {
+    // An edit keeps the stored media, so the preview shows that rather than
+    // nothing — otherwise saving looks like it would drop the attachment.
+    if (editing) return editing.attachment;
     if (!attachmentFile) return null;
     return {
       path: "preview",
@@ -313,7 +317,7 @@ export function BroadcastCentre() {
       mime: announcementAttachmentMime(attachmentFile),
       size: attachmentFile.size,
     };
-  }, [attachmentFile]);
+  }, [attachmentFile, editing]);
 
   function setAttachment(file: File | null) {
     if (!file) {
@@ -453,23 +457,30 @@ export function BroadcastCentre() {
 
   function startEditing(announcement: AnnouncementRow) {
     if (composerLocked) return;
-    // Keep whatever was in the composer so Cancel gives it back. The saved draft
-    // in storage is left untouched while editing, so this only has to cover the
-    // in-memory fields.
-    suspendedDraftRef.current = {
-      kind,
-      title,
-      body,
-      publishMode,
-      startsAt,
-      expiryMode,
-      endsAt,
-      scheduleTimeSource: scheduleTimeSourceRef.current,
-    };
+    // Park the composer so Cancel gives it back — but only the first time. A
+    // second Edit, on this row or another, must not overwrite the parked
+    // new-broadcast draft with the edit already in the form; Cancel would then
+    // restore someone else's broadcast as if it were the author's own draft.
+    if (!editing) {
+      suspendedDraftRef.current = {
+        kind,
+        title,
+        body,
+        publishMode,
+        startsAt,
+        expiryMode,
+        endsAt,
+        attachmentFile,
+        scheduleTimeSource: scheduleTimeSourceRef.current,
+      };
+    }
     setEditing(announcement);
     setKind(announcement.kind);
     setTitle(announcement.title);
     setBody(announcement.body);
+    // An edit cannot change stored media, so the composer's pending upload is
+    // parked rather than carried in — leaving it staged would show a file in
+    // the preview that Save silently drops.
     setAttachment(null);
     if (announcement.endsAt) {
       setExpiryMode("custom");
@@ -483,8 +494,10 @@ export function BroadcastCentre() {
   function stopEditing() {
     const suspended = suspendedDraftRef.current;
     setEditing(null);
-    setAttachment(null);
-    if (!suspended) return;
+    if (!suspended) {
+      setAttachment(null);
+      return;
+    }
     setKind(suspended.kind);
     setTitle(suspended.title);
     setBody(suspended.body);
@@ -492,6 +505,7 @@ export function BroadcastCentre() {
     setStartsAt(suspended.startsAt);
     setExpiryMode(suspended.expiryMode);
     setEndsAt(suspended.endsAt);
+    setAttachment(suspended.attachmentFile);
     scheduleTimeSourceRef.current = suspended.scheduleTimeSource;
     suspendedDraftRef.current = null;
   }
@@ -671,10 +685,12 @@ export function BroadcastCentre() {
               <div>
                 <div className="text-xs font-medium">Media attachment</div>
                 <div className="mt-0.5 text-[11px] text-muted-foreground">
-                  Optional. One file, up to 25 MB.
+                  {editing
+                    ? "Fixed for this broadcast. End it and post a new one to change the media."
+                    : "Optional. One file, up to 25 MB."}
                 </div>
               </div>
-              {attachmentFile && (
+              {!editing && attachmentFile && (
                 <button
                   type="button"
                   disabled={composerLocked}
@@ -688,12 +704,20 @@ export function BroadcastCentre() {
             <input
               ref={fileInputRef}
               type="file"
-              disabled={composerLocked}
+              disabled={composerLocked || editing !== null}
               accept={ANNOUNCEMENT_ATTACHMENT_ACCEPT}
               onChange={handleFileChange}
               className="sr-only"
             />
-            {attachmentFile ? (
+            {editing ? (
+              <div className="mt-2 rounded-md border border-border bg-muted/15 p-3 text-xs text-muted-foreground">
+                {editing.attachment
+                  ? `Keeping ${editing.attachment.name} (${formatAttachmentSize(
+                      editing.attachment.size,
+                    )}).`
+                  : "This broadcast has no attachment."}
+              </div>
+            ) : attachmentFile ? (
               <div className="mt-2 rounded-md border border-border bg-muted/15 p-3">
                 <div className="flex items-center gap-3">
                   <span className="grid size-10 shrink-0 place-items-center rounded-md bg-primary/10 text-primary-ink">
@@ -974,7 +998,7 @@ export function BroadcastCentre() {
                   </div>
                   <AnnouncementMedia
                     attachment={previewAttachment}
-                    previewUrl={attachmentPreviewUrl}
+                    previewUrl={editing ? null : attachmentPreviewUrl}
                     compact
                   />
                 </div>
