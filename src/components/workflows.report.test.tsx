@@ -513,6 +513,6 @@ describe("Match Report form", () => {
     });
     expect(mocks.clearDraft).toHaveBeenCalledWith(USER.id);
     expect(mocks.refreshInteractionViews).not.toHaveBeenCalled();
-    expect(await screen.findByText(/This report is queued locally/i)).toBeTruthy();
+    expect(await screen.findByText(/queued on this device/i)).toBeTruthy();
   });
 });

@@ -18,7 +18,10 @@ import { listPlayers } from "@/lib/players.functions";
 import { listUsersAndRoles } from "@/lib/users-and-roles.functions";
 import { listMatchReports } from "@/lib/match-reports/reports.functions";
 import { listAssignableMentors, listCalendarEvents } from "@/lib/calendar.functions";
-import { alerts as systemAlerts, goalkeepers, dutyStatusForGk } from "@/lib/mock-data";
+import { alerts as systemAlerts } from "@/lib/mock-data";
+import { toGoalkeepers } from "@/lib/roster/live-goalkeepers";
+import { listPlayerDutyOfCare } from "@/lib/duty-of-care.functions";
+import { buildRosterDutyIndex, rosterDutyFor } from "@/lib/duty-of-care-roster";
 import { isDateOnlyInPeriod, lastNDaysPeriod } from "@/lib/dashboard-period";
 import { isDashboardInteractionType } from "@/lib/interactions/schema";
 import { buildActiveMentorInsightRows } from "@/lib/active-mentor-insights";
@@ -117,7 +120,7 @@ export const Route = createFileRoute("/insights/$metric")({
 
 function Empty({ label }: { label: string }) {
   return (
-    <div className="py-10 text-center text-[10px] font-mono uppercase tracking-widest text-muted-foreground/70">
+    <div className="py-10 text-center text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
       {label}
     </div>
   );
@@ -161,10 +164,12 @@ function InsightDrilldown() {
   const fetchReports = useServerFn(listMatchReports);
   const fetchEvents = useServerFn(listCalendarEvents);
 
+  // Duty of Care needs the roster too: its list is one row per live goalkeeper,
+  // and the dashboard band it was clicked from counts live rows.
   const players = useQuery({
     queryKey: ["players"],
     queryFn: () => fetchPlayers(),
-    enabled: enabled && active === "goalkeepers",
+    enabled: enabled && (active === "goalkeepers" || active === "duty"),
     staleTime: 30_000,
   });
   const users = useQuery({
@@ -196,15 +201,18 @@ function InsightDrilldown() {
     enabled && (active === "interactions" || active === "duty"),
   );
 
-  const dutySource = useMemo(
-    () =>
-      (interactions.data ?? []).map((i) => ({
-        gkId: i.gkSlug,
-        type: i.interactionType,
-        date: i.occurredAt,
-      })),
-    [interactions.data],
-  );
+  // Duty of Care reads `public.player_duty_of_care`, the same projection the
+  // dashboard headline, the roster chips and every profile badge read. It was
+  // recomputed here from logged interactions keyed by legacy slug, which is why
+  // this drilldown said 10 overdue while the roster said 15.
+  const dutyListFn = useServerFn(listPlayerDutyOfCare);
+  const duty = useQuery({
+    queryKey: ["duty-of-care", "roster"],
+    queryFn: () => dutyListFn(),
+    enabled: enabled && active === "duty",
+    staleTime: 60_000,
+  });
+  const dutyIndex = useMemo(() => buildRosterDutyIndex(duty.data ?? []), [duty.data]);
 
   if (!user || user.role === "mentor") return null;
   if (active === "alerts" && !canViewSystemAlerts) {
@@ -240,14 +248,14 @@ function InsightDrilldown() {
                   type: "",
                   source: "interactions-logged",
                 }}
-                className="text-[10px] font-mono uppercase tracking-widest text-primary inline-flex items-center gap-1"
+                className="text-[10px] font-mono uppercase tracking-widest text-primary-ink inline-flex items-center gap-1"
               >
                 Open full interaction log <ArrowUpRight className="size-3" />
               </Link>
             ) : (
               <Link
                 to={meta.to}
-                className="text-[10px] font-mono uppercase tracking-widest text-primary inline-flex items-center gap-1"
+                className="text-[10px] font-mono uppercase tracking-widest text-primary-ink inline-flex items-center gap-1"
               >
                 {meta.linkLabel} <ArrowUpRight className="size-3" />
               </Link>
@@ -265,7 +273,7 @@ function InsightDrilldown() {
             search={{ from: period.fromDate, to: period.toDate, level: "", tier: "" }}
             className={`px-2.5 h-7 inline-flex items-center border text-[10px] font-mono uppercase tracking-widest ${
               m === active
-                ? "border-primary text-primary"
+                ? "border-primary text-primary-ink"
                 : "border-border text-muted-foreground hover:text-foreground"
             }`}
           >
@@ -301,11 +309,16 @@ function InsightDrilldown() {
 
         {active === "duty" &&
           (() => {
-            if (interactions.isLoading) return <Empty label="Loading…" />;
-            if (interactions.isError) return <Empty label="Duty of Care unavailable" />;
-            const rows = goalkeepers.map((gk) => ({
+            if (duty.isPending || players.isPending) return <Empty label="Loading…" />;
+            if (duty.isError || players.isError) return <Empty label="Duty of Care unavailable" />;
+            // `public.players`, not the seed fixture. The seed holds 114 names
+            // and the live roster 116, so building this list from the fixture
+            // made the band you clicked ("Overdue 15") open a list that counted
+            // a different 15 — and silently dropped every goalkeeper signed
+            // since the fixture was captured.
+            const rows = toGoalkeepers(players.data).map((gk) => ({
               gk,
-              duty: dutyStatusForGk(gk, dutySource),
+              duty: rosterDutyFor(dutyIndex, gk.name),
             }));
             if (rows.length === 0) return <Empty label="No goalkeepers on the roster" />;
             return <DutyOfCareWorkbench rows={rows} initialLevel={search.level} />;

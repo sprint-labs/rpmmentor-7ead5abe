@@ -1,5 +1,5 @@
 import { Clock3, LogOut, RefreshCw, Wrench } from "lucide-react";
-import { BrandMark } from "@/components/brand-mark";
+import { GkhqMark } from "@/components/gkhq-lockup";
 
 interface MaintenanceScreenProps {
   onSignOut: () => void | Promise<void>;
@@ -26,8 +26,8 @@ export function MaintenanceScreen({ onSignOut, onCheckAgain }: MaintenanceScreen
           className="w-full rounded-2xl border border-border bg-card/90 p-6 shadow-2xl backdrop-blur sm:p-10"
         >
           <div className="flex items-center justify-between gap-4">
-            <BrandMark className="size-12 shrink-0" alt="Mentor Hub" />
-            <div className="inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3 py-1.5 font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-primary">
+            <GkhqMark className="size-12 shrink-0" alt="Mentor Hub" />
+            <div className="inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3 py-1.5 font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-primary-ink">
               <span
                 className="size-2 rounded-full bg-primary motion-safe:animate-pulse"
                 aria-hidden="true"
@@ -37,7 +37,7 @@ export function MaintenanceScreen({ onSignOut, onCheckAgain }: MaintenanceScreen
           </div>
 
           <div className="mt-10">
-            <div className="mb-5 grid size-12 place-items-center rounded-xl bg-primary/10 text-primary">
+            <div className="mb-5 grid size-12 place-items-center rounded-xl bg-primary/10 text-primary-ink">
               <Wrench className="size-6" aria-hidden="true" />
             </div>
             <h1
@@ -52,7 +52,7 @@ export function MaintenanceScreen({ onSignOut, onCheckAgain }: MaintenanceScreen
           </div>
 
           <div className="mt-8 flex gap-3 rounded-xl border border-border bg-background/70 p-4">
-            <Clock3 className="mt-0.5 size-5 shrink-0 text-primary" aria-hidden="true" />
+            <Clock3 className="mt-0.5 size-5 shrink-0 text-primary-ink" aria-hidden="true" />
             <div>
               <p className="text-sm font-semibold">Access will be restored shortly</p>
               <p className="mt-1 text-sm leading-relaxed text-muted-foreground">

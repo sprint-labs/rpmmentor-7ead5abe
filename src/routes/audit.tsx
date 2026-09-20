@@ -35,7 +35,7 @@ function AuditPage() {
   if (!can("audit.view")) {
     return (
       <Card className="p-10 text-center text-sm text-muted-foreground">
-        <FileWarning className="size-8 mx-auto mb-2 text-muted-foreground/60" />
+        <FileWarning className="size-8 mx-auto mb-2 text-muted-foreground" />
         You don't have permission to view the audit log.
       </Card>
     );

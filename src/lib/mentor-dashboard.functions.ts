@@ -1,11 +1,10 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
-import { goalkeepers, mentors } from "@/lib/mock-data";
+import { goalkeepers } from "@/lib/mock-data";
 import type { TierLevel } from "@/lib/mock-data";
 import {
   countCanonicalReportsForCoach,
-  FALLBACK_MENTOR_ID,
   requireCoachIdentity,
   selectCoachProfileForDashboard,
   type DashboardCoachProfile,
@@ -106,14 +105,19 @@ export const getMentorDashboardStats = createServerFn({ method: "GET" })
       throw new Error("Your dashboard identity was unavailable.");
     }
 
-    let mentorId = profile?.mentor_id ?? null;
-    const usingSuperAdminFallbackMentor =
-      !mentorId && (roles ?? []).some((r) => r.role === "super_admin");
-
-    // Allow super admins previewing the mentor view to see populated data.
-    if (usingSuperAdminFallbackMentor) {
-      mentorId = FALLBACK_MENTOR_ID;
-    }
+    // The caller's own legacy mentor id, or none. There is no substitute.
+    //
+    // A super admin previewing the mentor view used to be handed the seeded
+    // identifier `m-david-rouse`, on the reasoning that it would "see populated
+    // data". What it actually did was look up a person who does not exist in
+    // `public.profiles` — `mentor_id` is NULL on every production profile — and
+    // throw, so the preview rendered "Your dashboard didn't load." every time.
+    // It also named the seed's mentor in the outstanding-actions copy.
+    //
+    // A previewing admin now sees their own identity. With no mentor id the
+    // outstanding-actions panel reports itself unavailable, which is the honest
+    // answer, rather than inventing someone else's work.
+    const mentorId = profile?.mentor_id ?? null;
 
     const days = data.days;
     const now = Date.now();
@@ -167,24 +171,13 @@ export const getMentorDashboardStats = createServerFn({ method: "GET" })
       "personal interaction count",
     );
 
-    const { data: fallbackMentorProfile, error: fallbackMentorProfileError } =
-      usingSuperAdminFallbackMentor
-        ? await supabase
-            .from("profiles")
-            .select("name,email")
-            .eq("mentor_id", FALLBACK_MENTOR_ID)
-            .maybeSingle<DashboardCoachProfile>()
-        : { data: null, error: null };
-    if (fallbackMentorProfileError) {
-      throw new Error("Could not load the preview mentor identity.");
-    }
-    const coachIdentity = requireCoachIdentity(
-      selectCoachProfileForDashboard(
-        profile ?? null,
-        fallbackMentorProfile ?? null,
-        usingSuperAdminFallbackMentor,
-      ),
-    );
+    // This is where the preview actually broke. The lookup above searched
+    // `profiles` for the seeded `mentor_id`, found nothing — the column is NULL
+    // on every production profile — and `requireCoachIdentity(null)` then threw,
+    // which is the "Your dashboard didn't load." a previewing admin saw.
+    //
+    // The caller's own profile is the identity, always.
+    const coachIdentity = requireCoachIdentity(profile ?? null);
 
     // Match Reports are read from the same canonical Supabase store as the
     // report centre, then scoped to the authenticated coach identity.
@@ -232,7 +225,9 @@ export const getMentorDashboardStats = createServerFn({ method: "GET" })
       Math.abs(+new Date(a) - +new Date(b)) <= 3 * 86400000;
 
     const outstandingItems: OutstandingActionItem[] = [];
-    const mentorDisplay = mentors.find((m) => m.id === mentorId)?.name ?? "You";
+    // The signed-in person, from their own profile row — not a name looked up
+    // in the seed by an identifier that is NULL in production anyway.
+    const mentorDisplay = profile?.name?.trim() || "You";
     for (const obs of mentorObservations) {
       const gkNameKey = (obs.goalkeeper_name ?? "").trim().toLowerCase();
       const hasReport = coachReports.some(

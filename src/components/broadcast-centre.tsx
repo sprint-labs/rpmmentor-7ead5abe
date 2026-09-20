@@ -75,7 +75,7 @@ const KIND_META: Record<
   feature: {
     icon: Sparkles,
     accent: "border-primary/40 bg-primary/5",
-    iconClass: "text-primary",
+    iconClass: "text-primary-ink",
   },
   info: {
     icon: Info,
@@ -139,7 +139,7 @@ function BroadcastStatusBadge({
     <span
       className={cn(
         "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider",
-        status === "live" && "border-primary/40 bg-primary/10 text-primary",
+        status === "live" && "border-primary/40 bg-primary/10 text-primary-ink",
         status === "scheduled" && "border-sky-500/40 bg-sky-500/10 text-sky-500",
         status === "ended" && "border-border bg-muted/30 text-muted-foreground",
       )}
@@ -420,7 +420,7 @@ export function BroadcastCentre() {
       <Card className="overflow-hidden p-0">
         <div className="flex flex-col gap-4 border-b border-border bg-gradient-to-r from-primary/10 via-transparent to-transparent px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-start gap-3">
-            <span className="grid size-10 shrink-0 place-items-center rounded-lg border border-primary/30 bg-primary/10 text-primary">
+            <span className="grid size-10 shrink-0 place-items-center rounded-lg border border-primary/30 bg-primary/10 text-primary-ink">
               <Megaphone className="size-5" aria-hidden="true" />
             </span>
             <div>
@@ -443,15 +443,15 @@ export function BroadcastCentre() {
         </div>
         <div className="grid gap-3 px-4 py-3 text-xs text-muted-foreground sm:grid-cols-3">
           <div className="flex items-center gap-2">
-            <CheckCircle2 className="size-4 text-primary" aria-hidden="true" />
+            <CheckCircle2 className="size-4 text-primary-ink" aria-hidden="true" />
             Audience: all signed in users
           </div>
           <div className="flex items-center gap-2">
-            <FileUp className="size-4 text-primary" aria-hidden="true" />
+            <FileUp className="size-4 text-primary-ink" aria-hidden="true" />
             Images, video, audio or PDF
           </div>
           <div className="flex items-center gap-2">
-            <CalendarClock className="size-4 text-primary" aria-hidden="true" />
+            <CalendarClock className="size-4 text-primary-ink" aria-hidden="true" />
             Publish now or schedule ahead
           </div>
         </div>
@@ -591,7 +591,7 @@ export function BroadcastCentre() {
             {attachmentFile ? (
               <div className="mt-2 rounded-md border border-border bg-muted/15 p-3">
                 <div className="flex items-center gap-3">
-                  <span className="grid size-10 shrink-0 place-items-center rounded-md bg-primary/10 text-primary">
+                  <span className="grid size-10 shrink-0 place-items-center rounded-md bg-primary/10 text-primary-ink">
                     <FileUp className="size-4" aria-hidden="true" />
                   </span>
                   <div className="min-w-0 flex-1">
@@ -802,7 +802,7 @@ export function BroadcastCentre() {
             <div className="bg-background p-3">
               <div className="overflow-hidden rounded-lg border border-border bg-card shadow-sm">
                 <div className="flex items-center gap-2 border-b border-border px-3 py-2.5">
-                  <span className="grid size-7 place-items-center rounded-md bg-primary/10 text-primary">
+                  <span className="grid size-7 place-items-center rounded-md bg-primary/10 text-primary-ink">
                     <Megaphone className="size-3.5" aria-hidden="true" />
                   </span>
                   <div>
@@ -812,7 +812,7 @@ export function BroadcastCentre() {
                 </div>
                 <div className="p-3">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-[10px] font-semibold uppercase tracking-wider text-primary">
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-primary-ink">
                       {ANNOUNCEMENT_KIND_LABEL[kind]}
                     </span>
                     <span className="text-[10px] text-muted-foreground">
@@ -825,7 +825,7 @@ export function BroadcastCentre() {
                   <div
                     className={cn(
                       "mt-1.5 whitespace-pre-wrap text-xs leading-relaxed",
-                      body.trim() ? "text-muted-foreground" : "italic text-muted-foreground/60",
+                      body.trim() ? "text-muted-foreground" : "italic text-muted-foreground",
                     )}
                   >
                     {body.trim() || "Your message will appear here as you type."}
@@ -846,7 +846,10 @@ export function BroadcastCentre() {
             </h3>
             <div className="mt-3 space-y-3 text-xs">
               <div className="flex items-start gap-2">
-                <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" />
+                <CheckCircle2
+                  className="mt-0.5 size-4 shrink-0 text-primary-ink"
+                  aria-hidden="true"
+                />
                 <div>
                   <div className="font-medium">Help & updates</div>
                   <div className="mt-0.5 text-muted-foreground">

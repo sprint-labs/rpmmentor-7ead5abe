@@ -1,7 +1,7 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { LOGIN_LOCKUP_SRC } from "@/lib/brand";
+import { GkhqLockup } from "@/components/gkhq-lockup";
 
 // Beta namespace: keep a local typed shim rather than digging into SDK internals.
 interface OAuthAuthorizationDetails {
@@ -90,12 +90,12 @@ function Consent() {
   return (
     <main className="min-h-screen flex items-center justify-center bg-background p-6">
       <div className="w-full max-w-md">
-        <div className="mb-10">
-          <img src={LOGIN_LOCKUP_SRC} alt="Mentor Hub by RPM" className="h-16 w-auto" />
+        <div className="mb-8">
+          <GkhqLockup className="gap-3" markClassName="size-11" wordmarkClassName="h-6 w-auto" alt="GKHQ Mentor Hub" />
         </div>
 
 
-        <h1 className="text-3xl font-display font-bold uppercase tracking-[0.02em] leading-tight">
+        <h1 className="text-2xl font-display font-bold uppercase tracking-[0.02em] leading-tight">
           Connect {clientName} to Mentor Hub
         </h1>
         <p className="text-sm text-muted-foreground mt-3 leading-relaxed">

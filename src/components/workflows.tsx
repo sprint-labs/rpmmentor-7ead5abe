@@ -16,7 +16,17 @@ import {
 } from "lucide-react";
 import { goalkeepers } from "@/lib/mock-data";
 import { listPlayers, type PlayerRosterRow } from "@/lib/players.functions";
+import { goalkeeperByName } from "@/lib/roster/goalkeeper-profile";
 import { COMPETITIONS } from "@/lib/competitions";
+import {
+  EMPTY_CLUB_INDEX,
+  canonicalCompetition,
+  clubsForCompetition,
+  competitionsForClub,
+  hasClubsForCompetition,
+  hasCompetitionsForClub,
+} from "@/lib/competition-clubs";
+import { getCompetitionClubIndex } from "@/lib/competition-clubs.functions";
 import {
   findPlayerByName,
   legacyGkSlugForName,
@@ -80,6 +90,7 @@ import {
 import { HandwrittenNotesField } from "@/components/handwritten-notes-field";
 import { VoiceNoteField } from "@/components/voice-note-field";
 import { GoalkeeperPicker } from "@/components/goalkeeper-picker";
+import { ComboField } from "@/components/combo-field";
 import {
   Dialog,
   DialogContent,
@@ -175,7 +186,9 @@ function DraftStatusIndicator({
       </span>
     );
   }
-  return <span className="opacity-60 text-muted-foreground">Autosaves every 5s</span>;
+  // No opacity: `--muted-foreground` sits just above 4.5:1, so dimming it at
+  // all drops this hint under the AA floor.
+  return <span className="text-muted-foreground">Autosaves every 5s</span>;
 }
 
 export type WorkflowKind = "interaction" | "report" | "media" | "goalkeeper" | "bug" | "question";
@@ -242,13 +255,13 @@ export function WorkflowDialog({
     activeKind === "report"
       ? handoff
         ? "Live Match Observation · the interaction is created when this report is submitted"
-        : "Draft autosaves locally · Submission writes to the RPM Match Reports Google Sheet"
+        : "Draft autosaves locally · Submission saves to the RPM match report store"
       : activeKind === "media"
         ? "Stored in the central media repository"
         : activeKind === "interaction"
           ? isEditing
             ? "Corrects the original record · visible everywhere it appears"
-            : "Saved to Lovable Cloud · visible in the interactions log"
+            : "Saved to the RPM database · visible in the interactions log"
           : activeKind === "bug" || activeKind === "question"
             ? "Goes to the Super Admin support inbox · you will get a reply in Help & Messages"
             : "Saved locally to this session";
@@ -406,7 +419,7 @@ function Submitted({
       {pending ? (
         <AlertCircle className="size-10 text-amber-500 mx-auto" />
       ) : (
-        <CheckCircle2 className="size-10 text-primary mx-auto" />
+        <CheckCircle2 className="size-10 text-primary-ink mx-auto" />
       )}
       <p className="text-sm font-medium mt-3">{message}</p>
       {detail && <div className="mt-3">{detail}</div>}
@@ -442,7 +455,7 @@ function TagPicker({ value, onChange }: { value: string[]; onChange: (v: string[
             key={t}
             type="button"
             onClick={() => onChange(active ? value.filter((x) => x !== t) : [...value, t])}
-            className={`px-2 py-0.5 rounded text-[10px] border ${active ? "bg-primary/15 border-primary/40 text-primary" : "border-border text-muted-foreground hover:bg-accent/40"}`}
+            className={`px-2 py-0.5 rounded text-[10px] border ${active ? "bg-primary/15 border-primary/40 text-primary-ink" : "border-border text-muted-foreground hover:bg-accent/40"}`}
           >
             {t}
           </button>
@@ -566,7 +579,7 @@ function AudioSaveStatusNote({
   }
   if (status === "saved") {
     return (
-      <p className="inline-flex items-center gap-1.5 text-xs text-primary">
+      <p className="inline-flex items-center gap-1.5 text-xs text-primary-ink">
         <CheckCircle2 className="size-3.5" /> Audio saved
       </p>
     );
@@ -1402,7 +1415,7 @@ export function InteractionForm({
       {savedInteraction && audioUploading && <AudioUploadProgress progress={audioProgress} />}
 
       {savedInteraction && audioStatus === "saved" && (
-        <p className="inline-flex items-center gap-1.5 text-xs text-primary">
+        <p className="inline-flex items-center gap-1.5 text-xs text-primary-ink">
           <CheckCircle2 className="size-3.5" /> Audio saved
         </p>
       )}
@@ -1419,7 +1432,7 @@ export function InteractionForm({
           <button
             type="button"
             onClick={discardDraft}
-            className="shrink-0 text-primary hover:text-primary/80"
+            className="shrink-0 text-primary-ink hover:underline"
           >
             Start blank
           </button>
@@ -1451,7 +1464,7 @@ export function InteractionForm({
                     setExternalGoalkeeperName("");
                     clearFieldError("gkId");
                   }}
-                  className="text-[11px] text-primary hover:text-primary/80"
+                  className="text-[11px] text-primary-ink hover:underline"
                 >
                   Choose from RPM roster
                 </button>
@@ -1484,7 +1497,7 @@ export function InteractionForm({
                     setExternalGoalkeeperName("");
                     clearFieldError("gkId");
                   }}
-                  className="text-[11px] text-primary hover:text-primary/80"
+                  className="text-[11px] text-primary-ink hover:underline"
                 >
                   Non-RPM Goalkeeper
                 </button>
@@ -1544,7 +1557,7 @@ export function InteractionForm({
               <button
                 type="button"
                 onClick={resetClub}
-                className="mt-1 inline-flex items-center gap-1 text-[11px] text-primary hover:text-primary/80"
+                className="mt-1 inline-flex items-center gap-1 text-[11px] text-primary-ink hover:underline"
               >
                 <RotateCcw className="size-3" /> Reset to roster club
               </button>
@@ -1705,7 +1718,7 @@ export function InteractionForm({
 }
 
 /**
- * Match Report form — writes to the RPM Match Reports Google Sheet via
+ * Match Report form — writes to `public.match_reports_cache` via
  * a server function. Fields locked to the confirmed 14-column schema.
  */
 function ReportForm({
@@ -1739,6 +1752,16 @@ function ReportForm({
     for (const p of players) map.set(p.full_name.trim().toLowerCase(), p);
     return map;
   }, [players]);
+  // Which clubs play in which competition, learned from the roster and from
+  // reports already filed. Suggestions only — every field below stays free text.
+  const clubIndexFn = useServerFn(getCompetitionClubIndex);
+  const clubIndexQuery = useQuery({
+    queryKey: ["competition-clubs"],
+    queryFn: () => clubIndexFn(),
+    staleTime: 5 * 60_000,
+  });
+  const clubIndex = clubIndexQuery.data ?? EMPTY_CLUB_INDEX;
+
   // Track the value we auto-filled so a mentor's manual edit is never overwritten.
   const autoFilledTeamRef = useRef<string | null>(null);
   const [teamAutoFilled, setTeamAutoFilled] = useState(false);
@@ -1759,6 +1782,47 @@ function ReportForm({
   const [competition, setCompetition] = useState("");
   const [team, setTeam] = useState("");
   const [opponent, setOpponent] = useState("");
+
+  const goalkeeperOptions = useMemo(
+    () => (players.length ? players.map((p) => p.full_name) : goalkeepers.map((g) => g.name)),
+    [players],
+  );
+  // Once the keeper is picked, Team is known, and a club plays a knowable set of
+  // competitions — its league plus the cups that league enters. A Birmingham
+  // report should not have to scroll past the Allsvenskan to reach the
+  // Championship. With no club yet, or one Mentor Hub has never seen, the full
+  // list stands.
+  const competitionScopedToTeam = hasCompetitionsForClub(clubIndex, team);
+  const competitionOptions = useMemo(() => {
+    if (competitionScopedToTeam) return competitionsForClub(clubIndex, team);
+    return Array.from(
+      new Set(
+        [
+          ...COMPETITIONS,
+          ...clubIndex.competitions,
+          ...players.map((p) => p.league),
+          ...goalkeepers.map((g) => g.league),
+        ]
+          .map((name) => canonicalCompetition(name))
+          .filter(Boolean),
+      ),
+    ).sort((a, b) => a.localeCompare(b));
+  }, [clubIndex, competitionScopedToTeam, team, players]);
+  const competitionHint = competitionScopedToTeam
+    ? `${team.trim()} competitions · type any other`
+    : undefined;
+  // Team and Opponent narrow to the chosen competition; a cup or an unrecognised
+  // competition falls back to every club Mentor Hub knows.
+  const clubOptions = useMemo(
+    () => clubsForCompetition(clubIndex, competition),
+    [clubIndex, competition],
+  );
+  const competitionScoped = hasClubsForCompetition(clubIndex, competition);
+  const opponentHint = competition.trim()
+    ? competitionScoped
+      ? `Clubs Mentor Hub knows in ${competition.trim()} · type any other`
+      : `No clubs on file for ${competition.trim()} yet · showing all · type any other`
+    : "Pick a competition to narrow these · type any other";
   const [matchDate, setMatchDate] = useState(new Date().toISOString().slice(0, 10));
   const [scores, setScores] = useState<Record<PillarId, number>>({
     protect_goal: 3,
@@ -2194,7 +2258,7 @@ function ReportForm({
       return (
         <Submitted
           pending
-          message="This report is queued locally. It has not yet been submitted to the RPM Match Reports Google Sheet, so it is not available to view yet."
+          message="This report is queued on this device. It has not reached the RPM match report store yet, so it is not available to view."
           onDone={onDone}
         />
       );
@@ -2204,8 +2268,8 @@ function ReportForm({
         pending={!!done.interactionError}
         message={
           done.interactionError
-            ? `Match report submitted to the RPM Match Reports Google Sheet · Average ${done.average.toFixed(1)}. The Live Match Observation interaction could NOT be created (${done.interactionError}), so it will not appear in the interactions log. Do not resubmit the report — tell an administrator.`
-            : `Match report submitted to the RPM Match Reports Google Sheet · Average ${done.average.toFixed(1)}. A Live Match Observation interaction has been logged against this goalkeeper.`
+            ? `Match report submitted · Average ${done.average.toFixed(1)}. The Live Match Observation interaction could NOT be created (${done.interactionError}), so it will not appear in the interactions log. Do not resubmit the report — tell an administrator.`
+            : `Match report submitted · Average ${done.average.toFixed(1)}. A Live Match Observation interaction has been logged against this goalkeeper.`
         }
         onDone={onDone}
         action={{
@@ -2385,23 +2449,15 @@ function ReportForm({
     <form onSubmit={onSubmit} className="space-y-4">
       <div className="grid grid-cols-2 gap-3">
         <Field label="Goalkeeper *">
-          <input
-            className={inputCls}
-            required
-            list="mr-gk-suggestions"
+          <ComboField
             value={goalkeeper}
-            onChange={(e) => setGoalkeeper(e.target.value)}
+            onValueChange={setGoalkeeper}
+            options={goalkeeperOptions}
+            ariaLabel="Goalkeeper"
             placeholder="e.g. James Beadle"
-            maxLength={80}
+            emptyMessage="Not on the RPM roster — what you typed is kept."
+            required
           />
-          <datalist id="mr-gk-suggestions">
-            {(players.length
-              ? players.map((p) => ({ id: p.id, name: p.full_name }))
-              : goalkeepers.map((g) => ({ id: g.id, name: g.name }))
-            ).map((g) => (
-              <option key={g.id} value={g.name} />
-            ))}
-          </datalist>
         </Field>
         <Field label="Coach (you) *">
           <input
@@ -2414,54 +2470,36 @@ function ReportForm({
           />
         </Field>
         <Field label="Competition *">
-          <input
-            className={inputCls}
-            required
+          <ComboField
             value={competition}
-            list="mr-competition-suggestions"
-            onChange={(e) => setCompetition(e.target.value)}
+            onValueChange={setCompetition}
+            options={competitionOptions}
+            ariaLabel="Competition"
             placeholder="e.g. EFL Championship"
-            maxLength={80}
+            hint={competitionHint}
+            required
           />
-          <datalist id="mr-competition-suggestions">
-            {Array.from(
-              new Set(
-                [
-                  ...COMPETITIONS,
-                  ...players.map((p) => p.league),
-                  ...goalkeepers.map((g) => g.league),
-                ].filter(Boolean),
-              ),
-            )
-              .sort((a, b) => a.localeCompare(b))
-              .map((l) => (
-                <option key={l} value={l} />
-              ))}
-          </datalist>
         </Field>
         <Field label="Team *">
-          <input
-            className={inputCls}
-            required
+          <ComboField
             value={team}
-            onChange={(e) => handleTeamChange(e.target.value)}
+            onValueChange={handleTeamChange}
+            options={clubOptions}
+            ariaLabel="Team"
             placeholder="e.g. Wolves"
-            maxLength={80}
+            hint={teamAutoFilled ? "Auto-filled from roster · edit to override" : undefined}
+            required
           />
-          {teamAutoFilled && (
-            <div className="mt-1 text-[10px] text-muted-foreground">
-              Auto-filled from roster · edit to override
-            </div>
-          )}
         </Field>
         <Field label="Opponent *">
-          <input
-            className={inputCls}
-            required
+          <ComboField
             value={opponent}
-            onChange={(e) => setOpponent(e.target.value)}
+            onValueChange={setOpponent}
+            options={clubOptions}
+            ariaLabel="Opponent"
             placeholder="e.g. Blackburn Rovers"
-            maxLength={80}
+            hint={opponentHint}
+            required
           />
         </Field>
         <Field label="Match Date *">
@@ -2528,7 +2566,15 @@ function ReportForm({
         destinationLabel="comments"
         onTranscribed={(text, mode) => applyOcrText(text, mode)}
       />
+      {/*
+        Same flow as the interaction form: the transcript lands in Comments the
+        moment it arrives, where it is visible, editable and actually submitted,
+        rather than waiting behind a reviewed checkbox and two more clicks. The
+        AI rewrite still follows and is still offered as an explicit replace.
+      */}
       <VoiceNoteField
+        autoApply
+        destinationLabel="Comments"
         draft={voiceTranscript}
         onDraftChange={setVoiceTranscript}
         allowReplace={false}
@@ -2537,9 +2583,11 @@ function ReportForm({
         onTranscribed={applyVoiceText}
         onAudioAttach={async ({ blob, mimeType, durationSec }) => {
           if (!user) throw new Error("Sign in required to save audio.");
-          const gk = goalkeepers.find(
-            (g) => g.name.trim().toLowerCase() === goalkeeper.trim().toLowerCase(),
-          );
+          // The picker above offers the live roster, so this must resolve
+          // against the live roster too. Matching only the seed rejected a
+          // goalkeeper the same form had just offered — anyone signed since
+          // the seed was captured — with "select a known goalkeeper".
+          const gk = goalkeeperByName(goalkeeper, players);
           if (!gk) throw new Error("Select a known goalkeeper before saving the voice note.");
           const ext = (mimeType.split("/")[1] || "webm").split(";")[0];
           const stamp = new Date().toISOString().replace(/[:.]/g, "-");
@@ -2967,14 +3015,14 @@ function MediaAttachPicker({
           <Paperclip className="size-3.5" />
           Attach Media{" "}
           {selected.length > 0 && (
-            <span className="text-primary normal-case">· {selected.length} selected</span>
+            <span className="text-primary-ink normal-case">· {selected.length} selected</span>
           )}
         </div>
         {user && (
           <button
             type="button"
             onClick={() => setShowUpload((v) => !v)}
-            className="text-[11px] text-primary hover:underline"
+            className="text-[11px] text-primary-ink hover:underline"
           >
             {showUpload ? "Cancel upload" : "Upload new"}
           </button>
@@ -3123,12 +3171,12 @@ function MediaUploadRow({ item }: { item: MediaUploadItem<MediaAsset> }) {
     <li className="rounded-md border border-border bg-input/20 px-3 py-2.5">
       <div className="flex items-start gap-2">
         {item.status === "succeeded" ? (
-          <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" />
+          <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-primary-ink" aria-hidden="true" />
         ) : item.status === "failed" ? (
           <AlertCircle className="mt-0.5 size-4 shrink-0 text-destructive" aria-hidden="true" />
         ) : item.status === "uploading" ? (
           <Loader2
-            className="mt-0.5 size-4 shrink-0 animate-spin text-primary"
+            className="mt-0.5 size-4 shrink-0 animate-spin text-primary-ink"
             aria-hidden="true"
           />
         ) : (

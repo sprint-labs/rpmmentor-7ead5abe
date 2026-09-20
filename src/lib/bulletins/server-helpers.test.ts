@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   addDateOnlyDays,
   bulletinAccessForRoles,
+  bulletinAttentionFilters,
   getLondonAttentionWindow,
   sanitiseBulletinSearch,
 } from "./server-helpers";
@@ -87,5 +88,54 @@ describe("Bulletin Board server query safeguards", () => {
     expect(source).toMatch(/Only Bulletin Board management can create work/);
     expect(source).not.toMatch(/\.delete\(/);
     expect(source).not.toMatch(/\.limit\((?:200|500)\)/);
+  });
+});
+
+describe("Bulletin attention bounds", () => {
+  const window = { today: "2026-09-20", dueSoonThrough: "2026-09-27" };
+
+  it("counts anything due before today as overdue, and nothing on today", () => {
+    expect(bulletinAttentionFilters("overdue", window)).toEqual({
+      excludeClosed: true,
+      dueBefore: "2026-09-20",
+    });
+  });
+
+  it("opens the due-soon window on today and closes it seven days out", () => {
+    expect(bulletinAttentionFilters("due_soon", window)).toEqual({
+      excludeClosed: true,
+      dueOnOrAfter: "2026-09-20",
+      dueOnOrBefore: "2026-09-27",
+    });
+  });
+
+  it("reads unassigned off the owner, never off a date", () => {
+    expect(bulletinAttentionFilters("unassigned", window)).toEqual({
+      excludeClosed: true,
+      ownerIsNull: true,
+    });
+  });
+
+  it("leaves closed work out of all three", () => {
+    for (const attention of ["overdue", "due_soon", "unassigned"] as const) {
+      expect(bulletinAttentionFilters(attention, window).excludeClosed).toBe(true);
+    }
+  });
+
+  it("gives today to overdue and to due-soon without overlapping on it", () => {
+    // An item due today is due soon, not overdue. The boundary lives in one
+    // place precisely so the dashboard chip and the list it opens agree.
+    const overdue = bulletinAttentionFilters("overdue", window);
+    const dueSoon = bulletinAttentionFilters("due_soon", window);
+    expect(overdue.dueBefore).toBe(window.today);
+    expect(dueSoon.dueOnOrAfter).toBe(window.today);
+  });
+
+  it("is the definition the dashboard counts and the board lists both read", () => {
+    const source = readFileSync(new URL("../bulletins.functions.ts", import.meta.url), "utf8");
+    // Three summary counts plus the list filter: if any caller open-codes the
+    // bounds again, the chip can promise a number its list cannot show.
+    expect(source.match(/bulletinAttentionFilters\(/g)).toHaveLength(4);
+    expect(source).not.toMatch(/excludeClosed: true,\s*dueBefore: today/);
   });
 });

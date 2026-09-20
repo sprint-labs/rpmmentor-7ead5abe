@@ -987,6 +987,8 @@ export type Database = {
           full_name: string
           id: string
           instagram_url: string | null
+          is_academy: boolean
+          is_free_agent: boolean
           league: string
           nationality: string
           on_loan: boolean
@@ -1004,6 +1006,8 @@ export type Database = {
           full_name: string
           id?: string
           instagram_url?: string | null
+          is_academy?: boolean
+          is_free_agent?: boolean
           league?: string
           nationality?: string
           on_loan?: boolean
@@ -1021,6 +1025,8 @@ export type Database = {
           full_name?: string
           id?: string
           instagram_url?: string | null
+          is_academy?: boolean
+          is_free_agent?: boolean
           league?: string
           nationality?: string
           on_loan?: boolean

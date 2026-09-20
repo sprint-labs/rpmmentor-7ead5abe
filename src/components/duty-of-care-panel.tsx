@@ -29,10 +29,16 @@ const REASON_MAX = 500;
 export function DutyOfCarePanel({
   playerId,
   playerName,
+  compact = false,
 }: {
   /** Canonical `players.id`. Without one there is no duty-of-care row to read. */
   playerId: string | null;
   playerName: string;
+  /**
+   * Stack the panel and quieten the reset control, for the narrower profile
+   * sidebar. The status itself is unchanged — only how loudly it is shown.
+   */
+  compact?: boolean;
 }) {
   const { can } = useAuth();
   const [open, setOpen] = useState(false);
@@ -56,7 +62,11 @@ export function DutyOfCarePanel({
 
   return (
     <Card className="p-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div
+        className={
+          compact ? "flex flex-col gap-2" : "flex flex-wrap items-center justify-between gap-3"
+        }
+      >
         <div className="min-w-0">
           <SectionTitle>Duty of Care</SectionTitle>
           <div className="mt-1 flex flex-wrap items-center gap-2">
@@ -77,7 +87,11 @@ export function DutyOfCarePanel({
           <button
             type="button"
             onClick={() => setOpen(true)}
-            className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-md border border-border px-3 text-sm"
+            className={
+              compact
+                ? "inline-flex h-8 w-full shrink-0 items-center justify-center gap-1.5 rounded-md border border-border px-2 text-xs"
+                : "inline-flex h-9 shrink-0 items-center gap-1.5 rounded-md border border-border px-3 text-sm"
+            }
           >
             <RotateCcw className="size-3.5" /> Reset duty of care
           </button>

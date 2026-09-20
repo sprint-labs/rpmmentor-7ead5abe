@@ -43,6 +43,7 @@ export {
   buildFixtureNotes,
   buildFixtureTitle,
   embedFixtureDuplicateKey,
+  stripFixtureDuplicateKey,
   extractFixtureDuplicateKey,
   FIXTURE_IMPORT_KEY_PREFIX,
   normalizeHomeAway,
