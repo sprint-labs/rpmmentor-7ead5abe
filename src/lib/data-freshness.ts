@@ -94,6 +94,16 @@ export function formatSyncedAt(instantMs: number): string {
 }
 
 /**
+ * The same instant as `formatSyncedAt`, set to sit inside a sentence:
+ * "19 Sep 2026 at 20:42". Derived from that one function rather than
+ * formatted again, so the chip and the note behind it can never disagree.
+ */
+export function formatSyncedAtInSentence(instantMs: number): string {
+  const label = formatSyncedAt(instantMs);
+  return label === "—" ? label : label.replace(", ", " at ");
+}
+
+/**
  * The oldest of several fetch times, which is what bounds a screen's freshness:
  * a page is only as current as its most stale panel.
  *
@@ -164,9 +174,11 @@ export function describeDataFreshness({
   return {
     label: `Last synced ${formatSyncedAt(oldest)}`,
     tone: stale ? "stale" : "fresh",
-    detail:
-      `When this page's figures were last read from the database, in UK time. ` +
-      `It is the oldest of the reads behind the panels on this page, so every figure shown is at least this current.` +
-      storeLine,
+    // One sentence. The previous note ran to three, explaining that this is the
+    // oldest of the reads behind the panels and when the match report store
+    // last took a delivery — true, and more than anyone opens a tooltip for.
+    // The time is the one on the chip itself, so the note explains the number
+    // beside it rather than introducing a second one.
+    detail: `System figures are current as of the last database sync, ${formatSyncedAtInSentence(oldest)} UK time.`,
   };
 }

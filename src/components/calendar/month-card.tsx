@@ -74,7 +74,9 @@ export function CalendarMonthCard({
   const todayMonth = useMemo(() => monthOf(new Date(`${today}T12:00:00`)), [today]);
   const [cursor, setCursor] = useState<MonthCursor>(todayMonth);
 
-  const cells = useMemo(() => monthGrid(cursor), [cursor]);
+  // Trimmed: this card shows the month, not a fixed six-row frame. A sixth row
+  // that is entirely next month is a row of noise in a panel this size.
+  const cells = useMemo(() => monthGrid(cursor, { trim: true }), [cursor]);
 
   /** Event count per local date, cancellations excluded. */
   const countsByDate = useMemo(() => {
@@ -173,30 +175,20 @@ export function CalendarMonthCard({
               const isToday = cell.iso === today;
               const has = count > 0 && !pending;
 
-              // Days borrowed from the adjacent months are alignment padding,
-              // nothing more. They carry no events here, and following one led
-              // straight back to the month already on screen, so they are not
-              // links and are hidden from assistive technology — the month's
-              // real days are all present without them.
-              //
-              // They keep `text-muted-foreground` at full strength. Dimming it
-              // with an opacity class is a guaranteed AA failure: the token is
-              // tuned to sit just above 4.5:1, so anything below 100% drops
-              // under the floor. An earlier version of this card used
-              // `opacity-40` here and axe flagged all three visible outside
-              // days on the deployed preview.
+              // Days borrowed from the adjacent months hold the weekday
+              // columns in line and nothing else, so the card no longer draws
+              // their numbers: this panel shows one month, and a date from
+              // another one sitting in it only invites a misread. They stay in
+              // the DOM as empty squares because dropping them would slide the
+              // 1st under the wrong weekday, and stay hidden from assistive
+              // technology because there is nothing there to announce.
               if (!cell.inMonth) {
                 return (
                   <div
                     key={cell.iso}
                     aria-hidden="true"
-                    className="flex aspect-square min-h-8 flex-col items-center justify-center rounded border border-transparent text-[11px] tabular-nums text-muted-foreground"
-                  >
-                    <span>{cell.day}</span>
-                    {/* Keeps the number on the same baseline as an in-month
-                        square, which reserves a row for its dots. */}
-                    <span aria-hidden="true" className="mt-0.5 h-1" />
-                  </div>
+                    className="flex aspect-square min-h-8 flex-col items-center justify-center rounded border border-transparent"
+                  />
                 );
               }
 

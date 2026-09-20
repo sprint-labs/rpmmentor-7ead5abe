@@ -90,9 +90,11 @@ describe("describeDataFreshness", () => {
     expect(tone).toBe("stale");
   });
 
-  it("puts the match-report store's own sync in the detail, never the headline", () => {
-    // These are different questions. The store's delivery time must not be
-    // presented as the freshness of the figures on screen.
+  it("keeps the match-report store's own sync out of the healthy note", () => {
+    // These are different questions, and the note is one sentence about the
+    // figures on screen. The store's delivery time is neither the headline nor
+    // part of that sentence; it survives where it still earns its place, on
+    // the branches that admit something is wrong.
     const { label, detail } = describeDataFreshness({
       fetchedAt: [SEP_19],
       anyError: false,
@@ -100,15 +102,31 @@ describe("describeDataFreshness", () => {
       now: SEP_19,
     });
     expect(label).toBe("Last synced 19 Sep 2026, 15:31");
+    expect(detail).not.toContain("18 Sep 2026, 13:38");
+  });
+
+  it("still reports the store's delivery when a panel has failed", () => {
+    const { detail } = describeDataFreshness({
+      fetchedAt: [SEP_19],
+      anyError: true,
+      reportsSyncedAt: "2026-09-18T12:38:42Z",
+      now: SEP_19,
+    });
     expect(detail).toContain("18 Sep 2026, 13:38");
   });
 
-  it("explains what was measured even when there is no store timestamp", () => {
-    const { detail } = describeDataFreshness({
+  it("names the moment the figures are current to, in one sentence", () => {
+    const { label, detail } = describeDataFreshness({
       fetchedAt: [SEP_19],
       anyError: false,
       now: SEP_19,
     });
-    expect(detail).toContain("read from the database");
+    expect(detail).toBe(
+      "System figures are current as of the last database sync, 19 Sep 2026 at 15:31 UK time.",
+    );
+    // The note explains the chip beside it, so the two carry the same instant
+    // rather than two times a reader has to reconcile.
+    expect(label).toContain("19 Sep 2026, 15:31");
+    expect(detail.split(". ").length).toBe(1);
   });
 });

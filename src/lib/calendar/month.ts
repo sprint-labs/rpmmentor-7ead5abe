@@ -60,6 +60,16 @@ export const WEEKDAY_NAMES = [
 const WEEKS = 6;
 const DAYS_PER_WEEK = 7;
 
+export interface MonthGridOptions {
+  /** Stop after the last row containing a day of this month. */
+  trim?: boolean;
+}
+
+/** Day 0 of the next month is the last day of this one. */
+function daysInMonth({ year, month }: MonthCursor): number {
+  return new Date(year, month, 0).getDate();
+}
+
 function pad2(n: number): string {
   return String(n).padStart(2, "0");
 }
@@ -118,14 +128,20 @@ export function isSameMonth(a: MonthCursor, b: MonthCursor): boolean {
  * and sizing the card to the worst case keeps the dashboard from reflowing when
  * the user pages between months.
  */
-export function monthGrid(cursor: MonthCursor): MonthCell[] {
+export function monthGrid(cursor: MonthCursor, options: MonthGridOptions = {}): MonthCell[] {
   const { year, month } = cursor;
   const firstOfMonth = new Date(year, month - 1, 1);
   // getDay() is Sunday-based; shift so Monday is 0.
   const leading = (firstOfMonth.getDay() + 6) % 7;
 
+  // A fixed six rows keeps every month the same height, which is what a
+  // full-page calendar wants — the grid does not jump as you page through the
+  // year. A compact card has no such need, and the sixth row is often entirely
+  // next month, so `trim` asks for only the rows this month reaches into.
+  const weeks = options.trim ? Math.ceil((leading + daysInMonth(cursor)) / DAYS_PER_WEEK) : WEEKS;
+
   const cells: MonthCell[] = [];
-  for (let i = 0; i < WEEKS * DAYS_PER_WEEK; i++) {
+  for (let i = 0; i < weeks * DAYS_PER_WEEK; i++) {
     // Day 1 of the month sits at index `leading`, so earlier indexes walk back
     // into the previous month and later ones roll into the next. The Date
     // constructor normalises both, including across a year boundary.

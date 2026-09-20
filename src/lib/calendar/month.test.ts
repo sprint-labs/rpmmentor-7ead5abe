@@ -133,3 +133,38 @@ describe("monthLabel / isSameMonth", () => {
     expect(isSameMonth(SEP_2026, { year: 2026, month: 10 })).toBe(false);
   });
 });
+
+describe("monthGrid trim", () => {
+  it("keeps six rows by default, so a full calendar never changes height", () => {
+    expect(monthGrid(SEP_2026)).toHaveLength(42);
+  });
+
+  it("drops the rows this month never reaches", () => {
+    // September 2026 starts on a Tuesday and runs 30 days: one leading cell
+    // plus 30 is 31, which fits in five rows. The sixth is entirely October.
+    const cells = monthGrid(SEP_2026, { trim: true });
+    expect(cells).toHaveLength(35);
+    expect(cells.filter((c) => c.inMonth)).toHaveLength(30);
+  });
+
+  it("still needs six rows when a long month starts late in the week", () => {
+    // August 2026 starts on a Saturday: five leading cells plus 31 is 36, which
+    // does not fit in five rows. Trimming must not cut a real day.
+    const cells = monthGrid({ year: 2026, month: 8 }, { trim: true });
+    expect(cells).toHaveLength(42);
+    expect(cells.filter((c) => c.inMonth)).toHaveLength(31);
+  });
+
+  it("never trims away a day of the month, for any month in a four-year span", () => {
+    for (let year = 2024; year <= 2027; year++) {
+      for (let month = 1; month <= 12; month++) {
+        const trimmed = monthGrid({ year, month }, { trim: true });
+        const full = monthGrid({ year, month });
+        expect(trimmed.filter((c) => c.inMonth).map((c) => c.iso)).toEqual(
+          full.filter((c) => c.inMonth).map((c) => c.iso),
+        );
+        expect(trimmed.length % 7).toBe(0);
+      }
+    }
+  });
+});
