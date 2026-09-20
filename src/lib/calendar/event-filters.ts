@@ -39,14 +39,16 @@ export function hasActiveEventFilters(filters: EventFilters): boolean {
 }
 
 export function matchesEventFilters(
-  event: { title: string; goalkeeperName?: string | null },
+  event: { title: string; goalkeeperName?: string | null; gkName?: string | null },
   filters: EventFilters,
 ): boolean {
   const goalkeeper = fold(filters.goalkeeper ?? "");
   const team = fold(filters.team ?? "");
   const competition = fold(filters.competition ?? "");
 
-  if (goalkeeper && !fold(event.goalkeeperName ?? "").includes(goalkeeper)) return false;
+  // Calendar rows store the player as `gkName`; other callers use `goalkeeperName`.
+  if (goalkeeper && !fold(event.goalkeeperName ?? event.gkName ?? "").includes(goalkeeper))
+    return false;
   if (team && !fold(teamsFromTitle(event.title)).includes(team)) return false;
   if (competition && !fold(competitionFromTitle(event.title)).includes(competition)) return false;
 

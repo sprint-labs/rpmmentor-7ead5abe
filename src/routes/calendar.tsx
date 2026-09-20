@@ -9,7 +9,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { PageHeader, Card, Pill } from "@/components/primitives";
 import { formatDate, goalkeepers } from "@/lib/mock-data";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { withPermission } from "@/components/require-permission";
 import {
   X,
@@ -266,6 +266,7 @@ function CalendarPage() {
    * was a plain div, and its detail lived only in a `title` tooltip.
    */
   const [viewing, setViewing] = useState<DisplayEvent | null>(null);
+  const viewingDialogRef = useRef<HTMLDivElement>(null);
   const [saving, setSaving] = useState(false);
   const [participationSaving, setParticipationSaving] = useState<string | null>(null);
   const [importOpen, setImportOpen] = useState(false);
@@ -442,6 +443,43 @@ function CalendarPage() {
       });
     }
   }, [openNewOnMount, canManage, prefillTitle, prefillNotes]);
+
+  useEffect(() => {
+    if (!viewing) return;
+    const previouslyFocused = document.activeElement as HTMLElement | null;
+    const dialog = viewingDialogRef.current;
+    const focusableSelector =
+      'a[href], button:not([disabled]), select:not([disabled]), textarea:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])';
+    dialog?.querySelector<HTMLElement>(focusableSelector)?.focus();
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setViewing(null);
+        return;
+      }
+      if (event.key !== "Tab" || !dialog) return;
+      const focusable = Array.from(dialog.querySelectorAll<HTMLElement>(focusableSelector)).filter(
+        (element) => !element.hasAttribute("hidden"),
+      );
+      if (!focusable.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      previouslyFocused?.focus();
+    };
+  }, [viewing]);
 
   function openEdit(e: DisplayEvent) {
     setDraft({
@@ -1011,11 +1049,16 @@ function CalendarPage() {
       {viewing && (
         <div
           className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-background/80 p-4 backdrop-blur-sm"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="calendar-event-detail-title"
+          onClick={() => setViewing(null)}
         >
-          <div className="mt-8 w-full max-w-lg rounded-lg border border-border bg-card p-4 shadow-lg">
+          <div
+            ref={viewingDialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="calendar-event-detail-title"
+            className="mt-8 w-full max-w-lg rounded-lg border border-border bg-card p-4 shadow-lg"
+            onClick={(event) => event.stopPropagation()}
+          >
             <div className="mb-3 flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <h2

@@ -57,6 +57,15 @@ describe("matchesEventFilters", () => {
     );
   });
 
+  it("matches a calendar row that stores the player as gkName", () => {
+    expect(
+      matchesEventFilters({ title: FIXTURE.title, gkName: "Joe Lumley" }, { goalkeeper: "lumley" }),
+    ).toBe(true);
+    expect(
+      matchesEventFilters({ title: FIXTURE.title, gkName: "Joe Lumley" }, { goalkeeper: "Bell" }),
+    ).toBe(false);
+  });
+
   it("ignores accents, so a plain keyboard finds every name", () => {
     expect(
       matchesEventFilters({ title: "x", goalkeeperName: "José Sá" }, { goalkeeper: "jose sa" }),
