@@ -1,16 +1,16 @@
 {
   "manifest_version": 1,
-  "captured_on": "2026-09-09",
+  "captured_on": "2026-09-20",
   "source": {
     "repository": "sprint-labs/rpmmentor-7ead5abe",
-    "origin_main_sha": "2f78aaa7ec8cbcb8dd5c1dc85caba33d040101ec",
-    "active_migration_files_on_origin_main": 50
+    "origin_main_sha": "28f45f4",
+    "active_migration_files_on_origin_main": 52
   },
   "production": {
     "project_ref": "zdxxezquhvpjmoxlecjp",
     "project_name": "RPM Mentor Hub",
     "region": "eu-west-2",
-    "ledger_rows": 50,
+    "ledger_rows": 52,
     "migrations": [
       {
         "version": "20260811095729",
@@ -361,6 +361,20 @@
         "statement_count": 1,
         "sql_length": 2115,
         "sql_md5": "bbd62773141b91c38cb90eda2504e238"
+      },
+      {
+        "version": "20260915174038",
+        "name": "duty_of_care_manual_resets",
+        "statement_count": 1,
+        "sql_length": 7421,
+        "sql_md5": "77fd35834aee4651dce95b5d5500663b"
+      },
+      {
+        "version": "20260919045843",
+        "name": "players_academy_free_agent_flags",
+        "statement_count": 1,
+        "sql_length": 1514,
+        "sql_md5": "959674c829fda25d555086e3e3d03fa6"
       }
     ]
   },
@@ -378,11 +392,17 @@
       "production_ledger_row": false,
       "live_evidence": "The guarded list_mentor_directory() definition and SELECT-wrapped auth helper expressions are present in production.",
       "reconciliation": "Reconciled into production migration 20260825181827 after disposable replay verification; the historical source file remains archived."
+    },
+    {
+      "source_file": "supabase/migrations/20260919120000_players_academy_free_agent_flags.sql",
+      "production_ledger_row": false,
+      "live_evidence": "players.is_academy and players.is_free_agent exist as boolean not null default false, and players_tier_check permits only Tier 1-4 or NULL. Verified against zdxxezquhvpjmoxlecjp on 2026-09-20.",
+      "reconciliation": "The same change was applied out of band as ledger row 20260919045843, whose statements are this file's SQL body without its comment header. The ledger row is now carried as a repository file at its own version, and this later duplicate is removed so it cannot be applied a second time. Its rationale is preserved in commit f85222e."
     }
   ],
   "staging": {
     "project_ref": "emyxyqqftwnjpcmctkpe",
-    "project_name": "RPM Mentor Hub \u2014 Staging",
+    "project_name": "RPM Mentor Hub — Staging",
     "ledger_rows": 18,
     "ledger_strategy": "current-schema snapshot",
     "schema_parity_with_production": false,
