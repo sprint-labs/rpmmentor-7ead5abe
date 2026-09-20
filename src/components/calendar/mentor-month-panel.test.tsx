@@ -109,4 +109,23 @@ describe("MentorMonthPanel", () => {
     expect(screen.getByRole("status").textContent).toContain("didn't load");
     expect(screen.queryByRole("link", { name: /nothing scheduled/ })).toBeNull();
   });
+
+  it("lets the page drop the divider when the list sits beside it, not below", () => {
+    const { container } = render(
+      <MentorMonthPanel
+        className="mb-0 border-b-0 pb-0"
+        events={[]}
+        pending={false}
+        error={false}
+        today="2026-09-20"
+      />,
+    );
+
+    const root = container.firstElementChild as HTMLElement;
+    // twMerge resolves these against the panel's own defaults.
+    expect(root.className).toContain("border-b-0");
+    expect(root.className).not.toContain("border-b ");
+    expect(root.className).toContain("mb-0");
+    expect(root.className).toContain("pb-0");
+  });
 });

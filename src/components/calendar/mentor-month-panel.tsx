@@ -25,6 +25,7 @@ import {
   type MonthCursor,
 } from "@/lib/calendar/month";
 import { mentorPrimaryActionLabels } from "@/components/mentor/mentor-dashboard-cards";
+import { cn } from "@/lib/utils";
 
 /** The calendar columns this panel reads. */
 export interface MentorMonthEvent {
@@ -85,12 +86,19 @@ export function MentorMonthPanel({
   pending,
   error,
   today,
+  className,
 }: {
   events: readonly MentorMonthEvent[] | undefined;
   pending: boolean;
   error: boolean;
   /** Today as a local `YYYY-MM-DD`. Injected so tests can pin it. */
   today: string;
+  /**
+   * Placement and trim passed by the page. The default divider below the
+   * grid is only right when the list it introduces sits directly underneath;
+   * beside it, the caller drops the rule.
+   */
+  className?: string;
 }) {
   // Opened on the month `today` falls in, not the machine's. The two agree in
   // normal use, but taking it from the prop is what makes the grid a pure
@@ -129,7 +137,7 @@ export function MentorMonthPanel({
   );
 
   return (
-    <div className="mb-4 border-b border-border pb-4">
+    <div className={cn("mb-4 border-b border-border pb-4", className)}>
       <div className="mb-3 flex items-center justify-between gap-2">
         <button
           type="button"
