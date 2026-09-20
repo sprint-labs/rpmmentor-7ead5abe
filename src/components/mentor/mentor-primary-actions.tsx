@@ -26,10 +26,10 @@ export function MentorPrimaryActions({
           <button
             type="button"
             onClick={onLogReport}
-            className="min-h-[7.5rem] rounded-lg bg-primary text-primary-foreground px-5 py-4 text-left flex flex-col justify-between gap-4 hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            className="flex min-h-14 items-center gap-2.5 rounded-lg bg-primary px-4 py-3 text-left text-primary-foreground hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           >
-            <FileText className="size-8" aria-hidden="true" />
-            <span className="block text-xl font-display font-bold uppercase tracking-[0.02em]">
+            <FileText className="size-5 shrink-0" aria-hidden="true" />
+            <span className="text-sm font-semibold uppercase tracking-wider">
               {mentorPrimaryActionLabels.logMatchReport}
             </span>
           </button>
@@ -38,10 +38,10 @@ export function MentorPrimaryActions({
           <button
             type="button"
             onClick={onLogInteraction}
-            className="min-h-[7.5rem] rounded-lg border-2 border-primary bg-primary/10 text-foreground px-5 py-4 text-left flex flex-col justify-between gap-4 hover:bg-primary/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            className="flex min-h-14 items-center gap-2.5 rounded-lg border-2 border-primary bg-primary/10 px-4 py-3 text-left text-foreground hover:bg-primary/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           >
-            <Plus className="size-8 text-primary-ink" aria-hidden="true" />
-            <span className="block text-xl font-display font-bold uppercase tracking-[0.02em]">
+            <Plus className="size-5 shrink-0 text-primary-ink" aria-hidden="true" />
+            <span className="text-sm font-semibold uppercase tracking-wider">
               {mentorPrimaryActionLabels.logInteraction}
             </span>
           </button>

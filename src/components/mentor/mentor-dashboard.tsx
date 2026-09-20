@@ -2,17 +2,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import {
-  ArrowUpRight,
-  CalendarClock,
-  CalendarPlus,
-  ChevronDown,
-  ChevronRight,
-  FileText,
-  Video,
-  AlertTriangle,
-  Plus,
-} from "lucide-react";
+import { ArrowUpRight, CalendarClock, CalendarPlus, Plus } from "lucide-react";
 import { MentorPrimaryActions } from "./mentor-primary-actions";
 import { cn } from "@/lib/utils";
 import {
@@ -55,22 +45,6 @@ import { lastNDaysPeriod } from "@/lib/dashboard-period";
 interface Props {
   user: SessionUser;
   mentorProfileId: string;
-}
-
-function formatEventDateTime(iso: string) {
-  const d = new Date(iso);
-  const day = d.getDate();
-  const suffix =
-    day % 10 === 1 && day !== 11
-      ? "st"
-      : day % 10 === 2 && day !== 12
-        ? "nd"
-        : day % 10 === 3 && day !== 13
-          ? "rd"
-          : "th";
-  const month = d.toLocaleString("en-GB", { month: "long" });
-  const time = d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
-  return `${month} ${day}${suffix} · ${time}`;
 }
 
 function formatRelativeTime(iso: string) {
@@ -160,12 +134,9 @@ export function MentorDashboard({ user }: Props) {
   );
 
   const upcoming = useMemo(() => data?.upcomingList ?? [], [data?.upcomingList]);
-  const outstanding = data?.outstandingItems ?? [];
-  const outstandingUnavailable = !isLoading && !isError && data?.outstandingAvailable === false;
   const upcomingUnavailable = !isLoading && !isError && data?.upcomingAvailable === false;
   const updatedAt = data?.lastUpdatedAt ? formatRelativeTime(data.lastUpdatedAt) : undefined;
   const period = `Last ${rangeDays} days`;
-  const [showOutstanding, setShowOutstanding] = useState(false);
 
   const filteredUpcoming = useMemo(() => {
     if (filters.length === 0) return upcoming;
@@ -300,148 +271,6 @@ export function MentorDashboard({ user }: Props) {
           </Link>
         </div>
       </section>
-
-      <Card className="p-4">
-        <button
-          onClick={() => setShowOutstanding((v) => !v)}
-          className="w-full flex items-center justify-between gap-3 text-left"
-          aria-expanded={showOutstanding}
-        >
-          <div className="flex items-center gap-2">
-            {showOutstanding ? (
-              <ChevronDown className="size-4 text-muted-foreground" />
-            ) : (
-              <ChevronRight className="size-4 text-muted-foreground" />
-            )}
-            <h2 className="text-sm font-semibold tracking-tight uppercase text-muted-foreground">
-              Outstanding Actions
-            </h2>
-            {/* Red only when there is something to do. A red "0" flagged an
-                empty list as a problem. */}
-            <span
-              className={cn(
-                "inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium border tabular-nums font-mono",
-                !isLoading && !isError && !outstandingUnavailable && outstanding.length > 0
-                  ? "bg-destructive/15 text-destructive border-destructive/40"
-                  : "border-border text-muted-foreground",
-              )}
-            >
-              {isLoading ? "…" : isError || outstandingUnavailable ? "—" : outstanding.length}
-            </span>
-          </div>
-          <span className="text-[11px] uppercase tracking-wider text-muted-foreground">
-            {showOutstanding ? "Hide" : "Show"}
-          </span>
-        </button>
-        <p className="mt-1.5 pl-6 text-xs text-muted-foreground">
-          Match reports and clips still owed after events you attended.
-        </p>
-
-        {showOutstanding &&
-          (isLoading ? (
-            <div className="text-xs text-muted-foreground py-6 text-center">
-              Loading outstanding actions…
-            </div>
-          ) : isError || outstandingUnavailable ? (
-            <div className="text-xs text-muted-foreground py-6 text-center">
-              Outstanding actions didn't load — try again shortly.
-            </div>
-          ) : outstanding.length === 0 ? (
-            <div className="text-xs text-muted-foreground py-6 text-center">
-              All caught up — nothing overdue.
-            </div>
-          ) : (
-            <div className="mt-3 divide-y divide-border">
-              {outstanding.map((item) => {
-                const isReport = item.kind === "missing_report";
-                const Icon = isReport ? FileText : Video;
-                const toneClass = isReport
-                  ? "bg-destructive/15 text-destructive border-destructive/30"
-                  : "bg-warning/15 text-warning border-warning/30";
-                const actionHref = isReport ? "/reports" : "/media";
-                const actionSearch = isReport
-                  ? {
-                      from: "",
-                      to: "",
-                      coach: mentorName ?? "",
-                      mentorProfileId: effectiveMentorId,
-                      source: "outstanding-report",
-                    }
-                  : {
-                      from: "",
-                      to: "",
-                      uploaderName: mentorName ?? "",
-                      mentorProfileId: effectiveMentorId,
-                      kind: "video",
-                      source: "outstanding-clip",
-                    };
-                return (
-                  <div key={item.id} className="flex items-center gap-3 py-2.5">
-                    <Avatar initials={item.gkInitials ?? "—"} />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span
-                          className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium border ${toneClass}`}
-                        >
-                          <Icon className="size-3" />
-                          {isReport ? "Missing report" : "Missing clip"}
-                        </span>
-                        <span className="font-medium text-sm truncate">
-                          {item.gkName ?? "No goalkeeper linked"}
-                        </span>
-                        {item.gkStatus && <TierBadge tier={item.gkStatus as Tier} />}
-                        {item.gkTierLevel && <TierLevelBadge level={item.gkTierLevel} />}
-                        {item.daysOverdue > 0 && (
-                          <Pill tone="destructive">
-                            <AlertTriangle className="size-3 mr-0.5" />
-                            {item.daysOverdue}d overdue
-                          </Pill>
-                        )}
-                      </div>
-                      {item.gkClub && (
-                        <div className="text-xs text-muted-foreground truncate mt-0.5">
-                          {item.gkClub}
-                        </div>
-                      )}
-                      <div className="text-[10px] text-muted-foreground mt-0.5 font-mono tabular-nums">
-                        Observed {formatEventDateTime(item.observationDate)} · Due{" "}
-                        {formatEventDateTime(item.dueDate)} ·{" "}
-                        {item.actionableByRole === "self"
-                          ? "Yours to complete"
-                          : `${item.actionableBy} to complete`}
-                      </div>
-                    </div>
-                    <Link
-                      to={actionHref}
-                      search={actionSearch}
-                      onClick={() =>
-                        trackClick(isReport ? "outstanding-report" : "outstanding-clip", actionHref)
-                      }
-                      className="shrink-0 text-xs px-2.5 py-1.5 rounded-md border border-border hover:bg-accent/40 text-primary-ink inline-flex items-center gap-1"
-                    >
-                      {isReport ? "Submit report" : "Upload clip"}
-                      <ArrowUpRight className="size-3" />
-                    </Link>
-                    {canLog && (
-                      <button
-                        type="button"
-                        onClick={() => openLog(item.gkId, item.gkName)}
-                        aria-label={
-                          item.gkName
-                            ? `Log an interaction for ${item.gkName}`
-                            : "Log an interaction"
-                        }
-                        className="shrink-0 text-xs px-2.5 py-1.5 rounded-md border border-border hover:bg-accent/40 text-primary-ink inline-flex items-center gap-1"
-                      >
-                        <Plus className="size-3" /> Log
-                      </button>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          ))}
-      </Card>
 
       {(isFollowUpsError || writeUpsDue.length > 0) && (
         <Card className="p-4">
