@@ -254,9 +254,27 @@ describe("dashboard operational grid", () => {
     // One-sentence rows; a wide measure makes them harder to scan, not easier.
     expect(cellFor("Recent Activity").className).toContain("lg:col-span-4");
 
-    // The calendar and the fixtures that fall in it currently share one cell.
-    expect(cellFor("Calendar").className).toContain("lg:col-span-8");
-    expect(cellFor("Upcoming Fixtures")).toBe(cellFor("Calendar"));
+    // A fixed-aspect matrix: extra width is paid for in empty height, so the
+    // calendar is capped rather than stretched to fill what is left over.
+    expect(cellFor("Calendar").className).toContain("lg:col-span-4");
+    expect(cellFor("Calendar").className).toContain("max-w-[380px]");
+
+    // Rows whose third line truncates, so this one keeps the wider measure.
+    expect(cellFor("Upcoming Fixtures").className).toContain("lg:col-span-6");
+
+    // Each now carries its own placement instead of sharing a wrapper cell.
+    expect(cellFor("Upcoming Fixtures")).not.toBe(cellFor("Calendar"));
+  });
+
+  it("keeps the page free of the xl-only breakpoint that stacked the calendar pair", async () => {
+    await renderDashboard();
+
+    // The dissolved wrapper was the page's only `xl:` tier: between 1024 and
+    // 1279px it had not fired, so the calendar and the fixtures stacked
+    // inside an 8-of-12 cell and the day cells ballooned.
+    for (const name of PANELS) {
+      expect(cellFor(name).className).not.toMatch(/(^|\s)xl:/);
+    }
   });
 
   it("places Recent Activity from one cell, so it cannot resize when it errors", async () => {
