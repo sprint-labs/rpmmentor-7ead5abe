@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { Session } from "@supabase/supabase-js";
-import { hasAuthCallback, isRecoveryCallback } from "@/lib/password-recovery";
+import { isPasswordRecoveryLanding } from "@/lib/password-recovery";
 
 export type Role = "super_admin" | "admin" | "mentor_manager" | "mentor";
 
@@ -264,7 +264,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [passwordRecoveryPending, setPasswordRecoveryPending] = useState(() => {
     if (typeof window === "undefined") return false;
-    return isRecoveryCallback(window.location) || hasAuthCallback(window.location);
+    return isPasswordRecoveryLanding(window.location);
   });
 
   // Read inside the auth callback, which closes over its first render.

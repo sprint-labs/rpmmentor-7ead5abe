@@ -9,6 +9,7 @@ import { AppShell } from "@/components/app-shell";
 import { AuthProvider } from "@/lib/auth";
 import { NotificationsProvider } from "@/lib/notifications";
 import { ThemeProvider, themeInitScript } from "@/lib/theme";
+import { canonicalOriginScript } from "@/lib/canonical-url";
 import { Toaster } from "@/components/ui/sonner";
 import { registerSw } from "@/lib/pwa/register-sw";
 import { toast } from "sonner";
@@ -115,6 +116,7 @@ function RootShell({ children }: { children: ReactNode }) {
   return (
     <html lang="en" className="dark" data-theme="dark" suppressHydrationWarning>
       <head>
+        <ScriptOnce>{canonicalOriginScript}</ScriptOnce>
         <ScriptOnce>{themeInitScript}</ScriptOnce>
         <style dangerouslySetInnerHTML={{ __html: bootSplashCss }} />
         <HeadContent />

@@ -78,3 +78,29 @@ export function stripAuthCallbackFromUrl(): void {
     // A blocked history write is cosmetic only; the token is already spent.
   }
 }
+
+/**
+ * True when a landing should hold the caller on the reset screen until a new
+ * password is set.
+ *
+ * A bare `?code=` is deliberately not enough on its own. Supabase hands back
+ * exactly the same parameter for a completed Google sign-in as it does for a
+ * browser-initiated reset, so reading one anywhere would route somebody who
+ * has just signed in with Google to the reset screen. That redirect drops the
+ * code on the way, leaving the reset screen with nothing to verify and
+ * reporting a valid sign-in as an expired link. An ambiguous code therefore
+ * counts only on the reset route itself, which is the only address a reset or
+ * invite link is ever sent to. Anything that names itself — `type=recovery`,
+ * `type=invite`, or a one-time `token_hash` — still counts wherever it lands.
+ */
+export function isPasswordRecoveryLanding(
+  location: Pick<Location, "pathname" | "hash" | "search">,
+): boolean {
+  if (isRecoveryCallback(location)) return true;
+
+  const { hashParams, queryParams } = parseAuthCallbackParams(location);
+  if (queryParams.get("token_hash") || hashParams.get("token_hash")) return true;
+
+  const path = location.pathname.replace(/\/+$/, "") || "/";
+  return path === PASSWORD_RECOVERY_PATH && hasAuthCallback(location);
+}
