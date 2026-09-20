@@ -419,7 +419,12 @@ function Dashboard() {
   return (
     // `pt-2` is the half-line of air the header was missing: the greeting sat
     // hard against the app bar above it.
-    <div className="space-y-4 pt-2">
+    //
+    // Capped, because the tokens below buy width for a reason: unbounded, a
+    // one-sentence activity row is run across 827px on a 2560px monitor. The
+    // cap sits on the page rather than on the cells so all four bands — header,
+    // stats, bulletins and the grid — stay aligned with each other.
+    <div className="mx-auto w-full max-w-[1440px] space-y-4 pt-2">
       <PageHeader
         title={greeting}
         titleClassName="break-words text-2xl leading-tight min-[390px]:text-[1.625rem] sm:text-3xl"
