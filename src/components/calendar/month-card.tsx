@@ -233,11 +233,25 @@ export function CalendarMonthCard({
             })}
           </div>
 
-          <p className="mt-3 border-t border-border pt-2 text-[10px] text-muted-foreground">
-            {pending
-              ? "Loading events…"
-              : `${eventsThisMonth} event${eventsThisMonth === 1 ? "" : "s"} in ${monthLabel(cursor)}`}
-          </p>
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-t border-border pt-2 text-[10px] text-muted-foreground">
+            <p>
+              {pending
+                ? "Loading events…"
+                : `${eventsThisMonth} event${eventsThisMonth === 1 ? "" : "s"} in ${monthLabel(cursor)}`}
+            </p>
+            {/* The dots meant something only to whoever wrote them. A key
+                beside the count says what green and blue stand for. */}
+            <p className="inline-flex items-center gap-3" aria-hidden="true">
+              <span className="inline-flex items-center gap-1">
+                <span className="inline-block size-1.5 rounded-full bg-primary" />
+                Event
+              </span>
+              <span className="inline-flex items-center gap-1">
+                <span className="inline-block size-1.5 rounded-full bg-info" />
+                Interaction logged
+              </span>
+            </p>
+          </div>
         </>
       )}
     </div>

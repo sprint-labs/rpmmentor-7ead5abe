@@ -34,6 +34,7 @@ import {
 import { mentors } from "@/lib/mock-data";
 import type { Tier } from "@/lib/mock-data";
 import type { SessionUser } from "@/lib/auth";
+import { greetingFor } from "@/lib/greeting";
 import { logDashboardClick } from "@/lib/analytics.functions";
 import { mentorDashboardMetricCardLabels } from "./mentor-dashboard-cards";
 import { WorkflowDialog, type WorkflowKind } from "@/components/workflows";
@@ -158,7 +159,6 @@ export function MentorDashboard({ user }: Props) {
     [followUpData],
   );
 
-  const firstName = user.name.split(" ")[0];
   const upcoming = useMemo(() => data?.upcomingList ?? [], [data?.upcomingList]);
   const outstanding = data?.outstandingItems ?? [];
   const outstandingUnavailable = !isLoading && !isError && data?.outstandingAvailable === false;
@@ -226,15 +226,18 @@ export function MentorDashboard({ user }: Props) {
   return (
     <div className="space-y-6">
       <header>
+        {/* Same greeting as the manager home, so the two screens read as one
+            product. The subtitle names what is on the page rather than
+            stating a priority. */}
         <h1 className="text-3xl font-display font-bold uppercase tracking-[0.02em]">
-          Hello, {firstName}
+          {greetingFor(user.name)}
         </h1>
         <p className="text-xs uppercase tracking-wider text-muted-foreground mt-2">
           {isLoading
             ? "Loading your dashboard…"
             : isError
               ? "Your dashboard didn't load."
-              : "Match reports and interactions come first"}
+              : "Your match reports, interactions and what's coming up"}
         </p>
         {isError && (
           <button
@@ -256,7 +259,15 @@ export function MentorDashboard({ user }: Props) {
 
       <BulletinDashboardCard scope="team" />
 
-      <section aria-label="Your activity">
+      <section aria-labelledby="mentor-activity-heading">
+        {/* A visible heading, not only an aria-label: without it the two
+            cards read as team totals, and they are this mentor's own. */}
+        <h2
+          id="mentor-activity-heading"
+          className="mb-2 text-[10px] font-mono uppercase tracking-[0.14em] text-muted-foreground"
+        >
+          Your activity · {period.toLowerCase()}
+        </h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Link
             to="/reports"
@@ -306,7 +317,16 @@ export function MentorDashboard({ user }: Props) {
             <h2 className="text-sm font-semibold tracking-tight uppercase text-muted-foreground">
               Outstanding Actions
             </h2>
-            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium border bg-destructive/15 text-destructive border-destructive/40 tabular-nums font-mono">
+            {/* Red only when there is something to do. A red "0" flagged an
+                empty list as a problem. */}
+            <span
+              className={cn(
+                "inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium border tabular-nums font-mono",
+                !isLoading && !isError && !outstandingUnavailable && outstanding.length > 0
+                  ? "bg-destructive/15 text-destructive border-destructive/40"
+                  : "border-border text-muted-foreground",
+              )}
+            >
               {isLoading ? "…" : isError || outstandingUnavailable ? "—" : outstanding.length}
             </span>
           </div>
@@ -314,6 +334,9 @@ export function MentorDashboard({ user }: Props) {
             {showOutstanding ? "Hide" : "Show"}
           </span>
         </button>
+        <p className="mt-1.5 pl-6 text-xs text-muted-foreground">
+          Match reports and clips still owed after events you attended.
+        </p>
 
         {showOutstanding &&
           (isLoading ? (

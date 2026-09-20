@@ -22,6 +22,7 @@ function initialsOf(name: string) {
 
 import { ArrowUpRight, AlertTriangle, CalendarClock, FileText, Plus } from "lucide-react";
 import { useAuth, ROLE_LABEL } from "@/lib/auth";
+import { greetingFor } from "@/lib/greeting";
 import { MentorDashboard } from "@/components/mentor/mentor-dashboard";
 import { SyncStatusChip } from "@/components/sync-status-chip";
 import { DataFreshnessChip } from "@/components/data-freshness-chip";
@@ -316,26 +317,31 @@ function Dashboard() {
   const dutyBandPercents = wholePercentsSummingTo100(dutyBandCounts);
   const dutyBands = (
     [
+      // Hints say what the band means in plain words. "Cadence" is the
+      // engine's term; a manager reading this needs to know whether contact
+      // happened in time and what to do about it.
       {
         level: "up_to_date",
         label: "Up to date",
-        hint: "On cadence for tier",
+        hint: "Contacted within their tier's window",
         bar: "bg-success",
         value: "text-success",
       },
       {
         level: "due_soon",
         label: "Due soon",
-        hint: "Approaching cadence",
+        hint: "Next contact is due shortly · plan it",
         bar: "bg-warning",
         value: "text-warning",
       },
       {
         level: "overdue",
         label: "Overdue",
-        hint: "Past required cadence",
-        bar: "bg-warning",
-        value: "text-warning",
+        // Red, matching the profile badge, the roster chip and the KPI card
+        // above. In amber this band was indistinguishable from "Due soon".
+        hint: "Past their tier's window · contact first",
+        bar: "bg-destructive",
+        value: "text-destructive",
       },
       {
         level: "not_required",
@@ -344,7 +350,7 @@ function Dashboard() {
         // "Tier 4" told a manager they had no formal duty for someone who is
         // simply untiered — which this same page flags for assignment. Verified
         // against live data: 15 Tier 4 plus 2 with no tier.
-        hint: "Tier 4 or no tier recorded",
+        hint: "Tier 4, or no tier recorded yet",
         bar: "bg-muted-foreground/50",
         value: "text-foreground",
       },
@@ -355,7 +361,7 @@ function Dashboard() {
         // required" above. Verified against live data: every goalkeeper in this
         // band holds Tier 1 or Tier 2 and none has any qualifying contact on
         // record. That is a gap to close, not an absence of information.
-        hint: "Tiered, no qualifying contact recorded",
+        hint: "Has a tier but no contact logged yet",
         bar: "bg-muted-foreground/50",
         value: "text-foreground",
       },
@@ -413,7 +419,7 @@ function Dashboard() {
     reportsSyncedAt: overview?.reportsSyncedAt ?? null,
   });
 
-  const greeting = `Good ${new Date().getHours() < 12 ? "morning" : new Date().getHours() < 18 ? "afternoon" : "evening"}, ${user.name.split(" ")[0]}`;
+  const greeting = greetingFor(user.name);
 
   return (
     // `pt-2` is the half-line of air the header was missing: the greeting sat
@@ -422,7 +428,9 @@ function Dashboard() {
       <PageHeader
         title={greeting}
         titleClassName="break-words text-2xl leading-tight min-[390px]:text-[1.625rem] sm:text-3xl"
-        description={`${ROLE_LABEL[user.role]} view · overview of goalkeeper coverage and outstanding actions.`}
+        // Names what is actually on this screen. It used to promise
+        // "outstanding actions", which is a panel on the mentor home, not here.
+        description={`${ROLE_LABEL[user.role]} view · goalkeeper coverage, duty of care and team activity. Select any figure to see the goalkeepers behind it.`}
         action={
           <div className="grid w-full grid-cols-1 gap-2 min-[390px]:grid-cols-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center">
             {/* Two different questions, so two indicators:
@@ -468,7 +476,7 @@ function Dashboard() {
           <StatCard
             label="Total Goalkeepers"
             value={overviewError ? "—" : (overview?.totalGoalkeepers ?? "…")}
-            hint={overviewError ? "Count unavailable" : "Player records on file"}
+            hint={overviewError ? "Count unavailable" : "Goalkeepers on the roster"}
           />
         </Link>
         <Link
@@ -494,11 +502,16 @@ function Dashboard() {
           to="/insights/$metric"
           params={{ metric: "duty" }}
           search={{ from: period.fromDate, to: period.toDate, level: "overdue", tier: "" }}
-          className="group block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-warning"
+          className="group block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive"
         >
           <span className="sr-only">Break down: </span>
+          {/* The figure is the overdue count, so the label says so: "Duty of
+              Care · 10" left the reader to find out from the hint what the 10
+              was. Red, not amber: overdue is red on the profile badge, the
+              roster chips and the Bulletin Board, and amber is "due soon"
+              everywhere else on this page. */}
           <StatCard
-            label="Duty of Care"
+            label="Duty of Care Overdue"
             value={dutyPending ? "…" : dutyUnavailable ? "—" : dutyOverview.overdue}
             hint={
               // "Nothing overdue" is an all-clear on a safeguarding metric, so
@@ -510,10 +523,10 @@ function Dashboard() {
                 : dutyUnavailable
                   ? "Count unavailable"
                   : dutyOverview.overdue > 0
-                    ? `Goalkeepers past required cadence · of ${dutyOverview.total}`
-                    : "Nothing overdue"
+                    ? `Not contacted within their tier's window · of ${dutyOverview.total}`
+                    : "Everyone contacted on time"
             }
-            accent="warning"
+            accent="destructive"
             emptyMessage="Nothing overdue"
           />
         </Link>
@@ -567,7 +580,7 @@ function Dashboard() {
                   to="/goalkeepers"
                   className="text-primary-ink inline-flex items-center gap-1 normal-case tracking-normal"
                 >
-                  Goalkeepers <ArrowUpRight className="size-3" />
+                  Open roster <ArrowUpRight className="size-3" />
                 </Link>
               </div>
             }
@@ -581,8 +594,8 @@ function Dashboard() {
               a manager to distrust the one canonical number on the page. */}
           <p className="mb-4 text-xs leading-relaxed text-muted-foreground">
             {dutyPending || dutyUnavailable
-              ? "Live cadence status from the goalkeeper roster."
-              : `Live cadence status for all ${dutyOverview.total} goalkeepers. Percentages are of that roster.`}
+              ? "Whether each goalkeeper has been contacted as often as their tier requires."
+              : `Whether each of the ${dutyOverview.total} goalkeepers has been contacted as often as their tier requires. Percentages are of the full roster. Select a band to see who is in it.`}
           </p>
           {/* Gated on the duty read, which is where every number below comes
               from. Gating on the interactions read instead drew five bands of
@@ -613,7 +626,12 @@ function Dashboard() {
                     />
                   </div>
                   <div className="flex items-baseline justify-between font-mono text-xs">
-                    <span className="text-muted-foreground">{b.label}</span>
+                    {/* The arrow says the band opens a list. Without it the
+                        only cue was a hover wash, which touch never shows. */}
+                    <span className="inline-flex items-center gap-1 text-muted-foreground">
+                      {b.label}
+                      <ArrowUpRight aria-hidden="true" className="size-3 opacity-60" />
+                    </span>
                     <span className={`tabular-nums font-bold ${b.value}`}>{b.count}</span>
                   </div>
                   <div className="flex items-center justify-between text-[10px] text-muted-foreground">
@@ -653,15 +671,37 @@ function Dashboard() {
           <div className="col-span-12 self-start lg:col-span-8 command-panel p-5">
             <SectionTitle
               action={
-                can("interactions.log") ? (
-                  <button
-                    type="button"
-                    onClick={() => setWorkflow("interaction")}
-                    className="text-[10px] font-mono uppercase tracking-widest text-primary-ink inline-flex items-center gap-1 hover:underline"
-                  >
-                    <Plus className="size-3" /> Log interaction
-                  </button>
-                ) : undefined
+                <span className="inline-flex items-center gap-3">
+                  {can("interactions.log") && (
+                    <button
+                      type="button"
+                      onClick={() => setWorkflow("interaction")}
+                      className="text-[10px] font-mono uppercase tracking-widest text-primary-ink inline-flex items-center gap-1 hover:underline"
+                    >
+                      <Plus className="size-3" /> Log interaction
+                    </button>
+                  )}
+                  {/* A way out of the feed. Every other panel on this page
+                      links to its full list; this one showed eight rows and
+                      stopped. The link follows the selected tab. */}
+                  {activityFeed === "interactions" ? (
+                    <Link
+                      to="/interactions"
+                      search={interactionsSearch}
+                      className="text-[10px] font-mono uppercase tracking-widest text-primary-ink inline-flex items-center gap-1"
+                    >
+                      All interactions <ArrowUpRight className="size-3" />
+                    </Link>
+                  ) : (
+                    <Link
+                      to="/reports"
+                      search={reportsSearch}
+                      className="text-[10px] font-mono uppercase tracking-widest text-primary-ink inline-flex items-center gap-1"
+                    >
+                      All match reports <ArrowUpRight className="size-3" />
+                    </Link>
+                  )}
+                </span>
               }
             >
               Recent Activity
@@ -773,7 +813,10 @@ function Dashboard() {
                 </span>
               }
             >
-              Upcoming Fixtures
+              {/* "Events", not "Fixtures": the list is every kind of calendar
+                  event (visits and catch-ups included), and its own actions
+                  say "New event" and "All events". */}
+              Upcoming Events
             </SectionTitle>
             {/* An undisclosed cap on a list like this reads as "there are only
                 six". Live data regularly has several times that in the next week
@@ -842,14 +885,17 @@ function Dashboard() {
                           {formatRelative(e.event_date)}
                           {e.start_time ? ` · ${e.start_time.slice(0, 5)}` : ""}
                         </div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-medium truncate">{e.title}</span>
+                        <div className="text-xs font-medium truncate">{e.title}</div>
+                        {/* The tier badge sits beside the goalkeeper it
+                            belongs to. Next to the fixture title it read as
+                            the match's tier. */}
+                        <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+                          <span className="truncate">
+                            {e.event_type}
+                            {e.goalkeeper_name ? ` · ${e.goalkeeper_name}` : ""}
+                            {e.location ? ` · ${e.location}` : ""}
+                          </span>
                           {gk ? <TierBadge tier={gk.tier} /> : null}
-                        </div>
-                        <div className="text-[10px] text-muted-foreground truncate">
-                          {e.event_type}
-                          {e.goalkeeper_name ? ` · ${e.goalkeeper_name}` : ""}
-                          {e.location ? ` · ${e.location}` : ""}
                         </div>
                       </div>
                       <CalendarClock className="size-3.5 text-muted-foreground shrink-0" />

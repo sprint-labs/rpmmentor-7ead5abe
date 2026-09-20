@@ -891,8 +891,12 @@ export function AppShell() {
                 <h2 id="menu-title" className="text-sm font-semibold tracking-tight truncate">
                   {user.name}
                 </h2>
+                {/* Says "Viewing as" while a preview role is on, so the
+                    drawer never claims the manager IS a mentor. */}
                 <span className="text-[10px] uppercase tracking-wider text-muted-foreground truncate">
-                  {ROLE_LABEL[user.role]}
+                  {user.role !== user.actualRole
+                    ? `Viewing as ${ROLE_LABEL[user.role]}`
+                    : ROLE_LABEL[user.role]}
                 </span>
               </div>
               <button
