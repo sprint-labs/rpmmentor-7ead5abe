@@ -3,6 +3,7 @@ import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
 import { stripFixtureDuplicateKey } from "@/lib/calendar/fixture-import/fields";
 import { eventSummaryLine } from "@/lib/calendar/event-summary";
+import { hasActiveEventFilters, matchesEventFilters } from "@/lib/calendar/event-filters";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
@@ -12,6 +13,7 @@ import { useEffect, useMemo, useState } from "react";
 import { withPermission } from "@/components/require-permission";
 import {
   X,
+  Search,
   Plus,
   Pencil,
   Trash2,
@@ -85,6 +87,14 @@ const calendarSearchSchema = z.object({
   month: fallback(z.string(), "").default(""),
   /** "" is every event, which is how this page has always opened. */
   kind: fallback(z.enum(["", "fixtures", "interactions"]), "").default(""),
+  /**
+   * Free-text narrowing, in the URL for the same reason as `kind`: a narrowed
+   * calendar can be linked to and survives a reload. All three are plain
+   * "contains" matches that narrow as they are typed.
+   */
+  gkq: fallback(z.string(), "").default(""),
+  team: fallback(z.string(), "").default(""),
+  comp: fallback(z.string(), "").default(""),
 });
 
 export const Route = createFileRoute("/calendar")({
@@ -181,6 +191,9 @@ function followUpHint(eventType: string): string {
 function CalendarPage() {
   const {
     gkId,
+    gkq,
+    team: teamFilter,
+    comp: compFilter,
     new: openNewOnMount,
     title: prefillTitle,
     notes: prefillNotes,
@@ -371,10 +384,13 @@ function CalendarPage() {
     const forGoalkeeper = filteredGoalkeeper
       ? mapped.filter((e) => e.gkId === filteredGoalkeeper.id)
       : mapped;
-    if (!kindFilter) return forGoalkeeper;
-    const wantFixtures = kindFilter === "fixtures";
-    return forGoalkeeper.filter((e) => isFixtureEvent(e.type) === wantFixtures);
-  }, [events, filteredGoalkeeper, kindFilter]);
+    const byKind = kindFilter
+      ? forGoalkeeper.filter((e) => isFixtureEvent(e.type) === (kindFilter === "fixtures"))
+      : forGoalkeeper;
+    const typed = { goalkeeper: gkq, team: teamFilter, competition: compFilter };
+    if (!hasActiveEventFilters(typed)) return byKind;
+    return byKind.filter((e) => matchesEventFilters(e, typed));
+  }, [events, filteredGoalkeeper, kindFilter, gkq, teamFilter, compFilter]);
 
   const [view, setView] = useState<"month" | "week">("month");
   const today = new Date();
@@ -580,6 +596,62 @@ function CalendarPage() {
           );
         })}
       </div>
+
+      {/* Three plain search bars. No dropdown opens and nothing is chosen from
+          a list: the calendar and the events under it narrow on each keystroke,
+          which is faster than picking when you already know the name. */}
+      <div className="grid gap-2 sm:grid-cols-3">
+        {(
+          [
+            { key: "gkq", label: "Goalkeeper", value: gkq },
+            { key: "team", label: "Team", value: teamFilter },
+            { key: "comp", label: "Competition", value: compFilter },
+          ] as const
+        ).map((field) => (
+          <label key={field.key} className="block">
+            <span className="mb-1 block text-[11px] uppercase tracking-wider text-muted-foreground">
+              {field.label}
+            </span>
+            <div className="relative">
+              <Search
+                className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground"
+                aria-hidden="true"
+              />
+              <input
+                type="search"
+                value={field.value}
+                placeholder={`Filter by ${field.label.toLowerCase()}`}
+                onChange={(ev) => {
+                  const next = ev.target.value;
+                  void navigate({
+                    to: "/calendar",
+                    search: (prev) => ({ ...prev, [field.key]: next }),
+                    replace: true,
+                  });
+                }}
+                className="min-h-9 w-full rounded-md border border-border bg-background pl-8 pr-2 text-xs focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              />
+            </div>
+          </label>
+        ))}
+      </div>
+
+      {hasActiveEventFilters({ goalkeeper: gkq, team: teamFilter, competition: compFilter }) && (
+        <div className="flex items-center justify-between gap-3 rounded-md border border-border/60 bg-accent/30 px-3 py-2.5">
+          <div className="text-xs text-muted-foreground">
+            Showing {displayEvents.length} matching{" "}
+            {displayEvents.length === 1 ? "event" : "events"}
+          </div>
+          <Link
+            to="/calendar"
+            search={(prev) => ({ ...prev, gkq: "", team: "", comp: "" })}
+            replace
+            className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-2.5 py-1.5 text-xs font-medium text-foreground shadow-sm hover:bg-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <X className="size-3.5" /> Clear filters
+          </Link>
+        </div>
+      )}
 
       {/* What the colours mean. The grid tells you at a glance which fixtures
           are still waiting on a result, which is the whole point of the tone —
