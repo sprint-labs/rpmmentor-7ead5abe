@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { GkhqLockup } from "@/components/gkhq-lockup";
 import { passwordRecoveryRedirectUrl } from "@/lib/password-recovery";
 import { canonicalUrl } from "@/lib/canonical-url";
+import { GOOGLE_SIGN_IN_ENABLED } from "@/lib/auth-providers";
 import { MAINTENANCE_MODE } from "@/lib/maintenance";
 
 /**
@@ -193,29 +194,36 @@ function LoginPage() {
               </button>
             </form>
 
-            {/* The rule is drawn behind the word rather than as two flex
-                children so "OR" stays centred on the form, not on whatever
-                width the two halves happen to take. */}
-            <div className="relative my-6">
-              <span aria-hidden="true" className="absolute inset-0 flex items-center">
-                <span className="w-full border-t border-border" />
-              </span>
-              <span className="relative flex justify-center">
-                <span className="bg-background px-3 text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
-                  or
-                </span>
-              </span>
-            </div>
+            {/* The divider and the Google button travel together: an OR with
+                nothing on the far side of it is worse than neither. See
+                `GOOGLE_SIGN_IN_ENABLED` for what has to be true to show them. */}
+            {GOOGLE_SIGN_IN_ENABLED && (
+              <>
+                {/* The rule is drawn behind the word rather than as two flex
+                    children so "OR" stays centred on the form, not on whatever
+                    width the two halves happen to take. */}
+                <div className="relative my-6">
+                  <span aria-hidden="true" className="absolute inset-0 flex items-center">
+                    <span className="w-full border-t border-border" />
+                  </span>
+                  <span className="relative flex justify-center">
+                    <span className="bg-background px-3 text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
+                      or
+                    </span>
+                  </span>
+                </div>
 
-            <button
-              type="button"
-              onClick={handleGoogleSignIn}
-              disabled={googleSubmitting}
-              className="w-full flex items-center justify-center gap-2.5 py-2.5 rounded-xl border border-border bg-card text-sm font-medium hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-colors disabled:opacity-60"
-            >
-              <GoogleMark className="size-4 shrink-0" />
-              {googleSubmitting ? "Redirecting to Google…" : "Sign in with Google"}
-            </button>
+                <button
+                  type="button"
+                  onClick={handleGoogleSignIn}
+                  disabled={googleSubmitting}
+                  className="w-full flex items-center justify-center gap-2.5 py-2.5 rounded-xl border border-border bg-card text-sm font-medium hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-colors disabled:opacity-60"
+                >
+                  <GoogleMark className="size-4 shrink-0" />
+                  {googleSubmitting ? "Redirecting to Google…" : "Sign in with Google"}
+                </button>
+              </>
+            )}
 
             <p className="text-[11px] text-muted-foreground mt-8 leading-relaxed">
               Mentor Hub accounts are provisioned by an administrator. If you need access, contact{" "}
