@@ -254,10 +254,11 @@ describe("dashboard operational grid", () => {
     // One-sentence rows; a wide measure makes them harder to scan, not easier.
     expect(cellFor("Recent Activity").className).toContain("lg:col-span-4");
 
-    // A fixed-aspect matrix: extra width is paid for in empty height, so the
-    // calendar is capped rather than stretched to fill what is left over.
-    expect(cellFor("Calendar").className).toContain("lg:col-span-4");
-    expect(cellFor("Calendar").className).toContain("max-w-[380px]");
+    // The calendar takes the same span as the fixtures beside it, so the pair
+    // reads as balanced and row two fills exactly. The ceiling stops it buying
+    // height it has nothing to put in on a wide monitor.
+    expect(cellFor("Calendar").className).toContain("lg:col-span-6");
+    expect(cellFor("Calendar").className).toContain("max-w-[640px]");
 
     // Rows whose third line truncates, so this one keeps the wider measure.
     expect(cellFor("Upcoming Fixtures").className).toContain("lg:col-span-6");

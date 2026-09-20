@@ -26,8 +26,13 @@ export const BENTO_SPAN: Record<BentoSize, string> = {
   list: "col-span-12 self-start lg:col-span-4",
   /** Multi-line rows, or a truncating metadata line that loses information when narrowed. */
   detail: "col-span-12 self-start lg:col-span-6",
-  /** A fixed-aspect matrix, where width is paid for in height: every 100px of width buys ~85px of empty square. */
-  matrix: "col-span-12 self-start max-w-[380px] lg:col-span-4",
+  /**
+   * A fixed-aspect matrix, where width is paid for in height: every 100px of
+   * width buys ~85px of empty square. It takes the same column span as the
+   * panel it sits beside so the pair reads as balanced, and keeps a ceiling so
+   * that on a wide monitor it stops buying height it has nothing to put in.
+   */
+  matrix: "col-span-12 self-start max-w-[640px] lg:col-span-6",
 };
 
 /**

@@ -43,7 +43,7 @@ describe("bentoSpan", () => {
   });
 
   it("caps only the matrix token, because only it pays for width in height", () => {
-    expect(BENTO_SPAN.matrix).toContain("max-w-[380px]");
+    expect(BENTO_SPAN.matrix).toContain("max-w-[640px]");
     expect(BENTO_SPAN.list).not.toContain("max-w-");
     expect(BENTO_SPAN.detail).not.toContain("max-w-");
   });
