@@ -106,9 +106,7 @@ function StatisticCard() {
         }}
       />
       <CardContent className="relative z-10 flex h-full items-center justify-center p-6">
-        <span className="text-6xl font-bold tracking-tight text-foreground/90 md:text-8xl">
-          10X
-        </span>
+        <span className="text-6xl font-bold tracking-tight text-foreground md:text-8xl">10X</span>
       </CardContent>
     </Card>
   );

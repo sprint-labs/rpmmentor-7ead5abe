@@ -74,8 +74,10 @@ describe("animated sidebar", () => {
 
     const dashboard = screen.getAllByRole("link", { name: /Dashboard/ })[0];
     expect(dashboard.getAttribute("href")).toBe("/");
+    expect(dashboard.getAttribute("aria-label")).toBe("Dashboard");
     const logout = screen.getAllByRole("link", { name: /Logout/ })[0];
     expect(logout.getAttribute("href")).toBe("/login");
+    expect(logout.getAttribute("aria-label")).toBe("Logout");
   });
 
   it("expands the desktop rail on hover and collapses it on leave", async () => {
@@ -86,9 +88,19 @@ describe("animated sidebar", () => {
 
     fireEvent.mouseEnter(rail!);
     await waitFor(() => expect(rail!.style.width).toBe("300px"));
+    await waitFor(() =>
+      expect(
+        screen.getAllByRole("link", { name: "Dashboard" })[0].getAttribute("aria-label"),
+      ).toBeNull(),
+    );
 
     fireEvent.mouseLeave(rail!);
     await waitFor(() => expect(rail!.style.width).toBe("60px"));
+    await waitFor(() =>
+      expect(screen.getAllByRole("link", { name: "Dashboard" })[0].getAttribute("aria-label")).toBe(
+        "Dashboard",
+      ),
+    );
   });
 
   it("opens and closes the mobile overlay from the menu button", async () => {

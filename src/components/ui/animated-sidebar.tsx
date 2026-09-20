@@ -173,9 +173,14 @@ export const SidebarLink = ({
   className?: string;
 } & Omit<LinkComponentProps, "to" | "children" | "className">) => {
   const { open, animate } = useSidebar();
+  const collapsed = Boolean(animate && !open);
   return (
     <Link
       to={link.href}
+      // display:none on the collapsed label drops it from the a11y tree.
+      // Name the link from that same label; drop the attribute once expanded
+      // so the visible text stays the name (voice control).
+      aria-label={collapsed ? link.label : undefined}
       className={cn(
         "flex items-center justify-start gap-2 group/sidebar py-2 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring",
         className,
