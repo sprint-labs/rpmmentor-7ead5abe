@@ -72,7 +72,6 @@ const NAV: NavItem[] = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, exact: true, perm: "goalkeepers.view" },
   { to: "/bulletins", label: "Bulletin Board", icon: Columns3, perm: "bulletins.view" },
   { to: "/goalkeepers", label: "Goalkeepers", icon: Users, perm: "goalkeepers.view" },
-  { to: "/users", label: "Team Members", icon: UserCog, perm: "mentors.view" },
   {
     to: "/interactions",
     label: "Interactions Log",
@@ -86,6 +85,10 @@ const NAV: NavItem[] = [
   { to: "/alerts", label: "Notification Centre", icon: BellRing, perm: "alerts.view" },
   { to: "/calendar", label: "Calendar", icon: Calendar, perm: "calendar.view" },
   { to: "/follow-ups", label: "Follow-ups", icon: ClipboardCheck, perm: "calendar.view" },
+  // Below the day-to-day work. The roster of colleagues is looked up now
+  // and then; goalkeepers, interactions, reports and the calendar are the
+  // reasons someone opens this menu.
+  { to: "/users", label: "Team Members", icon: UserCog, perm: "mentors.view" },
   { to: "/support", label: "Help & Messages", icon: LifeBuoy, perm: "support.send" },
   { to: "/executive", label: "Executive", icon: BarChart3, perm: "executive.view" },
   { to: "/system/users", label: "Manage Users", icon: ShieldCheck, perm: "system.manage" },
