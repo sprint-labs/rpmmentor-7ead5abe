@@ -79,7 +79,11 @@ describe("post-upload broadcast submission", () => {
     expect(source).toContain("BROADCAST_SCHEDULE_MIN_LEAD_MS");
     expect(source).toContain("Date.now() - adminClockSample.wallStartedAt");
     expect(source).toContain("disabled={composerLocked || adminServerNow === null}");
-    expect(source).toContain('(publishMode === "later" && adminServerNow === null)');
+    // Editing cannot move a publish time, so the clock guard is scoped to a new
+    // broadcast. The guard itself is unchanged: with no edit open the condition
+    // is the same one, and Save is separately gated on a resolvable end time.
+    expect(source).toContain('(!editing && publishMode === "later" && adminServerNow === null)');
+    expect(source).toContain('(editing !== null && expiryMode === "custom" && !endsAt)');
     expect(source).toContain("onClick={() => void refetchAdminClock()}");
     expect(source).not.toContain("nextAdminScheduleAt(Date.now())");
   });

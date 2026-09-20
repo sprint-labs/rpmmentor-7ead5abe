@@ -20,6 +20,7 @@ import {
 import { requireAnnouncementMediaStorageReady } from "@/lib/support/announcement-media-capability";
 import { verifyStoredAnnouncementAttachment } from "@/lib/support/announcement-storage-verification";
 import { resolveServerBroadcastWindow } from "@/lib/support/broadcast-window";
+import { isBroadcastEditable, resolveBroadcastEditEnd } from "@/lib/support/broadcast-edit";
 import { ANNOUNCEMENT_MEDIA_BUCKET } from "@/lib/storage/bucket";
 import {
   ANNOUNCEMENT_KINDS,
@@ -34,6 +35,7 @@ import {
   markAnnouncementReadInput,
   replySupportThreadInput,
   setSupportThreadStatusInput,
+  updateAnnouncementInput,
   type AnnouncementAttachment,
   type AnnouncementKind,
   type AnnouncementRow,
@@ -510,6 +512,66 @@ export const createAnnouncement = createServerFn({ method: "POST" })
       throw new Error(error?.message ?? "Could not create the announcement.");
     }
     return mapAnnouncement(inserted as AnnouncementDbRow, null);
+  });
+
+export const updateAnnouncement = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((data) => updateAnnouncementInput.parse(data))
+  .handler(async ({ data, context }): Promise<AnnouncementRow> => {
+    await requireRole(context.supabase, context.userId, SUPPORT_INBOX_ROLES, "edit announcements");
+
+    const { data: existing, error: existingError } =
+      await queryAnnouncementsWithSchemaCompatibility(
+        () =>
+          context.supabase
+            .from("announcements")
+            .select(ANNOUNCEMENT_COLUMNS)
+            .eq("id", data.announcementId)
+            .maybeSingle(),
+        () =>
+          context.supabase
+            .from("announcements")
+            .select(LEGACY_ANNOUNCEMENT_COLUMNS)
+            .eq("id", data.announcementId)
+            .maybeSingle(),
+      );
+    if (existingError) throw new Error(existingError.message);
+    if (!existing) throw new Error("That announcement was not found.");
+    const existingAnnouncement = existing as unknown as AnnouncementDbRow;
+
+    const editTarget = {
+      startsAt: existingAnnouncement.starts_at,
+      endsAt: existingAnnouncement.ends_at,
+      active: existingAnnouncement.active,
+    };
+    if (!isBroadcastEditable(editTarget, Date.now())) {
+      throw new Error("That broadcast has ended. Duplicate it instead of editing it.");
+    }
+
+    // The end time is the one scheduling field still in play, and it has to stay
+    // after the start the broadcast already went out on.
+    const endsAt = resolveBroadcastEditEnd(
+      data.endsAt
+        ? { expiryMode: "custom", endsAt: data.endsAt }
+        : { expiryMode: "none", endsAt: "" },
+      editTarget,
+    );
+
+    const { data: updated, error } = await context.supabase
+      .from("announcements")
+      .update({
+        kind: data.kind,
+        title: data.title,
+        body: data.body ?? "",
+        ends_at: endsAt,
+      })
+      .eq("id", data.announcementId)
+      .eq("active", true)
+      .select(LEGACY_ANNOUNCEMENT_COLUMNS)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!updated) throw new Error("That broadcast ended while you were editing it.");
+    return mapAnnouncement({ ...existingAnnouncement, ...(updated as AnnouncementDbRow) }, null);
   });
 
 export const endAnnouncement = createServerFn({ method: "POST" })

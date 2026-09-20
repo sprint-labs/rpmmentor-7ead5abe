@@ -165,6 +165,26 @@ export const createAnnouncementInput = z
   });
 export type CreateAnnouncementInput = z.input<typeof createAnnouncementInput>;
 
+/**
+ * Editing an existing broadcast.
+ *
+ * Only the parts that are still the author's to change are here. The publish
+ * time is absent because a live broadcast has already been read: moving its
+ * start would rewrite when people were told, not when they will be. `endsAt`
+ * stays editable so a broadcast can be extended or cut short, and the
+ * attachment is left alone entirely — replacing stored media is an upload
+ * flow, not a field edit, and a partial one would strand bytes in the bucket.
+ */
+export const updateAnnouncementInput = z.object({
+  announcementId: z.string().regex(UUID, "announcementId must be an announcements.id"),
+  kind: z.enum(ANNOUNCEMENT_KINDS),
+  title: z.string().trim().min(1, "Title is required").max(160),
+  body: z.string().trim().max(4000).default(""),
+  /** Absolute end time, or null to leave the broadcast running. */
+  endsAt: z.string().datetime({ offset: true }).nullish(),
+});
+export type UpdateAnnouncementInput = z.input<typeof updateAnnouncementInput>;
+
 export const endAnnouncementInput = z.object({
   announcementId: z.string().regex(UUID, "announcementId must be an announcements.id"),
 });
