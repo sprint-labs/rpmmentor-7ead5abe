@@ -30,6 +30,18 @@ export interface MediaShelf {
 export const RECENT_SHELF_LIMIT = 12;
 
 /**
+ * Hold the shelf layout while the live roster is still in flight whenever any
+ * asset is linked. An empty default map would otherwise name each UUID
+ * "Unknown goalkeeper" and then reshuffle once listPlayers settles.
+ */
+export function shouldHoldShelvesForRoster(
+  rosterPending: boolean,
+  assets: readonly MediaAsset[],
+): boolean {
+  return rosterPending && assets.some((asset) => Boolean(asset.gk_id));
+}
+
+/**
  * Roster first, then the legacy mock roster for a `gk_id` that predates the
  * players table, then a placeholder — the same order the flat grid used.
  */

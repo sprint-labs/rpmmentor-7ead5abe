@@ -6,6 +6,7 @@ import {
   countMediaKinds,
   describeLibrary,
   resolveGoalkeeper,
+  shouldHoldShelvesForRoster,
   type GoalkeeperInfo,
 } from "@/lib/media-shelves";
 import type { MediaAsset, MediaKind } from "@/lib/media-store";
@@ -39,6 +40,20 @@ function asset(overrides: Partial<MediaAsset> = {}): MediaAsset {
     ...overrides,
   };
 }
+
+describe("shouldHoldShelvesForRoster", () => {
+  it("holds while the roster is in flight and any asset is linked", () => {
+    expect(shouldHoldShelvesForRoster(true, [asset({ gk_id: "gk-zoe" })])).toBe(true);
+  });
+
+  it("does not hold once the roster has settled", () => {
+    expect(shouldHoldShelvesForRoster(false, [asset({ gk_id: "gk-zoe" })])).toBe(false);
+  });
+
+  it("does not hold for an unlinked-only library", () => {
+    expect(shouldHoldShelvesForRoster(true, [asset()])).toBe(false);
+  });
+});
 
 describe("resolveGoalkeeper", () => {
   it("prefers the live roster", () => {

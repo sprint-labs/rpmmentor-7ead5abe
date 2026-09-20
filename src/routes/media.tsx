@@ -43,6 +43,7 @@ import {
   countMediaKinds,
   describeLibrary,
   resolveGoalkeeper,
+  shouldHoldShelvesForRoster,
   type GoalkeeperInfo,
   type MediaShelf,
 } from "@/lib/media-shelves";
@@ -91,7 +92,7 @@ function isKind(v: string): v is MediaKind | "all" {
 function MediaPage() {
   const { can, user } = useAuth();
   const listPlayersFn = useServerFn(listPlayers);
-  const { data: rosterPlayers = [] } = useQuery({
+  const { data: rosterPlayers = [], isPending: rosterPending } = useQuery({
     queryKey: ["players", "roster"],
     queryFn: () => listPlayersFn(),
     staleTime: 5 * 60_000,
@@ -215,7 +216,11 @@ function MediaPage() {
   const showShelves = !narrowed && !flatView;
 
   const kindCounts = useMemo(() => countMediaKinds(assets), [assets]);
-  const shelves = useMemo(() => buildMediaShelves(assets, rosterById), [assets, rosterById]);
+  const holdForRoster = shouldHoldShelvesForRoster(rosterPending, assets);
+  const shelves = useMemo(
+    () => (holdForRoster ? [] : buildMediaShelves(assets, rosterById)),
+    [assets, holdForRoster, rosterById],
+  );
   // A type filter is applied by Supabase, so the other segments would read 0
   // rather than "none here" — show counts only while the whole library is in hand.
   const showKindCounts = (filters.kind ?? "all") === "all";
@@ -293,7 +298,7 @@ function MediaPage() {
         }
         title={navSource?.title ?? "Media Library"}
         description={
-          loading
+          loading || holdForRoster
             ? "Loading…"
             : narrowed
               ? `${assets.length} asset${assets.length === 1 ? "" : "s"} matching filters.`
@@ -518,7 +523,7 @@ function MediaPage() {
         )}
       </div>
 
-      {loading && assets.length === 0 ? (
+      {(loading && assets.length === 0) || holdForRoster ? (
         <ShelfSkeleton />
       ) : !loading && assets.length === 0 ? (
         <Card>
