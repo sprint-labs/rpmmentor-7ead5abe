@@ -153,13 +153,17 @@ export function GoalkeeperDistribution({
       <SectionTitle
         action={
           error ? null : (
+            /* The roster total was already the denominator of every bracketed
+               figure in the rows below. Printing it again in the corner made
+               it look like a separate fact; naming the unit says what the
+               brackets mean instead, and does not go stale while loading. */
             <span className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
-              {pending ? "…" : `${roster?.total ?? 0} on roster`}
+              by % on the roster
             </span>
           )
         }
       >
-        Goalkeeper Distribution
+        Tiers &amp; Tags Distribution
       </SectionTitle>
 
       {error ? (

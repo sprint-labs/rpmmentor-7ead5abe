@@ -44,12 +44,61 @@ import { BulletinDashboardCard } from "@/components/bulletins/dashboard-card";
 
 const OVERVIEW_PERIOD_DAYS = 14;
 
+/** The two feeds behind Recent Activity, in tab order. */
+const ACTIVITY_FEEDS = [
+  { id: "interactions", label: "Interactions" },
+  { id: "reports", label: "Match Reports" },
+] as const;
+
+/** One entry in either feed, reduced to what the row actually prints. */
+interface ActivityEntry {
+  id: string;
+  actor: string;
+  actorNamed: boolean;
+  action: string;
+  target: string;
+  date: string;
+}
+
+/**
+ * A line in Recent Activity.
+ *
+ * Both feeds render through this so an interaction and a report cannot drift
+ * into describing themselves differently; only the rail colour separates them.
+ * An unnamed actor stays italic and muted, because "A mentor" is a placeholder
+ * standing in for a missing profile name, not somebody's name.
+ */
+function ActivityRow({ entry, tone }: { entry: ActivityEntry; tone: string }) {
+  return (
+    <div className="flex items-start gap-3 text-xs">
+      <div className={`w-0.5 self-stretch min-h-8 shrink-0 ${tone}`} />
+      <div className="flex-1 min-w-0">
+        <p className="text-muted-foreground leading-snug">
+          <span
+            className={
+              entry.actorNamed ? "text-foreground font-semibold" : "italic text-muted-foreground"
+            }
+          >
+            {entry.actor}
+          </span>{" "}
+          {entry.action} <span className="text-foreground font-semibold">{entry.target}</span>
+        </p>
+        <span className="text-[10px] text-muted-foreground font-mono">
+          {formatRelative(entry.date)}
+        </span>
+      </div>
+    </div>
+  );
+}
+
 export const Route = createFileRoute("/")({ component: Dashboard });
 
 function Dashboard() {
   const { user, can } = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  /** Which feed the Recent Activity panel is showing. */
+  const [activityFeed, setActivityFeed] = useState<"interactions" | "reports">("interactions");
   const [workflow, setWorkflow] = useState<WorkflowKind | null>(null);
 
   const listReports = useServerFn(listMatchReports);
@@ -209,6 +258,39 @@ function Dashboard() {
         .sort((a, b) => +new Date(b.date) - +new Date(a.date))
         .slice(0, 8),
     [loggedInteractions],
+  );
+
+  /**
+   * The same feed, told from the Match Reports side.
+   *
+   * It reads the `["match-reports"]` cache this page already loads for the KPI
+   * card, so switching the toggle costs no request and can never show a
+   * different set of reports from the number above it.
+   *
+   * Ordered by match date. A report has no logged-at stamp of its own in this
+   * shape, and the date on it is the fixture's — which is the date a reader
+   * means when they ask what was reported on recently.
+   */
+  const recentReports = useMemo(
+    () =>
+      (reportsData?.reports ?? [])
+        .map((r) => {
+          const coach = (r.coach ?? "").trim();
+          const named = coach.length > 0 && !coach.includes("@");
+          const opponent = (r.opponent ?? "").trim();
+          return {
+            id: `report-${r.report_id}`,
+            actor: named ? coach : "A coach",
+            actorNamed: named,
+            action: opponent ? `reported on a match against ${opponent} for` : "reported on",
+            target: r.goalkeeper,
+            date: r.match_date ?? "",
+          };
+        })
+        .filter((r) => r.date)
+        .sort((a, b) => +new Date(b.date) - +new Date(a.date))
+        .slice(0, 8),
+    [reportsData],
   );
 
   if (!user) return null;
@@ -544,157 +626,17 @@ function Dashboard() {
           )}
         </div>
 
-        <GoalkeeperDistribution roster={roster} pending={rosterPending} error={rosterError} />
-
-        {/* Month calendar. Reads the same `["calendar-events"]` cache as the
-            Upcoming Events panel beside it, so the two cannot disagree and the
-            card costs no extra request. */}
-        <CalendarMonthCard
-          className="col-span-12 self-start lg:col-span-4"
-          events={teamEvents}
-          interactions={loggedInteractions}
-          pending={calendarPending}
-          error={calendarError}
-          today={todayIso}
-        />
-
-        {/* Upcoming interactions */}
-        <div className="col-span-12 lg:col-span-4 command-panel p-5">
-          <SectionTitle
-            action={
-              <span className="inline-flex items-center gap-3">
-                {can("calendar.manage") && (
-                  <Link
-                    to="/calendar"
-                    search={{ gkId: "", new: true }}
-                    className="text-[10px] font-mono uppercase tracking-widest text-primary-ink inline-flex items-center gap-1 hover:underline"
-                  >
-                    <Plus className="size-3" /> New event
-                  </Link>
-                )}
-                <Link
-                  to="/insights/$metric"
-                  params={{ metric: "events" }}
-                  search={{ from: period.fromDate, to: period.toDate, level: "", tier: "" }}
-                  className="text-[10px] font-mono uppercase tracking-widest text-primary-ink inline-flex items-center gap-1"
-                >
-                  All events <ArrowUpRight className="size-3" />
-                </Link>
-              </span>
-            }
-          >
-            Upcoming Events
-          </SectionTitle>
-          {/* An undisclosed cap on a list like this reads as "there are only
-              six". Live data regularly has several times that in the next week
-              alone, so the count says what is being withheld. */}
-          {!calendarPending && !calendarError && upcomingAll.length > upcoming.length ? (
-            <p className="-mt-2 mb-2 text-[10px] text-muted-foreground">
-              Showing the next {upcoming.length} of {upcomingAll.length} scheduled.
-            </p>
-          ) : null}
-          <div className="divide-y divide-border">
-            {calendarPending ? (
-              <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground py-6 text-center">
-                Loading calendar…
-              </div>
-            ) : calendarError ? (
-              <div className="space-y-2 py-6 text-center">
-                <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
-                  Calendar didn't load
-                </div>
-                <Link
-                  to="/calendar"
-                  search={{ gkId: "", new: false }}
-                  className="text-[10px] font-mono uppercase tracking-widest text-primary-ink hover:underline"
-                >
-                  Open calendar
-                </Link>
-              </div>
-            ) : upcoming.length === 0 ? (
-              <div className="space-y-2 py-6 text-center">
-                <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
-                  Nothing scheduled
-                </div>
-                <p className="text-[11px] text-muted-foreground px-2">
-                  This reads the shared team calendar. Schedule a visit or catch-up to fill it.
-                </p>
-                {can("calendar.manage") ? (
-                  <Link
-                    to="/calendar"
-                    search={{ gkId: "", new: true }}
-                    className="text-[10px] font-mono uppercase tracking-widest text-primary-ink hover:underline"
-                  >
-                    Schedule an event
-                  </Link>
-                ) : (
-                  <Link
-                    to="/calendar"
-                    search={{ gkId: "", new: false }}
-                    className="text-[10px] font-mono uppercase tracking-widest text-primary-ink hover:underline"
-                  >
-                    View calendar
-                  </Link>
-                )}
-              </div>
-            ) : (
-              upcoming.map((e) => {
-                // Resolved against the live roster, so an event for a
-                // goalkeeper signed since the seed was captured still links to
-                // their profile and still shows their real tier.
-                const gk = e.goalkeeper_name
-                  ? goalkeeperByName(e.goalkeeper_name, rosterRows)
-                  : null;
-                const content = (
-                  <>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-[10px] font-mono text-primary-ink mb-1 uppercase tracking-widest">
-                        {formatRelative(e.event_date)}
-                        {e.start_time ? ` · ${e.start_time.slice(0, 5)}` : ""}
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-medium truncate">{e.title}</span>
-                        {gk ? <TierBadge tier={gk.tier} /> : null}
-                      </div>
-                      <div className="text-[10px] text-muted-foreground truncate">
-                        {e.event_type}
-                        {e.goalkeeper_name ? ` · ${e.goalkeeper_name}` : ""}
-                        {e.location ? ` · ${e.location}` : ""}
-                      </div>
-                    </div>
-                    <CalendarClock className="size-3.5 text-muted-foreground shrink-0" />
-                  </>
-                );
-                return gk ? (
-                  <Link
-                    key={e.id}
-                    to="/goalkeepers/$gkId"
-                    params={{ gkId: gk.id }}
-                    className="flex items-start gap-3 py-3 hover:bg-accent/30 -mx-2 px-2 transition-colors"
-                  >
-                    {content}
-                  </Link>
-                ) : (
-                  <div key={e.id} className="flex items-start gap-3 py-3 -mx-2 px-2">
-                    {content}
-                  </div>
-                );
-              })
-            )}
-          </div>
-        </div>
-
         {/* Recent activity */}
         <ErrorBoundary
           fallback={(reset) => (
             <div className="col-span-12 self-start lg:col-span-8 command-panel p-5">
-              <SectionTitle>Recent Logged Interactions</SectionTitle>
+              <SectionTitle>Recent Activity</SectionTitle>
               <div className="border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive flex items-start gap-2">
                 <AlertTriangle className="size-4 shrink-0" />
                 <div className="flex-1 min-w-0">
-                  <p className="font-medium">Recent interactions didn't load</p>
+                  <p className="font-medium">Recent activity didn't load</p>
                   <p className="text-destructive/80">
-                    Something went wrong loading the latest interactions.
+                    Something went wrong loading the latest activity.
                   </p>
                 </div>
               </div>
@@ -722,48 +664,218 @@ function Dashboard() {
                 ) : undefined
               }
             >
-              Recent Logged Interactions
+              Recent Activity
             </SectionTitle>
+
+            {/* Two feeds over one panel. A tablist rather than two links: this
+                swaps what the panel shows without leaving the dashboard, and
+                both feeds read caches the page has already loaded. */}
+            <div
+              role="tablist"
+              aria-label="Recent activity feed"
+              className="mb-4 inline-flex gap-1 rounded-md border border-border p-0.5"
+            >
+              {ACTIVITY_FEEDS.map((feed) => {
+                const selected = activityFeed === feed.id;
+                return (
+                  <button
+                    key={feed.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={selected}
+                    onClick={() => setActivityFeed(feed.id)}
+                    className={`min-h-8 rounded px-2.5 text-[10px] font-mono uppercase tracking-widest transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+                      selected
+                        ? "bg-accent text-foreground"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    {feed.label}
+                  </button>
+                );
+              })}
+            </div>
+
             <div className="space-y-3">
-              {interactionsPending ? (
+              {activityFeed === "interactions" ? (
+                interactionsPending ? (
+                  <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground py-6 text-center">
+                    Loading interactions…
+                  </div>
+                ) : interactionsError ? (
+                  <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground py-6 text-center">
+                    Interactions didn't load
+                  </div>
+                ) : recentActivity.length === 0 ? (
+                  <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground py-6 text-center">
+                    No interactions logged recently
+                  </div>
+                ) : (
+                  recentActivity.map((a) => <ActivityRow key={a.id} entry={a} tone="bg-info" />)
+                )
+              ) : reportsLoading ? (
                 <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground py-6 text-center">
-                  Loading interactions…
+                  Loading match reports…
                 </div>
-              ) : interactionsError ? (
+              ) : reportsError ? (
                 <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground py-6 text-center">
-                  Interactions didn't load
+                  Match reports didn't load
                 </div>
-              ) : recentActivity.length === 0 ? (
+              ) : recentReports.length === 0 ? (
                 <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground py-6 text-center">
-                  No interactions logged recently
+                  No match reports submitted recently
                 </div>
               ) : (
-                recentActivity.map((a) => (
-                  <div key={a.id} className="flex items-start gap-3 text-xs">
-                    <div className="w-0.5 self-stretch min-h-8 bg-info shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-muted-foreground leading-snug">
-                        <span
-                          className={
-                            a.actorNamed
-                              ? "text-foreground font-semibold"
-                              : "italic text-muted-foreground"
-                          }
-                        >
-                          {a.actor}
-                        </span>{" "}
-                        {a.action} <span className="text-foreground font-semibold">{a.target}</span>
-                      </p>
-                      <span className="text-[10px] text-muted-foreground font-mono">
-                        {formatRelative(a.date)}
-                      </span>
-                    </div>
-                  </div>
-                ))
+                recentReports.map((a) => <ActivityRow key={a.id} entry={a} tone="bg-primary" />)
               )}
             </div>
           </div>
         </ErrorBoundary>
+
+        {/* Calendar and the fixtures in it, as one cell. */}
+        <div className="col-span-12 grid gap-4 self-start lg:col-span-8 xl:grid-cols-2">
+          {/* Month calendar, kept at the width it had as a quarter-width card;
+              the wider cell goes to the fixtures list beside it rather than to
+              a stretched grid. */}
+          <CalendarMonthCard
+            className="self-start"
+            events={teamEvents}
+            interactions={loggedInteractions}
+            pending={calendarPending}
+            error={calendarError}
+            today={todayIso}
+          />
+
+          {/* Upcoming fixtures, beside the month they fall in. Both read the
+              same `["calendar-events"]` cache, so a date on the grid and a
+              row in this list can never disagree. */}
+          <div className="command-panel self-start p-5">
+            <SectionTitle
+              action={
+                <span className="inline-flex items-center gap-3">
+                  {can("calendar.manage") && (
+                    <Link
+                      to="/calendar"
+                      search={{ gkId: "", new: true }}
+                      className="text-[10px] font-mono uppercase tracking-widest text-primary-ink inline-flex items-center gap-1 hover:underline"
+                    >
+                      <Plus className="size-3" /> New event
+                    </Link>
+                  )}
+                  <Link
+                    to="/insights/$metric"
+                    params={{ metric: "events" }}
+                    search={{ from: period.fromDate, to: period.toDate, level: "", tier: "" }}
+                    className="text-[10px] font-mono uppercase tracking-widest text-primary-ink inline-flex items-center gap-1"
+                  >
+                    All events <ArrowUpRight className="size-3" />
+                  </Link>
+                </span>
+              }
+            >
+              Upcoming Fixtures
+            </SectionTitle>
+            {/* An undisclosed cap on a list like this reads as "there are only
+                six". Live data regularly has several times that in the next week
+                alone, so the count says what is being withheld. */}
+            {!calendarPending && !calendarError && upcomingAll.length > upcoming.length ? (
+              <p className="-mt-2 mb-2 text-[10px] text-muted-foreground">
+                Showing the next {upcoming.length} of {upcomingAll.length} scheduled.
+              </p>
+            ) : null}
+            <div className="divide-y divide-border">
+              {calendarPending ? (
+                <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground py-6 text-center">
+                  Loading calendar…
+                </div>
+              ) : calendarError ? (
+                <div className="space-y-2 py-6 text-center">
+                  <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
+                    Calendar didn't load
+                  </div>
+                  <Link
+                    to="/calendar"
+                    search={{ gkId: "", new: false }}
+                    className="text-[10px] font-mono uppercase tracking-widest text-primary-ink hover:underline"
+                  >
+                    Open calendar
+                  </Link>
+                </div>
+              ) : upcoming.length === 0 ? (
+                <div className="space-y-2 py-6 text-center">
+                  <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
+                    Nothing scheduled
+                  </div>
+                  <p className="text-[11px] text-muted-foreground px-2">
+                    This reads the shared team calendar. Schedule a visit or catch-up to fill it.
+                  </p>
+                  {can("calendar.manage") ? (
+                    <Link
+                      to="/calendar"
+                      search={{ gkId: "", new: true }}
+                      className="text-[10px] font-mono uppercase tracking-widest text-primary-ink hover:underline"
+                    >
+                      Schedule an event
+                    </Link>
+                  ) : (
+                    <Link
+                      to="/calendar"
+                      search={{ gkId: "", new: false }}
+                      className="text-[10px] font-mono uppercase tracking-widest text-primary-ink hover:underline"
+                    >
+                      View calendar
+                    </Link>
+                  )}
+                </div>
+              ) : (
+                upcoming.map((e) => {
+                  // Resolved against the live roster, so an event for a
+                  // goalkeeper signed since the seed was captured still links to
+                  // their profile and still shows their real tier.
+                  const gk = e.goalkeeper_name
+                    ? goalkeeperByName(e.goalkeeper_name, rosterRows)
+                    : null;
+                  const content = (
+                    <>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-[10px] font-mono text-primary-ink mb-1 uppercase tracking-widest">
+                          {formatRelative(e.event_date)}
+                          {e.start_time ? ` · ${e.start_time.slice(0, 5)}` : ""}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-medium truncate">{e.title}</span>
+                          {gk ? <TierBadge tier={gk.tier} /> : null}
+                        </div>
+                        <div className="text-[10px] text-muted-foreground truncate">
+                          {e.event_type}
+                          {e.goalkeeper_name ? ` · ${e.goalkeeper_name}` : ""}
+                          {e.location ? ` · ${e.location}` : ""}
+                        </div>
+                      </div>
+                      <CalendarClock className="size-3.5 text-muted-foreground shrink-0" />
+                    </>
+                  );
+                  return gk ? (
+                    <Link
+                      key={e.id}
+                      to="/goalkeepers/$gkId"
+                      params={{ gkId: gk.id }}
+                      className="flex items-start gap-3 py-3 hover:bg-accent/30 -mx-2 px-2 transition-colors"
+                    >
+                      {content}
+                    </Link>
+                  ) : (
+                    <div key={e.id} className="flex items-start gap-3 py-3 -mx-2 px-2">
+                      {content}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </div>
+
+        <GoalkeeperDistribution roster={roster} pending={rosterPending} error={rosterError} />
       </div>
 
       <WorkflowDialog kind={workflow} onClose={() => setWorkflow(null)} />
