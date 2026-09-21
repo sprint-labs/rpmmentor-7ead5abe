@@ -79,9 +79,44 @@ describe("post-upload broadcast submission", () => {
     expect(source).toContain("BROADCAST_SCHEDULE_MIN_LEAD_MS");
     expect(source).toContain("Date.now() - adminClockSample.wallStartedAt");
     expect(source).toContain("disabled={composerLocked || adminServerNow === null}");
-    expect(source).toContain('(publishMode === "later" && adminServerNow === null)');
+    // Editing cannot move a publish time, so the clock guard is scoped to a new
+    // broadcast. The guard itself is unchanged: with no edit open the condition
+    // is the same one, and Save is separately gated on a resolvable end time.
+    expect(source).toContain('(!editing && publishMode === "later" && adminServerNow === null)');
+    expect(source).toContain('(editing !== null && expiryMode === "custom" && !endsAt)');
     expect(source).toContain("onClick={() => void refetchAdminClock()}");
     expect(source).not.toContain("nextAdminScheduleAt(Date.now())");
+  });
+
+  it("parks the composer once per edit and never sends media it cannot change", () => {
+    const source = readFileSync(
+      new URL("../../components/broadcast-centre.tsx", import.meta.url),
+      "utf8",
+    );
+    const editStart = source.indexOf("function startEditing");
+    const stopStart = source.indexOf("function stopEditing", editStart);
+    const duplicateStart = source.indexOf("function duplicateAnnouncement", stopStart);
+    const startEditingSource = source.slice(editStart, stopStart);
+    const stopEditingSource = source.slice(stopStart, duplicateStart);
+
+    expect(editStart).toBeGreaterThanOrEqual(0);
+    expect(stopStart).toBeGreaterThan(editStart);
+    expect(duplicateStart).toBeGreaterThan(stopStart);
+
+    // A second Edit must not overwrite the parked new-broadcast draft with the
+    // edit already sitting in the form.
+    expect(startEditingSource).toContain("if (!editing) {");
+    expect(startEditingSource).toContain("suspendedDraftRef.current = {");
+    expect(startEditingSource).toContain("attachmentFile,");
+
+    // Cancel restores the pending upload rather than discarding it.
+    expect(stopEditingSource).toContain("setAttachment(suspended.attachmentFile)");
+
+    // The picker cannot stage a file that updateAnnouncement would silently
+    // drop, and the preview shows the media the edit actually keeps.
+    expect(source).toContain("disabled={composerLocked || editing !== null}");
+    expect(source).toContain("if (editing) return editing.attachment;");
+    expect(source).toContain("previewUrl={editing ? null : attachmentPreviewUrl}");
   });
 
   it("protects the publication clock endpoint with the Super Admin role", () => {
