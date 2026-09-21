@@ -12,6 +12,7 @@ import {
   Megaphone,
   Radio,
   Send,
+  Pencil,
   Sparkles,
   Trash2,
   Wrench,
@@ -31,8 +32,10 @@ import {
   endAnnouncement,
   getAdminAnnouncementClock,
   listAdminAnnouncements,
+  updateAnnouncement,
 } from "@/lib/support.functions";
 import { useAnnouncementClock } from "@/lib/support/announcement-clock";
+import { resolveBroadcastEditEnd } from "@/lib/support/broadcast-edit";
 import {
   advanceAdminServerNow,
   estimateAdminServerNow,
@@ -161,6 +164,7 @@ export function BroadcastCentre() {
   const list = useServerFn(listAdminAnnouncements);
   const create = useServerFn(createAnnouncement);
   const end = useServerFn(endAnnouncement);
+  const update = useServerFn(updateAnnouncement);
   const getAdminClock = useServerFn(getAdminAnnouncementClock);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const scheduleTimeSourceRef = useRef<BroadcastScheduleTimeSource>("auto");
@@ -176,6 +180,24 @@ export function BroadcastCentre() {
   const [attachmentPreviewUrl, setAttachmentPreviewUrl] = useState<string | null>(null);
   const [draftReady, setDraftReady] = useState(false);
   const [dragActive, setDragActive] = useState(false);
+  /**
+   * The broadcast being edited, or null when composing a new one. Holding the
+   * whole row rather than just its id keeps the attachment and publish time on
+   * hand for the editing notice, neither of which an edit can change.
+   */
+  const [editing, setEditing] = useState<AnnouncementRow | null>(null);
+  /** Composer state parked while an edit borrows the form, restored on cancel. */
+  const suspendedDraftRef = useRef<{
+    kind: AnnouncementKind;
+    title: string;
+    body: string;
+    publishMode: PublishMode;
+    startsAt: string;
+    expiryMode: ExpiryMode;
+    endsAt: string;
+    attachmentFile: File | null;
+    scheduleTimeSource: BroadcastScheduleTimeSource;
+  } | null>(null);
 
   useEffect(() => {
     const draft = readBroadcastDraft();
@@ -206,6 +228,10 @@ export function BroadcastCentre() {
 
   useEffect(() => {
     if (!draftReady) return;
+    // An edit borrows the composer; it is not a draft of a new broadcast. Saving
+    // here would overwrite whatever the author had half-written before they
+    // clicked Edit, which cancelling is supposed to give them back.
+    if (editing) return;
     const draft: BroadcastDraft = {
       kind,
       title,
@@ -217,7 +243,7 @@ export function BroadcastCentre() {
       endsAt,
     };
     writeBroadcastDraft(draft);
-  }, [body, draftReady, endsAt, expiryMode, kind, publishMode, startsAt, title]);
+  }, [body, draftReady, editing, endsAt, expiryMode, kind, publishMode, startsAt, title]);
 
   useEffect(() => {
     if (!attachmentFile) {
@@ -281,6 +307,9 @@ export function BroadcastCentre() {
   const recent = data.filter((announcement) => statusOf(announcement, now) === "ended").slice(0, 8);
 
   const previewAttachment = useMemo<AnnouncementAttachment | null>(() => {
+    // An edit keeps the stored media, so the preview shows that rather than
+    // nothing — otherwise saving looks like it would drop the attachment.
+    if (editing) return editing.attachment;
     if (!attachmentFile) return null;
     return {
       path: "preview",
@@ -288,7 +317,7 @@ export function BroadcastCentre() {
       mime: announcementAttachmentMime(attachmentFile),
       size: attachmentFile.size,
     };
-  }, [attachmentFile]);
+  }, [attachmentFile, editing]);
 
   function setAttachment(file: File | null) {
     if (!file) {
@@ -376,17 +405,47 @@ export function BroadcastCentre() {
     onError: (error: Error) => toast.error(error.message),
   });
 
-  const endMutation = useMutation({
-    mutationFn: (announcementId: string) => end({ data: { announcementId } }),
+  const updateMutation = useMutation({
+    mutationFn: async () => {
+      if (!editing) throw new Error("There is no broadcast open for editing.");
+      if (!title.trim()) throw new Error("Add a title before saving.");
+      const resolvedEndsAt = resolveBroadcastEditEnd(
+        { expiryMode: expiryMode === "none" ? "none" : "custom", endsAt },
+        editing,
+      );
+      return update({
+        data: {
+          announcementId: editing.id,
+          kind,
+          title: title.trim(),
+          body: body.trim(),
+          endsAt: resolvedEndsAt,
+        },
+      });
+    },
     onSuccess: async () => {
-      toast.success("Broadcast ended");
+      toast.success("Broadcast updated");
+      stopEditing();
       await refetch();
       void queryClient.invalidateQueries({ queryKey: ["announcements"] });
     },
     onError: (error: Error) => toast.error(error.message),
   });
 
-  const composerLocked = createMutation.isPending;
+  const endMutation = useMutation({
+    mutationFn: (announcementId: string) => end({ data: { announcementId } }),
+    onSuccess: async (_result, announcementId) => {
+      toast.success("Broadcast ended");
+      // An ended broadcast can no longer be saved, so leave the editor rather
+      // than stranding the author on a form whose Save will always fail.
+      if (editing?.id === announcementId) stopEditing();
+      await refetch();
+      void queryClient.invalidateQueries({ queryKey: ["announcements"] });
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  const composerLocked = createMutation.isPending || updateMutation.isPending;
 
   useEffect(() => {
     if (composerLocked || adminServerNow === null || scheduleTimeSourceRef.current !== "auto") {
@@ -396,8 +455,64 @@ export function BroadcastCentre() {
     setStartsAt((current) => (current === next ? current : next));
   }, [adminServerNow, composerLocked]);
 
+  function startEditing(announcement: AnnouncementRow) {
+    if (composerLocked) return;
+    // Park the composer so Cancel gives it back — but only the first time. A
+    // second Edit, on this row or another, must not overwrite the parked
+    // new-broadcast draft with the edit already in the form; Cancel would then
+    // restore someone else's broadcast as if it were the author's own draft.
+    if (!editing) {
+      suspendedDraftRef.current = {
+        kind,
+        title,
+        body,
+        publishMode,
+        startsAt,
+        expiryMode,
+        endsAt,
+        attachmentFile,
+        scheduleTimeSource: scheduleTimeSourceRef.current,
+      };
+    }
+    setEditing(announcement);
+    setKind(announcement.kind);
+    setTitle(announcement.title);
+    setBody(announcement.body);
+    // An edit cannot change stored media, so the composer's pending upload is
+    // parked rather than carried in — leaving it staged would show a file in
+    // the preview that Save silently drops.
+    setAttachment(null);
+    if (announcement.endsAt) {
+      setExpiryMode("custom");
+      setEndsAt(toDateTimeLocal(new Date(announcement.endsAt)));
+    } else {
+      setExpiryMode("none");
+      setEndsAt("");
+    }
+  }
+
+  function stopEditing() {
+    const suspended = suspendedDraftRef.current;
+    setEditing(null);
+    if (!suspended) {
+      setAttachment(null);
+      return;
+    }
+    setKind(suspended.kind);
+    setTitle(suspended.title);
+    setBody(suspended.body);
+    setPublishMode(suspended.publishMode);
+    setStartsAt(suspended.startsAt);
+    setExpiryMode(suspended.expiryMode);
+    setEndsAt(suspended.endsAt);
+    setAttachment(suspended.attachmentFile);
+    scheduleTimeSourceRef.current = suspended.scheduleTimeSource;
+    suspendedDraftRef.current = null;
+  }
+
   function duplicateAnnouncement(announcement: AnnouncementRow) {
     if (composerLocked) return;
+    if (editing) stopEditing();
     setKind(announcement.kind);
     setTitle(announcement.title);
     setBody(announcement.body);
@@ -461,12 +576,16 @@ export function BroadcastCentre() {
         <Card className="space-y-5 p-4 sm:p-5">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <h3 className="text-sm font-semibold">Create broadcast</h3>
+              <h3 className="text-sm font-semibold">
+                {editing ? "Edit broadcast" : "Create broadcast"}
+              </h3>
               <p className="mt-0.5 text-xs text-muted-foreground">
-                Your text draft is saved on this device as you type.
+                {editing
+                  ? "Changes reach everyone who opens Help & updates from now on."
+                  : "Your text draft is saved on this device as you type."}
               </p>
             </div>
-            {(title || body || attachmentFile) && (
+            {!editing && (title || body || attachmentFile) && (
               <button
                 type="button"
                 disabled={composerLocked}
@@ -566,10 +685,12 @@ export function BroadcastCentre() {
               <div>
                 <div className="text-xs font-medium">Media attachment</div>
                 <div className="mt-0.5 text-[11px] text-muted-foreground">
-                  Optional. One file, up to 25 MB.
+                  {editing
+                    ? "Fixed for this broadcast. End it and post a new one to change the media."
+                    : "Optional. One file, up to 25 MB."}
                 </div>
               </div>
-              {attachmentFile && (
+              {!editing && attachmentFile && (
                 <button
                   type="button"
                   disabled={composerLocked}
@@ -583,12 +704,20 @@ export function BroadcastCentre() {
             <input
               ref={fileInputRef}
               type="file"
-              disabled={composerLocked}
+              disabled={composerLocked || editing !== null}
               accept={ANNOUNCEMENT_ATTACHMENT_ACCEPT}
               onChange={handleFileChange}
               className="sr-only"
             />
-            {attachmentFile ? (
+            {editing ? (
+              <div className="mt-2 rounded-md border border-border bg-muted/15 p-3 text-xs text-muted-foreground">
+                {editing.attachment
+                  ? `Keeping ${editing.attachment.name} (${formatAttachmentSize(
+                      editing.attachment.size,
+                    )}).`
+                  : "This broadcast has no attachment."}
+              </div>
+            ) : attachmentFile ? (
               <div className="mt-2 rounded-md border border-border bg-muted/15 p-3">
                 <div className="flex items-center gap-3">
                   <span className="grid size-10 shrink-0 place-items-center rounded-md bg-primary/10 text-primary-ink">
@@ -661,71 +790,86 @@ export function BroadcastCentre() {
           <div className="grid gap-4 rounded-md border border-border bg-muted/10 p-3 sm:grid-cols-2">
             <div>
               <div className="text-xs font-medium">Publish</div>
-              <div className="mt-2 grid grid-cols-2 gap-1 rounded-md bg-muted p-1">
-                {(["now", "later"] as PublishMode[]).map((mode) => (
-                  <button
-                    key={mode}
-                    type="button"
-                    disabled={composerLocked}
-                    aria-pressed={publishMode === mode}
-                    onClick={() => setPublishMode(mode)}
-                    className={cn(
-                      "h-8 rounded text-xs font-medium",
-                      publishMode === mode
-                        ? "bg-background text-foreground shadow-sm"
-                        : "text-muted-foreground hover:text-foreground",
-                    )}
-                  >
-                    {mode === "now" ? "Now" : "Schedule"}
-                  </button>
-                ))}
-              </div>
-              {publishMode === "later" && (
-                <div className="mt-3">
-                  <label className="block text-[11px] text-muted-foreground">
-                    Publish date and time
-                    <input
-                      type="datetime-local"
-                      disabled={composerLocked || adminServerNow === null}
-                      value={startsAt}
-                      min={
-                        adminServerNow === null
-                          ? undefined
-                          : toDateTimeLocal(
-                              new Date(
-                                nextAdminScheduleInputMinAt(
-                                  adminServerNow,
-                                  BROADCAST_SCHEDULE_MIN_LEAD_MS,
-                                ),
-                              ),
-                            )
-                      }
-                      onChange={(event) => {
-                        scheduleTimeSourceRef.current = "user";
-                        setStartsAt(event.target.value);
-                      }}
-                      className="mt-1 h-9 w-full rounded-md border border-border bg-background px-2.5 text-xs text-foreground"
-                    />
-                  </label>
-                  {adminServerNow === null && (
-                    <div className="mt-1 flex items-center gap-2 text-[10px] text-muted-foreground">
-                      <span>
-                        {adminClockError
-                          ? "Scheduling clock unavailable."
-                          : "Checking server time…"}
-                      </span>
-                      {adminClockError && !adminClockFetching && (
-                        <button
-                          type="button"
-                          onClick={() => void refetchAdminClock()}
-                          className="font-medium text-foreground underline underline-offset-2"
-                        >
-                          Retry
-                        </button>
+              {editing ? (
+                <div className="mt-2 rounded-md border border-border bg-background px-2.5 py-2">
+                  <div className="text-xs text-foreground">
+                    {statusOf(editing, now) === "scheduled" ? "Scheduled for" : "Published"}{" "}
+                    {formatDateTime(editing.startsAt)}
+                  </div>
+                  <p className="mt-1 text-[10px] text-muted-foreground">
+                    The publish time cannot be changed. End this broadcast and post a new one if it
+                    needs to go out again.
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <div className="mt-2 grid grid-cols-2 gap-1 rounded-md bg-muted p-1">
+                    {(["now", "later"] as PublishMode[]).map((mode) => (
+                      <button
+                        key={mode}
+                        type="button"
+                        disabled={composerLocked}
+                        aria-pressed={publishMode === mode}
+                        onClick={() => setPublishMode(mode)}
+                        className={cn(
+                          "h-8 rounded text-xs font-medium",
+                          publishMode === mode
+                            ? "bg-background text-foreground shadow-sm"
+                            : "text-muted-foreground hover:text-foreground",
+                        )}
+                      >
+                        {mode === "now" ? "Now" : "Schedule"}
+                      </button>
+                    ))}
+                  </div>
+                  {publishMode === "later" && (
+                    <div className="mt-3">
+                      <label className="block text-[11px] text-muted-foreground">
+                        Publish date and time
+                        <input
+                          type="datetime-local"
+                          disabled={composerLocked || adminServerNow === null}
+                          value={startsAt}
+                          min={
+                            adminServerNow === null
+                              ? undefined
+                              : toDateTimeLocal(
+                                  new Date(
+                                    nextAdminScheduleInputMinAt(
+                                      adminServerNow,
+                                      BROADCAST_SCHEDULE_MIN_LEAD_MS,
+                                    ),
+                                  ),
+                                )
+                          }
+                          onChange={(event) => {
+                            scheduleTimeSourceRef.current = "user";
+                            setStartsAt(event.target.value);
+                          }}
+                          className="mt-1 h-9 w-full rounded-md border border-border bg-background px-2.5 text-xs text-foreground"
+                        />
+                      </label>
+                      {adminServerNow === null && (
+                        <div className="mt-1 flex items-center gap-2 text-[10px] text-muted-foreground">
+                          <span>
+                            {adminClockError
+                              ? "Scheduling clock unavailable."
+                              : "Checking server time…"}
+                          </span>
+                          {adminClockError && !adminClockFetching && (
+                            <button
+                              type="button"
+                              onClick={() => void refetchAdminClock()}
+                              className="font-medium text-foreground underline underline-offset-2"
+                            >
+                              Retry
+                            </button>
+                          )}
+                        </div>
                       )}
                     </div>
                   )}
-                </div>
+                </>
               )}
             </div>
 
@@ -739,8 +883,9 @@ export function BroadcastCentre() {
                   className="mt-2 h-10 w-full rounded-md border border-border bg-background px-2.5 text-xs"
                 >
                   <option value="none">No automatic end</option>
-                  <option value="24h">After 24 hours</option>
-                  <option value="7d">After 7 days</option>
+                  {/* A relative window has no anchor once a broadcast is out. */}
+                  {!editing && <option value="24h">After 24 hours</option>}
+                  {!editing && <option value="7d">After 7 days</option>}
                   <option value="custom">Choose date and time</option>
                 </select>
               </label>
@@ -764,25 +909,46 @@ export function BroadcastCentre() {
               <Clock3 className="size-3.5" aria-hidden="true" />
               {placementCopy}
             </div>
-            <button
-              type="button"
-              disabled={
-                composerLocked ||
-                !title.trim() ||
-                (publishMode === "later" && adminServerNow === null)
-              }
-              onClick={() => createMutation.mutate()}
-              className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {composerLocked ? (
-                "Publishing…"
-              ) : (
-                <>
-                  <Send className="size-4" aria-hidden="true" />
-                  {publishMode === "later" ? "Schedule broadcast" : "Publish broadcast"}
-                </>
+            <div className="flex items-center gap-2">
+              {editing && (
+                <button
+                  type="button"
+                  disabled={composerLocked}
+                  onClick={stopEditing}
+                  className="inline-flex h-10 items-center justify-center rounded-md border border-border px-4 text-sm font-medium hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Cancel
+                </button>
               )}
-            </button>
+              <button
+                type="button"
+                disabled={
+                  composerLocked ||
+                  !title.trim() ||
+                  (!editing && publishMode === "later" && adminServerNow === null) ||
+                  (editing !== null && expiryMode === "custom" && !endsAt)
+                }
+                onClick={() => (editing ? updateMutation.mutate() : createMutation.mutate())}
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {composerLocked ? (
+                  editing ? (
+                    "Saving…"
+                  ) : (
+                    "Publishing…"
+                  )
+                ) : editing ? (
+                  <>
+                    <Pencil className="size-4" aria-hidden="true" /> Save changes
+                  </>
+                ) : (
+                  <>
+                    <Send className="size-4" aria-hidden="true" />
+                    {publishMode === "later" ? "Schedule broadcast" : "Publish broadcast"}
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </Card>
 
@@ -832,7 +998,7 @@ export function BroadcastCentre() {
                   </div>
                   <AnnouncementMedia
                     attachment={previewAttachment}
-                    previewUrl={attachmentPreviewUrl}
+                    previewUrl={editing ? null : attachmentPreviewUrl}
                     compact
                   />
                 </div>
@@ -952,6 +1118,20 @@ export function BroadcastCentre() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2 pl-12 lg:pl-0">
+                    <button
+                      type="button"
+                      disabled={composerLocked}
+                      onClick={() => startEditing(announcement)}
+                      className={cn(
+                        "inline-flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-xs hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50",
+                        editing?.id === announcement.id
+                          ? "border-primary text-primary-ink"
+                          : "border-border",
+                      )}
+                    >
+                      <Pencil className="size-3.5" aria-hidden="true" />
+                      {editing?.id === announcement.id ? "Editing" : "Edit"}
+                    </button>
                     <button
                       type="button"
                       disabled={composerLocked}

@@ -4,6 +4,7 @@ import {
   createAnnouncementInput,
   createSupportThreadInput,
   replySupportThreadInput,
+  updateAnnouncementInput,
 } from "./schema";
 
 describe("createSupportThreadInput", () => {
@@ -196,5 +197,44 @@ describe("createAnnouncementInput", () => {
         expiryMode: "custom",
       }),
     ).toThrow("Choose a valid end time.");
+  });
+});
+
+describe("updateAnnouncementInput", () => {
+  const base = {
+    announcementId: "c302aebf-c7c9-4fa6-a24f-052a18d02439",
+    kind: "info" as const,
+    title: "What's new in the Mentor Hub?",
+  };
+
+  it("defaults a missing body to an empty string", () => {
+    const parsed = updateAnnouncementInput.parse(base);
+    expect(parsed.body).toBe("");
+    expect(parsed.endsAt).toBeUndefined();
+  });
+
+  it("keeps the line breaks a multi-line broadcast was written with", () => {
+    const body = "A few updates went live today:\n\n- Fresh look\n- Google sign-in";
+    expect(updateAnnouncementInput.parse({ ...base, body }).body).toBe(body);
+  });
+
+  it("accepts null as leaving the broadcast running", () => {
+    expect(updateAnnouncementInput.parse({ ...base, endsAt: null }).endsAt).toBeNull();
+  });
+
+  it("rejects an end time without an offset", () => {
+    expect(() => updateAnnouncementInput.parse({ ...base, endsAt: "2026-09-27T15:55" })).toThrow();
+  });
+
+  it("rejects an id that is not a uuid", () => {
+    expect(() => updateAnnouncementInput.parse({ ...base, announcementId: "42" })).toThrow();
+  });
+
+  it("rejects an empty title", () => {
+    expect(() => updateAnnouncementInput.parse({ ...base, title: "   " })).toThrow();
+  });
+
+  it("rejects a 161-character title", () => {
+    expect(() => updateAnnouncementInput.parse({ ...base, title: "x".repeat(161) })).toThrow();
   });
 });
