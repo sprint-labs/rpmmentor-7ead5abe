@@ -39,11 +39,12 @@ import {
   type MediaFilters,
 } from "@/lib/media-store";
 import {
+  aliasesForGkId,
+  buildGoalkeeperIdentities,
   buildMediaShelves,
   countMediaKinds,
   describeLibrary,
   resolveGoalkeeper,
-  type GoalkeeperInfo,
   type MediaShelf,
 } from "@/lib/media-shelves";
 import { withPermission } from "@/components/require-permission";
@@ -96,16 +97,10 @@ function MediaPage() {
     queryFn: () => listPlayersFn(),
     staleTime: 5 * 60_000,
   });
-  const rosterById = useMemo(
-    () =>
-      new Map<string, GoalkeeperInfo>(
-        rosterPlayers.map((player) => [
-          player.id,
-          { name: player.full_name, club: player.current_club || null },
-        ]),
-      ),
-    [rosterPlayers],
-  );
+  // Keyed by BOTH `players.id` and the legacy `gk-*` slug: `media_assets.gk_id`
+  // holds either, so a map keyed only on the UUID left half a goalkeeper's
+  // media resolving to "Unknown goalkeeper" and sitting on a shelf of its own.
+  const rosterById = useMemo(() => buildGoalkeeperIdentities(rosterPlayers), [rosterPlayers]);
   const goalkeeperFilterOptions = useMemo(
     () =>
       [...rosterPlayers]
@@ -117,6 +112,19 @@ function MediaPage() {
   const navSource = getNavSource(source);
   const [assets, setAssets] = useState<MediaAsset[]>([]);
   const [loading, setLoading] = useState(true);
+  /**
+   * The filters the rows in `assets` were actually fetched for.
+   *
+   * The heading and the count derive from `filters` synchronously, but
+   * `setAssets` only runs once `listMedia` resolves. Between the two the grid
+   * showed the previous goalkeeper's clips under the newly chosen
+   * goalkeeper's name — on the one page whose whole job is attributing
+   * footage to the right person. Comparing this against `filters` is how the
+   * grid knows its contents no longer match its own heading.
+   */
+  const [loadedFilters, setLoadedFilters] = useState<MediaFilters | null>(null);
+  /** A failed read has to say so; it used to leave the stale grid on screen. */
+  const [loadError, setLoadError] = useState(false);
   const [workflow, setWorkflow] = useState<WorkflowKind | null>(null);
   const [editing, setEditing] = useState<MediaAsset | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -133,24 +141,59 @@ function MediaPage() {
   const [thumbUrls, setThumbUrls] = useState<Record<string, string>>({});
 
   useEffect(() => {
-    setFilters((prev) => ({
-      ...prev,
-      from: from || undefined,
-      to: to || undefined,
-      uploaderName: uploaderName || undefined,
-      kind: isKind(kindParam) ? kindParam : prev.kind,
-    }));
+    setFilters((prev) => {
+      const next: MediaFilters = {
+        ...prev,
+        from: from || undefined,
+        to: to || undefined,
+        uploaderName: uploaderName || undefined,
+        kind: isKind(kindParam) ? kindParam : prev.kind,
+      };
+      // Returning a fresh object unconditionally re-ran `load` on every mount,
+      // for a set of filters identical to the one already in flight. Keeping
+      // the previous identity when nothing changed removes that second read.
+      const unchanged =
+        next.from === prev.from &&
+        next.to === prev.to &&
+        next.uploaderName === prev.uploaderName &&
+        next.kind === prev.kind;
+      return unchanged ? prev : next;
+    });
   }, [from, to, uploaderName, kindParam]);
 
+  /**
+   * Only the newest read may write state.
+   *
+   * Reads overlap routinely — every filter keystroke starts one, and the
+   * upload/update events restart one at any time. Without a generation guard a
+   * slower earlier read can land *after* a newer one and write its own filters
+   * into `loadedFilters`, which then never matches `filters` again: `stale`
+   * stays true and the page sits on the skeleton forever. A superseded read
+   * therefore writes nothing at all, not even `loading` — the read that
+   * replaced it is still running and owns that flag.
+   */
+  const loadSeq = useRef(0);
+
   const load = useCallback(async () => {
+    const seq = ++loadSeq.current;
     setLoading(true);
+    setLoadError(false);
+
+    let rows: MediaAsset[] | null = null;
     try {
-      setAssets(await listMedia(filters));
+      rows = await listMedia(filters);
     } catch (e) {
       console.error(e);
-    } finally {
-      setLoading(false);
     }
+
+    if (seq !== loadSeq.current) return;
+
+    // A failed read drops the rows rather than leaving the previous
+    // goalkeeper's media sitting under this goalkeeper's heading.
+    setAssets(rows ?? []);
+    setLoadError(rows === null);
+    setLoadedFilters(filters);
+    setLoading(false);
   }, [filters]);
 
   useEffect(() => {
@@ -208,6 +251,9 @@ function MediaPage() {
     (filters.uploaderId ? 1 : 0) +
     (filters.uploaderName ? 1 : 0) +
     tagsDatesCount;
+
+  /** True while `assets` still belongs to a previous set of filters. */
+  const stale = loadedFilters !== filters;
 
   const searchActive = Boolean(filters.search?.trim());
   /** Anything narrowing the library collapses the shelves into one grid. */
@@ -267,6 +313,9 @@ function MediaPage() {
     setFilters((f) => ({
       ...f,
       gkId: shelf.gkId ?? undefined,
+      // Fetch every id this goalkeeper's media may be filed under, not just the
+      // one the shelf was keyed on.
+      gkIds: shelf.gkIds.length > 0 ? shelf.gkIds : undefined,
       unlinked: shelf.unlinked ? true : undefined,
     }));
   };
@@ -293,11 +342,13 @@ function MediaPage() {
         }
         title={navSource?.title ?? "Media Library"}
         description={
-          loading
+          loading || stale
             ? "Loading…"
-            : narrowed
-              ? `${assets.length} asset${assets.length === 1 ? "" : "s"} matching filters.`
-              : describeLibrary(assets)
+            : loadError
+              ? "Media could not be loaded."
+              : narrowed
+                ? `${assets.length} asset${assets.length === 1 ? "" : "s"} matching filters.`
+                : describeLibrary(assets, rosterById)
         }
         action={
           can("media.upload") ? (
@@ -369,9 +420,11 @@ function MediaPage() {
             onChange={(e) => {
               const v = e.target.value;
               setFlatView(false);
+              const picked = v && v !== UNLINKED_OPTION ? v : undefined;
               setFilters((f) => ({
                 ...f,
-                gkId: v && v !== UNLINKED_OPTION ? v : undefined,
+                gkId: picked,
+                gkIds: picked ? aliasesForGkId(picked, rosterById) : undefined,
                 unlinked: v === UNLINKED_OPTION ? true : undefined,
               }));
             }}
@@ -518,9 +571,28 @@ function MediaPage() {
         )}
       </div>
 
-      {loading && assets.length === 0 ? (
+      {loading || stale ? (
+        // `stale` matters as much as `loading` here: re-rendering the previous
+        // goalkeeper's rows under the new heading is the bug, and it happens
+        // while `assets.length > 0`.
         <ShelfSkeleton />
-      ) : !loading && assets.length === 0 ? (
+      ) : loadError ? (
+        <Card>
+          <EmptyState
+            icon={Filter}
+            title="Media could not be loaded"
+            description="The library did not respond. Refresh the page to try again — nothing has been changed or deleted."
+            primaryAction={
+              <button
+                onClick={() => void load()}
+                className="h-9 px-3 rounded-md bg-primary text-primary-foreground text-sm font-medium inline-flex items-center gap-1.5"
+              >
+                Try again
+              </button>
+            }
+          />
+        </Card>
+      ) : assets.length === 0 ? (
         <Card>
           <EmptyState
             icon={narrowed ? Filter : Video}
