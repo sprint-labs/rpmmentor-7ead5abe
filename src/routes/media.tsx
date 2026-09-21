@@ -141,30 +141,59 @@ function MediaPage() {
   const [thumbUrls, setThumbUrls] = useState<Record<string, string>>({});
 
   useEffect(() => {
-    setFilters((prev) => ({
-      ...prev,
-      from: from || undefined,
-      to: to || undefined,
-      uploaderName: uploaderName || undefined,
-      kind: isKind(kindParam) ? kindParam : prev.kind,
-    }));
+    setFilters((prev) => {
+      const next: MediaFilters = {
+        ...prev,
+        from: from || undefined,
+        to: to || undefined,
+        uploaderName: uploaderName || undefined,
+        kind: isKind(kindParam) ? kindParam : prev.kind,
+      };
+      // Returning a fresh object unconditionally re-ran `load` on every mount,
+      // for a set of filters identical to the one already in flight. Keeping
+      // the previous identity when nothing changed removes that second read.
+      const unchanged =
+        next.from === prev.from &&
+        next.to === prev.to &&
+        next.uploaderName === prev.uploaderName &&
+        next.kind === prev.kind;
+      return unchanged ? prev : next;
+    });
   }, [from, to, uploaderName, kindParam]);
 
+  /**
+   * Only the newest read may write state.
+   *
+   * Reads overlap routinely — every filter keystroke starts one, and the
+   * upload/update events restart one at any time. Without a generation guard a
+   * slower earlier read can land *after* a newer one and write its own filters
+   * into `loadedFilters`, which then never matches `filters` again: `stale`
+   * stays true and the page sits on the skeleton forever. A superseded read
+   * therefore writes nothing at all, not even `loading` — the read that
+   * replaced it is still running and owns that flag.
+   */
+  const loadSeq = useRef(0);
+
   const load = useCallback(async () => {
+    const seq = ++loadSeq.current;
     setLoading(true);
     setLoadError(false);
+
+    let rows: MediaAsset[] | null = null;
     try {
-      setAssets(await listMedia(filters));
+      rows = await listMedia(filters);
     } catch (e) {
       console.error(e);
-      // Drop the rows rather than leave the previous goalkeeper's media
-      // sitting under this goalkeeper's heading.
-      setAssets([]);
-      setLoadError(true);
-    } finally {
-      setLoadedFilters(filters);
-      setLoading(false);
     }
+
+    if (seq !== loadSeq.current) return;
+
+    // A failed read drops the rows rather than leaving the previous
+    // goalkeeper's media sitting under this goalkeeper's heading.
+    setAssets(rows ?? []);
+    setLoadError(rows === null);
+    setLoadedFilters(filters);
+    setLoading(false);
   }, [filters]);
 
   useEffect(() => {
