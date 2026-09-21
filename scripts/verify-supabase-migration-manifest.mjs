@@ -6,6 +6,7 @@ import path from "node:path";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const migrationDir = path.join(root, "supabase", "migrations");
 const manifestPath = path.join(root, "docs", "supabase-production-migration-manifest.json");
+const operatingGuidePath = path.join(root, "docs", "RPM-LIVE-OPERATING-GUIDE.md");
 
 const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
 const productionMigrations = manifest.production.migrations;
@@ -20,6 +21,34 @@ if (manifest.production.ledger_rows !== productionMigrations.length) {
   errors.push(
     `Production ledger count mismatch: manifest says ${manifest.production.ledger_rows}, but lists ${productionMigrations.length}`,
   );
+}
+
+// The operating guide states these counts in prose, and prose drifts silently:
+// it sat on "30 files / 26 applied" long after the real answer was 52 / 52, which
+// is exactly the kind of stale fact someone reaches for before a production
+// change. Hold the sentence to the manifest so the drift fails the pull request
+// instead of waiting to be spotted.
+const guide = await readFile(operatingGuidePath, "utf8");
+const statedCounts = guide.match(
+  /holds \*\*(\d+)\*\* SQL files and the live project's ledger reports \*\*(\d+)\*\* applied entries/,
+);
+
+if (!statedCounts) {
+  errors.push(
+    `${path.relative(root, operatingGuidePath)} no longer states the migration counts in the expected form; update the sentence or this check.`,
+  );
+} else {
+  const [, statedFiles, statedLedger] = statedCounts.map(Number);
+  if (statedFiles !== activeNames.length) {
+    errors.push(
+      `Operating guide states ${statedFiles} migration files, but supabase/migrations holds ${activeNames.length}`,
+    );
+  }
+  if (statedLedger !== manifest.production.ledger_rows) {
+    errors.push(
+      `Operating guide states ${statedLedger} applied ledger entries, but the manifest records ${manifest.production.ledger_rows}`,
+    );
+  }
 }
 
 for (const entry of reviewedForwardMigrations) {
