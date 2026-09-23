@@ -125,9 +125,9 @@ function LoginPage() {
       <div className="w-full max-w-md">
         <div className="mb-8">
           <GkhqLockup
-            className="gap-3"
-            markClassName="size-[4.125rem]"
-            wordmarkClassName="h-6 w-auto"
+            className="gap-4 sm:gap-6"
+            markClassName="size-[5.5rem] sm:size-[8.25rem]"
+            wordmarkClassName="h-8 sm:h-12 w-auto"
             alt="GKHQ Mentor Hub"
           />
         </div>
