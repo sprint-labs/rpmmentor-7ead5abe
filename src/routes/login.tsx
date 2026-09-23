@@ -59,6 +59,23 @@ const viewMotion = {
   transition: { duration: 0.2, ease: "easeInOut" },
 } as const;
 
+// Seeded so the server and client render identical positions (no hydration mismatch).
+const STARS = (() => {
+  let seed = 7;
+  const rand = () => {
+    seed = (seed * 16807) % 2147483647;
+    return seed / 2147483647;
+  };
+  return Array.from({ length: 36 }, () => ({
+    x: rand() * 100,
+    y: rand() * 100,
+    size: rand() < 0.8 ? 1 : 2,
+    opacity: 0.3 + rand() * 0.4,
+    duration: 3 + rand() * 4,
+    delay: rand() * 5,
+  }));
+})();
+
 function LoginPage() {
   const { user, signIn } = useAuth();
   const navigate = useNavigate();
@@ -140,10 +157,25 @@ function LoginPage() {
       <MotionConfig reducedMotion="user">
         <div className="relative w-full max-w-md overflow-hidden rounded-2xl border border-border bg-card shadow-xl">
           <div aria-hidden="true" className="pointer-events-none absolute inset-0">
-            <div className="absolute inset-0 bg-gradient-to-b from-primary/15 via-primary/[0.04] to-primary/15" />
-            <div className="absolute -top-24 left-1/2 size-72 -translate-x-1/2 rounded-full bg-primary/20 blur-3xl" />
-            <div className="absolute -bottom-28 -right-16 size-80 rounded-full bg-primary/15 blur-3xl" />
-            <div className="absolute -bottom-20 -left-20 size-64 rounded-full bg-primary/10 blur-3xl" />
+            <div className="absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-primary/10 to-transparent" />
+            {STARS.map((s, i) => (
+              <span
+                key={i}
+                className="absolute"
+                style={{ left: `${s.x}%`, top: `${s.y}%`, opacity: s.opacity }}
+              >
+                <span
+                  className="block rounded-full bg-primary animate-pulse motion-reduce:animate-none"
+                  style={{
+                    width: s.size,
+                    height: s.size,
+                    boxShadow: `0 0 ${s.size * 3}px var(--primary)`,
+                    animationDuration: `${s.duration}s`,
+                    animationDelay: `${s.delay}s`,
+                  }}
+                />
+              </span>
+            ))}
           </div>
 
           <div className="relative p-6 sm:p-8">
@@ -175,7 +207,7 @@ function LoginPage() {
                 <motion.div key="signin" {...viewMotion}>
                   <div className="mb-8 text-center">
                     <h1 className="text-3xl font-display font-bold tracking-[0.01em] leading-tight">
-                      Welcome back
+                      Welcome Back
                     </h1>
                     <p className="mt-2 text-sm text-muted-foreground">
                       Sign in to your Mentor Hub account
@@ -257,15 +289,15 @@ function LoginPage() {
                     <button
                       type="submit"
                       disabled={submitting}
-                      className="group relative w-full h-12 overflow-hidden rounded-xl bg-gradient-to-b from-[#5dff4a] via-primary to-[#0a9a00] text-primary-foreground text-sm font-semibold ring-1 ring-inset ring-white/30 shadow-[0_0_28px_-4px_var(--primary),0_8px_20px_-8px_var(--primary),inset_0_1px_0_rgba(255,255,255,0.7),inset_0_-3px_8px_rgba(0,0,0,0.25)] transition-[filter,transform,box-shadow] hover:brightness-110 hover:shadow-[0_0_40px_-4px_var(--primary),0_10px_24px_-8px_var(--primary),inset_0_1px_0_rgba(255,255,255,0.7),inset_0_-3px_8px_rgba(0,0,0,0.25)] active:scale-[0.99] disabled:opacity-60"
+                      className="group relative w-full h-12 overflow-hidden rounded-xl bg-gradient-to-b from-[#3fd92f] via-primary to-[#0b8f00] text-primary-foreground text-sm font-semibold ring-1 ring-inset ring-white/20 shadow-[0_0_10px_-6px_var(--primary),inset_0_1px_0_rgba(255,255,255,0.4),inset_0_-3px_8px_rgba(0,0,0,0.2)] transition-[filter,transform,box-shadow] duration-300 hover:brightness-105 hover:shadow-[0_0_20px_-6px_var(--primary),0_6px_14px_-8px_var(--primary),inset_0_1px_0_rgba(255,255,255,0.55),inset_0_-3px_8px_rgba(0,0,0,0.2)] active:scale-[0.99] disabled:opacity-60"
                     >
                       <span
                         aria-hidden="true"
-                        className="pointer-events-none absolute inset-x-1 top-0.5 h-1/2 rounded-t-[10px] rounded-b-[40%] bg-gradient-to-b from-white/60 to-white/5"
+                        className="pointer-events-none absolute inset-x-1 top-0.5 h-1/2 rounded-t-[10px] rounded-b-[40%] bg-gradient-to-b from-white/45 to-white/0 opacity-60 transition-opacity duration-300 group-hover:opacity-100"
                       />
                       <span
                         aria-hidden="true"
-                        className="pointer-events-none absolute inset-y-0 -left-1/3 w-1/3 -skew-x-12 bg-gradient-to-r from-transparent via-white/40 to-transparent opacity-0 transition-[left,opacity] duration-700 group-hover:left-[110%] group-hover:opacity-100 motion-reduce:hidden"
+                        className="pointer-events-none absolute inset-y-0 -left-1/3 w-1/3 -skew-x-12 bg-gradient-to-r from-transparent via-white/25 to-transparent opacity-0 transition-[left,opacity] duration-700 group-hover:left-[110%] group-hover:opacity-100 motion-reduce:hidden"
                       />
                       <span className="relative flex items-center justify-center gap-2 drop-shadow-[0_1px_0_rgba(255,255,255,0.35)]">
                         {submitting ? (
