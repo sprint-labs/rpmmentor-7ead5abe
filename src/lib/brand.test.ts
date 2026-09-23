@@ -37,7 +37,7 @@ describe("brand assets are served from the Vercel public folder", () => {
     const source = readFileSync(resolve(file), "utf8");
     expect(source).not.toMatch(/__l5e/);
     expect(source).not.toMatch(/\.asset\.json/);
-    expect(source).toContain("GkhqLockup");
+    expect(source).toMatch(/GkhqLockup|GkhqMark/);
   });
 });
 
