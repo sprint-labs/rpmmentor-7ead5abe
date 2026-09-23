@@ -12,6 +12,7 @@ import {
   TUS_RETRY_DELAYS,
 } from "@/lib/media-upload-transport";
 import { MEDIA_BUCKET } from "@/lib/storage/bucket";
+import { readAllPages } from "@/lib/paginated-read";
 
 export {
   attachmentLookupIds,
@@ -25,6 +26,15 @@ export {
 };
 
 export type MediaKind = "video" | "pdf" | "image" | "audio";
+
+/**
+ * Why a file was uploaded. Every row that existed before Match Clips, and every
+ * upload outside that workflow, is `general`. Only `uploadMedia` called from
+ * the Match Clips uploader may write `match_clip` — see
+ * `media-purpose-guard.test.ts`.
+ */
+export type MediaAssetPurpose = "general" | "match_clip";
+export const MATCH_CLIP_PURPOSE: MediaAssetPurpose = "match_clip";
 
 export interface MediaAsset {
   id: string;
@@ -42,6 +52,10 @@ export interface MediaAsset {
   uploaded_by_role: string | null;
   created_at: string;
   updated_at: string;
+  /** Absent only on rows read before the Match Clips columns existed. */
+  asset_purpose?: MediaAssetPurpose;
+  match_event_id?: string | null;
+  upload_batch_id?: string | null;
 }
 
 export interface MediaAuditEntry {
@@ -292,6 +306,12 @@ export async function uploadMedia(opts: {
   onProgress?: (fraction: number) => void;
   /** Stable Storage object path. Retries must reuse the same value. */
   objectPath?: string | null;
+  /**
+   * Set only by the Match Clips uploader. When absent the insert carries none
+   * of the Match Clips columns, so every other upload path writes exactly what
+   * it wrote before and the column default classifies it `general`.
+   */
+  matchClip?: { matchEventId: string | null; uploadBatchId: string };
 }): Promise<MediaAsset> {
   const { file, gkId, title, notes, kind, ratingTags, user, onProgress } = opts;
 
@@ -335,6 +355,13 @@ export async function uploadMedia(opts: {
       uploaded_by_id: user.id,
       uploaded_by_name: user.name,
       uploaded_by_role: user.role,
+      ...(opts.matchClip
+        ? {
+            asset_purpose: MATCH_CLIP_PURPOSE,
+            match_event_id: opts.matchClip.matchEventId,
+            upload_batch_id: opts.matchClip.uploadBatchId,
+          }
+        : {}),
     })
     .select("*")
     .single();
@@ -344,7 +371,20 @@ export async function uploadMedia(opts: {
     throw new Error(`Could not save media record: ${dbErr.message}`);
   }
   const asset = data as MediaAsset;
-  await logAudit({ action: "upload", asset, user, metadata: { size: file.size, kind } });
+  await logAudit({
+    action: "upload",
+    asset,
+    user,
+    metadata: opts.matchClip
+      ? {
+          size: file.size,
+          kind,
+          purpose: MATCH_CLIP_PURPOSE,
+          match_event_id: opts.matchClip.matchEventId,
+          upload_batch_id: opts.matchClip.uploadBatchId,
+        }
+      : { size: file.size, kind },
+  });
   return asset;
 }
 
@@ -379,6 +419,37 @@ export async function listMedia(filters: MediaFilters = {}): Promise<MediaAsset[
   const { data, error } = await q;
   if (error) throw new Error(error.message);
   return (data || []) as MediaAsset[];
+}
+
+export interface MatchClipFilters {
+  gkIds?: string[];
+  matchEventIds?: string[];
+  unmatched?: boolean;
+}
+
+/**
+ * Every Match Clip, newest first, read in pages so the API row cap can never
+ * silently drop the oldest clips. Grouping by match happens in `match-clips.ts`.
+ */
+export async function listMatchClips(filters: MatchClipFilters = {}): Promise<MediaAsset[]> {
+  return readAllPages<MediaAsset>(async (from, to) => {
+    let q = supabase
+      .from("media_assets")
+      .select("*")
+      .eq("asset_purpose", MATCH_CLIP_PURPOSE)
+      // `id` breaks ties so a page boundary never skips or repeats a row.
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: false })
+      .range(from, to);
+    if (filters.gkIds?.length) q = q.in("gk_id", filters.gkIds);
+    if (filters.matchEventIds?.length) q = q.in("match_event_id", filters.matchEventIds);
+    else if (filters.unmatched) q = q.is("match_event_id", null);
+    const { data, error } = await q;
+    // Keep the database's own message: the page reads it to tell a missing
+    // Match Clips schema apart from any other failure.
+    if (error) throw new Error(error.message);
+    return { data: (data || []) as MediaAsset[], error: null };
+  }, "Match clips could not be loaded.");
 }
 
 export async function getMediaByIds(ids: string[]): Promise<MediaAsset[]> {

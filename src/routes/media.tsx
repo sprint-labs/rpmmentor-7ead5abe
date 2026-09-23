@@ -3,34 +3,19 @@ import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
-import { PageHeader, Pill, EmptyState, Card } from "@/components/primitives";
+import { PageHeader, EmptyState, Card } from "@/components/primitives";
 import { DataSourceBanner } from "@/lib/data-classification";
-import { formatDate } from "@/lib/mock-data";
-import {
-  ArrowRight,
-  ChevronLeft,
-  ChevronRight,
-  FileText,
-  Filter,
-  Image as ImageIcon,
-  Mic,
-  Pencil,
-  Search,
-  SlidersHorizontal,
-  Trash2,
-  Upload,
-  Video,
-  X,
-} from "lucide-react";
+import { Filter, Search, SlidersHorizontal, Upload, Video, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { WorkflowDialog, type WorkflowKind, EditMediaDialog } from "@/components/workflows";
+import { MediaTile } from "@/components/media-tile";
+import { ShelfHeader, ShelfSkeleton, ShelfTrack } from "@/components/media-shelf";
 import { DEMO_USERS, useAuth } from "@/lib/auth";
 import {
   listMedia,
   openAsset,
   deleteMedia,
   getSignedUrl,
-  formatBytes,
   canDeleteAsset,
   canEditAsset,
   RATING_TAG_OPTIONS,
@@ -66,12 +51,6 @@ export const Route = createFileRoute("/media")({
   component: withPermission(MediaPage, "media.view"),
 });
 
-const KIND_ICON: Record<MediaKind, typeof Video> = {
-  video: Video,
-  pdf: FileText,
-  image: ImageIcon,
-  audio: Mic,
-};
 /** Toolbar order, widest type first — it mirrors how the library actually fills up. */
 const KINDS = ["all", "video", "audio", "pdf", "image"] as const;
 const KIND_LABEL: Record<(typeof KINDS)[number], string> = {
@@ -666,262 +645,6 @@ function MediaPage() {
 
       <WorkflowDialog kind={workflow} onClose={() => setWorkflow(null)} />
       <EditMediaDialog asset={editing} onClose={() => setEditing(null)} />
-    </div>
-  );
-}
-
-function ShelfHeader({
-  title,
-  subtitle,
-  count,
-  onViewAll,
-}: {
-  title: string;
-  subtitle: string | null;
-  count: number;
-  onViewAll?: () => void;
-}) {
-  return (
-    <div className="mb-3 flex items-baseline justify-between gap-3">
-      <h2 className="flex min-w-0 items-baseline gap-2">
-        <span className="truncate font-display text-base font-bold uppercase tracking-[0.04em]">
-          {title}
-        </span>
-        {subtitle && (
-          <span className="hidden truncate text-xs text-muted-foreground sm:inline">
-            · {subtitle}
-          </span>
-        )}
-        <span className="font-mono text-xs tabular-nums text-muted-foreground">{count}</span>
-      </h2>
-      {onViewAll && (
-        <button
-          type="button"
-          onClick={onViewAll}
-          className="inline-flex shrink-0 items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
-        >
-          View all
-          <ArrowRight className="size-3" />
-        </button>
-      )}
-    </div>
-  );
-}
-
-/**
- * A sideways-scrolling shelf. The edge arrows are for pointer devices —
- * touch users already swipe, and the track keeps its native scrolling either way.
- */
-function ShelfTrack({ children }: { children: ReactNode }) {
-  const trackRef = useRef<HTMLDivElement | null>(null);
-  const [atStart, setAtStart] = useState(true);
-  const [atEnd, setAtEnd] = useState(true);
-
-  const syncEdges = useCallback(() => {
-    const el = trackRef.current;
-    if (!el) return;
-    const max = el.scrollWidth - el.clientWidth;
-    setAtStart(el.scrollLeft <= 4);
-    setAtEnd(el.scrollLeft >= max - 4);
-  }, []);
-
-  // No dependency list: the shelf's contents change with the filters, and
-  // scrollWidth only settles after that render.
-  useEffect(syncEdges);
-
-  useEffect(() => {
-    window.addEventListener("resize", syncEdges);
-    return () => window.removeEventListener("resize", syncEdges);
-  }, [syncEdges]);
-
-  const nudge = (direction: -1 | 1) => {
-    const el = trackRef.current;
-    if (!el) return;
-    const step = Math.max(220, el.clientWidth * 0.8) * direction;
-    if (typeof el.scrollBy === "function") el.scrollBy({ left: step, behavior: "smooth" });
-    else el.scrollLeft += step;
-  };
-
-  const arrow =
-    "absolute top-[30%] z-[1] hidden size-8 -translate-y-1/2 place-items-center rounded-full border border-border bg-background/90 text-foreground shadow-sm backdrop-blur transition-opacity [@media(any-pointer:fine)]:grid";
-
-  return (
-    <div className="relative">
-      <button
-        type="button"
-        aria-label="Scroll shelf left"
-        onClick={() => nudge(-1)}
-        className={cn(arrow, "-left-2", atStart ? "pointer-events-none opacity-0" : "opacity-100")}
-      >
-        <ChevronLeft className="size-4" />
-      </button>
-      <div
-        ref={trackRef}
-        onScroll={syncEdges}
-        className="flex snap-x gap-3 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-      >
-        {children}
-      </div>
-      <button
-        type="button"
-        aria-label="Scroll shelf right"
-        onClick={() => nudge(1)}
-        className={cn(arrow, "-right-2", atEnd ? "pointer-events-none opacity-0" : "opacity-100")}
-      >
-        <ChevronRight className="size-4" />
-      </button>
-    </div>
-  );
-}
-
-function MediaTile({
-  asset,
-  goalkeeperLabel,
-  thumbUrl,
-  busy,
-  className,
-  onOpen,
-  onEdit,
-  onDelete,
-}: {
-  asset: MediaAsset;
-  goalkeeperLabel: string | null;
-  thumbUrl?: string;
-  busy: boolean;
-  className?: string;
-  onOpen: () => void;
-  onEdit?: () => void;
-  onDelete?: () => void;
-}) {
-  const Icon = KIND_ICON[asset.media_type] ?? FileText;
-  const unlinked = !asset.gk_id;
-  const tags = asset.rating_tags.slice(0, 2);
-  const extraTags = asset.rating_tags.length - tags.length;
-
-  return (
-    <div className={cn("group relative", className)}>
-      <button
-        type="button"
-        onClick={onOpen}
-        title={`Open ${asset.title}`}
-        className="block w-full rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
-      >
-        <div
-          className={cn(
-            "relative aspect-[4/3] overflow-hidden rounded-md border bg-gradient-to-br from-accent/30 to-muted",
-            unlinked ? "border-dashed border-border" : "border-border",
-          )}
-        >
-          {thumbUrl ? (
-            <img
-              src={thumbUrl}
-              alt={asset.title}
-              className="absolute inset-0 size-full object-cover"
-              loading="lazy"
-            />
-          ) : asset.media_type === "audio" ? (
-            <div className="absolute inset-0 grid place-items-center">
-              <WaveformPlaceholder />
-            </div>
-          ) : (
-            <div className="absolute inset-0 grid place-items-center">
-              <Icon className="size-9 text-muted-foreground" />
-            </div>
-          )}
-          <span className="absolute left-1.5 top-1.5 inline-flex items-center gap-1 rounded bg-background/75 px-1.5 py-0.5 text-[10px] uppercase tracking-wider backdrop-blur">
-            <Icon className="size-3" />
-            {asset.media_type}
-          </span>
-          <span className="absolute bottom-1.5 right-1.5 rounded bg-background/75 px-1.5 py-0.5 font-mono text-[10px] tabular-nums backdrop-blur">
-            {formatBytes(asset.file_size)}
-          </span>
-          <span className="absolute inset-0 bg-foreground/0 transition-colors group-hover:bg-foreground/10" />
-        </div>
-      </button>
-
-      {(onEdit || onDelete) && (
-        <div className="absolute right-1.5 top-1.5 flex items-center gap-1 transition-opacity sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100">
-          {onEdit && (
-            <button
-              type="button"
-              onClick={onEdit}
-              title={`Edit ${asset.title}`}
-              className="grid size-6 place-items-center rounded border border-border bg-background/85 text-muted-foreground backdrop-blur hover:text-foreground"
-            >
-              <Pencil className="size-3" />
-              <span className="sr-only">Edit {asset.title}</span>
-            </button>
-          )}
-          {onDelete && (
-            <button
-              type="button"
-              onClick={onDelete}
-              disabled={busy}
-              title={`Delete ${asset.title}`}
-              className="grid size-6 place-items-center rounded border border-border bg-background/85 text-muted-foreground backdrop-blur hover:text-destructive disabled:opacity-50"
-            >
-              <Trash2 className="size-3" />
-              <span className="sr-only">Delete {asset.title}</span>
-            </button>
-          )}
-        </div>
-      )}
-
-      <div className="mt-2 space-y-1">
-        <p className="line-clamp-2 text-sm font-medium leading-tight">{asset.title}</p>
-        {goalkeeperLabel && (
-          <p className="truncate text-[11px] text-muted-foreground">{goalkeeperLabel}</p>
-        )}
-        <p className="truncate text-[11px] text-muted-foreground">
-          {formatDate(asset.created_at)}
-          {asset.uploaded_by_name ? ` · ${asset.uploaded_by_name}` : ""}
-        </p>
-        {tags.length > 0 && (
-          <div className="flex flex-wrap items-center gap-1 pt-0.5">
-            {tags.map((t) => (
-              <Pill key={t} tone="info">
-                {t}
-              </Pill>
-            ))}
-            {extraTags > 0 && <Pill tone="muted">+{extraTags}</Pill>}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function ShelfSkeleton() {
-  return (
-    <div className="space-y-8" aria-hidden="true">
-      {[0, 1].map((row) => (
-        <div key={row}>
-          <div className="mb-3 h-4 w-40 animate-pulse rounded bg-muted" />
-          <div className="flex gap-3 overflow-hidden">
-            {[0, 1, 2, 3, 4, 5].map((i) => (
-              <div key={i} className="w-[168px] shrink-0 sm:w-[196px]">
-                <div className="aspect-[4/3] animate-pulse rounded-md bg-muted" />
-                <div className="mt-2 h-3 w-4/5 animate-pulse rounded bg-muted" />
-                <div className="mt-1.5 h-3 w-2/5 animate-pulse rounded bg-muted" />
-              </div>
-            ))}
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function WaveformPlaceholder() {
-  const bars = Array.from({ length: 28 });
-  return (
-    <div className="flex h-12 items-end gap-[3px]">
-      {bars.map((_, i) => {
-        const h = 20 + Math.abs(Math.sin(i * 1.3)) * 70;
-        return (
-          <span key={i} className="w-[3px] rounded-sm bg-primary/60" style={{ height: `${h}%` }} />
-        );
-      })}
     </div>
   );
 }
