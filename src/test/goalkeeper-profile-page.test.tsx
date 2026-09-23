@@ -5,6 +5,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createMemoryHistory, createRouter, Outlet, RouterProvider } from "@tanstack/react-router";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ReactNode } from "react";
+import type { MediaAsset } from "@/lib/media-store";
+import { formatDate } from "@/lib/mock-data";
 import { routeTree } from "../routeTree.gen";
 
 vi.mock("@/lib/auth", () => ({
@@ -65,7 +67,7 @@ vi.mock("sonner", () => ({ toast: vi.fn() }));
 // server function, so it is stubbed here; the rest of the module stays real.
 vi.mock("@/lib/media-store", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/media-store")>()),
-  listMedia: vi.fn().mockResolvedValue([]),
+  listMedia: listMediaMock,
 }));
 
 vi.mock("@/lib/match-reports/reports.functions", () => ({
@@ -79,6 +81,7 @@ vi.mock("@/lib/match-reports/reports.functions", () => ({
 const {
   getPlayerDutyOfCareMock,
   listMatchReportsMock,
+  listMediaMock,
   listPlayerDutyOfCareMock,
   listPlayersMock,
   resetDutyOfCareMock,
@@ -88,6 +91,7 @@ const {
 } = vi.hoisted(() => ({
   getPlayerDutyOfCareMock: vi.fn(),
   listMatchReportsMock: vi.fn(),
+  listMediaMock: vi.fn(),
   listPlayerDutyOfCareMock: vi.fn(),
   listPlayersMock: vi.fn(),
   resetDutyOfCareMock: vi.fn(),
@@ -222,7 +226,30 @@ beforeAll(() => {
 beforeEach(() => {
   listPlayersMock.mockResolvedValue([LIVE_ONLY_PLAYER]);
   listMatchReportsMock.mockResolvedValue({ reports: [] });
+  listMediaMock.mockResolvedValue([]);
 });
+
+/** A media row linked to the live-only goalkeeper; each case overrides what it tests. */
+function mediaAsset(overrides: Partial<MediaAsset>): MediaAsset {
+  return {
+    id: "media-1",
+    gk_id: "00000000-0000-4000-8000-0000000000aa",
+    title: "Individual Learning Plan",
+    notes: null,
+    media_type: "pdf",
+    mime_type: "application/pdf",
+    file_path: "00000000-0000-4000-8000-0000000000aa/plan.pdf",
+    file_size: 180_000,
+    thumbnail_path: null,
+    rating_tags: [],
+    uploaded_by_id: "mentor-1",
+    uploaded_by_name: "A Mentor",
+    uploaded_by_role: "mentor",
+    created_at: "2026-09-23T12:00:00.000Z",
+    updated_at: "2026-09-23T12:00:00.000Z",
+    ...overrides,
+  };
+}
 
 afterEach(() => {
   cleanup();
@@ -280,6 +307,31 @@ describe("Goalkeeper profile page", () => {
     await waitFor(() => expect(listPlayersMock).toHaveBeenCalled());
     expect(screen.queryByText(/The roster could not be loaded/)).toBeNull();
     expect(screen.queryByText("Goalkeeper not found.")).toBeNull();
+  });
+
+  it("dates each media file so two versions of a re-uploaded plan can be told apart", async () => {
+    // A development plan is uploaded again each time it changes, usually under
+    // the same file name. `listMedia` answers newest first.
+    const newer = "2026-10-21T12:00:00.000Z";
+    const older = "2026-08-20T12:00:00.000Z";
+    listMediaMock.mockResolvedValue([
+      mediaAsset({ id: "plan-v2", created_at: newer, updated_at: newer }),
+      mediaAsset({
+        id: "plan-v1",
+        media_type: "image",
+        mime_type: "image/jpeg",
+        created_at: older,
+        updated_at: older,
+      }),
+    ]);
+
+    const { container } = await renderProfile("/goalkeepers/gk-kwame-asante");
+
+    expect(await screen.findByText("Media (2)")).toBeTruthy();
+    expect(screen.getAllByText("Individual Learning Plan")).toHaveLength(2);
+    const dates = Array.from(container.querySelectorAll("time"));
+    expect(dates.map((date) => date.getAttribute("datetime"))).toEqual([newer, older]);
+    expect(dates.map((date) => date.textContent)).toEqual([formatDate(newer), formatDate(older)]);
   });
 
   it("reports an unreachable roster as a failure rather than not found", async () => {
