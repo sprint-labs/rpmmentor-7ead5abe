@@ -1,17 +1,19 @@
 // @vitest-environment jsdom
 
 import { cleanup, render } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import {
-  BOOT_SPLASH_MIN_MS,
   BootSplash,
+  SIGN_IN_SPLASH_MS,
+  SignInSplash,
   bootSplashCss,
-  bootSplashHideScript,
+  bootSplashSkipScript,
 } from "@/components/boot-splash";
 
 afterEach(() => {
   cleanup();
-  vi.useRealTimers();
+  localStorage.clear();
+  document.documentElement.removeAttribute("data-no-splash");
 });
 
 describe("BootSplash", () => {
@@ -53,22 +55,33 @@ describe("bootSplashCss", () => {
   });
 });
 
-describe("bootSplashHideScript", () => {
-  it("keeps the splash up for one full fill loop before fading it out", () => {
-    vi.useFakeTimers();
-    const { container } = render(<BootSplash />);
-    const splash = container.querySelector("#boot-splash");
+describe("bootSplashSkipScript", () => {
+  it("skips the page-load splash when nobody is signed in", () => {
+    new Function(bootSplashSkipScript)();
 
-    new Function(bootSplashHideScript)();
-
-    vi.advanceTimersByTime(BOOT_SPLASH_MIN_MS - 1);
-    expect(splash?.getAttribute("data-hide")).toBeNull();
-
-    vi.advanceTimersByTime(1);
-    expect(splash?.getAttribute("data-hide")).toBe("1");
+    expect(document.documentElement.getAttribute("data-no-splash")).toBe("1");
+    expect(bootSplashCss).toContain("html[data-no-splash] #boot-splash{display:none}");
   });
 
-  it("matches the minimum to the length of one fill loop", () => {
-    expect(bootSplashCss).toContain(`animation:bs-rise ${BOOT_SPLASH_MIN_MS / 1000}s`);
+  it("keeps the page-load splash for a saved session", () => {
+    localStorage.setItem("sb-abcdef-auth-token", "{}");
+
+    new Function(bootSplashSkipScript)();
+
+    expect(document.documentElement.hasAttribute("data-no-splash")).toBe(false);
+  });
+});
+
+describe("SignInSplash", () => {
+  it("announces the sign-in and reuses the splash art", () => {
+    const { getByRole, container } = render(<SignInSplash />);
+
+    expect(getByRole("status").getAttribute("aria-label")).toBe("Signing you in");
+    expect(container.querySelector("img.bs-base")?.getAttribute("src")).toBe("/gkhq-mark.png");
+    expect(container.querySelector("#boot-splash")).toBeNull();
+  });
+
+  it("holds for exactly one fill loop", () => {
+    expect(bootSplashCss).toContain(`animation:bs-rise ${SIGN_IN_SPLASH_MS / 1000}s`);
   });
 });
