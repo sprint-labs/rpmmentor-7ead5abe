@@ -88,6 +88,7 @@ const {
   APOSTROPHE_PLAYER,
   CURLY_REPORT,
   LIVE_ONLY_PLAYER,
+  LOAN_PLAYER,
 } = vi.hoisted(() => ({
   getPlayerDutyOfCareMock: vi.fn(),
   listMatchReportsMock: vi.fn(),
@@ -119,6 +120,20 @@ const {
    * The apostrophe hazard, as the live database actually holds it:
    * `public.players` stores a straight `'`, `match_reports_cache` a curly one.
    */
+  LOAN_PLAYER: {
+    id: "00000000-0000-4000-8000-000000000001",
+    full_name: "James Beadle",
+    current_club: "Birmingham City",
+    parent_club: "Brighton & Hove Albion",
+    on_loan: true,
+    league: "EFL Championship",
+    nationality: "England",
+    instagram_url: null,
+    contract_until: "June 2028",
+    tier: "Tier 1",
+    is_academy: false,
+    is_free_agent: false,
+  },
   APOSTROPHE_PLAYER: {
     id: "00000000-0000-4000-8000-0000000000bb",
     full_name: "Rich O'Donnell",
@@ -257,6 +272,17 @@ afterEach(() => {
 });
 
 describe("Goalkeeper profile page", () => {
+  it("does not show an on-loan badge in the profile header", async () => {
+    listPlayersMock.mockResolvedValue([LOAN_PLAYER]);
+
+    await renderProfile("/goalkeepers/gk-james-beadle");
+
+    expect(await screen.findByRole("heading", { name: "James Beadle" })).toBeTruthy();
+    expect(screen.getByText("Birmingham City · EFL Championship")).toBeTruthy();
+    expect(screen.queryByText(/On loan from/i)).toBeNull();
+    expect(screen.queryByText(/^On loan$/i)).toBeNull();
+  });
+
   it("resolves a goalkeeper who exists only in the live roster", async () => {
     await renderProfile("/goalkeepers/gk-kwame-asante");
 
