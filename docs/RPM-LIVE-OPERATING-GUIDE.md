@@ -99,7 +99,7 @@ All 18 public tables are RLS-enabled. The most important live counts at this sna
 
 The current database was recreated from the repository's historical migrations with security-minded adjustments. Crucially, its `handle_new_user()` function creates a profile but **does not automatically grant a role**. Provision a role deliberately. Do not assume older source comments saying that a default mentor role is seeded are still true.
 
-The repository's migration history and the live database are reconciled: `supabase/migrations/` holds **53** SQL files and the live project's ledger reports **53** applied entries. The latest, `20260923033248_match_clips.sql`, was applied on 23 Sep 2026 and added to the manifest at its ledger version. `docs/supabase-production-migration-manifest.json` is the captured baseline (project `zdxxezquhvpjmoxlecjp`, captured 2026-09-20) and `npm run check:migrations` verifies the repository against it on every pull request. Treat that parity as a checked invariant, not as permission to run migrations against production. Before any schema, Auth, RLS, trigger, policy, storage or data change: inspect the live target, prepare a forward-only migration, review it, back up/validate the affected data, and obtain explicit production approval.
+The repository's migration history and the live database are reconciled: `supabase/migrations/` holds **54** SQL files and the live project's ledger reports **54** applied entries. The latest two, `20260923033248_match_clips.sql` and `20260923041738_players_insert_management.sql`, were applied on 23 Sep 2026 and added to the manifest at their ledger versions. `docs/supabase-production-migration-manifest.json` is the captured baseline (project `zdxxezquhvpjmoxlecjp`, recaptured 2026-09-23) and `npm run check:migrations` verifies the repository against it on every pull request. Treat that parity as a checked invariant, not as permission to run migrations against production. Before any schema, Auth, RLS, trigger, policy, storage or data change: inspect the live target, prepare a forward-only migration, review it, back up/validate the affected data, and obtain explicit production approval.
 
 ### Why the code looks this way
 
@@ -183,6 +183,21 @@ Use this short release gate:
 9. ~~**Google sign-in shipped before its provider state was confirmed**~~ — **Resolved 21 Sep 2026 (process).** The button shipped in #110 and needed three same-day corrective pull requests (#111, #112, #113) because the provider's live configuration was never evidenced before release: the provider held a placeholder client id, so Supabase handed the browser to Google, which answered `Error 401: invalid_client` on a page of its own — a signed-out user taken off the site entirely, in Google's words, and invisible to CI and to a local build. `src/lib/auth-providers.ts` now carries `GOOGLE_SIGN_IN_ENABLED` as the single kill switch and documents every precondition; the release gate above now requires those preconditions to be evidenced against the live project, plus one real sign-in on the preview deployment, before a provider change merges. The same gate applies to any future provider (Microsoft, Apple, magic link).
 
 8. **`list_mentor_directory()` security lint** — The function now rejects callers who are not `mentor`, `mentor_manager`, `admin`, or `super_admin`. Supabase may still surface `authenticated_security_definer_function_executable` because `authenticated` retains `EXECUTE` on a `SECURITY DEFINER` RPC; that is required for calendar/insights reads from the browser client.
+
+### 23 Sep 2026 — Three goalkeepers added to the roster (completed)
+
+Management request (David Rouse, 21 Sep 2026). Two Chelsea Academy goalkeepers and one Brisbane Roar goalkeeper were missing from the roster, so they had no profile page for their Individual Learning Plans to be uploaded to. Inserted directly into live `public.players` on project `zdxxezquhvpjmoxlecjp`.
+
+| Item | State |
+| --- | --- |
+| Why it came to the owner | At the time the in-app **Add Goalkeeper** form saved nothing and `public.players` had no INSERT policy. Fixed the same day: `createPlayer` in `src/lib/players.functions.ts` plus live migration `20260923041738_players_insert_management` (Mentor Manager, Admin and Super Admin only; verified under RLS that a Mentor is refused). |
+| Why not a migration | This repository is public and two of the three are under 18. A migration would publish their names in Git history permanently, so the rows went in as data. Apply the same rule to any future under-18 signing. Names and ids are in the live table, not here. |
+| Rows | 3 inserted (116 → 119 live players), each guarded against a live row with the same `lower(full_name)`. |
+| Values | Club and parent club set, not on loan, league matching the goalkeepers already recorded at the same clubs (`Premier League`, `Australian A League`), nationality from club and national-team records. Academy flag on for the two Chelsea Academy goalkeepers only. |
+| Left for management | `tier` unassigned (set it from the profile), `contract_until` and `instagram_url` empty. |
+| Date of birth | Not stored. `players` has no column for it and the seed in `src/lib/mock-data.ts` is public, so these profiles show "Not recorded". |
+| Verified | Read back under RLS as the Mentor account that will upload the plans: all 119 visible. A Mentor `media_assets` insert linked to one of the new rows is allowed (dry run, rolled back, no row left). |
+| Reversal | Soft delete: set `deleted_at` and `deleted_by` (a Super Admin's user id) together on the row, which is what `deletePlayerRecord` in `src/lib/players.functions.ts` does. No screen calls that function yet. |
 
 ### 28 Aug 2026 — Joe Monks provisioned as Admin (completed)
 

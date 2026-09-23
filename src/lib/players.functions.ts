@@ -9,7 +9,12 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { CLUB_EDIT_ROLES, requireRole, SUPER_ADMIN_ROLES } from "@/lib/roles.server";
+import {
+  CLUB_EDIT_ROLES,
+  PLAYER_CREATE_ROLES,
+  requireRole,
+  SUPER_ADMIN_ROLES,
+} from "@/lib/roles.server";
 import { londonToday } from "@/lib/time/london";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -67,6 +72,28 @@ export const playerRecordUpdateSchema = z.object({
   isAcademy: z.boolean(),
   isFreeAgent: z.boolean(),
 });
+
+/**
+ * A new goalkeeper. Same field rules as `playerRecordUpdateSchema`, plus the
+ * name, which a new row cannot do without.
+ */
+export const playerCreateSchema = z.object({
+  fullName: z.string().trim().min(2, "Full name is required.").max(120),
+  currentClub: z.string().trim().max(120),
+  parentClub: nullableText(120),
+  onLoan: z.boolean(),
+  league: z.string().trim().max(120),
+  nationality: z.string().trim().max(120),
+  instagramUrl: nullableHttpUrl,
+  contractUntil: nullableText(120),
+  tier: nullableTier,
+  isAcademy: z.boolean(),
+  isFreeAgent: z.boolean(),
+});
+export type PlayerCreateInput = z.input<typeof playerCreateSchema>;
+
+/** Postgres unique violation — here, `players_full_name_lower_idx`. */
+const UNIQUE_VIOLATION = "23505";
 
 export const playerTierUpdateSchema = z.object({
   id: z.string().regex(UUID, "A canonical player id is required."),
@@ -260,6 +287,46 @@ export const updatePlayerRecord = createServerFn({ method: "POST" })
       throw new Error("The saved player record could not be confirmed.");
     }
     return row;
+  });
+
+/**
+ * Add a goalkeeper to the live roster, under the caller's own session.
+ *
+ * Authorisation is enforced twice: the role check below, which produces a
+ * clear message, and the `players_insert_management` RLS policy. A name that
+ * is already live is rejected by `players_full_name_lower_idx` and reported
+ * in plain words.
+ */
+export const createPlayer = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((data: unknown) => playerCreateSchema.parse(data))
+  .handler(async ({ data, context }): Promise<PlayerRosterRow> => {
+    await requireRole(context.supabase, context.userId, PLAYER_CREATE_ROLES, "add a goalkeeper");
+
+    const { data: created, error } = await context.supabase
+      .from("players")
+      .insert({
+        full_name: data.fullName,
+        current_club: data.currentClub,
+        parent_club: data.parentClub,
+        on_loan: data.onLoan,
+        league: data.league,
+        nationality: data.nationality,
+        instagram_url: data.instagramUrl,
+        contract_until: data.contractUntil,
+        tier: data.tier,
+        is_academy: data.isAcademy,
+        is_free_agent: data.isFreeAgent,
+      })
+      .select(PLAYER_COLUMNS)
+      .single();
+    if (error) {
+      if (error.code === UNIQUE_VIOLATION) {
+        throw new Error(`${data.fullName} is already on the roster.`);
+      }
+      throw new Error(error.message);
+    }
+    return created as PlayerRosterRow;
   });
 
 export interface PlayerDeletionImpact {

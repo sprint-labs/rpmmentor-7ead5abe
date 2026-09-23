@@ -36,6 +36,13 @@ export const DUTY_OF_CARE_RESET_ROLES: readonly AppRole[] = [
   "super_admin",
 ];
 
+/**
+ * Roles that may add a goalkeeper to the roster. Mirrors the
+ * `goalkeepers.create` permission in `src/lib/auth.tsx` and the
+ * `players_insert_management` RLS policy — change all three together.
+ */
+export const PLAYER_CREATE_ROLES: readonly AppRole[] = ["mentor_manager", "admin", "super_admin"];
+
 /** Destructive entity controls are deliberately reserved for Super Admins. */
 export const SUPER_ADMIN_ROLES: readonly AppRole[] = ["super_admin"];
 
