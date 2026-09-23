@@ -1,6 +1,6 @@
 {
   "manifest_version": 1,
-  "captured_on": "2026-09-20",
+  "captured_on": "2026-09-23",
   "source": {
     "repository": "sprint-labs/rpmmentor-7ead5abe",
     "origin_main_sha": "28f45f4",
@@ -10,7 +10,7 @@
     "project_ref": "zdxxezquhvpjmoxlecjp",
     "project_name": "RPM Mentor Hub",
     "region": "eu-west-2",
-    "ledger_rows": 52,
+    "ledger_rows": 53,
     "migrations": [
       {
         "version": "20260811095729",
@@ -375,18 +375,17 @@
         "statement_count": 1,
         "sql_length": 1514,
         "sql_md5": "959674c829fda25d555086e3e3d03fa6"
+      },
+      {
+        "version": "20260923041738",
+        "name": "players_insert_management",
+        "statement_count": 1,
+        "sql_length": 1011,
+        "sql_md5": "37742b3f6cd52cefa9d616c61a99de27"
       }
     ]
   },
-  "reviewed_forward_migrations": [
-    {
-      "version": "20260923040000",
-      "name": "players_insert_management",
-      "statement_count": 1,
-      "sql_length": 1012,
-      "sql_md5": "ee4c4e5756270650641d4652e3be6e6a"
-    }
-  ],
+  "reviewed_forward_migrations": [],
   "repository_comparison": {
     "live_rows_with_byte_exact_local_statement": 27,
     "live_rows_contained_inside_a_larger_local_file": 2,

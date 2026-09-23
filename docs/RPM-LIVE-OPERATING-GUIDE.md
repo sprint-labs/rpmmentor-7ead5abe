@@ -99,7 +99,7 @@ All 18 public tables are RLS-enabled. The most important live counts at this sna
 
 The current database was recreated from the repository's historical migrations with security-minded adjustments. Crucially, its `handle_new_user()` function creates a profile but **does not automatically grant a role**. Provision a role deliberately. Do not assume older source comments saying that a default mentor role is seeded are still true.
 
-The repository's migration history and the live database are reconciled: `supabase/migrations/` holds **53** SQL files and the live project's ledger reports **52** applied entries. `docs/supabase-production-migration-manifest.json` is the captured baseline (project `zdxxezquhvpjmoxlecjp`, captured 2026-09-20) and `npm run check:migrations` verifies the repository against it on every pull request. Treat that parity as a checked invariant, not as permission to run migrations against production. Before any schema, Auth, RLS, trigger, policy, storage or data change: inspect the live target, prepare a forward-only migration, review it, back up/validate the affected data, and obtain explicit production approval.
+The repository's migration history and the live database are reconciled: `supabase/migrations/` holds **53** SQL files and the live project's ledger reports **53** applied entries. `docs/supabase-production-migration-manifest.json` is the captured baseline (project `zdxxezquhvpjmoxlecjp`, captured 2026-09-20) and `npm run check:migrations` verifies the repository against it on every pull request. Treat that parity as a checked invariant, not as permission to run migrations against production. Before any schema, Auth, RLS, trigger, policy, storage or data change: inspect the live target, prepare a forward-only migration, review it, back up/validate the affected data, and obtain explicit production approval.
 
 ### Why the code looks this way
 
@@ -190,7 +190,7 @@ Management request (David Rouse, 21 Sep 2026). Two Chelsea Academy goalkeepers a
 
 | Item | State |
 | --- | --- |
-| Why it came to the owner | The in-app **Add Goalkeeper** form (`GoalkeeperForm` in `src/components/workflows.tsx`) saves nothing: it shows "Goalkeeper added to the database." without writing a row, and `public.players` has no INSERT policy for it to use. Until that is built, new goalkeepers are added this way. |
+| Why it came to the owner | At the time the in-app **Add Goalkeeper** form saved nothing and `public.players` had no INSERT policy. Fixed the same day: `createPlayer` in `src/lib/players.functions.ts` plus live migration `20260923041738_players_insert_management` (Mentor Manager, Admin and Super Admin only; verified under RLS that a Mentor is refused). |
 | Why not a migration | This repository is public and two of the three are under 18. A migration would publish their names in Git history permanently, so the rows went in as data. Apply the same rule to any future under-18 signing. Names and ids are in the live table, not here. |
 | Rows | 3 inserted (116 → 119 live players), each guarded against a live row with the same `lower(full_name)`. |
 | Values | Club and parent club set, not on loan, league matching the goalkeepers already recorded at the same clubs (`Premier League`, `Australian A League`), nationality from club and national-team records. Academy flag on for the two Chelsea Academy goalkeepers only. |
