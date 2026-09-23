@@ -126,8 +126,8 @@ function LoginPage() {
         <div className="mb-8">
           <GkhqLockup
             className="gap-3"
-            markClassName="size-16"
-            wordmarkClassName="h-9 w-auto"
+            markClassName="size-[4.125rem]"
+            wordmarkClassName="h-6 w-auto"
             alt="GKHQ Mentor Hub"
           />
         </div>
@@ -148,8 +148,8 @@ function LoginPage() {
         {view === "signin" && (
           <>
             <div className="mb-8">
-              <h1 className="text-lg font-display font-bold tracking-[0.02em] leading-tight whitespace-nowrap">
-                Welcome to the mentor hub
+              <h1 className="text-xl font-display font-bold tracking-[0.02em] leading-tight whitespace-nowrap">
+                Welcome Back to the Mentor Hub
               </h1>
               <p className="text-sm text-muted-foreground mt-3 leading-relaxed">
                 Sign in with your Username &amp; Password below
