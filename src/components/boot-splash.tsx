@@ -24,12 +24,19 @@ export const bootSplashCss = `
 `;
 
 /**
- * Takes the splash down once the page has loaded.
+ * Shortest time the splash stays up: one full `bs-rise` loop (2.2s), so the
+ * mark always fills and fades once instead of being cut off mid-rise.
+ */
+export const BOOT_SPLASH_MIN_MS = 2200;
+
+/**
+ * Takes the splash down once the page has loaded and the minimum time has
+ * passed.
  *
  * It runs as a plain inline script rather than an effect because the splash has
  * to clear even if hydration is slow or fails; the 4s timeout is the backstop.
  */
-export const bootSplashHideScript = `(()=>{const el=document.getElementById('boot-splash');if(!el)return;const hide=()=>{el.setAttribute('data-hide','1');setTimeout(()=>el.remove(),400)};if(document.readyState==='complete'){setTimeout(hide,150)}else{window.addEventListener('load',()=>setTimeout(hide,150),{once:true})}setTimeout(hide,4000)})();`;
+export const bootSplashHideScript = `(()=>{const el=document.getElementById('boot-splash');if(!el)return;const t0=Date.now();const hide=()=>{el.setAttribute('data-hide','1');setTimeout(()=>el.remove(),400)};const later=()=>setTimeout(hide,Math.max(150,${BOOT_SPLASH_MIN_MS}-(Date.now()-t0)));if(document.readyState==='complete'){later()}else{window.addEventListener('load',later,{once:true})}setTimeout(hide,4000)})();`;
 
 /**
  * The first-paint splash: the GKHQ mark filling with GK Green, a sweeping

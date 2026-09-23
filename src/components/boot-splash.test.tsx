@@ -1,10 +1,18 @@
 // @vitest-environment jsdom
 
 import { cleanup, render } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
-import { BootSplash, bootSplashCss } from "@/components/boot-splash";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import {
+  BOOT_SPLASH_MIN_MS,
+  BootSplash,
+  bootSplashCss,
+  bootSplashHideScript,
+} from "@/components/boot-splash";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.useRealTimers();
+});
 
 describe("BootSplash", () => {
   it("draws the brand mark from the shipped asset rather than retyping GK", () => {
@@ -42,5 +50,25 @@ describe("bootSplashCss", () => {
       expect(reduced).toContain(layer);
     }
     expect(reduced).toContain("animation:none");
+  });
+});
+
+describe("bootSplashHideScript", () => {
+  it("keeps the splash up for one full fill loop before fading it out", () => {
+    vi.useFakeTimers();
+    const { container } = render(<BootSplash />);
+    const splash = container.querySelector("#boot-splash");
+
+    new Function(bootSplashHideScript)();
+
+    vi.advanceTimersByTime(BOOT_SPLASH_MIN_MS - 1);
+    expect(splash?.getAttribute("data-hide")).toBeNull();
+
+    vi.advanceTimersByTime(1);
+    expect(splash?.getAttribute("data-hide")).toBe("1");
+  });
+
+  it("matches the minimum to the length of one fill loop", () => {
+    expect(bootSplashCss).toContain(`animation:bs-rise ${BOOT_SPLASH_MIN_MS / 1000}s`);
   });
 });
