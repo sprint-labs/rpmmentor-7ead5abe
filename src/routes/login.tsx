@@ -59,14 +59,22 @@ const viewMotion = {
   transition: { duration: 0.2, ease: "easeInOut" },
 } as const;
 
+type Star = {
+  x: number;
+  y: number;
+  size: number;
+  opacity: number;
+  duration: number;
+  delay: number;
+};
+
 // Seeded so the server and client render identical positions (no hydration mismatch).
-const STARS = (() => {
-  let seed = 7;
+function makeStars(seed: number, count: number): Star[] {
   const rand = () => {
     seed = (seed * 16807) % 2147483647;
     return seed / 2147483647;
   };
-  return Array.from({ length: 36 }, () => ({
+  return Array.from({ length: count }, () => ({
     x: rand() * 100,
     y: rand() * 100,
     size: rand() < 0.8 ? 1 : 2,
@@ -74,7 +82,31 @@ const STARS = (() => {
     duration: 3 + rand() * 4,
     delay: rand() * 5,
   }));
-})();
+}
+
+const CARD_STARS = makeStars(7, 36);
+const PAGE_STARS = makeStars(101, 48);
+
+function StarField({ stars }: { stars: Star[] }) {
+  return stars.map((s, i) => (
+    <span
+      key={i}
+      className="absolute"
+      style={{ left: `${s.x}%`, top: `${s.y}%`, opacity: s.opacity }}
+    >
+      <span
+        className="block rounded-full bg-primary animate-pulse motion-reduce:animate-none"
+        style={{
+          width: s.size,
+          height: s.size,
+          boxShadow: `0 0 ${s.size * 3}px var(--primary)`,
+          animationDuration: `${s.duration}s`,
+          animationDelay: `${s.delay}s`,
+        }}
+      />
+    </span>
+  ));
+}
 
 function LoginPage() {
   const { user, signIn } = useAuth();
@@ -152,30 +184,19 @@ function LoginPage() {
     <main
       id="main-content"
       tabIndex={-1}
-      className="min-h-screen flex items-center justify-center bg-background p-4 sm:p-6"
+      className="relative min-h-screen flex items-center justify-center overflow-hidden bg-background p-4 sm:p-6"
     >
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0">
+        <StarField stars={PAGE_STARS} />
+      </div>
+
       <MotionConfig reducedMotion="user">
-        <div className="relative w-full max-w-md overflow-hidden rounded-2xl border border-border bg-card shadow-xl">
+        <div className="relative w-full max-w-md overflow-hidden rounded-2xl border border-white/10 bg-card/45 backdrop-blur-2xl backdrop-saturate-150 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.9),inset_0_1px_0_rgba(255,255,255,0.12),inset_0_0_0_1px_rgba(255,255,255,0.03)]">
           <div aria-hidden="true" className="pointer-events-none absolute inset-0">
             <div className="absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-primary/10 to-transparent" />
-            {STARS.map((s, i) => (
-              <span
-                key={i}
-                className="absolute"
-                style={{ left: `${s.x}%`, top: `${s.y}%`, opacity: s.opacity }}
-              >
-                <span
-                  className="block rounded-full bg-primary animate-pulse motion-reduce:animate-none"
-                  style={{
-                    width: s.size,
-                    height: s.size,
-                    boxShadow: `0 0 ${s.size * 3}px var(--primary)`,
-                    animationDuration: `${s.duration}s`,
-                    animationDelay: `${s.delay}s`,
-                  }}
-                />
-              </span>
-            ))}
+            <div className="absolute inset-0 bg-gradient-to-br from-white/[0.07] via-transparent to-white/[0.02]" />
+            <div className="absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-white/40 to-transparent" />
+            <StarField stars={CARD_STARS} />
           </div>
 
           <div className="relative p-6 sm:p-8">
