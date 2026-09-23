@@ -11,6 +11,7 @@ import { EditMediaDialog } from "@/components/workflows";
 import { withPermission } from "@/components/require-permission";
 import { useAuth } from "@/lib/auth";
 import { listCalendarEvents, type TeamCalendarEvent } from "@/lib/calendar.functions";
+import { todayDateOnly } from "@/lib/interactions/schema";
 import {
   UNMATCHED_GROUP_KEY,
   describeMatchClips,
@@ -19,6 +20,7 @@ import {
   groupClipsByMatch,
   isMissingMatchClipsSchema,
   matchLabel,
+  pickableMatches,
   type MatchClipGroup,
 } from "@/lib/match-clips";
 import {
@@ -90,12 +92,21 @@ function MatchClipsPage() {
   }, [refresh]);
 
   const clips = useMemo(() => clipsQuery.data ?? [], [clipsQuery.data]);
+  // An id missing from a loaded calendar means that fixture is gone. Until the
+  // read settles, an empty map is "not loaded yet", not "every match was deleted".
+  const calendarPending = eventsQuery.isPending;
+  const calendarFailed = eventsQuery.isLoadingError;
   const eventsById = useMemo(
     () =>
       new Map<string, TeamCalendarEvent>(
         (eventsQuery.data ?? []).map((event) => [event.id, event]),
       ),
     [eventsQuery.data],
+  );
+  const today = todayDateOnly();
+  const uploadableMatchIds = useMemo(
+    () => new Set(pickableMatches(eventsQuery.data ?? [], today).map((event) => event.id)),
+    [eventsQuery.data, today],
   );
   const allGroups = useMemo(() => groupClipsByMatch(clips, eventsById), [clips, eventsById]);
   const groups = useMemo(
@@ -164,13 +175,16 @@ function MatchClipsPage() {
     );
   const clipCount = groups.reduce((sum, group) => sum + group.clips.length, 0);
 
-  const description = clipsQuery.isLoading
-    ? "Loading…"
-    : clipsQuery.isError
-      ? "Match clips could not be loaded."
-      : narrowed
-        ? `${clipCount} ${clipCount === 1 ? "clip" : "clips"} matching filters.`
-        : describeMatchClips(allGroups);
+  const description =
+    clipsQuery.isLoading || (calendarPending && !clipsQuery.isError)
+      ? "Loading…"
+      : clipsQuery.isError
+        ? "Match clips could not be loaded."
+        : calendarFailed
+          ? "Matches could not be loaded."
+          : narrowed
+            ? `${clipCount} ${clipCount === 1 ? "clip" : "clips"} matching filters.`
+            : describeMatchClips(allGroups);
 
   return (
     <div className="space-y-5">
@@ -247,7 +261,7 @@ function MatchClipsPage() {
         )}
       </div>
 
-      {clipsQuery.isLoading ? (
+      {clipsQuery.isLoading || (calendarPending && !clipsQuery.isError) ? (
         <GroupSkeleton />
       ) : missingSchema ? (
         <Card>
@@ -267,6 +281,23 @@ function MatchClipsPage() {
               <button
                 type="button"
                 onClick={() => void clipsQuery.refetch()}
+                className="inline-flex h-9 items-center gap-1.5 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground"
+              >
+                Try again
+              </button>
+            }
+          />
+        </Card>
+      ) : calendarFailed ? (
+        <Card>
+          <EmptyState
+            icon={Filter}
+            title="Matches could not be loaded"
+            description="The calendar did not respond. Try again — clips stay linked to their fixtures, and nothing has been changed."
+            primaryAction={
+              <button
+                type="button"
+                onClick={() => void eventsQuery.refetch()}
                 className="inline-flex h-9 items-center gap-1.5 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground"
               >
                 Try again
@@ -325,7 +356,9 @@ function MatchClipsPage() {
                 />
               )}
               onAddClips={
-                can("media.upload") && group.event ? () => openUpload(group.event!.id) : undefined
+                can("media.upload") && group.event && uploadableMatchIds.has(group.event.id)
+                  ? () => openUpload(group.event!.id)
+                  : undefined
               }
             />
           ))}
