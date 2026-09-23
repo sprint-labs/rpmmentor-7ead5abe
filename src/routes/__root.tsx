@@ -6,7 +6,12 @@ import { Analytics } from "@vercel/analytics/react";
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { AppShell } from "@/components/app-shell";
-import { BootSplash, bootSplashCss, bootSplashHideScript } from "@/components/boot-splash";
+import {
+  BootSplash,
+  bootSplashCss,
+  bootSplashHideScript,
+  bootSplashSkipScript,
+} from "@/components/boot-splash";
 import { AuthProvider } from "@/lib/auth";
 import { NotificationsProvider } from "@/lib/notifications";
 import { ThemeProvider, themeInitScript } from "@/lib/theme";
@@ -105,6 +110,7 @@ function RootShell({ children }: { children: ReactNode }) {
       <head>
         <ScriptOnce>{canonicalOriginScript}</ScriptOnce>
         <ScriptOnce>{themeInitScript}</ScriptOnce>
+        <ScriptOnce>{bootSplashSkipScript}</ScriptOnce>
         <style dangerouslySetInnerHTML={{ __html: bootSplashCss }} />
         <HeadContent />
       </head>
