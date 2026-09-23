@@ -163,7 +163,9 @@ export function MatchClipUploadForm({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const dataLoading = eventsQuery.isLoading || playersQuery.isLoading;
+  // Upload needs both reads to have *succeeded*: a failed read leaves an empty
+  // list, and a clip would then be saved without its match or goalkeeper.
+  const metadataNotReady = !eventsQuery.isSuccess || !playersQuery.isSuccess;
   const batchMatch = batchMatchId ? (matchesById.get(batchMatchId) ?? null) : null;
   const batchGkId = batchMatch ? goalkeeperIdForMatch(batchMatch, players) : fallbackGkId;
   const playerName = (gkId: string | null) =>
@@ -265,7 +267,7 @@ export function MatchClipUploadForm({
 
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault();
-    if (dataLoading) return;
+    if (metadataNotReady) return;
     if (!items.length) {
       setError("Choose one or more clips to upload.");
       return;
@@ -396,6 +398,18 @@ export function MatchClipUploadForm({
         </div>
       )}
 
+      {(eventsQuery.isError || playersQuery.isError) && (
+        <div
+          role="alert"
+          className="flex items-start gap-2 rounded-md border border-red-500/20 bg-red-500/10 p-2 text-xs text-red-400"
+        >
+          <AlertCircle className="mt-0.5 size-4 shrink-0" />
+          <span>
+            {eventsQuery.isError ? "Matches" : "Goalkeepers"} could not be loaded, so clips cannot
+            be linked correctly. Close this window and try again.
+          </span>
+        </div>
+      )}
       {error && (
         <div
           role="alert"
@@ -431,7 +445,8 @@ export function MatchClipUploadForm({
             // Until the calendar loads a prefilled match cannot resolve, and
             // until the roster loads a name-only fixture cannot find its
             // goalkeeper: either way the clip would be saved without its link.
-            disabled={busy || dataLoading}
+            // A failed read blocks upload the same way.
+            disabled={busy || metadataNotReady}
             className="h-9 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground disabled:opacity-60"
           >
             {busy ? "Uploading…" : `Upload ${queuedCount} ${queuedCount === 1 ? "clip" : "clips"}`}
