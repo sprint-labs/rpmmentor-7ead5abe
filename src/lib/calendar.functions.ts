@@ -10,6 +10,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import type { Database } from "@/integrations/supabase/types";
 import { requireRole, type AppRole } from "@/lib/roles.server";
+import { readAllPages } from "@/lib/paginated-read";
 import { EVENT_TYPES, isEventType, type EventType } from "@/lib/events/follow-up";
 import {
   DEFAULT_MATCH_PARTICIPATION_STATUS,
@@ -266,14 +267,20 @@ export const listAssignableMentors = createServerFn({ method: "GET" })
 export const listCalendarEvents = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<TeamCalendarEvent[]> => {
-    const { data, error } = await context.supabase
-      .from("calendar_events")
-      .select(COLUMNS)
-      .order("event_date", { ascending: true })
-      .order("start_time", { ascending: true, nullsFirst: true })
-      .limit(1000);
-    if (error) throw new Error(error.message);
-    return (data ?? []).map(toTeamCalendarEvent);
+    // Read in pages: a single `.limit(1000)` read, ordered oldest first,
+    // would silently drop the newest fixtures once the calendar outgrew it.
+    const rows = await readAllPages<CalendarEventSelect>(async (from, to) => {
+      const { data, error } = await context.supabase
+        .from("calendar_events")
+        .select(COLUMNS)
+        .order("event_date", { ascending: true })
+        .order("start_time", { ascending: true, nullsFirst: true })
+        .order("id", { ascending: true })
+        .range(from, to);
+      if (error) throw new Error(error.message);
+      return { data: (data ?? []) as CalendarEventSelect[], error: null };
+    }, "Calendar events could not be loaded.");
+    return rows.map(toTeamCalendarEvent);
   });
 
 export const createCalendarEvent = createServerFn({ method: "POST" })
