@@ -315,6 +315,12 @@ function GkProfile({ gk, player }: { gk: Goalkeeper; player: PlayerRosterRow }) 
     return out;
   }, [last5]);
 
+  /** At least one pillar has a valid 1–5 score in the last-five report pool. */
+  const hasSkillScoreData = useMemo(
+    () => PILLAR_IDS.some((id) => pillarContributors[id].length > 0),
+    [pillarContributors],
+  );
+
   const reportRef = (r: MatchReportRow) =>
     `${r.match_date ? formatDate(r.match_date) : "undated"} · ${r.opponent?.trim() || "opponent TBC"}`;
 
@@ -524,59 +530,82 @@ function GkProfile({ gk, player }: { gk: Goalkeeper; player: PlayerRosterRow }) 
         ))}
       </div>
 
-      {/* The skill scores themselves, as stats rather than as a buried panel.
-          Each value is the stored last-5-report average already computed above
-          — nothing is recalculated or re-weighted here. */}
-      <div>
-        <div className="mb-1.5 flex items-baseline justify-between gap-2">
+      {/* Skill scores: full pillar grid when data exists; one collapsed card when not. */}
+      {isLoading ? (
+        <Card className="p-4">
           <SectionTitle>Skill Scores</SectionTitle>
-          <span className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
-            Last 5 match reports
-          </span>
+          <p className="mt-2 text-xs text-muted-foreground italic">Loading skill scores…</p>
+        </Card>
+      ) : isError ? (
+        <Card className="p-4">
+          <SectionTitle>Skill Scores</SectionTitle>
+          <p className="mt-2 text-xs text-destructive">Couldn&apos;t load skill scores.</p>
+        </Card>
+      ) : !hasSkillScoreData ? (
+        <Card className="p-4">
+          <SectionTitle>Skill Scores</SectionTitle>
+          <p className="mt-2 text-sm text-muted-foreground italic">Not enough data yet</p>
+          <p className="mt-1.5 text-[11px] text-muted-foreground leading-snug">
+            Pillar means are calculated from valid 1–5 scores across the last 5 match reports.
+          </p>
+          {can("reports.submit") ? (
+            <button
+              type="button"
+              onClick={() => setWorkflow("report")}
+              className="mt-4 h-10 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              Submit a Match Report for {gk.name}
+            </button>
+          ) : null}
+        </Card>
+      ) : (
+        <div>
+          <div className="mb-1.5 flex items-baseline justify-between gap-2">
+            <SectionTitle>Skill Scores</SectionTitle>
+            <span className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
+              Last 5 match reports
+            </span>
+          </div>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7">
+            {PILLAR_IDS.map((id) => {
+              const v = pillarAverages[id];
+              const contributors = pillarContributors[id];
+              // 4+ elite green, 3–4 yellow-green, 2–3 amber, below 2 red.
+              const tone = scoreTone(v);
+              return (
+                <Card key={id} className="px-3 py-2.5">
+                  <div
+                    className="text-[10px] uppercase leading-tight tracking-wide text-muted-foreground"
+                    title={PILLAR_LABELS[id]}
+                  >
+                    {PILLAR_SHORT_LABELS[id]}
+                  </div>
+                  <div
+                    className={cn(
+                      "mt-0.5 text-xl font-semibold tabular-nums font-mono leading-tight",
+                      tone.ink,
+                    )}
+                  >
+                    {v == null ? "—" : v.toFixed(1)}
+                    {v != null && (
+                      <span className="ml-0.5 text-xs font-normal text-muted-foreground">/5</span>
+                    )}
+                  </div>
+                  <div className="mt-1">
+                    <ProgressBar
+                      value={v != null ? (v / 5) * 100 : 0}
+                      barClassName={tone.bar}
+                    />
+                  </div>
+                  <div className="mt-1 text-[10px] text-muted-foreground">
+                    {contributors.length} of 5 scored
+                  </div>
+                </Card>
+              );
+            })}
+          </div>
         </div>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7">
-          {PILLAR_IDS.map((id) => {
-            const v = pillarAverages[id];
-            const contributors = pillarContributors[id];
-            // 4+ elite green, 3–4 yellow-green, 2–3 amber, below 2 red.
-            const tone = scoreTone(isLoading || isError ? null : v);
-            return (
-              <Card key={id} className="px-3 py-2.5">
-                <div
-                  className="text-[10px] uppercase leading-tight tracking-wide text-muted-foreground"
-                  title={PILLAR_LABELS[id]}
-                >
-                  {PILLAR_SHORT_LABELS[id]}
-                </div>
-                <div
-                  className={cn(
-                    "mt-0.5 text-xl font-semibold tabular-nums font-mono leading-tight",
-                    isLoading || isError ? "text-foreground" : tone.ink,
-                  )}
-                >
-                  {isLoading ? "…" : isError || v == null ? "—" : v.toFixed(1)}
-                  {!isLoading && !isError && v != null && (
-                    <span className="ml-0.5 text-xs font-normal text-muted-foreground">/5</span>
-                  )}
-                </div>
-                <div className="mt-1">
-                  <ProgressBar
-                    value={v != null ? (v / 5) * 100 : 0}
-                    barClassName={isLoading || isError ? undefined : tone.bar}
-                  />
-                </div>
-                <div className="mt-1 text-[10px] text-muted-foreground">
-                  {isLoading
-                    ? "Loading…"
-                    : isError
-                      ? "Unavailable"
-                      : `${contributors.length} of 5 scored`}
-                </div>
-              </Card>
-            );
-          })}
-        </div>
-      </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
         <div className="space-y-4 lg:col-span-3">
@@ -654,37 +683,9 @@ function GkProfile({ gk, player }: { gk: Goalkeeper; player: PlayerRosterRow }) 
             </div>
           </Card>
 
-          <Card className="p-4">
-            <SectionTitle>Skill Score Coverage</SectionTitle>
-            {isLoading ? (
-              <div className="text-xs text-muted-foreground italic py-2">Loading…</div>
-            ) : isError ? (
-              <div className="text-xs text-destructive py-2">Couldn't load skill scores.</div>
-            ) : gkReports.length === 0 ? (
-              <div className="space-y-1.5 py-2">
-                <div className="text-xs text-muted-foreground italic">
-                  No skill scores available
-                </div>
-                <div className="text-[11px] text-muted-foreground leading-snug">
-                  Pillar means are calculated from valid 1–5 scores across the last 5 match reports.
-                </div>
-                <Link
-                  to="/reports"
-                  search={{
-                    from: "",
-                    to: "",
-                    coach: "",
-                    mentorProfileId: "",
-                    source: "",
-                    gk: gk.name,
-                    openSubmit: "1",
-                  }}
-                  className="text-[11px] text-primary-ink hover:underline inline-flex items-center gap-0.5"
-                >
-                  Submit a Match Report for {gk.name}
-                </Link>
-              </div>
-            ) : (
+          {hasSkillScoreData && !isLoading && !isError ? (
+            <Card className="p-4">
+              <SectionTitle>Skill Score Coverage</SectionTitle>
               <div className="space-y-3">
                 <div className="text-[10px] uppercase text-muted-foreground">
                   Pool of last {last5.length} report{last5.length === 1 ? "" : "s"}:
@@ -847,8 +848,8 @@ function GkProfile({ gk, player }: { gk: Goalkeeper; player: PlayerRosterRow }) 
                   </div>
                 )}
               </div>
-            )}
-          </Card>
+            </Card>
+          ) : null}
         </div>
 
         <div className="space-y-4 lg:col-span-2">

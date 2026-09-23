@@ -22,7 +22,8 @@ vi.mock("@/lib/auth", () => ({
       title: "Test",
     },
     loading: false,
-    can: (permission: string) => permission === "goalkeepers.view",
+    can: (permission: string) =>
+      permission === "goalkeepers.view" || permission === "reports.submit",
     signIn: vi.fn(),
     signOut: vi.fn(),
     setViewAsRole: vi.fn(),
@@ -257,6 +258,18 @@ afterEach(() => {
 });
 
 describe("Goalkeeper profile page", () => {
+  it("collapses skill scores when there is no scored report data yet", async () => {
+    await renderProfile("/goalkeepers/gk-kwame-asante");
+
+    expect(await screen.findByText("Not enough data yet")).toBeTruthy();
+    expect(screen.queryByText("0 of 5 scored")).toBeNull();
+    expect(screen.queryByText("Protect Goal")).toBeNull();
+    expect(screen.queryByText("Skill Score Coverage")).toBeNull();
+    expect(
+      screen.getByRole("button", { name: /Submit a Match Report for Kwame Asante/i }),
+    ).toBeTruthy();
+  });
+
   it("resolves a goalkeeper who exists only in the live roster", async () => {
     await renderProfile("/goalkeepers/gk-kwame-asante");
 
