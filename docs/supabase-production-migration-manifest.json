@@ -10,7 +10,7 @@
     "project_ref": "zdxxezquhvpjmoxlecjp",
     "project_name": "RPM Mentor Hub",
     "region": "eu-west-2",
-    "ledger_rows": 52,
+    "ledger_rows": 53,
     "migrations": [
       {
         "version": "20260811095729",
@@ -375,6 +375,13 @@
         "statement_count": 1,
         "sql_length": 1514,
         "sql_md5": "959674c829fda25d555086e3e3d03fa6"
+      },
+      {
+        "version": "20260923033248",
+        "name": "match_clips",
+        "statement_count": 1,
+        "sql_length": 1445,
+        "sql_md5": "3663ff4ccca3baaa08ebf712b2ac8180"
       }
     ]
   },

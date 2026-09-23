@@ -789,11 +789,13 @@ export type Database = {
       }
       media_assets: {
         Row: {
+          asset_purpose: string
           created_at: string
           file_path: string
           file_size: number | null
           gk_id: string | null
           id: string
+          match_event_id: string | null
           media_type: string
           mime_type: string | null
           notes: string | null
@@ -801,16 +803,19 @@ export type Database = {
           thumbnail_path: string | null
           title: string
           updated_at: string
+          upload_batch_id: string | null
           uploaded_by_id: string | null
           uploaded_by_name: string | null
           uploaded_by_role: string | null
         }
         Insert: {
+          asset_purpose?: string
           created_at?: string
           file_path: string
           file_size?: number | null
           gk_id?: string | null
           id?: string
+          match_event_id?: string | null
           media_type: string
           mime_type?: string | null
           notes?: string | null
@@ -818,16 +823,19 @@ export type Database = {
           thumbnail_path?: string | null
           title: string
           updated_at?: string
+          upload_batch_id?: string | null
           uploaded_by_id?: string | null
           uploaded_by_name?: string | null
           uploaded_by_role?: string | null
         }
         Update: {
+          asset_purpose?: string
           created_at?: string
           file_path?: string
           file_size?: number | null
           gk_id?: string | null
           id?: string
+          match_event_id?: string | null
           media_type?: string
           mime_type?: string | null
           notes?: string | null
@@ -835,11 +843,20 @@ export type Database = {
           thumbnail_path?: string | null
           title?: string
           updated_at?: string
+          upload_batch_id?: string | null
           uploaded_by_id?: string | null
           uploaded_by_name?: string | null
           uploaded_by_role?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "media_assets_match_event_id_fkey"
+            columns: ["match_event_id"]
+            isOneToOne: false
+            referencedRelation: "calendar_events"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       media_audit_log: {
         Row: {

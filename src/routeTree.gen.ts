@@ -14,6 +14,7 @@ import { Route as SupportRouteImport } from './routes/support'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as MediaRouteImport } from './routes/media'
 import { Route as McpRouteImport } from './routes/mcp'
+import { Route as MatchClipsRouteImport } from './routes/match-clips'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as InteractionsRouteImport } from './routes/interactions'
 import { Route as InstallRouteImport } from './routes/install'
@@ -70,6 +71,11 @@ const MediaRoute = MediaRouteImport.update({
 const McpRoute = McpRouteImport.update({
   id: '/mcp',
   path: '/mcp',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MatchClipsRoute = MatchClipsRouteImport.update({
+  id: '/match-clips',
+  path: '/match-clips',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginRoute = LoginRouteImport.update({
@@ -249,6 +255,7 @@ export interface FileRoutesByFullPath {
   '/install': typeof InstallRoute
   '/interactions': typeof InteractionsRoute
   '/login': typeof LoginRoute
+  '/match-clips': typeof MatchClipsRoute
   '/mcp': typeof McpRoute
   '/media': typeof MediaRoute
   '/reset-password': typeof ResetPasswordRoute
@@ -288,6 +295,7 @@ export interface FileRoutesByTo {
   '/install': typeof InstallRoute
   '/interactions': typeof InteractionsRoute
   '/login': typeof LoginRoute
+  '/match-clips': typeof MatchClipsRoute
   '/mcp': typeof McpRoute
   '/media': typeof MediaRoute
   '/reset-password': typeof ResetPasswordRoute
@@ -328,6 +336,7 @@ export interface FileRoutesById {
   '/install': typeof InstallRoute
   '/interactions': typeof InteractionsRoute
   '/login': typeof LoginRoute
+  '/match-clips': typeof MatchClipsRoute
   '/mcp': typeof McpRoute
   '/media': typeof MediaRoute
   '/reset-password': typeof ResetPasswordRoute
@@ -369,6 +378,7 @@ export interface FileRouteTypes {
     | '/install'
     | '/interactions'
     | '/login'
+    | '/match-clips'
     | '/mcp'
     | '/media'
     | '/reset-password'
@@ -408,6 +418,7 @@ export interface FileRouteTypes {
     | '/install'
     | '/interactions'
     | '/login'
+    | '/match-clips'
     | '/mcp'
     | '/media'
     | '/reset-password'
@@ -447,6 +458,7 @@ export interface FileRouteTypes {
     | '/install'
     | '/interactions'
     | '/login'
+    | '/match-clips'
     | '/mcp'
     | '/media'
     | '/reset-password'
@@ -487,6 +499,7 @@ export interface RootRouteChildren {
   InstallRoute: typeof InstallRoute
   InteractionsRoute: typeof InteractionsRoute
   LoginRoute: typeof LoginRoute
+  MatchClipsRoute: typeof MatchClipsRoute
   McpRoute: typeof McpRoute
   MediaRoute: typeof MediaRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
@@ -548,6 +561,13 @@ declare module '@tanstack/react-router' {
       path: '/mcp'
       fullPath: '/mcp'
       preLoaderRoute: typeof McpRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/match-clips': {
+      id: '/match-clips'
+      path: '/match-clips'
+      fullPath: '/match-clips'
+      preLoaderRoute: typeof MatchClipsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/login': {
@@ -802,6 +822,7 @@ const rootRouteChildren: RootRouteChildren = {
   InstallRoute: InstallRoute,
   InteractionsRoute: InteractionsRoute,
   LoginRoute: LoginRoute,
+  MatchClipsRoute: MatchClipsRoute,
   McpRoute: McpRoute,
   MediaRoute: MediaRoute,
   ResetPasswordRoute: ResetPasswordRoute,
