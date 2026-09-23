@@ -4,6 +4,7 @@ import { cleanup, fireEvent, render, screen, within } from "@testing-library/rea
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ReactNode } from "react";
 import type { MatchReportRow } from "@/lib/match-reports/schema";
+import type { Goalkeeper } from "@/lib/mock-data";
 
 vi.mock("@tanstack/react-router", () => ({
   Link: ({
@@ -14,7 +15,19 @@ vi.mock("@tanstack/react-router", () => ({
     children: ReactNode;
     to: string;
     params?: Record<string, string>;
-  }) => <a href={params?.reportId ? to.replace("$reportId", params.reportId) : to}>{children}</a>,
+  }) => (
+    <a
+      href={
+        params?.reportId
+          ? to.replace("$reportId", params.reportId)
+          : params?.gkId
+            ? to.replace("$gkId", params.gkId)
+            : to
+      }
+    >
+      {children}
+    </a>
+  ),
 }));
 
 import { MatchReportWorkbench } from "@/components/match-report-workbench";
@@ -188,5 +201,51 @@ describe("MatchReportWorkbench", () => {
     expect(screen.getByText("3")).toBeTruthy();
     // Average is taken from the two scored reports only: (3.43 + 2.90) / 2.
     expect(screen.getByText("3.17")).toBeTruthy();
+  });
+
+  it("names the top-rated goalkeeper and splits the period by rating band", () => {
+    render(<MatchReportWorkbench reports={reports} periodLabel="2026-08-26 → 2026-09-08" />);
+
+    expect(screen.getByText("2026-08-26 → 2026-09-08")).toBeTruthy();
+    expect(screen.getByText("Top rated")).toBeTruthy();
+    // 3.43 beats 2.90: the tile names him and his rounded score.
+    expect(screen.getByText("3.4").className).toContain("text-rating-strong");
+    expect(screen.getByText("Strong 1")).toBeTruthy();
+    expect(screen.getByText("Average 1")).toBeTruthy();
+    expect(screen.getByText("Elite 0")).toBeTruthy();
+  });
+
+  it("shows the goalkeeper's photo, tier and profile when the roster knows him", () => {
+    const roster = [
+      {
+        id: "gk-lawrence-vigouroux",
+        name: "Lawrence Vigouroux",
+        tier: "Tier 2",
+        tags: [],
+        profileImage: "/players/lawrence-vigouroux.webp",
+      } as unknown as Goalkeeper,
+    ];
+    render(
+      <MatchReportWorkbench
+        reports={reports}
+        periodLabel="2026-08-26 → 2026-09-08"
+        goalkeepers={roster}
+      />,
+    );
+
+    const detail = within(detailPanel());
+    expect(detail.getByRole("img", { name: "Lawrence Vigouroux portrait" })).toBeTruthy();
+    expect(detail.getByText("Tier 2")).toBeTruthy();
+    expect(detail.getByText("Strong")).toBeTruthy();
+    expect(detail.getByRole("link", { name: "Goalkeeper profile" }).getAttribute("href")).toBe(
+      "/goalkeepers/gk-lawrence-vigouroux",
+    );
+
+    // Off the roster: initials, no tier, no profile link — nothing invented.
+    fireEvent.click(screen.getByRole("button", { name: /Show details for Alfie Smith/ }));
+    const other = within(detailPanel());
+    expect(other.queryByRole("img")).toBeNull();
+    expect(other.queryByText(/^Tier/)).toBeNull();
+    expect(other.queryByRole("link", { name: "Goalkeeper profile" })).toBeNull();
   });
 });

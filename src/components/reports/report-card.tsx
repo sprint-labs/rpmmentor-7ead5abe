@@ -27,74 +27,10 @@ import { ClubCrest, clubRail } from "@/components/club-crest";
 import { TierBadge } from "@/components/primitives";
 import { scoreTone } from "@/lib/score-band";
 import { cn } from "@/lib/utils";
-import { PILLAR_IDS, type MatchReportRow, type PillarId } from "@/lib/match-reports/schema";
+import { PILLAR_IDS, type MatchReportRow } from "@/lib/match-reports/schema";
+import { PillarBar } from "@/components/reports/report-visuals";
+import { fixtureOf, formatMatchDate } from "@/lib/match-reports/report-display";
 import type { Goalkeeper } from "@/lib/mock-data";
-
-/**
- * Pillar names short enough to sit above a five-pip bar.
- *
- * `PILLAR_LABELS` is the formal wording ("Courage / Control / Intelligent /
- * Competitor") and stays the label on the report itself. At card width it
- * would wrap to four lines, so these are the same seven in one word each.
- */
-const SHORT_PILLAR: Record<PillarId, string> = {
-  protect_goal: "Goal",
-  protect_space: "Space",
-  protect_air: "Air",
-  control_play: "Control",
-  change_play: "Change",
-  psych: "Mental",
-  physical: "Physical",
-};
-
-const PIPS = [1, 2, 3, 4, 5];
-
-/**
- * A match date a person would say out loud.
- *
- * Parsed into local parts rather than through `new Date(iso)`, which reads a
- * date-only value as UTC midnight and moves it to the previous day for anyone
- * west of UTC.
- */
-function formatMatchDate(iso: string | null): string {
-  if (!iso) return "Date not recorded";
-  const [year, month, day] = iso.split("-").map(Number);
-  if (!year || !month || !day) return iso;
-  return new Date(year, month - 1, day).toLocaleDateString("en-GB", {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
-}
-
-/** One pillar: its name, a five-pip bar, and the score as a numeral. */
-function PillarBar({ id, score }: { id: PillarId; score: number | null }) {
-  const tone = scoreTone(score);
-  return (
-    <div className="min-w-0">
-      <div className="flex items-baseline justify-between gap-1">
-        <span className="truncate text-[9px] uppercase tracking-wider text-muted-foreground">
-          {SHORT_PILLAR[id]}
-        </span>
-        <span className={cn("font-mono text-[10px] font-bold tabular-nums", tone.ink)}>
-          {score ?? "—"}
-        </span>
-      </div>
-      <div aria-hidden="true" className="mt-1 flex gap-0.5">
-        {PIPS.map((pip) => (
-          <span
-            key={pip}
-            className={cn(
-              "h-1 flex-1 rounded-sm",
-              score != null && pip <= score ? tone.bar : "bg-border",
-            )}
-          />
-        ))}
-      </div>
-    </div>
-  );
-}
 
 export function ReportCard({
   report,
@@ -109,7 +45,7 @@ export function ReportCard({
   onLogInteraction: () => void;
 }) {
   const average = scoreTone(report.average);
-  const fixture = [report.team, report.opponent].filter(Boolean).join(" v ");
+  const fixture = fixtureOf(report.team, report.opponent);
 
   return (
     <article className="group relative flex flex-col overflow-hidden rounded-lg border border-border bg-card transition-colors hover:border-primary/40">

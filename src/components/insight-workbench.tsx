@@ -16,6 +16,10 @@ export interface WorkbenchTile {
   valueClassName?: string;
   /** Big mono figure (a count or score) rather than a plain line of text. */
   mono?: boolean;
+  /** A small line under the value, e.g. the period or a pip bar. */
+  caption?: ReactNode;
+  /** A CSS colour for a thin bar along the tile's top edge. */
+  accent?: string;
 }
 
 export interface WorkbenchFilterSpec<T> {
@@ -30,6 +34,8 @@ export interface WorkbenchFilterSpec<T> {
 
 export interface WorkbenchRowContent {
   initials: string;
+  /** Replaces the initials avatar, e.g. with a club crest. Decorative. */
+  leading?: ReactNode;
   title: string;
   subtitle: string;
   /** Middle column — hidden until xl, where there is room for it. */
@@ -43,9 +49,13 @@ export interface WorkbenchRowContent {
   rightTop?: string;
   rightTopClassName?: string;
   rightBottom?: string;
+  /** Extra decoration under the right-hand figures, e.g. a score strip. */
+  rightExtra?: ReactNode;
 }
 
 export interface WorkbenchDetailHeader {
+  /** Shown before the heading, e.g. the goalkeeper's portrait. */
+  leading?: ReactNode;
   title: string;
   subtitle: string;
   /** Optional figure shown large to the right of the heading. */
@@ -164,12 +174,19 @@ export function InsightWorkbench<T>({
         {summaryTiles.map((tile, index) => (
           <div
             key={tile.label}
-            className={`px-4 py-3 ${
+            className={`relative min-w-0 px-4 py-3 ${
               index === summaryTiles.length - 1
                 ? ""
                 : "border-b border-border sm:border-b-0 sm:border-r"
             }`}
           >
+            {tile.accent ? (
+              <span
+                aria-hidden="true"
+                className="absolute inset-x-0 top-0 h-0.5"
+                style={{ backgroundColor: tile.accent }}
+              />
+            ) : null}
             <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
               {tile.label}
             </div>
@@ -180,6 +197,9 @@ export function InsightWorkbench<T>({
             >
               {tile.value}
             </div>
+            {tile.caption ? (
+              <div className="mt-1.5 text-[11px] text-muted-foreground">{tile.caption}</div>
+            ) : null}
           </div>
         ))}
       </div>
@@ -260,7 +280,7 @@ export function InsightWorkbench<T>({
                   >
                     <span className="flex min-w-0 items-center gap-2.5">
                       <span aria-hidden="true">
-                        <Avatar initials={row.initials} size={28} />
+                        {row.leading ?? <Avatar initials={row.initials} size={28} />}
                       </span>
                       <span className="min-w-0">
                         <span className="block truncate text-xs font-semibold">{row.title}</span>
@@ -294,6 +314,7 @@ export function InsightWorkbench<T>({
                           {row.rightBottom}
                         </span>
                       ) : null}
+                      {row.rightExtra}
                     </span>
                   </button>
                 );
@@ -315,16 +336,19 @@ export function InsightWorkbench<T>({
                 Showing details for {header.title}
               </p>
               <div className="flex min-w-0 items-start justify-between gap-4">
-                <div className="min-w-0">
-                  <h2
-                    ref={detailHeadingRef}
-                    id={headingId}
-                    tabIndex={-1}
-                    className="break-words text-xl font-semibold tracking-tight"
-                  >
-                    {header.title}
-                  </h2>
-                  <p className="mt-1 text-xs text-muted-foreground">{header.subtitle}</p>
+                <div className="flex min-w-0 items-center gap-4">
+                  {header.leading}
+                  <div className="min-w-0">
+                    <h2
+                      ref={detailHeadingRef}
+                      id={headingId}
+                      tabIndex={-1}
+                      className="break-words text-xl font-semibold tracking-tight"
+                    >
+                      {header.title}
+                    </h2>
+                    <p className="mt-1 text-xs text-muted-foreground">{header.subtitle}</p>
+                  </div>
                 </div>
                 {header.rightValue ? (
                   <div className="shrink-0 text-right">

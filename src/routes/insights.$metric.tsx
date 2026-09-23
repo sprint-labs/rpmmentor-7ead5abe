@@ -169,7 +169,8 @@ function InsightDrilldown() {
   const players = useQuery({
     queryKey: ["players"],
     queryFn: () => fetchPlayers(),
-    enabled: enabled && (active === "goalkeepers" || active === "duty"),
+    // Match Reports reads it too, for each goalkeeper's photo and tier.
+    enabled: enabled && (active === "goalkeepers" || active === "duty" || active === "reports"),
     staleTime: 30_000,
   });
   const users = useQuery({
@@ -332,7 +333,13 @@ function InsightDrilldown() {
             if (reports.isLoading) return <Empty label="Loading…" />;
             if (reports.isError) return <Empty label="Reports unavailable" />;
             if (rows.length === 0) return <Empty label="No reports in this window" />;
-            return <MatchReportWorkbench reports={rows} periodLabel={periodLabel} />;
+            return (
+              <MatchReportWorkbench
+                reports={rows}
+                periodLabel={periodLabel}
+                goalkeepers={toGoalkeepers(players.data)}
+              />
+            );
           })()}
 
         {active === "mentors" &&

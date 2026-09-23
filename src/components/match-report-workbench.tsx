@@ -1,8 +1,17 @@
 import { Link } from "@tanstack/react-router";
-import { ArrowRight } from "lucide-react";
+import { useMemo } from "react";
+import { ArrowRight, Quote, Target, TrendingUp, UserRound } from "lucide-react";
 import { InsightWorkbench } from "@/components/insight-workbench";
-import { DetailFact } from "@/components/workbench-primitives";
+import { ClubCrest } from "@/components/club-crest";
+import { TierBadge } from "@/components/primitives";
+import { PipBar, PlayerPortrait, ScoreBandChip } from "@/components/reports/report-visuals";
+import { BAND_COLOR, BAND_LABEL, SHORT_PILLAR } from "@/lib/match-reports/report-display";
 import { initialsOf } from "@/lib/initials";
+import { normalisePersonName } from "@/lib/goalkeeper-player-link";
+import { isValidScore, pillarStandouts } from "@/lib/match-reports/goalkeeper-form";
+import { scoreTone, type ScoreBand } from "@/lib/score-band";
+import { cn } from "@/lib/utils";
+import type { Goalkeeper } from "@/lib/mock-data";
 import {
   PILLAR_IDS,
   PILLAR_LABELS,
@@ -13,6 +22,11 @@ import {
 interface MatchReportWorkbenchProps {
   reports: MatchReportRow[];
   periodLabel: string;
+  /**
+   * The live roster, for each goalkeeper's photo and tier. Optional: without
+   * it the pane falls back to initials and simply leaves the tier off.
+   */
+  goalkeepers?: Goalkeeper[];
 }
 
 /** "2026-09-05" -> "05 Sept 2026"; anything unparseable is shown as-is. */
@@ -35,41 +49,114 @@ function fixtureLabel(report: MatchReportRow): string {
   return home || away || "Fixture not recorded";
 }
 
+/** Bands in ramp order, for the score-spread bar. */
+const SPREAD_BANDS: ScoreBand[] = ["high", "good", "fair", "low"];
+
 /**
- * Scores run 1–5. Anything at 3.5+ reads as a strong outing, below 2.5 as one
- * that needs attention; the middle band stays neutral so the list isn't a wall
- * of colour.
+ * The period's reports as one bar split by rating band, so the mix of good and
+ * hard days reads before any number does.
  */
-function scoreTone(score: number | null | undefined): string {
-  if (score == null) return "text-muted-foreground";
-  if (score >= 3.5) return "text-success";
-  if (score < 2.5) return "text-warning";
-  return "text-foreground";
+function ScoreSpread({ reports }: { reports: MatchReportRow[] }) {
+  const counts = SPREAD_BANDS.map((band) => ({
+    band,
+    count: reports.filter(
+      (report) => isValidScore(report.average) && scoreTone(report.average).band === band,
+    ).length,
+  }));
+  const total = counts.reduce((sum, { count }) => sum + count, 0);
+  if (total === 0) return <span className="text-muted-foreground">No scored reports</span>;
+  return (
+    <div>
+      <div className="flex h-2 overflow-hidden rounded-full bg-border" aria-hidden="true">
+        {counts.map(({ band, count }) =>
+          count > 0 ? (
+            <span
+              key={band}
+              style={{ width: `${(count / total) * 100}%`, backgroundColor: BAND_COLOR[band] }}
+            />
+          ) : null,
+        )}
+      </div>
+      <ul className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px] font-normal text-muted-foreground">
+        {counts.map(({ band, count }) => (
+          <li key={band} className="inline-flex items-center gap-1">
+            <span
+              aria-hidden="true"
+              className="size-1.5 rounded-full"
+              style={{ backgroundColor: BAND_COLOR[band] }}
+            />
+            {`${BAND_LABEL[band]} ${count}`}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
 }
 
-function PillarScore({ pillar, score }: { pillar: PillarId; score: number | null }) {
-  const filled = score ?? 0;
+/** Seven slim bars, one per pillar, as tall as the score. Decorative. */
+function PillarStrip({ report }: { report: MatchReportRow }) {
   return (
-    <li className="flex items-center gap-3">
-      <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
-        {PILLAR_LABELS[pillar]}
-      </span>
-      <span className="flex shrink-0 items-center gap-1" aria-hidden="true">
-        {[1, 2, 3, 4, 5].map((step) => (
+    <span aria-hidden="true" className="mt-1.5 flex h-3.5 items-end justify-end gap-0.5">
+      {PILLAR_IDS.map((id) => {
+        const score = report.scores[id];
+        return (
           <span
-            key={step}
-            className={`h-1.5 w-4 rounded-sm ${step <= filled ? "bg-primary" : "bg-border"}`}
+            key={id}
+            className={cn(
+              "w-1.5 rounded-[2px]",
+              isValidScore(score) ? scoreTone(score).bar : "bg-border",
+            )}
+            style={{ height: `${isValidScore(score) ? (score / 5) * 100 : 20}%` }}
           />
-        ))}
-      </span>
-      <span className="w-8 shrink-0 text-right font-mono text-xs font-semibold tabular-nums">
-        {score != null ? `${score}/5` : "—"}
-      </span>
+        );
+      })}
+    </span>
+  );
+}
+
+function PillarTile({ pillar, score }: { pillar: PillarId; score: number | null }) {
+  const tone = scoreTone(score);
+  return (
+    <li className="rounded-lg border border-border bg-card px-3 py-2.5">
+      <div className="flex items-start justify-between gap-3">
+        <span className="min-w-0 text-xs leading-snug text-muted-foreground">
+          {PILLAR_LABELS[pillar]}
+        </span>
+        <span className={cn("shrink-0 font-mono text-sm font-bold tabular-nums", tone.ink)}>
+          {score != null ? `${score}/5` : "—"}
+        </span>
+      </div>
+      <PipBar score={score} className="mt-2 gap-1" pipClassName="h-1.5" />
     </li>
   );
 }
 
-export function MatchReportWorkbench({ reports, periodLabel }: MatchReportWorkbenchProps) {
+function Fact({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="min-w-0">
+      <dt className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
+        {label}
+      </dt>
+      <dd className="mt-1 flex min-w-0 items-center gap-2 break-words text-sm text-foreground">
+        {children}
+      </dd>
+    </div>
+  );
+}
+
+export function MatchReportWorkbench({
+  reports,
+  periodLabel,
+  goalkeepers = [],
+}: MatchReportWorkbenchProps) {
+  const rosterByName = useMemo(() => {
+    const index = new Map<string, Goalkeeper>();
+    for (const gk of goalkeepers) index.set(normalisePersonName(gk.name), gk);
+    return index;
+  }, [goalkeepers]);
+  const goalkeeperOf = (report: MatchReportRow) =>
+    rosterByName.get(normalisePersonName(report.goalkeeper));
+
   return (
     <InsightWorkbench<MatchReportRow>
       items={reports}
@@ -110,10 +197,17 @@ export function MatchReportWorkbench({ reports, periodLabel }: MatchReportWorkbe
         const average = scored.length
           ? scored.reduce((total, report) => total + (report.average ?? 0), 0) / scored.length
           : null;
+        const averageTone = scoreTone(average);
+        const top = scored.reduce<MatchReportRow | null>(
+          (best, report) => (!best || (report.average ?? 0) > (best.average ?? 0) ? report : best),
+          null,
+        );
+        const topTone = scoreTone(top?.average);
         return [
           {
             label: "Reports",
             mono: true,
+            accent: "var(--primary)",
             value: (
               <>
                 {visible.length}
@@ -124,13 +218,36 @@ export function MatchReportWorkbench({ reports, periodLabel }: MatchReportWorkbe
                 ) : null}
               </>
             ),
+            caption: periodLabel,
           },
-          { label: "Period", value: periodLabel },
           {
             label: "Average score",
             mono: true,
-            valueClassName: scoreTone(average),
+            accent: BAND_COLOR[averageTone.band],
+            valueClassName: averageTone.ink,
             value: average != null ? average.toFixed(2) : "—",
+            caption: <PipBar score={average} className="w-28 gap-1" pipClassName="h-1" />,
+          },
+          {
+            label: "Top rated",
+            accent: BAND_COLOR[topTone.band],
+            value: top ? (
+              <span className="block truncate font-display font-bold">{top.goalkeeper}</span>
+            ) : (
+              "—"
+            ),
+            caption: top ? (
+              <span className="flex min-w-0 items-center gap-1.5">
+                <span className={cn("font-mono font-bold tabular-nums", topTone.ink)}>
+                  {top.average?.toFixed(1)}
+                </span>
+                <span className="truncate">{fixtureLabel(top)}</span>
+              </span>
+            ) : undefined,
+          },
+          {
+            label: "Score spread",
+            value: <ScoreSpread reports={visible} />,
           },
         ];
       }}
@@ -139,6 +256,7 @@ export function MatchReportWorkbench({ reports, periodLabel }: MatchReportWorkbe
       }
       rowOf={(report) => ({
         initials: initialsOf(report.goalkeeper),
+        leading: <ClubCrest club={report.team} size="sm" />,
         title: report.goalkeeper,
         subtitle: fixtureLabel(report),
         middleTop: report.coach || "Mentor not recorded",
@@ -147,61 +265,130 @@ export function MatchReportWorkbench({ reports, periodLabel }: MatchReportWorkbe
           report.comments.trim() || report.competition?.trim() || "No comments recorded",
         middleBottomHighlighted: Boolean(report.comments.trim()),
         rightTop: report.average != null ? report.average.toFixed(2) : "—",
-        rightTopClassName: `text-sm font-semibold ${scoreTone(report.average)}`,
+        rightTopClassName: cn("text-sm font-bold", scoreTone(report.average).ink),
         rightBottom: formatMatchDate(report.match_date),
+        rightExtra: <PillarStrip report={report} />,
       })}
-      detailHeader={(report) => ({
-        title: report.goalkeeper,
-        subtitle: `${fixtureLabel(report)} · ${formatMatchDate(report.match_date)}`,
-        rightValue: report.average != null ? report.average.toFixed(2) : "—",
-        rightValueClassName: scoreTone(report.average),
-        rightLabel: "Av score",
-      })}
-      renderDetail={(report) => (
-        <>
-          <dl className="mt-5 grid grid-cols-1 gap-x-5 gap-y-3 sm:grid-cols-2">
-            <DetailFact label="Mentor" value={report.coach || "Not recorded"} />
-            <DetailFact label="Team" value={report.team?.trim() || "Not recorded"} />
-            <DetailFact label="Opponent" value={report.opponent?.trim() || "Not recorded"} />
-            <DetailFact label="Competition" value={report.competition?.trim() || "Not recorded"} />
-            <DetailFact label="Match date" value={formatMatchDate(report.match_date)} />
-          </dl>
+      detailHeader={(report) => {
+        const gk = goalkeeperOf(report);
+        return {
+          leading: (
+            <PlayerPortrait
+              name={report.goalkeeper}
+              imageUrl={gk?.profileImage}
+              club={report.team}
+              size={64}
+            />
+          ),
+          title: report.goalkeeper,
+          subtitle: `${fixtureLabel(report)} · ${formatMatchDate(report.match_date)}`,
+          rightValue: report.average != null ? report.average.toFixed(2) : "—",
+          rightValueClassName: scoreTone(report.average).ink,
+          rightLabel: "Av score",
+        };
+      }}
+      renderDetail={(report) => {
+        const gk = goalkeeperOf(report);
+        const { strongest, focus } = pillarStandouts(report.scores);
+        return (
+          <>
+            <div className="mt-4 flex flex-wrap items-center gap-2">
+              <ScoreBandChip score={report.average} />
+              {gk ? <TierBadge tier={gk.tier} /> : null}
+              {strongest ? (
+                <span className="inline-flex items-center gap-1 rounded border border-border px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                  <TrendingUp className="size-3 text-success" aria-hidden="true" />
+                  Best: {SHORT_PILLAR[strongest.id]}
+                </span>
+              ) : null}
+              {focus ? (
+                <span className="inline-flex items-center gap-1 rounded border border-border px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                  <Target className="size-3 text-warning" aria-hidden="true" />
+                  Work on: {SHORT_PILLAR[focus.id]}
+                </span>
+              ) : null}
+            </div>
 
-          <section className="mt-5" aria-labelledby="selected-report-pillars">
-            <h3
-              id="selected-report-pillars"
-              className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground"
+            <dl className="mt-4 grid grid-cols-2 gap-x-5 gap-y-3 rounded-lg border border-border bg-card p-3.5 sm:grid-cols-3">
+              <Fact label="Mentor">
+                <UserRound className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
+                <span className="min-w-0 truncate">{report.coach || "Not recorded"}</span>
+              </Fact>
+              <Fact label="Team">
+                <ClubCrest club={report.team} size="sm" className="size-6 text-[8px]" />
+                <span className="min-w-0 truncate">{report.team?.trim() || "Not recorded"}</span>
+              </Fact>
+              <Fact label="Opponent">
+                <ClubCrest club={report.opponent} size="sm" className="size-6 text-[8px]" />
+                <span className="min-w-0 truncate">
+                  {report.opponent?.trim() || "Not recorded"}
+                </span>
+              </Fact>
+              <Fact label="Competition">
+                <span className="min-w-0 truncate">
+                  {report.competition?.trim() || "Not recorded"}
+                </span>
+              </Fact>
+              <Fact label="Match date">
+                <span className="min-w-0 truncate">{formatMatchDate(report.match_date)}</span>
+              </Fact>
+            </dl>
+
+            <section className="mt-5" aria-labelledby="selected-report-pillars">
+              <h3
+                id="selected-report-pillars"
+                className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground"
+              >
+                RPM pillar scores
+              </h3>
+              <ul className="mt-3 grid gap-2 sm:grid-cols-2">
+                {PILLAR_IDS.map((pillar) => (
+                  <PillarTile key={pillar} pillar={pillar} score={report.scores[pillar] ?? null} />
+                ))}
+              </ul>
+            </section>
+
+            <section
+              className="relative mt-5 overflow-hidden rounded-lg border border-border bg-card p-4"
+              aria-labelledby="selected-report-comments"
             >
-              RPM pillar scores
-            </h3>
-            <ul className="mt-3 space-y-2.5">
-              {PILLAR_IDS.map((pillar) => (
-                <PillarScore key={pillar} pillar={pillar} score={report.scores[pillar] ?? null} />
-              ))}
-            </ul>
-          </section>
+              <span aria-hidden="true" className="absolute inset-y-0 left-0 w-0.5 bg-primary" />
+              <Quote
+                aria-hidden="true"
+                className="pointer-events-none absolute right-3 top-3 size-8 text-primary-ink/20"
+              />
+              <h3
+                id="selected-report-comments"
+                className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground"
+              >
+                Mentor's verdict
+              </h3>
+              <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-relaxed text-foreground/90">
+                {report.comments || "No comments recorded."}
+              </p>
+            </section>
 
-          <section className="mt-5" aria-labelledby="selected-report-comments">
-            <h3
-              id="selected-report-comments"
-              className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground"
-            >
-              Comments
-            </h3>
-            <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-relaxed text-foreground/90">
-              {report.comments || "No comments recorded."}
-            </p>
-          </section>
-
-          <Link
-            to="/reports/$reportId"
-            params={{ reportId: report.report_id }}
-            className="mt-5 inline-flex min-h-10 items-center gap-1.5 rounded-md border border-border px-3 text-xs font-medium hover:bg-accent/40"
-          >
-            Open full report <ArrowRight className="size-3.5" aria-hidden="true" />
-          </Link>
-        </>
-      )}
+            <div className="mt-5 flex flex-wrap gap-2">
+              <Link
+                to="/reports/$reportId"
+                params={{ reportId: report.report_id }}
+                className="inline-flex min-h-10 items-center gap-1.5 rounded-md bg-primary px-4 text-xs font-semibold text-primary-foreground hover:bg-primary/90"
+              >
+                Open full report <ArrowRight className="size-3.5" aria-hidden="true" />
+              </Link>
+              {gk ? (
+                <Link
+                  to="/goalkeepers/$gkId"
+                  params={{ gkId: gk.id }}
+                  className="inline-flex min-h-10 items-center gap-1.5 rounded-md border border-border px-3 text-xs font-medium hover:bg-accent/40"
+                >
+                  Goalkeeper profile
+                </Link>
+              ) : null}
+            </div>
+          </>
+        );
+      }}
       noMatchLabel="No match reports match these filters."
       placeholder="Select a match report to review its complete record."
     />
