@@ -46,11 +46,6 @@ function formatDay(value: string | null | undefined): string {
 // Total Goalkeepers
 // ---------------------------------------------------------------------------
 
-function loanLabel(player: PlayerRosterRow): string {
-  if (!player.on_loan) return "Not on loan";
-  return player.parent_club ? `On loan from ${player.parent_club}` : "On loan";
-}
-
 /** The option shown for, and filtered by, a player with no tier recorded. */
 export const NO_TIER_LABEL = "No tier";
 
@@ -212,14 +207,9 @@ export function PlayerRecordWorkbench({
         title: player.full_name,
         subtitle: player.current_club || "Club not recorded",
         middleTop: player.league || "League not recorded",
-        middleBottom: player.tier?.trim()
-          ? player.on_loan
-            ? loanLabel(player)
-            : player.nationality || "—"
-          : NO_TIER_LABEL,
-        // An untiered goalkeeper carries no duty-of-care obligation until one
-        // is assigned, so it outranks the loan flag for attention.
-        middleBottomHighlighted: !player.tier?.trim() || player.on_loan,
+        middleBottom: player.tier?.trim() ? player.nationality || "—" : NO_TIER_LABEL,
+        // An untiered goalkeeper carries no duty-of-care obligation until one is assigned.
+        middleBottomHighlighted: !player.tier?.trim(),
         rightTop: tierLabel(player),
         rightTopClassName: player.tier?.trim() ? "" : "text-warning",
         rightBottom: player.contract_until ? `to ${player.contract_until}` : undefined,
@@ -236,16 +226,7 @@ export function PlayerRecordWorkbench({
           <dl className="mt-5 grid grid-cols-1 gap-x-5 gap-y-3 sm:grid-cols-2">
             <DetailFact label="Club" value={player.current_club || "Not recorded"} />
             <DetailFact label="League" value={player.league || "Not recorded"} />
-            <DetailFact
-              label="Loan status"
-              value={
-                player.on_loan ? (
-                  <span className="text-warning">{loanLabel(player)}</span>
-                ) : (
-                  "Not on loan"
-                )
-              }
-            />
+            <DetailFact label="Loan status" value={player.on_loan ? "On loan" : "Not on loan"} />
             <DetailFact label="Parent club" value={player.parent_club || "Not recorded"} />
             <DetailFact label="Nationality" value={player.nationality || "Not recorded"} />
             <DetailFact label="Contract until" value={player.contract_until || "Not recorded"} />
