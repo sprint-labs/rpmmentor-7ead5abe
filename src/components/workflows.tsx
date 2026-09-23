@@ -66,7 +66,7 @@ import {
   saveInteractionDraft,
 } from "@/lib/interactions/draft-store";
 
-import { refreshInteractionViews } from "@/lib/query-refresh";
+import { refreshClubDependentViews, refreshInteractionViews } from "@/lib/query-refresh";
 import { useAuth, type SessionUser } from "@/lib/auth";
 import { createSupportThread } from "@/lib/support.functions";
 import {
@@ -3636,7 +3636,11 @@ export function GoalkeeperForm({ onDone }: { onDone: () => void }) {
     setBusy(true);
     try {
       const row = await saveFn({ data: form });
-      await queryClient.invalidateQueries({ queryKey: ["players"] });
+      // Roster lists, dashboard totals, and the distribution panel all count this insert.
+      await Promise.all([
+        refreshClubDependentViews(queryClient, row.id),
+        queryClient.invalidateQueries({ queryKey: ["roster-snapshot"] }),
+      ]);
       setSaved(row.full_name);
     } catch (err) {
       setError(err instanceof Error ? err.message : "The goalkeeper could not be added.");
