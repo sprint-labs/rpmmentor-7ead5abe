@@ -15,7 +15,12 @@ import {
   RotateCcw,
 } from "lucide-react";
 import { goalkeepers } from "@/lib/mock-data";
-import { listPlayers, type PlayerRosterRow } from "@/lib/players.functions";
+import {
+  createPlayer,
+  listPlayers,
+  type PlayerCreateInput,
+  type PlayerRosterRow,
+} from "@/lib/players.functions";
 import { goalkeeperByName } from "@/lib/roster/goalkeeper-profile";
 import { COMPETITIONS } from "@/lib/competitions";
 import {
@@ -3586,70 +3591,188 @@ function EditMediaForm({ asset, onDone }: { asset: MediaAsset; onDone: () => voi
   );
 }
 
-function GoalkeeperForm({ onDone }: { onDone: () => void }) {
-  const [done, setDone] = useState(false);
-  if (done) return <Submitted message="Goalkeeper added to the database." onDone={onDone} />;
+const GOALKEEPER_TIER_OPTIONS = ["", "Tier 1", "Tier 2", "Tier 3", "Tier 4"] as const;
+
+const EMPTY_GOALKEEPER: PlayerCreateInput = {
+  fullName: "",
+  currentClub: "",
+  parentClub: "",
+  onLoan: false,
+  league: "",
+  nationality: "",
+  instagramUrl: "",
+  contractUntil: "",
+  tier: "",
+  isAcademy: false,
+  isFreeAgent: false,
+};
+
+/**
+ * Adds a goalkeeper to the live roster through `createPlayer`.
+ *
+ * Only fields `public.players` actually stores are offered. Date of birth and
+ * height have no column yet, so asking for them would throw the answer away.
+ */
+export function GoalkeeperForm({ onDone }: { onDone: () => void }) {
+  const queryClient = useQueryClient();
+  const saveFn = useServerFn(createPlayer);
+  const [form, setForm] = useState<PlayerCreateInput>(EMPTY_GOALKEEPER);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [saved, setSaved] = useState<string | null>(null);
+
+  if (saved) return <Submitted message={`${saved} added to the roster.`} onDone={onDone} />;
+
+  const set = <K extends keyof PlayerCreateInput>(key: K, value: PlayerCreateInput[K]) =>
+    setForm((current) => ({ ...current, [key]: value }));
+
+  const onSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    if (!form.fullName.trim()) {
+      setError("Full name is required.");
+      return;
+    }
+    setBusy(true);
+    try {
+      const row = await saveFn({ data: form });
+      await queryClient.invalidateQueries({ queryKey: ["players"] });
+      setSaved(row.full_name);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "The goalkeeper could not be added.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
-    <form
-      onSubmit={(e) => {
-        e.preventDefault();
-        setDone(true);
-      }}
-      className="space-y-4"
-    >
+    <form onSubmit={onSubmit} className="space-y-4" aria-label="Add goalkeeper form">
       <div className="grid grid-cols-2 gap-3">
-        <Field label="Full Name">
-          <input className={inputCls} placeholder="e.g. Aiden Walsh" required />
-        </Field>
-        <Field label="Date of Birth">
-          <input type="date" className={inputCls} />
+        <Field label="Full Name" required>
+          <input
+            aria-label="Full Name"
+            className={inputCls}
+            placeholder="e.g. Aiden Walsh"
+            value={form.fullName}
+            onChange={(e) => set("fullName", e.target.value)}
+            required
+          />
         </Field>
         <Field label="Nationality">
-          <input className={inputCls} placeholder="e.g. Ireland" />
+          <input
+            aria-label="Nationality"
+            className={inputCls}
+            placeholder="e.g. Ireland"
+            value={form.nationality}
+            onChange={(e) => set("nationality", e.target.value)}
+          />
         </Field>
         <Field label="Club">
-          <input className={inputCls} placeholder="e.g. Shamrock Rovers" />
+          <input
+            aria-label="Club"
+            className={inputCls}
+            placeholder="e.g. Shamrock Rovers"
+            value={form.currentClub}
+            onChange={(e) => set("currentClub", e.target.value)}
+          />
         </Field>
         <Field label="League">
-          <input className={inputCls} placeholder="e.g. League of Ireland" />
+          <input
+            aria-label="League"
+            className={inputCls}
+            placeholder="e.g. League of Ireland"
+            value={form.league}
+            onChange={(e) => set("league", e.target.value)}
+          />
         </Field>
-        <Field label="Height">
-          <input className={inputCls} placeholder="e.g. 192cm" />
-        </Field>
-        <Field label="Status">
-          <select className={selectCls}>
-            {["Tier 1", "Tier 2", "Tier 3", "Tier 4", "Academy", "Free Agent"].map((t) => (
-              <option key={t}>{t}</option>
-            ))}
-          </select>
+        <Field label="Parent Club">
+          <input
+            aria-label="Parent Club"
+            className={inputCls}
+            placeholder="Only if on loan"
+            value={form.parentClub ?? ""}
+            onChange={(e) => set("parentClub", e.target.value)}
+          />
         </Field>
         <Field label="Contract Until">
-          <input type="date" className={inputCls} />
+          <input
+            aria-label="Contract Until"
+            className={inputCls}
+            placeholder="e.g. June 2027"
+            value={form.contractUntil ?? ""}
+            onChange={(e) => set("contractUntil", e.target.value)}
+          />
         </Field>
-        <Field label="Recommendation">
-          <select className={selectCls}>
-            {["Monitor", "Sign", "Loan", "Develop", "Retain", "Pass"].map((t) => (
-              <option key={t}>{t}</option>
+        <Field label="Tier">
+          <select
+            aria-label="Tier"
+            className={selectCls}
+            value={form.tier ?? ""}
+            onChange={(e) => set("tier", e.target.value as PlayerCreateInput["tier"])}
+          >
+            {GOALKEEPER_TIER_OPTIONS.map((t) => (
+              <option key={t} value={t}>
+                {t || "Not assigned yet"}
+              </option>
             ))}
           </select>
         </Field>
+        <Field label="Instagram">
+          <input
+            aria-label="Instagram"
+            className={inputCls}
+            placeholder="https://www.instagram.com/…"
+            value={form.instagramUrl ?? ""}
+            onChange={(e) => set("instagramUrl", e.target.value)}
+          />
+        </Field>
       </div>
-      <Field label="Initial Scouting Notes">
-        <textarea rows={4} className={taCls} placeholder="Profile summary, source, context…" />
-      </Field>
+      <div className="flex flex-wrap gap-4 text-sm">
+        <label className="inline-flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={form.onLoan}
+            onChange={(e) => set("onLoan", e.target.checked)}
+          />
+          On loan
+        </label>
+        <label className="inline-flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={form.isAcademy}
+            onChange={(e) => set("isAcademy", e.target.checked)}
+          />
+          Academy
+        </label>
+        <label className="inline-flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={form.isFreeAgent}
+            onChange={(e) => set("isFreeAgent", e.target.checked)}
+          />
+          Free Agent
+        </label>
+      </div>
+      {error && (
+        <div role="alert" className="text-xs text-red-400">
+          {error}
+        </div>
+      )}
       <div className="flex justify-end gap-2 pt-2">
         <button
           type="button"
           onClick={onDone}
           className="h-9 px-3 rounded-md border border-border text-sm"
+          disabled={busy}
         >
           Cancel
         </button>
         <button
           type="submit"
-          className="h-9 px-4 rounded-md bg-primary text-primary-foreground text-sm font-medium"
+          disabled={busy}
+          className="h-9 px-4 rounded-md bg-primary text-primary-foreground text-sm font-medium disabled:opacity-60"
         >
-          Add Goalkeeper
+          {busy ? "Adding…" : "Add Goalkeeper"}
         </button>
       </div>
     </form>
