@@ -65,10 +65,8 @@ export function GkhqMark({ className, alt = "" }: { className?: string; alt?: st
 }
 
 /**
- * Mark plus wordmark, the full lockup: the G beside the word, never above it.
- *
- * Every surface draws the same arrangement and differs only in how large the
- * pair is set — the header rail small, the sign-in and reset screens large.
+ * Mark plus wordmark, the full lockup: the G beside the word by default, or
+ * centred above it with `stacked` (the sign-in card).
  *
  * Callers size the gap through `className` rather than taking the default,
  * because it does not scale with the mark on its own. The mark art is taller
@@ -82,14 +80,16 @@ export function GkhqLockup({
   markClassName,
   wordmarkClassName,
   alt = "GKHQ",
+  stacked = false,
 }: {
   className?: string;
   markClassName?: string;
   wordmarkClassName?: string;
   alt?: string;
+  stacked?: boolean;
 }) {
   return (
-    <span className={cn("inline-flex items-center gap-2.5", className)}>
+    <span className={cn("inline-flex items-center gap-2.5", stacked && "flex-col", className)}>
       <GkhqMark className={markClassName} />
       <GkhqWordmark className={wordmarkClassName} alt={alt} />
     </span>
