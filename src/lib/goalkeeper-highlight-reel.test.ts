@@ -57,7 +57,9 @@ describe("goalkeeper highlight reels and core metrics", () => {
   it("shirt number stays blank until an authoritative source provides it", () => {
     // The master sheet has no shirt-number column; Beadle's is owner-supplied.
     const withShirt = goalkeepers.filter((gk) => gk.shirtNumber !== null).map((gk) => gk.name);
-    expect(withShirt).toEqual(["James Beadle"]);
+    expect(withShirt.sort()).toEqual(
+      ["Brandon Austin", "Dan Bentley", "James Beadle", "Joe Lumley"].sort(),
+    );
   });
 
   it("keeps James Beadle master-sheet profile facts", () => {
@@ -67,6 +69,10 @@ describe("goalkeeper highlight reels and core metrics", () => {
     expect(beadle!.shirtNumber).toBe(1);
     expect(beadle!.foot).toBe("Right");
     expect(beadle!.profileImage).toBe("/players/james-beadle.webp");
+
+    const austin = goalkeepers.find((gk) => gk.name === "Brandon Austin");
+    expect(austin!.shirtNumber).toBe(40);
+    expect(austin!.profileImage).toBe("/players/brandon-austin.webp");
   });
 
   it("includes Calum Ward on the QPR Championship roster", () => {
