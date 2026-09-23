@@ -378,7 +378,15 @@
       }
     ]
   },
-  "reviewed_forward_migrations": [],
+  "reviewed_forward_migrations": [
+    {
+      "version": "20260923040000",
+      "name": "players_insert_management",
+      "statement_count": 1,
+      "sql_length": 1012,
+      "sql_md5": "ee4c4e5756270650641d4652e3be6e6a"
+    }
+  ],
   "repository_comparison": {
     "live_rows_with_byte_exact_local_statement": 27,
     "live_rows_contained_inside_a_larger_local_file": 2,
