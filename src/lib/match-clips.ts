@@ -226,3 +226,106 @@ export function matchesByDate<E extends MatchEventLike>(matches: readonly E[]): 
   for (const list of byDate.values()) list.sort((a, b) => a.title.localeCompare(b.title));
   return byDate;
 }
+
+/** "2026/27" — English football seasons run from July to June. */
+export function seasonOf(dateIso: string): string {
+  const [y, m] = dateIso.split("-").map(Number);
+  const start = m! >= 7 ? y! : y! - 1;
+  return `${start}/${String((start + 1) % 100).padStart(2, "0")}`;
+}
+
+/** The searchable facts about a match, read from the calendar row (never the clip). */
+export interface MatchFacts {
+  /** Both sides, e.g. ["Reading", "Notts County"]. */
+  teams: string[];
+  /**
+   * The fixture's competition: a league, domestic cup, European or
+   * international competition, or a friendly. Null when the fixture does not
+   * record one — never guessed from the goalkeeper's league, because a club
+   * plays several competitions and a guess would file an FA Cup tie under its
+   * league.
+   */
+  competition: string | null;
+  season: string;
+}
+
+/** Shown, and offered as a filter, for a match whose competition is missing. */
+export const COMPETITION_NOT_SET = "Competition not set";
+
+function noteField(notes: string | null | undefined, field: string): string | null {
+  const value = new RegExp(`^${field}:\\s*(.+)$`, "im").exec(notes ?? "")?.[1]?.trim();
+  return value || null;
+}
+
+/**
+ * Teams, competition and season for a match. Imported fixtures title
+ * themselves "Home v Away (Competition)" and repeat Club, Opponent and
+ * Competition in the notes.
+ */
+export function matchFacts(event: MatchEventLike & { notes?: string | null }): MatchFacts {
+  const titleMatch = /^(.+?)\s+v\s+(.+?)(?:\s*\(([^)]+)\))?\s*$/i.exec(event.title.trim());
+  const teams = [
+    titleMatch?.[1],
+    titleMatch?.[2],
+    noteField(event.notes, "Club"),
+    noteField(event.notes, "Opponent"),
+  ]
+    .map((team) => team?.trim())
+    .filter((team): team is string => Boolean(team));
+  const competition = noteField(event.notes, "Competition") ?? titleMatch?.[3]?.trim() ?? null;
+  return {
+    teams: [...new Map(teams.map((team) => [team.toLowerCase(), team])).values()],
+    competition: competition || null,
+    season: seasonOf(event.event_date),
+  };
+}
+
+/** The competition as shown to people: never blank. */
+export function competitionLabel(facts: MatchFacts): string {
+  return facts.competition ?? COMPETITION_NOT_SET;
+}
+
+export interface MatchClipFilter {
+  /** Free text: team, competition, goalkeeper, fixture or clip title. */
+  query?: string;
+  season?: string;
+  competition?: string;
+  team?: string;
+}
+
+/**
+ * Narrow groups by season, competition, team and free text. The Unmatched
+ * group has no match facts, so any match filter hides it; free text still
+ * searches its clip titles.
+ */
+export function filterMatchClipGroups<E extends MatchEventLike>(
+  groups: readonly MatchClipGroup<E>[],
+  filter: MatchClipFilter,
+  factsFor: (event: E) => MatchFacts,
+  goalkeeperName: (gkId: string) => string | null,
+): MatchClipGroup<E>[] {
+  const query = filter.query?.trim().toLowerCase() ?? "";
+  const same = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
+  return groups.filter((group) => {
+    const facts = group.event ? factsFor(group.event) : null;
+    if ((filter.season || filter.competition || filter.team) && !facts) return false;
+    if (facts && filter.season && facts.season !== filter.season) return false;
+    // "Competition not set" is a real option, so blank fixtures can be found and fixed.
+    if (facts && filter.competition && !same(competitionLabel(facts), filter.competition))
+      return false;
+    if (facts && filter.team && !facts.teams.some((team) => same(team, filter.team!))) return false;
+    if (!query) return true;
+    const haystack = [
+      group.event?.title,
+      group.event?.goalkeeper_name,
+      facts ? competitionLabel(facts) : null,
+      ...(facts?.teams ?? []),
+      ...group.clips.map((clip) => clip.title),
+      ...group.clips.map((clip) => (clip.gk_id ? goalkeeperName(clip.gk_id) : null)),
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase();
+    return query.split(/\s+/).every((word) => haystack.includes(word));
+  });
+}
