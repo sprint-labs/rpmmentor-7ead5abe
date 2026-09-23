@@ -523,13 +523,14 @@ function Dashboard() {
             emptyMessage="Nothing overdue"
           />
         </Link>
+        {/* The Submission Centre, scoped to the same window as the count, so
+            the reports behind the number are the ones on screen. */}
         <Link
-          to="/insights/$metric"
-          params={{ metric: "reports" }}
-          search={{ from: period.fromDate, to: period.toDate, level: "", tier: "" }}
+          to="/reports"
+          search={reportsSearch}
           className="group block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
         >
-          <span className="sr-only">Break down: </span>
+          <span className="sr-only">Open the Match Report Submission Centre: </span>
           <StatCard
             label="Match Reports"
             value={

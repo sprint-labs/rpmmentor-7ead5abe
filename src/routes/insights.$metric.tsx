@@ -1,11 +1,10 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, redirect, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { ArrowUpRight, AlertTriangle } from "lucide-react";
 import { PageHeader, SectionTitle } from "@/components/primitives";
 import { InteractionWorkbench } from "@/components/interaction-workbench";
-import { MatchReportWorkbench } from "@/components/match-report-workbench";
 import {
   ActiveMentorWorkbench,
   DutyOfCareWorkbench,
@@ -16,7 +15,6 @@ import { useAuth } from "@/lib/auth";
 import { useLoggedInteractions } from "@/lib/interactions/use-interactions";
 import { listPlayers } from "@/lib/players.functions";
 import { listUsersAndRoles } from "@/lib/users-and-roles.functions";
-import { listMatchReports } from "@/lib/match-reports/reports.functions";
 import { listAssignableMentors, listCalendarEvents } from "@/lib/calendar.functions";
 import { alerts as systemAlerts } from "@/lib/mock-data";
 import { toGoalkeepers } from "@/lib/roster/live-goalkeepers";
@@ -27,15 +25,7 @@ import { isDashboardInteractionType } from "@/lib/interactions/schema";
 import { buildActiveMentorInsightRows } from "@/lib/active-mentor-insights";
 import { RequirePermission } from "@/components/require-permission";
 
-const METRICS = [
-  "goalkeepers",
-  "interactions",
-  "duty",
-  "reports",
-  "mentors",
-  "events",
-  "alerts",
-] as const;
+const METRICS = ["goalkeepers", "interactions", "duty", "mentors", "events", "alerts"] as const;
 type Metric = (typeof METRICS)[number];
 
 const META: Record<Metric, { title: string; description: string; to: string; linkLabel: string }> =
@@ -57,12 +47,6 @@ const META: Record<Metric, { title: string; description: string; to: string; lin
       description: "Reference-only cadence bands; not a canonical operational count.",
       to: "/goalkeepers",
       linkLabel: "Goalkeepers",
-    },
-    reports: {
-      title: "Match Reports",
-      description: "Match reports with match dates in the selected period.",
-      to: "/reports",
-      linkLabel: "All reports",
     },
     mentors: {
       title: "Active Mentors",
@@ -99,6 +83,18 @@ export const Route = createFileRoute("/insights/$metric")({
     level: typeof search.level === "string" ? search.level : "",
     tier: typeof search.tier === "string" ? search.tier : "",
   }),
+  // Match Reports has no drilldown of its own: the Submission Centre is the
+  // richer view of the same reports, so old links land there, keeping the
+  // window they were opened with.
+  beforeLoad: ({ params, search }) => {
+    if (params.metric === "reports") {
+      throw redirect({
+        to: "/reports",
+        search: { from: search.from.slice(0, 10), to: search.to.slice(0, 10) },
+        replace: true,
+      });
+    }
+  },
   head: ({ params }) => {
     const meta =
       META[(params.metric as Metric) in META ? (params.metric as Metric) : "goalkeepers"];
@@ -161,7 +157,6 @@ function InsightDrilldown() {
   const fetchPlayers = useServerFn(listPlayers);
   const fetchUsers = useServerFn(listUsersAndRoles);
   const fetchMentorDirectory = useServerFn(listAssignableMentors);
-  const fetchReports = useServerFn(listMatchReports);
   const fetchEvents = useServerFn(listCalendarEvents);
 
   // Duty of Care needs the roster too: its list is one row per live goalkeeper,
@@ -169,8 +164,7 @@ function InsightDrilldown() {
   const players = useQuery({
     queryKey: ["players"],
     queryFn: () => fetchPlayers(),
-    // Match Reports reads it too, for each goalkeeper's photo and tier.
-    enabled: enabled && (active === "goalkeepers" || active === "duty" || active === "reports"),
+    enabled: enabled && (active === "goalkeepers" || active === "duty"),
     staleTime: 30_000,
   });
   const users = useQuery({
@@ -184,13 +178,6 @@ function InsightDrilldown() {
     queryFn: () => fetchMentorDirectory(),
     enabled: enabled && active === "mentors",
     staleTime: 30_000,
-  });
-  const reports = useQuery({
-    queryKey: ["match-reports"],
-    queryFn: () => fetchReports(),
-    enabled: enabled && active === "reports",
-    staleTime: 30_000,
-    retry: 1,
   });
   const events = useQuery({
     queryKey: ["calendar-events"],
@@ -230,7 +217,7 @@ function InsightDrilldown() {
     <div className="space-y-4">
       <PageHeader
         title={meta.title}
-        description={`${meta.description}${active === "interactions" || active === "reports" ? ` · ${periodLabel}` : ""}`}
+        description={`${meta.description}${active === "interactions" ? ` · ${periodLabel}` : ""}`}
         action={
           <div className="flex items-center gap-3">
             <Link
@@ -323,23 +310,6 @@ function InsightDrilldown() {
             }));
             if (rows.length === 0) return <Empty label="No goalkeepers on the roster" />;
             return <DutyOfCareWorkbench rows={rows} initialLevel={search.level} />;
-          })()}
-
-        {active === "reports" &&
-          (() => {
-            const rows = (reports.data?.reports ?? [])
-              .filter((r) => isDateOnlyInPeriod(r.match_date, period.fromDate, period.toDate))
-              .sort((a, b) => (b.match_date ?? "").localeCompare(a.match_date ?? ""));
-            if (reports.isLoading) return <Empty label="Loading…" />;
-            if (reports.isError) return <Empty label="Reports unavailable" />;
-            if (rows.length === 0) return <Empty label="No reports in this window" />;
-            return (
-              <MatchReportWorkbench
-                reports={rows}
-                periodLabel={periodLabel}
-                goalkeepers={toGoalkeepers(players.data)}
-              />
-            );
           })()}
 
         {active === "mentors" &&
