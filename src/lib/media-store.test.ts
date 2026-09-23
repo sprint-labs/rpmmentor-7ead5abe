@@ -240,4 +240,35 @@ describe("media store upload limits and records", () => {
     expect(String(storageState.inserted[0]?.file_path)).toMatch(/^unlinked\//);
     expect(storageState.inserted[0]?.gk_id).toBeNull();
   });
+
+  it("writes none of the Match Clips columns for an ordinary upload", async () => {
+    await uploadMedia({
+      file: clip("library.mp4", 2048),
+      gkId: "gk-1",
+      title: "library.mp4",
+      kind: "video",
+      user: USER,
+    });
+    // The column default classifies it `general`; the insert must not say
+    // anything that could classify it otherwise.
+    expect(storageState.inserted[0]).not.toHaveProperty("asset_purpose");
+    expect(storageState.inserted[0]).not.toHaveProperty("match_event_id");
+    expect(storageState.inserted[0]).not.toHaveProperty("upload_batch_id");
+  });
+
+  it("classifies a Match Clips upload explicitly, with its match and batch", async () => {
+    await uploadMedia({
+      file: clip("save.mp4", 2048),
+      gkId: "gk-1",
+      title: "save.mp4",
+      kind: "video",
+      user: USER,
+      matchClip: { matchEventId: "event-1", uploadBatchId: "batch-1" },
+    });
+    expect(storageState.inserted[0]).toMatchObject({
+      asset_purpose: "match_clip",
+      match_event_id: "event-1",
+      upload_batch_id: "batch-1",
+    });
+  });
 });
