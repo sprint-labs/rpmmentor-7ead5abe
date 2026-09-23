@@ -222,9 +222,13 @@ function MatchClipsPage() {
     );
   const clipCount = groups.reduce((sum, group) => sum + group.clips.length, 0);
 
-  const description = clipsQuery.isLoading
+  // Clips are grouped by their calendar match, so the calendar has to be in
+  // hand first: without it every linked clip would read as a deleted fixture.
+  const loading = clipsQuery.isLoading || eventsQuery.isLoading;
+  const loadFailed = clipsQuery.isError || eventsQuery.isError;
+  const description = loading
     ? "Loading…"
-    : clipsQuery.isError
+    : loadFailed
       ? "Match clips could not be loaded."
       : narrowed
         ? `${clipCount} ${clipCount === 1 ? "clip" : "clips"} matching filters`
@@ -318,7 +322,7 @@ function MatchClipsPage() {
         </div>
       </div>
 
-      {clipsQuery.isLoading ? (
+      {loading ? (
         <ShelfSkeleton />
       ) : missingSchema ? (
         <Card>
@@ -328,7 +332,7 @@ function MatchClipsPage() {
             description="The database has not been updated for Match Clips yet. Nothing has been lost — the Media Library still holds every file."
           />
         </Card>
-      ) : clipsQuery.isError ? (
+      ) : loadFailed ? (
         <Card>
           <EmptyState
             icon={Filter}
@@ -337,7 +341,10 @@ function MatchClipsPage() {
             primaryAction={
               <button
                 type="button"
-                onClick={() => void clipsQuery.refetch()}
+                onClick={() => {
+                  void clipsQuery.refetch();
+                  void eventsQuery.refetch();
+                }}
                 className="inline-flex h-9 items-center gap-1.5 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground"
               >
                 Try again
