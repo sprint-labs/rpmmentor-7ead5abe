@@ -14,6 +14,9 @@ const storageState = vi.hoisted(() => ({
   removed: [] as string[][],
   insertError: null as { message: string } | null,
   inserted: [] as Array<Record<string, unknown>>,
+  clips: [] as Array<{ id: string }>,
+  clipRanges: [] as Array<[number, number]>,
+  clipsError: null as { message: string } | null,
 }));
 
 const tusState = vi.hoisted(() => ({
@@ -84,6 +87,30 @@ vi.mock("@/integrations/supabase/client", () => ({
       }),
     },
     from: (table: string) => ({
+      // A thenable query builder over `storageState.clips`, honouring `range`.
+      select: () => {
+        const ranges: Array<[number, number]> = [];
+        const builder = {
+          eq: () => builder,
+          order: () => builder,
+          in: () => builder,
+          is: () => builder,
+          range: (from: number, to: number) => {
+            ranges.push([from, to]);
+            storageState.clipRanges.push([from, to]);
+            return builder;
+          },
+          then: (resolve: (value: unknown) => void) => {
+            const [from, to] = ranges.at(-1) ?? [0, storageState.clips.length - 1];
+            resolve(
+              storageState.clipsError
+                ? { data: null, error: storageState.clipsError }
+                : { data: storageState.clips.slice(from, to + 1), error: null },
+            );
+          },
+        };
+        return builder;
+      },
       insert: (row: Record<string, unknown>) => {
         if (table === "media_assets") {
           if (storageState.insertError) {
@@ -109,6 +136,7 @@ vi.mock("@/integrations/supabase/client", () => ({
 
 import {
   MAX_FILE_BYTES,
+  listMatchClips,
   fileExceedsLimitMessage,
   formatFileLimit,
   getUploadAccessToken,
@@ -141,6 +169,9 @@ describe("media store upload limits and records", () => {
     storageState.removed = [];
     storageState.insertError = null;
     storageState.inserted = [];
+    storageState.clips = [];
+    storageState.clipRanges = [];
+    storageState.clipsError = null;
     tusState.objectNames = [];
     tusState.tokens = [];
     vi.stubEnv("VITE_SUPABASE_URL", "https://zdxxezquhvpjmoxlecjp.supabase.co");
@@ -239,6 +270,23 @@ describe("media store upload limits and records", () => {
     });
     expect(String(storageState.inserted[0]?.file_path)).toMatch(/^unlinked\//);
     expect(storageState.inserted[0]?.gk_id).toBeNull();
+  });
+
+  it("reads every page of match clips, so the row cap cannot drop the oldest", async () => {
+    storageState.clips = Array.from({ length: 1203 }, (_, i) => ({ id: `clip-${i}` }));
+    const clips = await listMatchClips();
+    expect(clips).toHaveLength(1203);
+    expect(clips.at(-1)).toEqual({ id: "clip-1202" });
+    expect(storageState.clipRanges).toEqual([
+      [0, 499],
+      [500, 999],
+      [1000, 1499],
+    ]);
+  });
+
+  it("keeps the database's message when the match clips read fails", async () => {
+    storageState.clipsError = { message: "column media_assets.asset_purpose does not exist" };
+    await expect(listMatchClips()).rejects.toThrow("asset_purpose does not exist");
   });
 
   it("writes none of the Match Clips columns for an ordinary upload", async () => {

@@ -302,6 +302,19 @@ describe("MatchClipUploadForm", () => {
     expect(uploadMediaMock).not.toHaveBeenCalled();
   });
 
+  it("does not upload when the calendar or roster read fails", async () => {
+    listPlayersMock.mockRejectedValue(new Error("roster unavailable"));
+    renderForm(ZOE_MATCH.id);
+    await waitForMatches();
+    await screen.findByText(/Goalkeepers could not be loaded/);
+    chooseClips([clip("orphaned.mp4")]);
+
+    const upload = screen.getByRole("button", { name: "Upload 1 clip" }) as HTMLButtonElement;
+    expect(upload.disabled).toBe(true);
+    fireEvent.click(upload);
+    expect(uploadMediaMock).not.toHaveBeenCalled();
+  });
+
   it("will not close while a batch is uploading, then closes once it finishes", async () => {
     let finish!: (value: { id: string }) => void;
     uploadMediaMock.mockImplementation(
