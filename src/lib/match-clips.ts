@@ -204,3 +204,25 @@ export function isMissingMatchClipsSchema(message: string | null | undefined): b
   if (!message) return false;
   return /asset_purpose|match_event_id|upload_batch_id/.test(message);
 }
+
+/** The Monday-first week (7 × `YYYY-MM-DD`) containing `dateIso`, in calendar terms. */
+export function weekOf(dateIso: string): string[] {
+  const [y, m, d] = dateIso.split("-").map(Number);
+  const date = new Date(Date.UTC(y!, m! - 1, d!));
+  const mondayOffset = (date.getUTCDay() + 6) % 7;
+  return Array.from({ length: 7 }, (_, i) =>
+    new Date(Date.UTC(y!, m! - 1, d! - mondayOffset + i)).toISOString().slice(0, 10),
+  );
+}
+
+/** Matches keyed by `event_date`, each day's list in title order. */
+export function matchesByDate<E extends MatchEventLike>(matches: readonly E[]): Map<string, E[]> {
+  const byDate = new Map<string, E[]>();
+  for (const event of matches) {
+    const list = byDate.get(event.event_date) ?? [];
+    list.push(event);
+    byDate.set(event.event_date, list);
+  }
+  for (const list of byDate.values()) list.sort((a, b) => a.title.localeCompare(b.title));
+  return byDate;
+}

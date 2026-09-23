@@ -1,12 +1,12 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { TeamCalendarEvent } from "@/lib/calendar.functions";
 import { todayDateOnly } from "@/lib/interactions/schema";
-import { shiftDateOnly } from "@/lib/match-clips";
+import { formatMatchDate, shiftDateOnly } from "@/lib/match-clips";
 import type { PlayerRosterRow } from "@/lib/players.functions";
 
 const uploadMediaMock = vi.fn();
@@ -177,7 +177,7 @@ afterEach(() => {
 
 async function waitForMatches() {
   await waitFor(() =>
-    expect((screen.getByRole("combobox", { name: "Match" }) as HTMLButtonElement).disabled).toBe(
+    expect((screen.getByRole("button", { name: "Match" }) as HTMLButtonElement).disabled).toBe(
       false,
     ),
   );
@@ -187,7 +187,7 @@ describe("MatchClipUploadForm", () => {
   it("sends every clip to the chosen match, its goalkeeper and one shared batch", async () => {
     renderForm(ZOE_MATCH.id);
     await waitForMatches();
-    expect(screen.getByRole("combobox", { name: "Match" }).textContent).toContain(
+    expect(screen.getByRole("button", { name: "Match" }).textContent).toContain(
       "Northern FC v Eastern Town",
     );
     await waitFor(() => expect(screen.getByText("Zoe Keeper")).toBeTruthy());
@@ -249,13 +249,45 @@ describe("MatchClipUploadForm", () => {
   it("uploads unmatched clips against the goalkeeper picked by hand", async () => {
     renderForm(null);
     await waitForMatches();
-    expect(screen.getByRole("combobox", { name: "Match" }).textContent).toContain("No match yet");
+    expect(screen.getByRole("button", { name: "Match" }).textContent).toContain("Select match");
 
     chooseClips([clip("loose.mp4")]);
     fireEvent.click(screen.getByRole("button", { name: "Upload 1 clip" }));
 
     await waitFor(() => expect(uploadMediaMock).toHaveBeenCalledTimes(1));
     expect(uploadCalls()[0]).toMatchObject({ gkId: null, matchClip: { matchEventId: null } });
+  });
+
+  it("picks the match from a calendar: day first, then the match beside it", async () => {
+    renderForm(null);
+    await waitForMatches();
+
+    fireEvent.click(screen.getByRole("button", { name: "Match" }));
+    const dialog = await screen.findByRole("dialog", { name: "Select match" });
+    // Opens on the most recent match day, with that day's matches listed.
+    const zoeMatch = await within(dialog).findByRole("button", {
+      name: /Northern FC v Eastern Town/,
+    });
+
+    // Week view pages back to Alex's match, 19 days earlier.
+    fireEvent.click(within(dialog).getByRole("button", { name: "week" }));
+    fireEvent.click(within(dialog).getByRole("button", { name: "Previous week" }));
+    fireEvent.click(within(dialog).getByRole("button", { name: "Previous week" }));
+    fireEvent.click(within(dialog).getByRole("button", { name: "Previous week" }));
+    fireEvent.click(
+      within(dialog).getByRole("button", {
+        name: new RegExp(`^${formatMatchDate(ALEX_MATCH.event_date)}, 1 match`),
+      }),
+    );
+    expect(zoeMatch.isConnected).toBe(false);
+    fireEvent.click(
+      within(dialog).getByRole("button", { name: /Southern United v Western Rovers/ }),
+    );
+
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Select match" })).toBeNull());
+    expect(screen.getByRole("button", { name: "Match" }).textContent).toContain(
+      "Southern United v Western Rovers",
+    );
   });
 
   it("does not upload until the matches have loaded", async () => {

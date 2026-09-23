@@ -10,9 +10,11 @@ import {
   isMissingMatchClipsSchema,
   isRecentMatch,
   matchLabel,
+  matchesByDate,
   pickableMatches,
   resolveClipMatch,
   shiftDateOnly,
+  weekOf,
   type MatchEventLike,
 } from "@/lib/match-clips";
 import type { MediaAsset } from "@/lib/media-store";
@@ -217,5 +219,33 @@ describe("isMissingMatchClipsSchema", () => {
     );
     expect(isMissingMatchClipsSchema("JWT expired")).toBe(false);
     expect(isMissingMatchClipsSchema(null)).toBe(false);
+  });
+});
+
+describe("weekOf", () => {
+  it("returns the Monday-first week, across a month boundary", () => {
+    expect(weekOf("2026-10-01")).toEqual([
+      "2026-09-28",
+      "2026-09-29",
+      "2026-09-30",
+      "2026-10-01",
+      "2026-10-02",
+      "2026-10-03",
+      "2026-10-04",
+    ]);
+    expect(weekOf("2026-09-28")[0]).toBe("2026-09-28");
+    expect(weekOf("2026-10-04")[0]).toBe("2026-09-28");
+  });
+});
+
+describe("matchesByDate", () => {
+  it("groups matches by day, alphabetical within a day", () => {
+    const byDate = matchesByDate([
+      match({ id: "b", title: "Oxford v Cambridge" }),
+      match({ id: "a", title: "Blackpool v Plymouth" }),
+      match({ id: "c", event_date: "2026-09-12" }),
+    ]);
+    expect(byDate.get("2026-09-19")!.map((event) => event.id)).toEqual(["a", "b"]);
+    expect(byDate.get("2026-09-12")!.map((event) => event.id)).toEqual(["c"]);
   });
 });
