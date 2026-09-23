@@ -65,10 +65,17 @@ export function MatchClipUploadDialog({
   prefillMatchId?: string | null;
 }) {
   const returnFocusRef = useRef<HTMLElement | null>(null);
+  // Closing mid-upload would unmount the form while files are still going up,
+  // and reopening starts a new batch, so the same files could be sent twice.
+  // While a batch runs, X, Escape and clicking outside are all ignored.
+  const [uploading, setUploading] = useState(false);
   if (!open) return null;
   return (
-    <Dialog open onOpenChange={(next) => !next && onClose()}>
+    <Dialog open onOpenChange={(next) => !next && !uploading && onClose()}>
       <DialogContent
+        onEscapeKeyDown={(event) => uploading && event.preventDefault()}
+        onPointerDownOutside={(event) => uploading && event.preventDefault()}
+        onInteractOutside={(event) => uploading && event.preventDefault()}
         onOpenAutoFocus={() => {
           returnFocusRef.current =
             document.activeElement instanceof HTMLElement ? document.activeElement : null;
@@ -89,7 +96,11 @@ export function MatchClipUploadDialog({
           </DialogDescription>
         </DialogHeader>
         <div className="overflow-y-auto p-5">
-          <MatchClipUploadForm onDone={onClose} prefillMatchId={prefillMatchId ?? null} />
+          <MatchClipUploadForm
+            onDone={onClose}
+            prefillMatchId={prefillMatchId ?? null}
+            onBusyChange={setUploading}
+          />
         </div>
       </DialogContent>
     </Dialog>
@@ -110,9 +121,12 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
 export function MatchClipUploadForm({
   onDone,
   prefillMatchId,
+  onBusyChange,
 }: {
   onDone: () => void;
   prefillMatchId: string | null;
+  /** Told when a batch starts and stops, so the dialog can refuse to close. */
+  onBusyChange?: (busy: boolean) => void;
 }) {
   const { user, can } = useAuth();
   const listPlayersFn = useServerFn(listPlayers);
@@ -149,6 +163,7 @@ export function MatchClipUploadForm({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const dataLoading = eventsQuery.isLoading || playersQuery.isLoading;
   const batchMatch = batchMatchId ? (matchesById.get(batchMatchId) ?? null) : null;
   const batchGkId = batchMatch ? goalkeeperIdForMatch(batchMatch, players) : fallbackGkId;
   const playerName = (gkId: string | null) =>
@@ -209,6 +224,7 @@ export function MatchClipUploadForm({
   const runBatch = async (retryFailed: boolean) => {
     setError(null);
     setBusy(true);
+    onBusyChange?.(true);
     try {
       const options = {
         upload: (task: ValidMediaUploadTask, onProgress: (fraction: number) => void) => {
@@ -243,12 +259,13 @@ export function MatchClipUploadForm({
       setError(err instanceof Error ? err.message : "The upload could not be started.");
     } finally {
       setBusy(false);
+      onBusyChange?.(false);
     }
   };
 
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault();
-    if (eventsQuery.isLoading) return;
+    if (dataLoading) return;
     if (!items.length) {
       setError("Choose one or more clips to upload.");
       return;
@@ -411,9 +428,10 @@ export function MatchClipUploadForm({
         {queuedCount > 0 && (
           <button
             type="submit"
-            // Until the calendar loads, a prefilled match cannot resolve and
-            // every clip would be saved as unmatched.
-            disabled={busy || eventsQuery.isLoading}
+            // Until the calendar loads a prefilled match cannot resolve, and
+            // until the roster loads a name-only fixture cannot find its
+            // goalkeeper: either way the clip would be saved without its link.
+            disabled={busy || dataLoading}
             className="h-9 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground disabled:opacity-60"
           >
             {busy ? "Uploading…" : `Upload ${queuedCount} ${queuedCount === 1 ? "clip" : "clips"}`}

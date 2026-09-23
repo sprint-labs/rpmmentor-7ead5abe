@@ -113,7 +113,7 @@ vi.mock("@/lib/auth", () => ({
   }),
 }));
 
-const { MatchClipUploadForm } = await import("./match-clip-upload-form");
+const { MatchClipUploadDialog, MatchClipUploadForm } = await import("./match-clip-upload-form");
 
 function renderForm(prefillMatchId: string | null) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -288,6 +288,45 @@ describe("MatchClipUploadForm", () => {
     expect(screen.getByRole("button", { name: "Match" }).textContent).toContain(
       "Southern United v Western Rovers",
     );
+  });
+
+  it("does not upload until the goalkeeper roster has loaded", async () => {
+    listPlayersMock.mockReturnValue(new Promise(() => {}));
+    renderForm(ZOE_MATCH.id);
+    await waitForMatches();
+    chooseClips([clip("early.mp4")]);
+
+    const upload = screen.getByRole("button", { name: "Upload 1 clip" }) as HTMLButtonElement;
+    expect(upload.disabled).toBe(true);
+    fireEvent.click(upload);
+    expect(uploadMediaMock).not.toHaveBeenCalled();
+  });
+
+  it("will not close while a batch is uploading, then closes once it finishes", async () => {
+    let finish!: (value: { id: string }) => void;
+    uploadMediaMock.mockImplementation(
+      () => new Promise<{ id: string }>((resolve) => (finish = resolve)),
+    );
+    const onClose = vi.fn();
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={client}>
+        <MatchClipUploadDialog open onClose={onClose} prefillMatchId={ZOE_MATCH.id} />
+      </QueryClientProvider>,
+    );
+    await waitForMatches();
+    chooseClips([clip("long.mp4")]);
+    fireEvent.click(screen.getByRole("button", { name: "Upload 1 clip" }));
+    await waitFor(() => expect(uploadMediaMock).toHaveBeenCalledTimes(1));
+
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" });
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    expect(onClose).not.toHaveBeenCalled();
+
+    finish({ id: "long.mp4" });
+    await screen.findByText("1 clip uploaded to Match Clips.");
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" });
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
   });
 
   it("does not upload until the matches have loaded", async () => {
