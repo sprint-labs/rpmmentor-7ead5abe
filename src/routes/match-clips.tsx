@@ -48,6 +48,11 @@ const MATCH_CLIPS_QUERY_KEY = ["match-clips"] as const;
 /** The same tile width the Media Library shelves use. */
 const TILE_CLASS = "w-[168px] shrink-0 snap-start sm:w-[196px]";
 
+/** Thumbnails are signed for an hour and re-signed after 50 minutes. */
+const THUMB_URL_TTL_S = 3600;
+const THUMB_REFRESH_AFTER_MS = 50 * 60_000;
+const THUMB_RECHECK_MS = 5 * 60_000;
+
 const SELECT_CLASS = "h-9 rounded-md border border-border bg-input/60 px-2 text-sm";
 
 function sortedUnique(values: Iterable<string | null | undefined>): string[] {
@@ -154,27 +159,36 @@ function MatchClipsPage() {
     [allGroups, query, season, competition, team, factsFor, rosterById],
   );
 
-  const [thumbUrls, setThumbUrls] = useState<Record<string, string>>({});
+  // Signed thumbnail URLs expire, so each is kept with the time it goes stale
+  // and re-signed after that; a page left open would otherwise show broken art.
+  const [thumbs, setThumbs] = useState<Record<string, { url: string; staleAt: number }>>({});
+  const [thumbClock, setThumbClock] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = window.setInterval(() => setThumbClock(Date.now()), THUMB_RECHECK_MS);
+    return () => window.clearInterval(timer);
+  }, []);
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const updates: Record<string, string> = {};
+      const updates: Record<string, { url: string; staleAt: number }> = {};
       for (const clip of clips) {
-        if (!clip.thumbnail_path || thumbUrls[clip.id]) continue;
+        const cached = thumbs[clip.id];
+        if (!clip.thumbnail_path || (cached && cached.staleAt > thumbClock)) continue;
         try {
-          updates[clip.id] = await getSignedUrl(clip.thumbnail_path, 3600);
+          const url = await getSignedUrl(clip.thumbnail_path, THUMB_URL_TTL_S);
+          updates[clip.id] = { url, staleAt: Date.now() + THUMB_REFRESH_AFTER_MS };
         } catch {
           /* the tile falls back to its type icon */
         }
       }
       if (!cancelled && Object.keys(updates).length) {
-        setThumbUrls((prev) => ({ ...prev, ...updates }));
+        setThumbs((prev) => ({ ...prev, ...updates }));
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [clips, thumbUrls]);
+  }, [clips, thumbs, thumbClock]);
 
   const [uploadOpen, setUploadOpen] = useState(false);
   const [uploadMatchId, setUploadMatchId] = useState<string | null>(null);
@@ -426,7 +440,7 @@ function MatchClipsPage() {
                             : "Unlinked"
                           : null
                       }
-                      thumbUrl={thumbUrls[clip.id]}
+                      thumbUrl={thumbs[clip.id]?.url}
                       busy={busyId === clip.id}
                       onOpen={() => void handleOpen(clip)}
                       onEdit={canEditAsset(clip, user) ? () => setEditing(clip) : undefined}

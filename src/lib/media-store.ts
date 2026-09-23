@@ -12,6 +12,7 @@ import {
   TUS_RETRY_DELAYS,
 } from "@/lib/media-upload-transport";
 import { MEDIA_BUCKET } from "@/lib/storage/bucket";
+import { readAllPages } from "@/lib/paginated-read";
 
 export {
   attachmentLookupIds,
@@ -426,19 +427,29 @@ export interface MatchClipFilters {
   unmatched?: boolean;
 }
 
-/** Every Match Clip, newest first. Grouping by match happens in `match-clips.ts`. */
+/**
+ * Every Match Clip, newest first, read in pages so the API row cap can never
+ * silently drop the oldest clips. Grouping by match happens in `match-clips.ts`.
+ */
 export async function listMatchClips(filters: MatchClipFilters = {}): Promise<MediaAsset[]> {
-  let q = supabase
-    .from("media_assets")
-    .select("*")
-    .eq("asset_purpose", MATCH_CLIP_PURPOSE)
-    .order("created_at", { ascending: false });
-  if (filters.gkIds?.length) q = q.in("gk_id", filters.gkIds);
-  if (filters.matchEventIds?.length) q = q.in("match_event_id", filters.matchEventIds);
-  else if (filters.unmatched) q = q.is("match_event_id", null);
-  const { data, error } = await q;
-  if (error) throw new Error(error.message);
-  return (data || []) as MediaAsset[];
+  return readAllPages<MediaAsset>(async (from, to) => {
+    let q = supabase
+      .from("media_assets")
+      .select("*")
+      .eq("asset_purpose", MATCH_CLIP_PURPOSE)
+      // `id` breaks ties so a page boundary never skips or repeats a row.
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: false })
+      .range(from, to);
+    if (filters.gkIds?.length) q = q.in("gk_id", filters.gkIds);
+    if (filters.matchEventIds?.length) q = q.in("match_event_id", filters.matchEventIds);
+    else if (filters.unmatched) q = q.is("match_event_id", null);
+    const { data, error } = await q;
+    // Keep the database's own message: the page reads it to tell a missing
+    // Match Clips schema apart from any other failure.
+    if (error) throw new Error(error.message);
+    return { data: (data || []) as MediaAsset[], error: null };
+  }, "Match clips could not be loaded.");
 }
 
 export async function getMediaByIds(ids: string[]): Promise<MediaAsset[]> {
