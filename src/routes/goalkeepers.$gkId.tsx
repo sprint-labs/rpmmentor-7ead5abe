@@ -934,6 +934,15 @@ function GkProfile({ gk, player }: { gk: Goalkeeper; player: PlayerRosterRow }) 
                     <ExternalLink className="size-3 shrink-0 text-muted-foreground" />
                     <span className="truncate">{m.title}</span>
                   </button>
+                  {/* A development plan is re-uploaded whenever it changes,
+                      usually under the same file name. The date is what tells
+                      two versions apart; the list is already newest first. */}
+                  <time
+                    dateTime={m.created_at}
+                    className="shrink-0 text-[10px] text-muted-foreground tabular-nums font-mono"
+                  >
+                    {formatDate(m.created_at)}
+                  </time>
                   <Pill>{m.media_type}</Pill>
                 </div>
               ))}
