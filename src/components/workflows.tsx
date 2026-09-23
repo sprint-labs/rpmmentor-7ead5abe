@@ -267,9 +267,11 @@ export function WorkflowDialog({
           ? isEditing
             ? "Corrects the original record · visible everywhere it appears"
             : "Saved to the RPM database · visible in the interactions log"
-          : activeKind === "bug" || activeKind === "question"
-            ? "Goes to the Super Admin support inbox · you will get a reply in Help & Messages"
-            : "Saved locally to this session";
+          : activeKind === "goalkeeper"
+            ? "Saved to the RPM database · added to the live roster"
+            : activeKind === "bug" || activeKind === "question"
+              ? "Goes to the Super Admin support inbox · you will get a reply in Help & Messages"
+              : "Saved locally to this session";
 
   return (
     <Dialog open onOpenChange={(next) => !next && onClose()}>

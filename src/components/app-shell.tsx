@@ -417,15 +417,7 @@ export function AppShell() {
   // Role-gated visible nav
   const visible = NAV.filter((n) => can(n.perm));
 
-  // Pick a primary CTA per role
   const canLog = can("interactions.log");
-  const primaryAction: { kind: WorkflowKind; label: string } | null = canLog
-    ? { kind: "interaction", label: "Log Interaction" }
-    : can("reports.submit")
-      ? { kind: "report", label: "Submit Report" }
-      : can("goalkeepers.create")
-        ? { kind: "goalkeeper", label: "Add Goalkeeper" }
-        : null;
 
   return (
     <div className="flex min-h-screen overflow-x-clip bg-background text-foreground supports-[height:100dvh]:min-h-dvh">
@@ -930,20 +922,20 @@ export function AppShell() {
               })}
             </nav>
             <div className="p-3 border-t border-sidebar-border space-y-2">
-              {primaryAction &&
-                primaryAction.kind !== "interaction" &&
-                primaryAction.kind !== "report" && (
-                  <button
-                    onClick={() => {
-                      setWorkflow(primaryAction.kind);
-                      setNavOpen(false);
-                    }}
-                    className="w-full min-h-11 flex items-center gap-2 px-3 py-2 rounded-md bg-primary text-primary-foreground text-xs uppercase tracking-[0.06em] font-semibold hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  >
-                    <Plus className="size-4" />
-                    {primaryAction.label}
-                  </button>
-                )}
+              {/* Mentor Managers' header button is Log Interaction, so the
+                  menu is where every role allowed to add a goalkeeper finds it. */}
+              {can("goalkeepers.create") && (
+                <button
+                  onClick={() => {
+                    setWorkflow("goalkeeper");
+                    setNavOpen(false);
+                  }}
+                  className="w-full min-h-11 flex items-center gap-2 px-3 py-2 rounded-md bg-primary text-primary-foreground text-xs uppercase tracking-[0.06em] font-semibold hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <Plus className="size-4" />
+                  Add Goalkeeper
+                </button>
+              )}
               <ThemeToggle menu />
               {canSeeSupport && (
                 <button
