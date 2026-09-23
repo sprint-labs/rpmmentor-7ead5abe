@@ -9,8 +9,13 @@ import {
   groupClipsByMatch,
   isMissingMatchClipsSchema,
   isRecentMatch,
+  COMPETITION_NOT_SET,
+  competitionLabel,
+  filterMatchClipGroups,
+  matchFacts,
   matchLabel,
   matchesByDate,
+  seasonOf,
   pickableMatches,
   resolveClipMatch,
   shiftDateOnly,
@@ -247,5 +252,75 @@ describe("matchesByDate", () => {
     ]);
     expect(byDate.get("2026-09-19")!.map((event) => event.id)).toEqual(["a", "b"]);
     expect(byDate.get("2026-09-12")!.map((event) => event.id)).toEqual(["c"]);
+  });
+});
+
+describe("seasonOf", () => {
+  it("runs July to June", () => {
+    expect(seasonOf("2026-08-15")).toBe("2026/27");
+    expect(seasonOf("2027-05-01")).toBe("2026/27");
+    expect(seasonOf("2026-06-30")).toBe("2025/26");
+    expect(seasonOf("2099-07-01")).toBe("2099/00");
+  });
+});
+
+describe("matchFacts", () => {
+  it("reads both teams from an imported fixture and never guesses the competition", () => {
+    const facts = matchFacts({
+      ...match({ title: "Wycombe Wanderers v Reading", event_date: "2026-09-26" }),
+      notes: "Imported fixture\nClub: Reading\nOpponent: Wycombe Wanderers\nHome/Away: Away",
+    });
+    expect(facts).toEqual({
+      teams: ["Wycombe Wanderers", "Reading"],
+      competition: null,
+      season: "2026/27",
+    });
+    expect(competitionLabel(facts)).toBe(COMPETITION_NOT_SET);
+  });
+
+  it("uses the competition the fixture records, in its notes or its title", () => {
+    expect(matchFacts(match()).competition).toBe("U21 Premier League");
+    expect(
+      matchFacts({ ...match({ title: "Arsenal v Barnet" }), notes: "Competition: FA Cup" })
+        .competition,
+    ).toBe("FA Cup");
+    expect(
+      matchFacts({ ...match({ title: "England v Spain" }), notes: "Competition:   " }).competition,
+    ).toBeNull();
+  });
+});
+
+describe("filterMatchClipGroups", () => {
+  const events = new Map([
+    ["event-1", match()],
+    [
+      "event-2",
+      match({ id: "event-2", title: "Reading v Notts County", event_date: "2025-10-04" }),
+    ],
+  ]);
+  const groups = groupClipsByMatch(
+    [
+      clip({ match_event_id: "event-1", title: "save.mp4" }),
+      clip({ match_event_id: "event-2", title: "cross.mp4" }),
+      clip({ match_event_id: null, title: "loose.mp4" }),
+    ],
+    events,
+  );
+  const facts = (event: MatchEventLike) => matchFacts(event);
+  const keys = (filter: Parameters<typeof filterMatchClipGroups>[1]) =>
+    filterMatchClipGroups(groups, filter, facts, () => "James Beadle").map((group) => group.key);
+
+  it("filters by season, competition and team", () => {
+    expect(keys({ season: "2025/26" })).toEqual(["event-2"]);
+    expect(keys({ competition: "u21 premier league" })).toEqual(["event-1"]);
+    expect(keys({ competition: COMPETITION_NOT_SET })).toEqual(["event-2"]);
+    expect(keys({ team: "Fulham" })).toEqual(["event-1"]);
+  });
+
+  it("searches teams, competitions and clip titles, every word", () => {
+    expect(keys({ query: "notts" })).toEqual(["event-2"]);
+    expect(keys({ query: "u21 brighton" })).toEqual(["event-1"]);
+    expect(keys({ query: "loose" })).toEqual([UNMATCHED_GROUP_KEY]);
+    expect(keys({})).toHaveLength(3);
   });
 });
