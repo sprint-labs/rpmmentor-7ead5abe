@@ -69,7 +69,7 @@ function MatchClipsPage() {
   const queryClient = useQueryClient();
   const listPlayersFn = useServerFn(listPlayers);
   const listEventsFn = useServerFn(listCalendarEvents);
-  const { data: rosterPlayers = [] } = useQuery({
+  const playersQuery = useQuery({
     queryKey: ["players", "roster"],
     queryFn: () => listPlayersFn(),
     staleTime: 5 * 60_000,
@@ -79,6 +79,7 @@ function MatchClipsPage() {
     queryFn: () => listEventsFn(),
     staleTime: 60_000,
   });
+  const rosterPlayers = useMemo(() => playersQuery.data ?? [], [playersQuery.data]);
   const rosterById = useMemo(() => buildGoalkeeperIdentities(rosterPlayers), [rosterPlayers]);
   const goalkeeperOptions = useMemo(
     () =>
@@ -238,8 +239,10 @@ function MatchClipsPage() {
 
   // Clips are grouped by their calendar match, so the calendar has to be in
   // hand first: without it every linked clip would read as a deleted fixture.
-  const loading = clipsQuery.isLoading || eventsQuery.isLoading;
-  const loadFailed = clipsQuery.isError || eventsQuery.isError;
+  const loading = clipsQuery.isLoading || eventsQuery.isLoading || playersQuery.isLoading;
+  // The roster names every goalkeeper on the page; without it they would all
+  // read "Unknown goalkeeper", so a failed roster read is a failed page.
+  const loadFailed = clipsQuery.isError || eventsQuery.isError || playersQuery.isError;
   const description = loading
     ? "Loading…"
     : loadFailed
@@ -358,6 +361,7 @@ function MatchClipsPage() {
                 onClick={() => {
                   void clipsQuery.refetch();
                   void eventsQuery.refetch();
+                  void playersQuery.refetch();
                 }}
                 className="inline-flex h-9 items-center gap-1.5 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground"
               >
