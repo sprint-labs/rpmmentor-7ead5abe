@@ -184,6 +184,21 @@ Use this short release gate:
 
 8. **`list_mentor_directory()` security lint** — The function now rejects callers who are not `mentor`, `mentor_manager`, `admin`, or `super_admin`. Supabase may still surface `authenticated_security_definer_function_executable` because `authenticated` retains `EXECUTE` on a `SECURITY DEFINER` RPC; that is required for calendar/insights reads from the browser client.
 
+### 23 Sep 2026 — Three goalkeepers added to the roster (completed)
+
+Management request (David Rouse, 21 Sep 2026). Two Chelsea Academy goalkeepers and one Brisbane Roar goalkeeper were missing from the roster, so they had no profile page for their Individual Learning Plans to be uploaded to. Inserted directly into live `public.players` on project `zdxxezquhvpjmoxlecjp`.
+
+| Item | State |
+| --- | --- |
+| Why it came to the owner | The in-app **Add Goalkeeper** form (`GoalkeeperForm` in `src/components/workflows.tsx`) saves nothing: it shows "Goalkeeper added to the database." without writing a row, and `public.players` has no INSERT policy for it to use. Until that is built, new goalkeepers are added this way. |
+| Why not a migration | This repository is public and two of the three are under 18. A migration would publish their names in Git history permanently, so the rows went in as data. Apply the same rule to any future under-18 signing. Names and ids are in the live table, not here. |
+| Rows | 3 inserted (116 → 119 live players), each guarded against a live row with the same `lower(full_name)`. |
+| Values | Club and parent club set, not on loan, league matching the goalkeepers already recorded at the same clubs (`Premier League`, `Australian A League`), nationality from club and national-team records. Academy flag on for the two Chelsea Academy goalkeepers only. |
+| Left for management | `tier` unassigned (set it from the profile), `contract_until` and `instagram_url` empty. |
+| Date of birth | Not stored. `players` has no column for it and the seed in `src/lib/mock-data.ts` is public, so these profiles show "Not recorded". |
+| Verified | Read back under RLS as the Mentor account that will upload the plans: all 119 visible. A Mentor `media_assets` insert linked to one of the new rows is allowed (dry run, rolled back, no row left). |
+| Reversal | Soft delete: set `deleted_at` and `deleted_by` (a Super Admin's user id) together on the row, which is what `deletePlayerRecord` in `src/lib/players.functions.ts` does. No screen calls that function yet. |
+
 ### 28 Aug 2026 — Joe Monks provisioned as Admin (completed)
 
 Owner-requested account provisioning against live Supabase project
