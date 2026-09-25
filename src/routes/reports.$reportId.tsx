@@ -1,8 +1,8 @@
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { PageHeader, Card, Pill } from "@/components/primitives";
-import { useCallback, useEffect, useState } from "react";
+import { Card, Pill } from "@/components/primitives";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
   FileText,
@@ -11,6 +11,7 @@ import {
   Mic,
   ExternalLink,
   Loader2,
+  Paperclip,
   Pencil,
   Save,
   Trash2,
@@ -32,7 +33,25 @@ import { listReportAttachmentsForIds, openAsset, type MediaAsset } from "@/lib/m
 import { reportCoverageQueryKey } from "@/lib/calendar/report-coverage";
 import { refreshInteractionViews } from "@/lib/query-refresh";
 import { useAuth } from "@/lib/auth";
-import { deleteMatchReport, getMatchReport } from "@/lib/match-reports/reports.functions";
+import {
+  deleteMatchReport,
+  getMatchReport,
+  listMatchReports,
+} from "@/lib/match-reports/reports.functions";
+import { goalkeeperForm } from "@/lib/match-reports/goalkeeper-form";
+import { listPlayers } from "@/lib/players.functions";
+import { toGoalkeepers } from "@/lib/roster/live-goalkeepers";
+import { normalisePersonName } from "@/lib/goalkeeper-player-link";
+import { scoreTone } from "@/lib/score-band";
+import { cn } from "@/lib/utils";
+import {
+  FormStrip,
+  MentorVerdict,
+  PillarBreakdown,
+  PillarStandouts,
+  PlayerSnapshot,
+  ReportHero,
+} from "@/components/reports/report-detail";
 import {
   getMatchReportEditAccess,
   updateOwnedMatchReport,
@@ -61,12 +80,6 @@ const ICON: Record<string, typeof FileText> = {
   audio: Mic,
 };
 
-function formatDate(iso: string | null) {
-  if (!iso) return "—";
-  const [y, m, d] = iso.split("-");
-  return `${d}/${m}/${y}`;
-}
-
 function editableScores(report: MatchReportRow): Record<PillarId, number> {
   const scores = {} as Record<PillarId, number>;
   for (const id of PILLAR_IDS) scores[id] = report.scores[id] ?? 3;
@@ -93,6 +106,34 @@ function ReportDetail() {
   });
 
   const r = data?.report ?? null;
+
+  // The goalkeeper's other reports and his roster record, for the photo, the
+  // snapshot stats and the form strip. Both share the keys the Submission
+  // Centre already fills, so arriving from there costs no extra request, and
+  // neither blocks the report: if one fails, its sections simply stay away.
+  const listFn = useServerFn(listMatchReports);
+  const { data: allReports } = useQuery({
+    queryKey: ["match-reports"],
+    queryFn: () => listFn(),
+    staleTime: 30_000,
+  });
+  const listPlayersFn = useServerFn(listPlayers);
+  const { data: rosterRows } = useQuery({
+    queryKey: ["players", "roster"],
+    queryFn: () => listPlayersFn(),
+    staleTime: 5 * 60_000,
+  });
+
+  const goalkeeper = useMemo(() => {
+    if (!r) return undefined;
+    const target = normalisePersonName(r.goalkeeper);
+    return toGoalkeepers(rosterRows).find((gk) => normalisePersonName(gk.name) === target);
+  }, [r, rosterRows]);
+
+  const form = useMemo(
+    () => (r && allReports ? goalkeeperForm(allReports.reports, r) : null),
+    [r, allReports],
+  );
 
   const [attachments, setAttachments] = useState<MediaAsset[]>([]);
   const [loadingAttachments, setLoadingAttachments] = useState(true);
@@ -229,20 +270,17 @@ function ReportDetail() {
   }
 
   return (
-    <div className="space-y-5">
-      <Link
-        to="/reports"
-        className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
-      >
-        <ArrowLeft className="size-3" />
-        Back to reports
-      </Link>
-
-      <PageHeader
-        title={`Match Report — ${r.goalkeeper}`}
-        description={`${formatDate(r.match_date)} · ${r.team ?? "—"} vs ${r.opponent ?? "—"} · Coach: ${r.coach}`}
-        action={
-          <div className="flex flex-wrap items-end justify-end gap-2">
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <Link
+          to="/reports"
+          className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
+        >
+          <ArrowLeft className="size-3" />
+          Back to reports
+        </Link>
+        {(canEdit || canDelete) && (
+          <div className="flex flex-wrap items-center justify-end gap-2">
             {canEdit && (
               <Button type="button" size="sm" variant="outline" onClick={openEditor}>
                 <Pencil />
@@ -261,17 +299,11 @@ function ReportDetail() {
                 Delete report
               </Button>
             )}
-            <div className="text-right min-w-16">
-              <div className="text-[11px] text-muted-foreground uppercase tracking-wider">
-                Average
-              </div>
-              <div className="text-3xl font-semibold tabular-nums font-mono">
-                {r.average != null ? r.average.toFixed(1) : "—"}
-              </div>
-            </div>
           </div>
-        }
-      />
+        )}
+      </div>
+
+      <ReportHero report={r} goalkeeper={goalkeeper} />
 
       {editAccessError && (
         <p className="text-xs text-destructive" role="alert">
@@ -279,13 +311,10 @@ function ReportDetail() {
         </p>
       )}
 
-      <div className="flex flex-wrap items-center gap-2 text-xs">
-        <span className="text-muted-foreground uppercase tracking-wider">Competition</span>
-        <Pill tone="muted">{r.competition ?? "Not recorded"}</Pill>
-      </div>
+      {form && <PlayerSnapshot report={r} form={form} goalkeeper={goalkeeper} />}
 
       {editing && draftScores && (
-        <Card className="p-4">
+        <Card className="rounded-xl p-4 sm:p-5">
           <form
             className="space-y-5"
             onSubmit={(event) => {
@@ -339,11 +368,14 @@ function ReportDetail() {
                               current ? { ...current, [id]: score } : current,
                             )
                           }
-                          className={`h-9 flex-1 rounded border text-sm font-mono font-semibold transition-colors ${
+                          className={cn(
+                            "h-9 flex-1 rounded border text-sm font-mono font-semibold transition-colors",
+                            // The picked score takes its band colour, so the
+                            // editor reads in the same ramp as the report.
                             selected
-                              ? "border-primary bg-primary text-primary-foreground"
-                              : "border-border text-muted-foreground hover:bg-accent hover:text-foreground"
-                          }`}
+                              ? cn("border-transparent text-rating-ink", scoreTone(score).bar)
+                              : "border-border text-muted-foreground hover:bg-accent hover:text-foreground",
+                          )}
                           aria-pressed={selected}
                         >
                           {score}
@@ -394,76 +426,60 @@ function ReportDetail() {
         </Card>
       )}
 
-      <div className="grid lg:grid-cols-3 gap-4">
-        <Card className="p-4 lg:col-span-2">
-          <div className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium mb-2">
-            Comments
-          </div>
-          <p className="text-sm leading-relaxed text-foreground/90 whitespace-pre-wrap">
-            {r.comments || (
-              <span className="text-muted-foreground italic">No comments recorded.</span>
-            )}
-          </p>
-        </Card>
-        <Card className="p-4">
-          <div className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium mb-2">
-            RPM Pillar Scores
-          </div>
-          <ul className="space-y-1.5 text-sm">
-            {PILLAR_IDS.map((id) => (
-              <li key={id} className="flex items-start justify-between gap-3">
-                <span className="text-muted-foreground text-xs leading-tight">
-                  {PILLAR_LABELS[id]}
-                </span>
-                <span className="font-semibold tabular-nums font-mono shrink-0">
-                  {r.scores[id] != null ? `${r.scores[id]}/5` : "—"}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </Card>
-      </div>
-
-      <Card className="p-4">
-        <div className="flex items-center justify-between mb-3">
-          <div className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
-            Attached Media
-          </div>
-          <span className="text-xs text-muted-foreground">{attachments.length} attached</span>
+      <div className="grid gap-4 lg:grid-cols-3">
+        <PillarBreakdown report={r} form={form} className="lg:col-span-2" />
+        <div className="space-y-4">
+          <PillarStandouts report={r} />
+          {form && <FormStrip report={r} form={form} />}
         </div>
-        {loadingAttachments ? (
-          <div className="text-sm text-muted-foreground py-4">Loading…</div>
-        ) : attachments.length === 0 ? (
-          <div className="text-sm text-muted-foreground py-4">
-            No media attached to this report.
+
+        <MentorVerdict report={r} className="lg:col-span-2" />
+
+        <section className="rounded-xl border border-border bg-card p-4 sm:p-5 lg:self-start">
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <h2 className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.2em] font-mono text-foreground">
+              <Paperclip className="size-3.5 text-primary-ink" aria-hidden="true" />
+              Attached Media
+            </h2>
+            <span className="rounded-full border border-border px-2 py-0.5 text-[11px] text-muted-foreground">
+              {attachments.length} attached
+            </span>
           </div>
-        ) : (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-            {attachments.map((a) => {
-              const Icon = ICON[a.media_type] ?? FileText;
-              return (
-                <button key={a.id} onClick={() => openAsset(a, user)} className="text-left">
-                  <Card className="overflow-hidden hover:border-primary/40 transition-colors">
-                    <div className="aspect-video bg-gradient-to-br from-accent/40 to-muted grid place-items-center relative">
-                      <Icon className="size-8 text-muted-foreground" />
-                      <ExternalLink className="size-3.5 absolute top-1.5 right-1.5 text-muted-foreground" />
-                    </div>
-                    <div className="p-2">
-                      <div className="text-xs font-medium line-clamp-1">{a.title}</div>
-                      <div className="flex items-center justify-between mt-1">
-                        <Pill>{a.media_type}</Pill>
-                        <span className="text-[10px] text-muted-foreground">
-                          {new Date(a.created_at).toLocaleDateString()}
-                        </span>
+          {loadingAttachments ? (
+            <div className="text-sm text-muted-foreground py-4">Loading…</div>
+          ) : attachments.length === 0 ? (
+            <div className="flex items-center gap-3 rounded-lg border border-dashed border-border px-4 py-5 text-sm text-muted-foreground">
+              <Video className="size-4 shrink-0" aria-hidden="true" />
+              No media attached to this report.
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-2 gap-3">
+              {attachments.map((a) => {
+                const Icon = ICON[a.media_type] ?? FileText;
+                return (
+                  <button key={a.id} onClick={() => openAsset(a, user)} className="text-left">
+                    <Card className="overflow-hidden hover:border-primary/40 transition-colors">
+                      <div className="aspect-video bg-gradient-to-br from-primary/15 via-accent/40 to-muted grid place-items-center relative">
+                        <Icon className="size-8 text-muted-foreground" />
+                        <ExternalLink className="size-3.5 absolute top-1.5 right-1.5 text-muted-foreground" />
                       </div>
-                    </div>
-                  </Card>
-                </button>
-              );
-            })}
-          </div>
-        )}
-      </Card>
+                      <div className="p-2">
+                        <div className="text-xs font-medium line-clamp-1">{a.title}</div>
+                        <div className="flex items-center justify-between mt-1">
+                          <Pill>{a.media_type}</Pill>
+                          <span className="text-[10px] text-muted-foreground">
+                            {new Date(a.created_at).toLocaleDateString()}
+                          </span>
+                        </div>
+                      </div>
+                    </Card>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </section>
+      </div>
 
       <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <AlertDialogContent>
