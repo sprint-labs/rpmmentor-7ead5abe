@@ -411,9 +411,6 @@ function GkProfile({ gk, player }: { gk: Goalkeeper; player: PlayerRosterRow }) 
               {gk.tags.map((tag: string) => (
                 <TierBadge key={tag} tier={tag as Tier} />
               ))}
-              {gk.onLoan && (
-                <Pill tone="info">On loan{gk.parentClub ? ` from ${gk.parentClub}` : ""}</Pill>
-              )}
             </div>
             <div className="mt-1 text-sm leading-snug text-muted-foreground">
               {profileSummary.join(" · ")}

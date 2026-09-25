@@ -255,9 +255,6 @@ function MobileGoalkeeperCard({
         {gk.tags.map((tag) => (
           <TierBadge key={tag} tier={tag} />
         ))}
-        {gk.onLoan && (
-          <Pill tone="info">On loan{gk.parentClub ? ` from ${gk.parentClub}` : ""}</Pill>
-        )}
       </div>
 
       <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 text-xs">
@@ -1250,14 +1247,7 @@ function GoalkeepersList() {
                       )}
                     </td>
                     <td className="px-2 text-muted-foreground">
-                      <div className="flex flex-col">
-                        <span>{gk.tags.includes("Free Agent") ? "-" : gk.club || "-"}</span>
-                        {gk.onLoan && gk.parentClub && (
-                          <span className="text-[10px] text-muted-foreground italic">
-                            on loan from {gk.parentClub}
-                          </span>
-                        )}
-                      </div>
+                      {gk.tags.includes("Free Agent") ? "-" : gk.club || "-"}
                     </td>
                     <td className="px-2 text-muted-foreground text-xs">
                       {gk.tags.includes("Free Agent") ? "-" : gk.league || "-"}

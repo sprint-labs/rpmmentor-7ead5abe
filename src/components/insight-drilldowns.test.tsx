@@ -205,18 +205,19 @@ afterEach(() => {
 });
 
 describe("PlayerRecordWorkbench", () => {
-  it("shows the full record and flags a loan in the list", () => {
+  it("shows the full record including loan status in the detail panel", () => {
     render(<PlayerRecordWorkbench players={players} />);
 
     const detail = within(panel("selected-player-detail"));
     expect(detail.getByRole("heading", { name: "Christian Walton" })).toBeTruthy();
-    expect(detail.getByText("On loan from Brighton")).toBeTruthy();
+    expect(detail.getByText("On loan")).toBeTruthy();
+    expect(detail.getByText("Brighton")).toBeTruthy();
     expect(detail.getByRole("link", { name: /Open player record/ }).getAttribute("href")).toBe(
       "/goalkeepers/gk-christian-walton",
     );
 
     const row = screen.getByRole("button", { name: "Show details for Christian Walton" });
-    expect(within(row).getByText("On loan from Brighton").className).toContain("text-warning");
+    expect(within(row).getByText("England")).toBeTruthy();
   });
 
   it("filters by league and keeps a visible record selected", () => {
