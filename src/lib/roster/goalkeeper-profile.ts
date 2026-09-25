@@ -16,7 +16,7 @@
 import { goalkeepers, type Goalkeeper } from "@/lib/mock-data";
 import { findPlayerByName, normalisePersonName } from "@/lib/goalkeeper-player-link";
 import type { PlayerRosterRow } from "@/lib/players.functions";
-import { toGoalkeeper } from "@/lib/roster/live-goalkeepers";
+import { toGoalkeeper, toGoalkeepers } from "@/lib/roster/live-goalkeepers";
 
 /** Seed rows by normalised name, built once from the roster already in memory. */
 const SEED_BY_NAME = new Map(goalkeepers.map((gk) => [normalisePersonName(gk.name), gk] as const));
@@ -54,7 +54,10 @@ export function withSeedNarrative(
  * ability to attach a voice note at all.
  *
  * The seed is kept as a fallback only because a picker can still fall back to
- * it while the roster query is in flight.
+ * it while the roster query is in flight. Once the roster has arrived it is
+ * the whole answer: a goalkeeper taken off the roster is archived in
+ * `public.players` but still listed in the seed, and must not come back
+ * through it as though he were still on the roster.
  */
 export function goalkeeperByName(
   name: string,
@@ -63,8 +66,25 @@ export function goalkeeperByName(
 ): Goalkeeper | null {
   const live = findPlayerByName(players, name);
   if (live) return toGoalkeeper(live);
+  if (players?.length) return null;
 
   const key = normalisePersonName(name);
   if (!key) return null;
   return seed.find((g) => normalisePersonName(g.name) === key) ?? null;
+}
+
+/**
+ * Every roster goalkeeper by normalised name, for a list of match reports to
+ * link each report to its goalkeeper's profile.
+ *
+ * Built from the live roster once it has arrived, and from the seed only
+ * while it has not, so a report on a goalkeeper taken off the roster reads as
+ * a report on any goalkeeper outside it: no profile link and no tier badge.
+ */
+export function rosterGoalkeepersByName(
+  players: readonly PlayerRosterRow[] | null | undefined,
+  seed: readonly Goalkeeper[] = goalkeepers,
+): Map<string, Goalkeeper> {
+  const source = players?.length ? toGoalkeepers(players) : seed;
+  return new Map(source.map((gk) => [normalisePersonName(gk.name), gk] as const));
 }
