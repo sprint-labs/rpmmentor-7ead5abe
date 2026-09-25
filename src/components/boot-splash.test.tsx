@@ -2,9 +2,19 @@
 
 import { cleanup, render } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
-import { BootSplash, bootSplashCss } from "@/components/boot-splash";
+import {
+  BootSplash,
+  SIGN_IN_SPLASH_MS,
+  SignInSplash,
+  bootSplashCss,
+  bootSplashSkipScript,
+} from "@/components/boot-splash";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  localStorage.clear();
+  document.documentElement.removeAttribute("data-no-splash");
+});
 
 describe("BootSplash", () => {
   it("draws the brand mark from the shipped asset rather than retyping GK", () => {
@@ -42,5 +52,36 @@ describe("bootSplashCss", () => {
       expect(reduced).toContain(layer);
     }
     expect(reduced).toContain("animation:none");
+  });
+});
+
+describe("bootSplashSkipScript", () => {
+  it("skips the page-load splash when nobody is signed in", () => {
+    new Function(bootSplashSkipScript)();
+
+    expect(document.documentElement.getAttribute("data-no-splash")).toBe("1");
+    expect(bootSplashCss).toContain("html[data-no-splash] #boot-splash{display:none}");
+  });
+
+  it("keeps the page-load splash for a saved session", () => {
+    localStorage.setItem("sb-abcdef-auth-token", "{}");
+
+    new Function(bootSplashSkipScript)();
+
+    expect(document.documentElement.hasAttribute("data-no-splash")).toBe(false);
+  });
+});
+
+describe("SignInSplash", () => {
+  it("announces the sign-in and reuses the splash art", () => {
+    const { getByRole, container } = render(<SignInSplash />);
+
+    expect(getByRole("status").getAttribute("aria-label")).toBe("Signing you in");
+    expect(container.querySelector("img.bs-base")?.getAttribute("src")).toBe("/gkhq-mark.png");
+    expect(container.querySelector("#boot-splash")).toBeNull();
+  });
+
+  it("holds for exactly one fill loop", () => {
+    expect(bootSplashCss).toContain(`animation:bs-rise ${SIGN_IN_SPLASH_MS / 1000}s`);
   });
 });
