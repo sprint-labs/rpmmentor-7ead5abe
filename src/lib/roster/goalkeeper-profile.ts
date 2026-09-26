@@ -40,6 +40,7 @@ export function withSeedNarrative(
     bio: match.bio,
     developmentPlan: match.developmentPlan,
     videoLinks: match.videoLinks,
+    seasonStats: match.seasonStats,
   };
 }
 

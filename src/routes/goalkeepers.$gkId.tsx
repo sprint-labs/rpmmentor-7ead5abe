@@ -38,6 +38,9 @@ import { scoreTone } from "@/lib/score-band";
 import { flagFor } from "@/lib/nationality-flag";
 import { rosterRowForLegacySlug, toGoalkeeper } from "@/lib/roster/live-goalkeepers";
 import { withSeedNarrative } from "@/lib/roster/goalkeeper-profile";
+import { formatDobDisplay } from "@/lib/dob-format";
+import { SEASON_STAT_ROWS } from "@/lib/goalkeeper-season-stats";
+import { ClubCrest } from "@/components/club-crest";
 import {
   compareInteractionsByAlertThenDate,
   interactionOutcomeAlertRank,
@@ -80,17 +83,6 @@ const PILLAR_SHORT_LABELS: Record<PillarId, string> = {
   psych: "Psychological",
   physical: "Physical",
 };
-
-function formatDob(iso: string): string {
-  if (!iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return "Not recorded";
-  const [year, month, day] = iso.split("-").map(Number);
-  return new Intl.DateTimeFormat("en-GB", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    timeZone: "UTC",
-  }).format(new Date(Date.UTC(year, month - 1, day)));
-}
 
 function formatContractExpiry(value: string): string {
   if (value === "—") return "-";
@@ -181,9 +173,9 @@ function GkProfile({ gk, player }: { gk: Goalkeeper; player: PlayerRosterRow }) 
     () => Array.from(new Set([gk.id, linkedPlayerId].filter((id): id is string => !!id))),
     [gk.id, linkedPlayerId],
   );
-  // Club, league and citizenship are read straight off the canonical row.
+  // Club, league and nationality are read straight off the canonical row.
   // `gk` is a mapping of that same row, so there is no second opinion to fall
-  // back to. Citizenship is shown in exactly one place: its stat box below.
+  // back to. Nationality is shown in exactly one place: its stat box below.
   const displayClub = player.current_club;
   const displayLeague = player.league;
   const displayNationality = player.nationality;
@@ -412,8 +404,11 @@ function GkProfile({ gk, player }: { gk: Goalkeeper; player: PlayerRosterRow }) 
                 <TierBadge key={tag} tier={tag as Tier} />
               ))}
             </div>
-            <div className="mt-1 text-sm leading-snug text-muted-foreground">
-              {profileSummary.join(" · ")}
+            <div className="mt-1 flex min-w-0 items-center gap-2 text-sm leading-snug text-muted-foreground">
+              {!gk.tags.includes("Free Agent") && displayClub ? (
+                <ClubCrest club={displayClub} size="sm" />
+              ) : null}
+              <span className="min-w-0">{profileSummary.join(" · ")}</span>
             </div>
             {/* The profile is resolved from the roster row itself, so club
                 corrections always have a canonical record to write back to. */}
@@ -491,10 +486,10 @@ function GkProfile({ gk, player }: { gk: Goalkeeper; player: PlayerRosterRow }) 
                     : "—",
             },
             { label: "Contract expiry", value: formatContractExpiry(gk.contractUntil) },
-            { label: "DOB", value: formatDob(gk.dob) },
+            { label: "DOB", value: formatDobDisplay(gk.dob) },
             { label: "Age", value: gk.age != null ? String(gk.age) : "Not recorded" },
             {
-              label: "Citizenship",
+              label: "Nationality",
               value: displayNationality || "—",
               // Decorative: the country name beside it already carries the
               // meaning, and not every nationality has a flag to show.
@@ -520,6 +515,37 @@ function GkProfile({ gk, player }: { gk: Goalkeeper; player: PlayerRosterRow }) 
           </Card>
         ))}
       </div>
+
+      {gk.seasonStats ? (
+        <div>
+          <div className="mb-1.5 flex items-baseline justify-between gap-2">
+            <SectionTitle>Season stats</SectionTitle>
+            <span className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
+              {gk.seasonStats.seasonLabel} · All competitions
+            </span>
+          </div>
+          <Card className="overflow-x-auto p-0">
+            <table className="w-full min-w-[280px] text-sm">
+              <thead>
+                <tr className="border-b border-border text-left text-[10px] uppercase tracking-wide text-muted-foreground">
+                  <th className="px-3 py-2 font-medium">Stat</th>
+                  <th className="px-3 py-2 font-medium text-right tabular-nums">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {SEASON_STAT_ROWS.map(({ key, label }) => (
+                  <tr key={key} className="border-b border-border/60 last:border-0">
+                    <td className="px-3 py-1.5 text-muted-foreground">{label}</td>
+                    <td className="px-3 py-1.5 text-right font-semibold tabular-nums">
+                      {gk.seasonStats![key]}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </Card>
+        </div>
+      ) : null}
 
       {/* The skill scores themselves, as stats rather than as a buried panel.
           Each value is the stored last-5-report average already computed above

@@ -39,6 +39,17 @@ describe("the narrative the database has no column for", () => {
     expect(merged.bio).toBe(seedGk.bio);
     expect(merged.developmentPlan).toEqual(seedGk.developmentPlan);
     expect(merged.videoLinks).toEqual(seedGk.videoLinks);
+    if (seedGk.seasonStats) {
+      expect(merged.seasonStats).toEqual(seedGk.seasonStats);
+    }
+  });
+
+  it("restores Goal.com season stats for James Beadle", () => {
+    const live = toGoalkeepers([player({ full_name: "James Beadle" })])[0];
+    const merged = withSeedNarrative(live);
+    expect(merged.seasonStats?.seasonLabel).toBe("2025/2026");
+    expect(merged.seasonStats?.appearances).toBe(38);
+    expect(merged.seasonStats?.minutesPlayed).toBe(3420);
   });
 
   it("leaves every column the database does hold alone", () => {
