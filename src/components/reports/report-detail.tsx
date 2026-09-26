@@ -28,7 +28,8 @@ import {
 import { Avatar, TierBadge } from "@/components/primitives";
 import { ClubCrest, clubRail } from "@/components/club-crest";
 import { PipBar, PlayerPortrait, ScoreBandChip } from "@/components/reports/report-visuals";
-import { BAND_COLOR, BAND_LABEL, formatMatchDate } from "@/lib/match-reports/report-display";
+import { ScoreScaleGuide } from "@/components/reports/score-scale-guide";
+import { BAND_COLOR, formatMatchDate } from "@/lib/match-reports/report-display";
 import { initialsOf } from "@/lib/initials";
 import { flagFor } from "@/lib/nationality-flag";
 import { scoreTone, type ScoreBand } from "@/lib/score-band";
@@ -42,6 +43,7 @@ import {
 import {
   PILLAR_IDS,
   PILLAR_LABELS,
+  averageMeaning,
   type MatchReportRow,
   type PillarId,
 } from "@/lib/match-reports/schema";
@@ -233,12 +235,15 @@ function StatTile({
   label,
   value,
   caption,
+  captionWraps = false,
   band,
   valueClassName,
 }: {
   label: string;
   value: ReactNode;
   caption?: ReactNode;
+  /** Let a caption that must be read in full wrap instead of truncating. */
+  captionWraps?: boolean;
   /** Paints the tile's top edge in the rating ramp when the value is a score. */
   band?: ScoreBand;
   valueClassName?: string;
@@ -262,7 +267,14 @@ function StatTile({
         {value}
       </div>
       {caption ? (
-        <div className="mt-1.5 truncate text-[11px] text-muted-foreground">{caption}</div>
+        <div
+          className={cn(
+            "mt-1.5 text-[11px] text-muted-foreground",
+            captionWraps ? "leading-snug" : "truncate",
+          )}
+        >
+          {caption}
+        </div>
       ) : null}
     </div>
   );
@@ -324,9 +336,8 @@ export function PlayerSnapshot({
       <StatTile
         label="Reports filed"
         value={form.reports.length}
-        caption={
-          overall.band === "unknown" ? "No scores yet" : `${BAND_LABEL[overall.band]} overall`
-        }
+        caption={averageMeaning(form.overallAverage) ?? "No scores yet"}
+        captionWraps
       />
       <StatTile
         label="Club"
@@ -374,13 +385,6 @@ function DeltaChipLarge({ delta }: { delta: number }) {
 // Pillars
 // ---------------------------------------------------------------------------
 
-const LEGEND: { band: ScoreBand; range: string }[] = [
-  { band: "high", range: "4–5" },
-  { band: "good", range: "3" },
-  { band: "fair", range: "2" },
-  { band: "low", range: "1" },
-];
-
 export function PillarBreakdown({
   report,
   form,
@@ -392,27 +396,7 @@ export function PillarBreakdown({
   className?: string;
 }) {
   return (
-    <Panel
-      title="RPM Pillar Scores"
-      className={className}
-      aside={
-        <ul className="flex flex-wrap items-center gap-x-3 gap-y-1" aria-label="Score colours">
-          {LEGEND.map(({ band, range }) => (
-            <li
-              key={band}
-              className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider text-muted-foreground"
-            >
-              <span
-                aria-hidden="true"
-                className="size-2 rounded-sm"
-                style={{ backgroundColor: BAND_COLOR[band] }}
-              />
-              {BAND_LABEL[band]} {range}
-            </li>
-          ))}
-        </ul>
-      }
-    >
+    <Panel title="RPM Pillar Scores" className={className}>
       <ul className="divide-y divide-border/60">
         {PILLAR_IDS.map((id) => (
           <PillarRow
@@ -430,6 +414,7 @@ export function PillarBreakdown({
           {plural(form.baselineCount, "other report", "other reports")}.
         </p>
       ) : null}
+      <ScoreScaleGuide className="mt-4 border-t border-border/60 pt-3" />
     </Panel>
   );
 }

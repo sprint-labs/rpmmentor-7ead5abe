@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState } from "react";
 
@@ -514,5 +514,65 @@ describe("Match Report form", () => {
     expect(mocks.clearDraft).toHaveBeenCalledWith(USER.id);
     expect(mocks.refreshInteractionViews).not.toHaveBeenCalled();
     expect(await screen.findByText(/queued on this device/i)).toBeTruthy();
+  });
+});
+
+describe("Match Report rating scale", () => {
+  // Word for word as RPM set it, highest first. Written out, not read from the
+  // shared constant, so a drift in either place fails here.
+  const RPM_RATING_SYSTEM = [
+    "Performing above current level",
+    "Performing at top of current level",
+    "Performing at current level",
+    "Performing below current level",
+    "Cause for concern",
+  ];
+
+  it("lists RPM's rating system where the mentor scores, in place of poor to excellent", async () => {
+    renderReport();
+    await waitFor(() => expect(mocks.loadDraft).toHaveBeenCalledWith(USER.id));
+
+    const scale = screen.getByRole("group", { name: "Rating scale" });
+    expect(
+      within(scale)
+        .getAllByRole("definition")
+        .map((d) => d.textContent),
+    ).toEqual(RPM_RATING_SYSTEM);
+    expect(
+      within(scale)
+        .getAllByRole("term")
+        .map((t) => t.textContent),
+    ).toEqual(["5", "4", "3", "2", "1"]);
+    expect(screen.queryByText(/poor/i)).toBeNull();
+    expect(screen.queryByText(/excellent/i)).toBeNull();
+  });
+
+  it("reads each score's meaning out on its button and marks the one picked", async () => {
+    renderReport();
+    await waitFor(() => expect(mocks.loadDraft).toHaveBeenCalledWith(USER.id));
+
+    const pillar = screen.getByRole("group", { name: "Protect the Goal score" });
+    const buttons = within(pillar).getAllByRole("button");
+    expect(buttons.map((b) => b.getAttribute("aria-label"))).toEqual([
+      "1: Cause for concern",
+      "2: Performing below current level",
+      "3: Performing at current level",
+      "4: Performing at top of current level",
+      "5: Performing above current level",
+    ]);
+    expect(buttons.map((b) => b.getAttribute("title"))).toEqual(
+      buttons.map((b) => b.getAttribute("aria-label")),
+    );
+
+    const four = within(pillar).getByRole("button", {
+      name: "4: Performing at top of current level",
+    });
+    fireEvent.click(four);
+    expect(four.getAttribute("aria-pressed")).toBe("true");
+    expect(
+      within(pillar)
+        .getByRole("button", { name: "3: Performing at current level" })
+        .getAttribute("aria-pressed"),
+    ).toBe("false");
   });
 });

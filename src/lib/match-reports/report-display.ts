@@ -22,14 +22,10 @@ export const SHORT_PILLAR: Record<PillarId, string> = {
   physical: "Physical",
 };
 
-/** The design system's names for the rating ramp (see `/design/gkhq`). */
-export const BAND_LABEL: Record<ScoreBand, string> = {
-  high: "Elite",
-  good: "Strong",
-  fair: "Average",
-  low: "Poor",
-  unknown: "Unscored",
-};
+// Scores are described in RPM's own words, from `SCORE_SCALE` in `schema.ts`.
+// The ramp's design-system names (Elite, Strong, Average, Poor) are for the
+// `/design/gkhq` gallery only: RPM judges every score against the goalkeeper's
+// current level, so they must not be shown against a score.
 
 /**
  * The band's colour as a CSS value, for the one place a class cannot reach: a
