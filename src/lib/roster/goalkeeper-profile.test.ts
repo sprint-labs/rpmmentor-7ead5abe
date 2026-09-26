@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { goalkeeperByName, withSeedNarrative } from "./goalkeeper-profile";
+import { goalkeeperByName, rosterGoalkeepersByName, withSeedNarrative } from "./goalkeeper-profile";
 import { toGoalkeepers } from "./live-goalkeepers";
 import { goalkeepers as seedRoster } from "@/lib/mock-data";
 import type { PlayerRosterRow } from "@/lib/players.functions";
@@ -106,5 +106,37 @@ describe("a name picked on a form resolves to the goalkeeper it names", () => {
   it("returns null for a name in neither source, and for an empty one", () => {
     expect(goalkeeperByName("Nobody At All", [live])).toBeNull();
     expect(goalkeeperByName("   ", [live])).toBeNull();
+  });
+
+  it("does not bring back a goalkeeper the loaded roster no longer holds", () => {
+    // Taken off the roster: archived in `public.players`, so absent from the
+    // live list, but still in the seed. He must resolve as off the roster.
+    const archived = seedRoster[0];
+    expect(goalkeeperByName(archived.name, [live])).toBeNull();
+  });
+});
+
+describe("the Submission Centre's roster lookup", () => {
+  const live = player({ id: "live-1", full_name: "Alfie Smith", tier: "Tier 2" });
+
+  it("links reports to the live roster once it has arrived", () => {
+    const byName = rosterGoalkeepersByName([live]);
+    expect(byName.get("alfie smith")?.id).toBe("gk-alfie-smith");
+    expect(byName.get("alfie smith")?.tier).toBe("Tier 2");
+  });
+
+  it("leaves a goalkeeper taken off the roster unlinked, even though the seed lists him", () => {
+    const archived = seedRoster[0];
+    const byName = rosterGoalkeepersByName([live]);
+    expect(byName.has(archived.name.toLowerCase())).toBe(false);
+    expect(byName.size).toBe(1);
+  });
+
+  it("stands in with the seed only while the roster query is in flight", () => {
+    for (const pending of [undefined, null, []]) {
+      const byName = rosterGoalkeepersByName(pending);
+      expect(byName.size).toBe(seedRoster.length);
+      expect(byName.get(seedRoster[0].name.toLowerCase())?.id).toBe(seedRoster[0].id);
+    }
   });
 });

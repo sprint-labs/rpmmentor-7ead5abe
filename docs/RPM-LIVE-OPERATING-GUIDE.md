@@ -184,6 +184,19 @@ Use this short release gate:
 
 8. **`list_mentor_directory()` security lint** — The function now rejects callers who are not `mentor`, `mentor_manager`, `admin`, or `super_admin`. Supabase may still surface `authenticated_security_definer_function_executable` because `authenticated` retains `EXECUTE` on a `SECURITY DEFINER` RPC; that is required for calendar/insights reads from the browser client.
 
+### 25 Sep 2026: Five goalkeepers taken off the roster (completed)
+
+Management request (David Rouse, 25 Sep 2026) to remove five goalkeepers from the system. The owner's instruction was narrower: take them off the roster but keep them in the system, alongside the goalkeepers mentors already score who are not on the roster (opposition goalkeepers and video-report goalkeepers).
+
+| Item | State |
+| --- | --- |
+| How | Archived, not deleted. `deleted_at` and `deleted_by` (the owner's Super Admin id) were set together on the five live `public.players` rows on project `zdxxezquhvpjmoxlecjp`, which is what `deletePlayerRecord` in `src/lib/players.functions.ts` does. The rows stay in the table for a controlled restore. Names and ids are in the live table, not here. |
+| Checked first | None of the five had an interaction, a calendar event or a duty-of-care reset. One had a Match Report. All five were Tier 3. |
+| Result | Live roster 119 → 114. `player_duty_of_care` 119 → 114, none of the five. Match Reports untouched (215 live), including the one on an archived goalkeeper. |
+| Still scoreable | A mentor types the name on the Match Report form, as for any goalkeeper outside the roster, and the form keeps what was typed. Those reports sit with the other non-roster reports in `match_reports_cache`. |
+| Code | The Submission Centre and the shared name resolver fell back to the seed in `src/lib/mock-data.ts`, which still lists all five, so an archived goalkeeper kept a tier badge and a profile link that no longer resolves. Both now use the seed only while the live roster is loading. |
+| Reversal | Set `deleted_at` and `deleted_by` back to null together on the row, as the service role. The app refuses to restore an archived record. |
+
 ### 23 Sep 2026 — Three goalkeepers added to the roster (completed)
 
 Management request (David Rouse, 21 Sep 2026). Two Chelsea Academy goalkeepers and one Brisbane Roar goalkeeper were missing from the roster, so they had no profile page for their Individual Learning Plans to be uploaded to. Inserted directly into live `public.players` on project `zdxxezquhvpjmoxlecjp`.
