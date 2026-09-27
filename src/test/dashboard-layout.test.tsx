@@ -288,3 +288,33 @@ describe("dashboard operational grid", () => {
     expect(cell.querySelectorAll("[class*='col-span-']")).toHaveLength(0);
   });
 });
+
+describe("dashboard Match Reports tile", () => {
+  it("opens the Submission Centre scoped to the window it counts", async () => {
+    await renderDashboard();
+
+    const tile = screen.getByRole("link", { name: /Open the Match Report Submission Centre/ });
+    const href = new URL(tile.getAttribute("href") ?? "", "http://localhost");
+    expect(href.pathname).toBe("/reports");
+    // The same 14-day window as the count on the tile, so the number matches
+    // the reports on screen.
+    expect(href.searchParams.get("from")).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(href.searchParams.get("to")).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+
+  it("sends the retired Match Reports insight to the Submission Centre", async () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const router = createRouter({
+      context: { queryClient },
+      history: createMemoryHistory({
+        initialEntries: ["/insights/reports?from=2026-09-10&to=2026-09-23"],
+      }),
+      routeTree,
+    });
+
+    await router.load();
+
+    expect(router.state.location.pathname).toBe("/reports");
+    expect(router.state.location.search).toMatchObject({ from: "2026-09-10", to: "2026-09-23" });
+  });
+});

@@ -6,9 +6,8 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { PageHeader, Card, Pill, SectionTitle, EmptyState } from "@/components/primitives";
 import { useEffect, useMemo, useState } from "react";
 import { FileText, RefreshCw, X, FilePlus2, NotebookPen } from "lucide-react";
-import { goalkeepers as roster, type Goalkeeper } from "@/lib/mock-data";
 import { listPlayers } from "@/lib/players.functions";
-import { toGoalkeepers } from "@/lib/roster/live-goalkeepers";
+import { rosterGoalkeepersByName } from "@/lib/roster/goalkeeper-profile";
 import { normalisePersonName } from "@/lib/goalkeeper-player-link";
 import { useAuth } from "@/lib/auth";
 import { WorkflowDialog, type WorkflowKind } from "@/components/workflows";
@@ -179,17 +178,10 @@ function ReportsPage() {
    *
    * Built from the live roster, so a report filed on a goalkeeper signed since
    * the seed was captured still links to their profile instead of rendering as
-   * plain text.
+   * plain text, and one on a goalkeeper taken off the roster reads as off it.
+   * The seed stands in only while the roster query is in flight.
    */
-  const rosterByName = useMemo(() => {
-    const m = new Map<string, Goalkeeper>();
-    for (const g of toGoalkeepers(rosterRows)) m.set(normalisePersonName(g.name), g);
-    // Fallback only: while the roster query is in flight, keep the links the
-    // page had before rather than showing none.
-    for (const g of roster)
-      if (!m.has(normalisePersonName(g.name))) m.set(normalisePersonName(g.name), g);
-    return m;
-  }, [rosterRows]);
+  const rosterByName = useMemo(() => rosterGoalkeepersByName(rosterRows), [rosterRows]);
 
   function openLog(prefill: { gkId?: string; date?: string } = {}) {
     setLogPrefill(prefill);

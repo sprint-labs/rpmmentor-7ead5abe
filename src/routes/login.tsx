@@ -1,10 +1,11 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useAuth } from "@/lib/auth";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, MotionConfig, motion } from "motion/react";
 import { ArrowLeft, Eye, EyeOff, Loader2, Lock, Mail, MailCheck } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { GkhqMark } from "@/components/gkhq-lockup";
+import { SIGN_IN_SPLASH_MS, SignInSplash } from "@/components/boot-splash";
 import { passwordRecoveryRedirectUrl } from "@/lib/password-recovery";
 import { canonicalUrl } from "@/lib/canonical-url";
 import { GOOGLE_SIGN_IN_ENABLED } from "@/lib/auth-providers";
@@ -120,13 +121,23 @@ function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [googleSubmitting, setGoogleSubmitting] = useState(false);
+  // Set while a password sign-in is in flight, so the redirect below waits for
+  // the sign-in splash instead of jumping straight to the dashboard.
+  const holdRedirect = useRef(false);
+  const [entering, setEntering] = useState(false);
 
   const [resetEmail, setResetEmail] = useState("");
   const [sentTo, setSentTo] = useState("");
 
   useEffect(() => {
-    if (user) navigate({ to: next, replace: true });
+    if (user && !holdRedirect.current) navigate({ to: next, replace: true });
   }, [user, navigate, next]);
+
+  useEffect(() => {
+    if (!entering) return;
+    const timer = setTimeout(() => navigate({ to: next, replace: true }), SIGN_IN_SPLASH_MS);
+    return () => clearTimeout(timer);
+  }, [entering, navigate, next]);
 
   /**
    * Hand off to Google. The browser leaves this page, so there is no success
@@ -162,9 +173,15 @@ function LoginPage() {
       return;
     }
     setSubmitting(true);
+    holdRedirect.current = true;
     const res = await signIn(email, password);
-    setSubmitting(false);
-    if (!res.ok) setError(res.error || "Invalid email or password.");
+    if (!res.ok) {
+      holdRedirect.current = false;
+      setSubmitting(false);
+      setError(res.error || "Invalid email or password.");
+      return;
+    }
+    setEntering(true);
   }
 
   async function handleForgotSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -453,6 +470,7 @@ function LoginPage() {
           </div>
         </div>
       </MotionConfig>
+      {entering && <SignInSplash />}
     </main>
   );
 }

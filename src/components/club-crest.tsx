@@ -11,6 +11,7 @@
  */
 import { cn } from "@/lib/utils";
 import { clubAccent, clubInitials } from "@/lib/club-identity";
+import { clubCrestUrlFor } from "@/lib/club-crest-urls";
 
 /**
  * The categorical ramp, indexed by `clubAccent`.
@@ -46,14 +47,27 @@ export function ClubCrest({
   className?: string;
 }) {
   const name = club?.trim() ?? "";
+  const crestUrl = clubCrestUrlFor(name);
+  const box = cn(
+    "grid shrink-0 place-items-center overflow-hidden rounded-md border-2 bg-muted",
+    RING[clubAccent(name) - 1],
+    size === "sm" ? "size-8" : "size-11",
+    className,
+  );
+  if (crestUrl) {
+    return (
+      <span aria-hidden="true" className={box}>
+        <img src={crestUrl} alt="" className="size-full object-contain p-0.5" />
+      </span>
+    );
+  }
   return (
     <span
       aria-hidden="true"
       className={cn(
-        "grid shrink-0 place-items-center rounded-md border-2 bg-muted font-display font-bold leading-none tracking-tight text-foreground",
-        RING[clubAccent(name) - 1],
-        size === "sm" ? "size-8 text-[10px]" : "size-11 text-xs",
-        className,
+        box,
+        "font-display font-bold leading-none tracking-tight text-foreground",
+        size === "sm" ? "text-[10px]" : "text-xs",
       )}
     >
       {clubInitials(name)}

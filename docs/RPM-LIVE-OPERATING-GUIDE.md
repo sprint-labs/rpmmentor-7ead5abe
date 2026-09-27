@@ -99,7 +99,7 @@ All 18 public tables are RLS-enabled. The most important live counts at this sna
 
 The current database was recreated from the repository's historical migrations with security-minded adjustments. Crucially, its `handle_new_user()` function creates a profile but **does not automatically grant a role**. Provision a role deliberately. Do not assume older source comments saying that a default mentor role is seeded are still true.
 
-The repository's migration history and the live database are reconciled: `supabase/migrations/` holds **54** SQL files and the live project's ledger reports **54** applied entries. The latest two, `20260923033248_match_clips.sql` and `20260923041738_players_insert_management.sql`, were applied on 23 Sep 2026 and added to the manifest at their ledger versions. `docs/supabase-production-migration-manifest.json` is the captured baseline (project `zdxxezquhvpjmoxlecjp`, recaptured 2026-09-23) and `npm run check:migrations` verifies the repository against it on every pull request. Treat that parity as a checked invariant, not as permission to run migrations against production. Before any schema, Auth, RLS, trigger, policy, storage or data change: inspect the live target, prepare a forward-only migration, review it, back up/validate the affected data, and obtain explicit production approval.
+The repository's migration history and the live database are reconciled: `supabase/migrations/` holds **55** SQL files and the live project's ledger reports **55** applied entries. `20260925180000_match_reports_canonical_goalkeeper_name.sql` is the latest applied: it was verified live on 27 Sep 2026 — the function, its `BEFORE INSERT OR UPDATE OF goalkeeper` trigger on `public.match_reports_cache`, and the `REVOKE` that keeps `anon` and `authenticated` off it are all in place, matching the reviewed SQL — and moved into the manifest's production list at its ledger version. There are no reviewed forward migrations outstanding. `docs/supabase-production-migration-manifest.json` is the captured baseline (project `zdxxezquhvpjmoxlecjp`, recaptured 2026-09-27) and `npm run check:migrations` verifies the repository against it on every pull request. Treat that parity as a checked invariant, not as permission to run migrations against production. Before any schema, Auth, RLS, trigger, policy, storage or data change: inspect the live target, prepare a forward-only migration, review it, back up/validate the affected data, and obtain explicit production approval.
 
 ### Why the code looks this way
 
@@ -183,6 +183,19 @@ Use this short release gate:
 9. ~~**Google sign-in shipped before its provider state was confirmed**~~ — **Resolved 21 Sep 2026 (process).** The button shipped in #110 and needed three same-day corrective pull requests (#111, #112, #113) because the provider's live configuration was never evidenced before release: the provider held a placeholder client id, so Supabase handed the browser to Google, which answered `Error 401: invalid_client` on a page of its own — a signed-out user taken off the site entirely, in Google's words, and invisible to CI and to a local build. `src/lib/auth-providers.ts` now carries `GOOGLE_SIGN_IN_ENABLED` as the single kill switch and documents every precondition; the release gate above now requires those preconditions to be evidenced against the live project, plus one real sign-in on the preview deployment, before a provider change merges. The same gate applies to any future provider (Microsoft, Apple, magic link).
 
 8. **`list_mentor_directory()` security lint** — The function now rejects callers who are not `mentor`, `mentor_manager`, `admin`, or `super_admin`. Supabase may still surface `authenticated_security_definer_function_executable` because `authenticated` retains `EXECUTE` on a `SECURITY DEFINER` RPC; that is required for calendar/insights reads from the browser client.
+
+### 25 Sep 2026: Five goalkeepers taken off the roster (completed)
+
+Management request (David Rouse, 25 Sep 2026) to remove five goalkeepers from the system. The owner's instruction was narrower: take them off the roster but keep them in the system, alongside the goalkeepers mentors already score who are not on the roster (opposition goalkeepers and video-report goalkeepers).
+
+| Item | State |
+| --- | --- |
+| How | Archived, not deleted. `deleted_at` and `deleted_by` (the owner's Super Admin id) were set together on the five live `public.players` rows on project `zdxxezquhvpjmoxlecjp`, which is what `deletePlayerRecord` in `src/lib/players.functions.ts` does. The rows stay in the table for a controlled restore. Names and ids are in the live table, not here. |
+| Checked first | None of the five had an interaction, a calendar event or a duty-of-care reset. One had a Match Report. All five were Tier 3. |
+| Result | Live roster 119 → 114. `player_duty_of_care` 119 → 114, none of the five. Match Reports untouched (215 live), including the one on an archived goalkeeper. |
+| Still scoreable | A mentor types the name on the Match Report form, as for any goalkeeper outside the roster, and the form keeps what was typed. Those reports sit with the other non-roster reports in `match_reports_cache`. |
+| Code | The Submission Centre and the shared name resolver fell back to the seed in `src/lib/mock-data.ts`, which still lists all five, so an archived goalkeeper kept a tier badge and a profile link that no longer resolves. Both now use the seed only while the live roster is loading. |
+| Reversal | Set `deleted_at` and `deleted_by` back to null together on the row, as the service role. The app refuses to restore an archived record. |
 
 ### 23 Sep 2026 — Three goalkeepers added to the roster (completed)
 
