@@ -101,7 +101,8 @@ describe("ReportHero", () => {
     expect(screen.getByText("Norwich City")).toBeTruthy();
     expect(screen.getByText("Reported by Andy Marshall")).toBeTruthy();
     expect(screen.getByText("4.1").className).toContain("text-rating-elite");
-    expect(screen.getByText("Elite")).toBeTruthy();
+    expect(screen.getByText("Performing at top of current level")).toBeTruthy();
+    expect(screen.queryByText("Elite")).toBeNull();
     expect(screen.getByRole("link", { name: /View goalkeeper profile/ }).getAttribute("href")).toBe(
       "/goalkeepers/$gkId:gk-james-beadle",
     );
@@ -135,6 +136,9 @@ describe("PlayerSnapshot", () => {
     expect(snapshot.getByText("vs 1 other report")).toBeTruthy();
     expect(snapshot.getByText("England")).toBeTruthy();
     expect(snapshot.getByText("Age 22")).toBeTruthy();
+    // Overall (4.1 + 3.1) / 2 = 3.6, in RPM's words rather than "Strong overall".
+    expect(snapshot.getByText("Performing at current level")).toBeTruthy();
+    expect(snapshot.queryByText(/overall/i)).toBeNull();
   });
 });
 
@@ -154,6 +158,26 @@ describe("PillarBreakdown", () => {
     render(<PillarBreakdown report={report()} form={null} />);
     expect(screen.getAllByText("5/5").length).toBe(3);
     expect(screen.queryByText(/\+/)).toBeNull();
+  });
+
+  it("lists RPM's rating system as the key, not the design system's band names", () => {
+    render(<PillarBreakdown report={report()} form={null} />);
+
+    const scale = screen.getByRole("group", { name: "Rating scale" });
+    expect(
+      within(scale)
+        .getAllByRole("definition")
+        .map((d) => d.textContent),
+    ).toEqual([
+      "Performing above current level",
+      "Performing at top of current level",
+      "Performing at current level",
+      "Performing below current level",
+      "Cause for concern",
+    ]);
+    for (const band of ["Elite", "Strong", "Average", "Poor"]) {
+      expect(screen.queryByText(new RegExp(`\\b${band}\\b`))).toBeNull();
+    }
   });
 });
 

@@ -115,8 +115,10 @@ import {
   PILLAR_IDS,
   PILLAR_LABELS,
   averageOfScores,
+  scoreMeaning,
   type PillarId,
 } from "@/lib/match-reports/schema";
+import { ScoreScaleGuide } from "@/components/reports/score-scale-guide";
 import {
   loadDraft,
   saveDraft,
@@ -2527,12 +2529,10 @@ function ReportForm({
       </div>
 
       <div>
-        <div className="flex items-baseline justify-between mb-2">
-          <div className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
-            RPM Pillar Scores (1–5)
-          </div>
-          <div className="text-[10px] text-muted-foreground">1 = poor · 5 = excellent</div>
+        <div className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium mb-2">
+          RPM Pillar Scores (1–5)
         </div>
+        <ScoreScaleGuide className="mb-2 rounded-md border border-border/60 bg-muted/30 px-3 py-2" />
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
           {PILLAR_IDS.map((id) => (
             <div
@@ -2542,7 +2542,11 @@ function ReportForm({
               <label className="text-xs text-foreground/90 leading-tight">
                 {PILLAR_LABELS[id]}
               </label>
-              <div className="flex items-center gap-1">
+              <div
+                className="flex items-center gap-1"
+                role="group"
+                aria-label={`${PILLAR_LABELS[id]} score`}
+              >
                 {[1, 2, 3, 4, 5].map((n) => {
                   const active = scores[id] === n;
                   return (
@@ -2550,6 +2554,9 @@ function ReportForm({
                       key={n}
                       type="button"
                       onClick={() => setScore(id, n)}
+                      aria-label={`${n}: ${scoreMeaning(n)}`}
+                      aria-pressed={active}
+                      title={`${n}: ${scoreMeaning(n)}`}
                       className={`size-7 rounded text-xs font-semibold tabular-nums font-mono transition-colors ${
                         active
                           ? "bg-primary text-primary-foreground"

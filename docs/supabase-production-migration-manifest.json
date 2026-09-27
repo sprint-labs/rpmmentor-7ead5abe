@@ -392,7 +392,15 @@
       }
     ]
   },
-  "reviewed_forward_migrations": [],
+  "reviewed_forward_migrations": [
+    {
+      "version": "20260925180000",
+      "name": "match_reports_canonical_goalkeeper_name",
+      "statement_count": 4,
+      "sql_length": 2032,
+      "sql_md5": "60e9eb0217d74588185a9111258e8c7f"
+    }
+  ],
   "repository_comparison": {
     "live_rows_with_byte_exact_local_statement": 27,
     "live_rows_contained_inside_a_larger_local_file": 2,

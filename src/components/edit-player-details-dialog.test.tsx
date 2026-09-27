@@ -100,13 +100,13 @@ describe("the permission the gate reads", () => {
 });
 
 describe("what the form lets each role change", () => {
-  it("holds Citizenship to Super Admin, matching the database guard", async () => {
+  it("holds Nationality to Super Admin, matching the database guard", async () => {
     authState.role = "mentor_manager";
     renderButton();
     screen.getByRole("button", { name: /edit details/i }).click();
 
-    const citizenship = await screen.findByLabelText("Citizenship");
-    expect((citizenship as HTMLInputElement).disabled).toBe(true);
+    const nationality = await screen.findByLabelText("Nationality");
+    expect((nationality as HTMLInputElement).disabled).toBe(true);
     expect((screen.getByLabelText("Current club") as HTMLInputElement).disabled).toBe(false);
     expect((screen.getByLabelText("Tier") as HTMLSelectElement).disabled).toBe(false);
   });
@@ -116,17 +116,17 @@ describe("what the form lets each role change", () => {
     renderButton();
     screen.getByRole("button", { name: /edit details/i }).click();
 
-    for (const label of ["Citizenship", "League", "Parent club", "Contract until"]) {
+    for (const label of ["Nationality", "League", "Parent club", "Contract until"]) {
       expect((await screen.findByLabelText(label)).hasAttribute("disabled")).toBe(false);
     }
   });
 
-  it("shows Citizenship seeded from players.nationality", async () => {
+  it("shows Nationality seeded from players.nationality", async () => {
     authState.role = "super_admin";
     renderButton();
     screen.getByRole("button", { name: /edit details/i }).click();
 
-    expect(((await screen.findByLabelText("Citizenship")) as HTMLInputElement).value).toBe(
+    expect(((await screen.findByLabelText("Nationality")) as HTMLInputElement).value).toBe(
       "New Zealand",
     );
   });

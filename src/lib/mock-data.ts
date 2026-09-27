@@ -133,6 +133,8 @@ export interface Goalkeeper {
   instagram?: string;
   parentClub?: string;
   onLoan?: boolean;
+  /** Goal.com all-competitions totals for one season (seed-only until wired live). */
+  seasonStats?: import("@/lib/goalkeeper-season-stats").GoalkeeperSeasonStats;
 }
 
 export interface Interaction {
@@ -382,11 +384,11 @@ const SEED: Seed[] = [
     tier: 1,
     academy: false,
     contract: "June 2029",
-    profileImage:
-      "https://cdn.sportfeeds.io/sdl/images/person/head/large/8y8d2dd469x9q0lc7qfyxypyh.png?quality=60&auto=webp&format=pjpg",
+    profileImage: "/players/brandon-austin.webp",
     instagram: "",
     comments: "",
     height: "188 cm",
+    shirtNumber: 40,
     foot: "Right",
   },
   {
@@ -437,11 +439,11 @@ const SEED: Seed[] = [
     tier: 1,
     academy: false,
     contract: "June 2027",
-    profileImage:
-      "https://cdn.sportfeeds.io/sdl/images/person/head/large/5pbnl8ssfcrxf9lfg1pl3vxzp.png?quality=60&auto=webp&format=pjpg",
+    profileImage: "/players/dan-bentley.webp",
     instagram: "",
     comments: "",
     height: "193 cm",
+    shirtNumber: 25,
   },
   {
     name: "Marcus Bettinelli",
@@ -1059,11 +1061,11 @@ const SEED: Seed[] = [
     tier: 2,
     academy: false,
     contract: "June 2027",
-    profileImage:
-      "https://cdn.sportfeeds.io/sdl/images/person/head/large/9g45z234d8mk5w4av5fjrx32t.png?quality=60&auto=webp&format=pjpg",
+    profileImage: "/players/joe-lumley.webp",
     instagram: "",
     comments: "",
     height: "190 cm",
+    shirtNumber: 1,
     foot: "Right",
   },
   {
@@ -2564,6 +2566,73 @@ beadle.developmentPlan = [
   "Continue strength block (lower-limb power) through international break.",
   "Review opposition striker tendencies pre-match in dedicated video clinic.",
 ];
+
+// Goal.com all-competitions season totals (seed-only presentation).
+function applyGoalSeasonStats(
+  name: string,
+  seasonLabel: string,
+  row: Omit<
+    import("@/lib/goalkeeper-season-stats").GoalkeeperSeasonStats,
+    "seasonLabel"
+  >,
+) {
+  const gk = goalkeepers.find((g) => g.name === name);
+  if (!gk) return;
+  gk.seasonStats = { seasonLabel, ...row };
+}
+
+applyGoalSeasonStats("James Beadle", "2025/2026", {
+  appearances: 38,
+  startingEleven: 38,
+  minutesPlayed: 3420,
+  yellowCards: 4,
+  redCards: 0,
+  foulsCommitted: 0,
+  foulsSuffered: 0,
+  goalsConceded: 45,
+  cleanSheets: 8,
+  saves: 0,
+  penaltySaves: 0,
+});
+applyGoalSeasonStats("Dan Bentley", "2025/2026", {
+  appearances: 3,
+  startingEleven: 3,
+  minutesPlayed: 270,
+  yellowCards: 0,
+  redCards: 0,
+  foulsCommitted: 0,
+  foulsSuffered: 2,
+  goalsConceded: 7,
+  cleanSheets: 0,
+  saves: 9,
+  penaltySaves: 0,
+});
+applyGoalSeasonStats("Joe Lumley", "2025/2026", {
+  appearances: 6,
+  startingEleven: 6,
+  minutesPlayed: 540,
+  yellowCards: 2,
+  redCards: 0,
+  foulsCommitted: 0,
+  foulsSuffered: 0,
+  goalsConceded: 7,
+  cleanSheets: 1,
+  saves: 0,
+  penaltySaves: 0,
+});
+applyGoalSeasonStats("Brandon Austin", "2024/2025", {
+  appearances: 3,
+  startingEleven: 3,
+  minutesPlayed: 270,
+  yellowCards: 0,
+  redCards: 0,
+  foulsCommitted: 0,
+  foulsSuffered: 2,
+  goalsConceded: 4,
+  cleanSheets: 1,
+  saves: 2,
+  penaltySaves: 0,
+});
 
 const corey = goalkeepers.find((g) => g.name === "Corey Addai");
 if (corey) {

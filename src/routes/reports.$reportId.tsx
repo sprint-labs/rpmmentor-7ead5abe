@@ -52,6 +52,7 @@ import {
   PlayerSnapshot,
   ReportHero,
 } from "@/components/reports/report-detail";
+import { ScoreScaleGuide } from "@/components/reports/score-scale-guide";
 import {
   getMatchReportEditAccess,
   updateOwnedMatchReport,
@@ -59,6 +60,7 @@ import {
 import {
   PILLAR_IDS,
   PILLAR_LABELS,
+  scoreMeaning,
   type MatchReportRow,
   type PillarId,
 } from "@/lib/match-reports/schema";
@@ -346,6 +348,8 @@ function ReportDetail() {
               </Button>
             </div>
 
+            <ScoreScaleGuide className="rounded-md border border-border/60 bg-muted/30 px-3 py-2" />
+
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
               {PILLAR_IDS.map((id) => (
                 <fieldset key={id} className="rounded-md border border-border p-3">
@@ -377,6 +381,8 @@ function ReportDetail() {
                               : "border-border text-muted-foreground hover:bg-accent hover:text-foreground",
                           )}
                           aria-pressed={selected}
+                          aria-label={`${score}: ${scoreMeaning(score)}`}
+                          title={`${score}: ${scoreMeaning(score)}`}
                         >
                           {score}
                         </button>

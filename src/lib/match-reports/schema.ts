@@ -27,6 +27,42 @@ export const PILLAR_LABELS: Record<PillarId, string> = {
   physical: "Speed, Agility and Athleticism",
 };
 
+/** A single RPM pillar score. There is no zero. */
+export type PillarScoreValue = 1 | 2 | 3 | 4 | 5;
+
+/**
+ * What each pillar score means: RPM's rating system, as RPM's mentor managers
+ * set it on 25 Sep 2026. Highest first, which is the order it is listed in.
+ * Every score is judged against the goalkeeper's current level.
+ *
+ * This is the only definition. The Match Report form, the report editor and
+ * the report page all list it from here, and every score button reads it out
+ * to screen readers. Keep the wording exactly as RPM gave it.
+ */
+export const SCORE_SCALE: readonly { score: PillarScoreValue; meaning: string }[] = [
+  { score: 5, meaning: "Performing above current level" },
+  { score: 4, meaning: "Performing at top of current level" },
+  { score: 3, meaning: "Performing at current level" },
+  { score: 2, meaning: "Performing below current level" },
+  { score: 1, meaning: "Cause for concern" },
+];
+
+/** The meaning of a whole pillar score, or null for anything that is not 1–5. */
+export function scoreMeaning(score: number | null | undefined): string | null {
+  return SCORE_SCALE.find((step) => step.score === score)?.meaning ?? null;
+}
+
+/**
+ * The meaning an average has reached. An average only earns the next meaning
+ * once it gets there, so 3.9 is still "Performing at current level". That is
+ * the same step the colour ramp in `score-band.ts` takes, so the words and the
+ * colour never disagree.
+ */
+export function averageMeaning(average: number | null | undefined): string | null {
+  if (average == null || !Number.isFinite(average)) return null;
+  return scoreMeaning(Math.min(5, Math.max(1, Math.floor(average))));
+}
+
 /** Sheet tab that holds the reports. */
 export const SHEET_TAB = "GKHQ Propietry Data Hub";
 export const SHEET_ID = "1UHesbMdPt89d_oZ86iIppQqkFQyWWwuIxklFEjfdywU";

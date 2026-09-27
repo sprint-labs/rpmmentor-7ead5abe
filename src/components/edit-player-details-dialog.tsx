@@ -14,7 +14,7 @@
  *     the button;
  *   - the `players_guard_club_only_update` trigger then narrows those roles to
  *     `current_club`, `tier` and `tier_effective_from`. Every other column,
- *     Citizenship included, remains Super Admin only.
+ *     Nationality included, remains Super Admin only.
  *
  * The form mirrors that split rather than hiding it: a Mentor Manager sees the
  * whole record and is told plainly which parts only a Super Admin can change,
@@ -42,7 +42,7 @@ interface DetailsForm {
   parentClub: string;
   onLoan: boolean;
   league: string;
-  /** `players.nationality`, shown throughout the app as "Citizenship". */
+  /** `players.nationality`, shown throughout the app as "Nationality". */
   nationality: string;
   /** Statuses, independent of tier — a Tier 1 goalkeeper can also be Academy. */
   isAcademy: boolean;
@@ -217,7 +217,7 @@ function EditDetailsDialog({
 
         {!isSuperAdmin && (
           <p className="mt-2 rounded-md border border-border/60 bg-muted/30 px-3 py-2 text-[11px] leading-snug text-muted-foreground">
-            You can change the club and tier. Citizenship, league, loan status, contract, Instagram,
+            You can change the club and tier. Nationality, league, loan status, contract, Instagram,
             Academy and Free Agent are held to Super Admin by the database.
           </p>
         )}
@@ -262,9 +262,9 @@ function EditDetailsDialog({
                 </select>
               </Field>
 
-              <Field id="edit-citizenship" label="Citizenship">
+              <Field id="edit-nationality" label="Nationality">
                 <input
-                  id="edit-citizenship"
+                  id="edit-nationality"
                   maxLength={120}
                   disabled={!isSuperAdmin}
                   className={FIELD_CLASS}

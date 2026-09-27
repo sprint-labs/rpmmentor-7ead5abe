@@ -16,8 +16,8 @@ import { ClubCrest } from "@/components/club-crest";
 import { initialsOf } from "@/lib/initials";
 import { scoreTone, type ScoreBand } from "@/lib/score-band";
 import { cn } from "@/lib/utils";
-import type { PillarId } from "@/lib/match-reports/schema";
-import { BAND_LABEL, SHORT_PILLAR } from "@/lib/match-reports/report-display";
+import { averageMeaning, type PillarId } from "@/lib/match-reports/schema";
+import { SHORT_PILLAR } from "@/lib/match-reports/report-display";
 
 /** Outline for a chip in the band's colour. Written out for Tailwind's scanner. */
 const BAND_BORDER: Record<ScoreBand, string> = {
@@ -72,20 +72,24 @@ export function PillarBar({ id, score }: { id: PillarId; score: number | null })
   );
 }
 
-/** "Strong", "Elite"… in the band's own colour, with a swatch. */
+/**
+ * What a score means on RPM's rating scale ("Performing at current level"…),
+ * in the band's own colour, with a swatch.
+ */
 export function ScoreBandChip({ score, className }: { score: number | null; className?: string }) {
   const tone = scoreTone(score);
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1.5 whitespace-nowrap rounded border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider",
+        // Sentence case and free to wrap: the meaning is a phrase, not one word.
+        "inline-flex items-center gap-1.5 rounded border px-1.5 py-0.5 text-[11px] font-semibold leading-tight",
         BAND_BORDER[tone.band],
         tone.ink,
         className,
       )}
     >
       <span aria-hidden="true" className={cn("size-1.5 rounded-full", tone.bar)} />
-      {BAND_LABEL[tone.band]}
+      {averageMeaning(score) ?? "Unscored"}
     </span>
   );
 }
