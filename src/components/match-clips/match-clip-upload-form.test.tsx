@@ -5,7 +5,6 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { TeamCalendarEvent } from "@/lib/calendar.functions";
-import { todayDateOnly } from "@/lib/interactions/schema";
 import { formatMatchDate, shiftDateOnly } from "@/lib/match-clips";
 import type { PlayerRosterRow } from "@/lib/players.functions";
 
@@ -39,7 +38,16 @@ const PLAYERS = [
   player(ALEX, "Alex Goalkeeper", "Southern United"),
 ];
 
-const TODAY = todayDateOnly();
+/**
+ * A fixed "today", because every fixture below is placed relative to it and
+ * the match picker's week view is a Monday-start grid.
+ *
+ * Whether a match 20 days back sits three weeks back in that grid or two
+ * depends on which weekday today is, so "page back three weeks, then pick
+ * Alex's day" passed or failed according to the date the suite ran on. A
+ * Wednesday, so the fixtures land clear of both ends of their weeks.
+ */
+const { TODAY } = vi.hoisted(() => ({ TODAY: "2026-09-16" }));
 
 function event(overrides: Partial<TeamCalendarEvent>): TeamCalendarEvent {
   return {
@@ -104,6 +112,11 @@ vi.mock("@/lib/players.functions", () => ({
 
 vi.mock("@/lib/calendar.functions", () => ({
   listCalendarEvents: () => listEventsMock(),
+}));
+
+vi.mock("@/lib/interactions/schema", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/interactions/schema")>()),
+  todayDateOnly: () => TODAY,
 }));
 
 vi.mock("@/lib/auth", () => ({
