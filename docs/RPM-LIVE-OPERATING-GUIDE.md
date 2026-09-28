@@ -184,6 +184,21 @@ Use this short release gate:
 
 8. **`list_mentor_directory()` security lint** — The function now rejects callers who are not `mentor`, `mentor_manager`, `admin`, or `super_admin`. Supabase may still surface `authenticated_security_definer_function_executable` because `authenticated` retains `EXECUTE` on a `SECURITY DEFINER` RPC; that is required for calendar/insights reads from the browser client.
 
+### 28 Sep 2026: Match Report goalkeeper names reconciled with the roster (completed)
+
+Follow-up to `20260925180000_match_reports_canonical_goalkeeper_name`, applied live on 26 Sep 2026. That trigger stores a Match Report's goalkeeper in the roster's spelling, but it fires only on insert and on an update of `goalkeeper`, so it never rewrote the reports already in the table. An audit of live `match_reports_cache` on project `zdxxezquhvpjmoxlecjp` found one roster goalkeeper whose five reports all carried a lower-case letter inside the surname where the roster row carries a capital.
+
+| Item | State |
+| --- | --- |
+| Why it mattered | The five agreed with each other, so nobody was split at the time. The next report filed for him would have been canonicalised to the roster spelling, splitting him in two across every per-goalkeeper total — the exact fault the migration exists to prevent, deferred rather than avoided. |
+| How | `goalkeeper` updated on five live `match_reports_cache` rows, scoped by `report_id` rather than by name, so nothing inserted between the read and the write could be caught. The name and the ids are in the live table, not here. |
+| Checked first | No goalkeeper anywhere in the table was stored under more than one spelling, and the three rows corrected by hand on 25 Sep 2026 were still correct. |
+| What changed | `goalkeeper` only. Scores, averages, match dates, opponents and event links untouched. |
+| Triggers | Both `match_reports_cache` BEFORE triggers fired normally. `match_reports_guard_event_snapshot` did not reject the update, which confirms no linked calendar event disagreed with the new spelling. |
+| Result | Across live `match_reports_cache`: 0 reports whose name differs from its roster row, 0 goalkeepers stored under more than one spelling, 0 names carrying untidy whitespace. |
+| Reversal | Set `goalkeeper` back to the previous spelling on those five `report_id`s, as the service role. Note this does not last on its own: the trigger re-canonicalises the column on the next edit, so a durable reversal also needs the roster row's `full_name` changed. |
+| Worth knowing | The trigger is forward-only by design. Any future correction to a roster `full_name` leaves existing reports on the old spelling until they are updated, so a `full_name` change should be paired with the same sweep. |
+
 ### 25 Sep 2026: Five goalkeepers taken off the roster (completed)
 
 Management request (David Rouse, 25 Sep 2026) to remove five goalkeepers from the system. The owner's instruction was narrower: take them off the roster but keep them in the system, alongside the goalkeepers mentors already score who are not on the roster (opposition goalkeepers and video-report goalkeepers).
