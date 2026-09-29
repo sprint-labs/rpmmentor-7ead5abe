@@ -1,4 +1,5 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
+import { toast } from "sonner";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -16,6 +17,8 @@ import {
   Calendar as CalendarIcon,
   Upload,
   ExternalLink,
+  Download,
+  FileBadge,
 } from "lucide-react";
 import { listMatchReports } from "@/lib/match-reports/reports.functions";
 import {
@@ -25,6 +28,9 @@ import {
   type PillarId,
 } from "@/lib/match-reports/schema";
 import { ReportPreviewModal } from "@/components/report-preview-modal";
+import { buildGoalkeeperDossier } from "@/lib/dossier/goalkeeper-dossier";
+import { exportGoalkeeperDossierPdf } from "@/lib/dossier/goalkeeper-dossier-pdf";
+import { compareMatchDatesNewestFirst } from "@/lib/dossier/goalkeeper-dossier-sources";
 import { WorkflowDialog, type WorkflowKind } from "@/components/workflows";
 import { useAuth } from "@/lib/auth";
 import { listMedia, openAsset, formatBytes, type MediaAsset } from "@/lib/media-store";
@@ -39,6 +45,7 @@ import { flagFor } from "@/lib/nationality-flag";
 import { rosterRowForLegacySlug, toGoalkeeper } from "@/lib/roster/live-goalkeepers";
 import { withSeedNarrative } from "@/lib/roster/goalkeeper-profile";
 import { formatDobDisplay } from "@/lib/dob-format";
+import { formatContractExpiry } from "@/lib/contract-expiry";
 import { SEASON_STAT_ROWS } from "@/lib/goalkeeper-season-stats";
 import { ClubCrest } from "@/components/club-crest";
 import {
@@ -83,25 +90,6 @@ const PILLAR_SHORT_LABELS: Record<PillarId, string> = {
   psych: "Psychological",
   physical: "Physical",
 };
-
-function formatContractExpiry(value: string): string {
-  if (value === "—") return "-";
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return "Not recorded";
-  const [year, month] = value.split("-").map(Number);
-  return new Intl.DateTimeFormat("en-GB", {
-    month: "long",
-    year: "numeric",
-    timeZone: "UTC",
-  }).format(new Date(Date.UTC(year, month - 1, 1)));
-}
-
-/** Sort match-report dates newest-first; undated reports sink to the bottom. */
-function compareMatchDatesNewestFirst(a: string | null, b: string | null): number {
-  if (!a && !b) return 0;
-  if (!a) return 1;
-  if (!b) return -1;
-  return b.localeCompare(a);
-}
 
 /**
  * Resolve `/goalkeepers/gk-…` against the live roster.
@@ -378,6 +366,31 @@ function GkProfile({ gk, player }: { gk: Goalkeeper; player: PlayerRosterRow }) 
     });
   }, [gkInteractions, gkReports]);
 
+  /**
+   * The printable dossier, built from what this page already resolved.
+   *
+   * Built here rather than re-fetched so the document cannot disagree with the
+   * profile it was exported from: same reports, same interactions, same
+   * averages. `/goalkeepers/$gkId/dossier` builds the identical model from the
+   * identical caches for the on-screen read.
+   */
+  const dossier = useMemo(
+    () => buildGoalkeeperDossier({ gk, reports: gkReports, interactions: gkInteractions }),
+    [gk, gkReports, gkInteractions],
+  );
+  const [exportingDossier, setExportingDossier] = useState(false);
+  const exportDossier = useCallback(async () => {
+    setExportingDossier(true);
+    try {
+      const filename = await exportGoalkeeperDossierPdf(dossier);
+      toast.success(`Dossier exported as ${filename}`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not export the dossier");
+    } finally {
+      setExportingDossier(false);
+    }
+  }, [dossier]);
+
   const ValidityHint = ({ children }: { children: React.ReactNode }) => (
     <div className="flex items-start gap-1.5 text-[11px] text-muted-foreground leading-snug">
       <Info className="size-3.5 mt-0.5 shrink-0" />
@@ -473,6 +486,41 @@ function GkProfile({ gk, player }: { gk: Goalkeeper; player: PlayerRosterRow }) 
           <p className="text-sm text-muted-foreground leading-relaxed">{gk.bio}</p>
         </Card>
       )}
+
+      {/* One printable document per goalkeeper: read it on screen, or take the
+          same document away as a PDF. Both render one model — see
+          `src/lib/dossier/goalkeeper-dossier.ts`. */}
+      <Card className="p-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex min-w-0 items-start gap-3">
+            <FileBadge className="size-5 shrink-0 text-primary-ink" aria-hidden />
+            <div className="min-w-0">
+              <SectionTitle className="mb-1">Dossier</SectionTitle>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                {gk.name}'s profile, skill scores, recent reports and interactions as one document,
+                current as of today. View it in the browser or export it as a PDF to send on.
+              </p>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-2 sm:flex sm:shrink-0">
+            <Link
+              to="/goalkeepers/$gkId/dossier"
+              params={{ gkId: gk.id }}
+              className="inline-flex h-11 min-w-0 items-center justify-center gap-2 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground sm:h-9"
+            >
+              <FileText className="size-4" aria-hidden /> View dossier
+            </Link>
+            <button
+              onClick={() => void exportDossier()}
+              disabled={exportingDossier}
+              className="inline-flex h-11 min-w-0 items-center justify-center gap-2 rounded-md border border-border px-3 text-sm disabled:opacity-60 sm:h-9"
+            >
+              <Download className="size-4" aria-hidden />{" "}
+              {exportingDossier ? "Exporting…" : "Export PDF"}
+            </button>
+          </div>
+        </div>
+      </Card>
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-8">
         {(
