@@ -45,6 +45,7 @@ import { Route as Char91DotwellKnownChar93OauthProtectedResourceRouteImport } fr
 import { Route as Char91DotmcpChar93ListToolsRouteImport } from './routes/[.mcp]/list-tools'
 import { Route as SystemPlayersIndexRouteImport } from './routes/system.players.index'
 import { Route as SystemPlayersPlayerIdRouteImport } from './routes/system.players.$playerId'
+import { Route as GoalkeepersGkIdDossierRouteImport } from './routes/goalkeepers_.$gkId.dossier'
 import { Route as Char91DotmcpChar93InvokeToolToolRouteImport } from './routes/[.mcp]/invoke-tool/$tool'
 import { Route as DotlovableOauthConsentRouteImport } from './routes/[.]lovable.oauth.consent'
 
@@ -230,6 +231,11 @@ const SystemPlayersPlayerIdRoute = SystemPlayersPlayerIdRouteImport.update({
   path: '/system/players/$playerId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const GoalkeepersGkIdDossierRoute = GoalkeepersGkIdDossierRouteImport.update({
+  id: '/goalkeepers_/$gkId/dossier',
+  path: '/goalkeepers/$gkId/dossier',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const Char91DotmcpChar93InvokeToolToolRoute =
   Char91DotmcpChar93InvokeToolToolRouteImport.update({
     id: '/.mcp/invoke-tool/$tool',
@@ -279,6 +285,7 @@ export interface FileRoutesByFullPath {
   '/reports/': typeof ReportsIndexRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
+  '/goalkeepers/$gkId/dossier': typeof GoalkeepersGkIdDossierRoute
   '/system/players/$playerId': typeof SystemPlayersPlayerIdRoute
   '/system/players/': typeof SystemPlayersIndexRoute
 }
@@ -319,6 +326,7 @@ export interface FileRoutesByTo {
   '/reports': typeof ReportsIndexRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
+  '/goalkeepers/$gkId/dossier': typeof GoalkeepersGkIdDossierRoute
   '/system/players/$playerId': typeof SystemPlayersPlayerIdRoute
   '/system/players': typeof SystemPlayersIndexRoute
 }
@@ -360,6 +368,7 @@ export interface FileRoutesById {
   '/reports/': typeof ReportsIndexRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
+  '/goalkeepers_/$gkId/dossier': typeof GoalkeepersGkIdDossierRoute
   '/system/players/$playerId': typeof SystemPlayersPlayerIdRoute
   '/system/players/': typeof SystemPlayersIndexRoute
 }
@@ -402,6 +411,7 @@ export interface FileRouteTypes {
     | '/reports/'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
+    | '/goalkeepers/$gkId/dossier'
     | '/system/players/$playerId'
     | '/system/players/'
   fileRoutesByTo: FileRoutesByTo
@@ -442,6 +452,7 @@ export interface FileRouteTypes {
     | '/reports'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
+    | '/goalkeepers/$gkId/dossier'
     | '/system/players/$playerId'
     | '/system/players'
   id:
@@ -482,6 +493,7 @@ export interface FileRouteTypes {
     | '/reports/'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
+    | '/goalkeepers_/$gkId/dossier'
     | '/system/players/$playerId'
     | '/system/players/'
   fileRoutesById: FileRoutesById
@@ -522,6 +534,7 @@ export interface RootRouteChildren {
   ReportsIndexRoute: typeof ReportsIndexRoute
   DotlovableOauthConsentRoute: typeof DotlovableOauthConsentRoute
   Char91DotmcpChar93InvokeToolToolRoute: typeof Char91DotmcpChar93InvokeToolToolRoute
+  GoalkeepersGkIdDossierRoute: typeof GoalkeepersGkIdDossierRoute
   SystemPlayersPlayerIdRoute: typeof SystemPlayersPlayerIdRoute
   SystemPlayersIndexRoute: typeof SystemPlayersIndexRoute
 }
@@ -780,6 +793,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SystemPlayersPlayerIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/goalkeepers_/$gkId/dossier': {
+      id: '/goalkeepers_/$gkId/dossier'
+      path: '/goalkeepers/$gkId/dossier'
+      fullPath: '/goalkeepers/$gkId/dossier'
+      preLoaderRoute: typeof GoalkeepersGkIdDossierRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/.mcp/invoke-tool/$tool': {
       id: '/.mcp/invoke-tool/$tool'
       path: '/.mcp/invoke-tool/$tool'
@@ -846,6 +866,7 @@ const rootRouteChildren: RootRouteChildren = {
   ReportsIndexRoute: ReportsIndexRoute,
   DotlovableOauthConsentRoute: DotlovableOauthConsentRoute,
   Char91DotmcpChar93InvokeToolToolRoute: Char91DotmcpChar93InvokeToolToolRoute,
+  GoalkeepersGkIdDossierRoute: GoalkeepersGkIdDossierRoute,
   SystemPlayersPlayerIdRoute: SystemPlayersPlayerIdRoute,
   SystemPlayersIndexRoute: SystemPlayersIndexRoute,
 }
