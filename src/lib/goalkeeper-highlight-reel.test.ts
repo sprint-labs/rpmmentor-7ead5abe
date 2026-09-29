@@ -55,10 +55,10 @@ describe("goalkeeper highlight reels and core metrics", () => {
   });
 
   it("shirt number stays blank until an authoritative source provides it", () => {
-    // The master sheet has no shirt-number column; Beadle's is owner-supplied.
+    // The master sheet has no shirt-number column; these are owner-supplied.
     const withShirt = goalkeepers.filter((gk) => gk.shirtNumber !== null).map((gk) => gk.name);
     expect(withShirt.sort()).toEqual(
-      ["Brandon Austin", "Dan Bentley", "James Beadle", "Joe Lumley"].sort(),
+      ["Brandon Austin", "Dan Bentley", "James Beadle", "Joe Lumley", "Mark Travers"].sort(),
     );
   });
 
