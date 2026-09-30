@@ -334,6 +334,19 @@ describe("Interactions page", () => {
     }
   });
 
+  it("Show all mentors clears both the mentor scope and the mentor filter", async () => {
+    const { router } = await renderAt(
+      "mentor_manager",
+      "/interactions?mentorId=33333333-3333-4333-8333-333333333333&mentor=Martyn%20Margetson",
+    );
+    fireEvent.click(screen.getByRole("link", { name: /Show all mentors/ }));
+    await waitFor(() =>
+      expect(router.state.location.search).toMatchObject({ mentorId: "", mentor: "" }),
+    );
+    const mentor = screen.getByRole("combobox", { name: "Filter by mentor" });
+    expect((mentor as HTMLSelectElement).value).toBe("");
+  });
+
   it("keeps a filter changed just before following Open report", async () => {
     const { router } = await renderAt("mentor_manager", "/interactions");
     fireEvent.change(screen.getByRole("combobox", { name: "Filter by interaction type" }), {

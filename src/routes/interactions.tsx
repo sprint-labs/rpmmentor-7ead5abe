@@ -245,7 +245,8 @@ function InteractionsPage() {
           <Pill tone="muted">{mentorScopeName || "One mentor"}</Pill>
           <Link
             to="/interactions"
-            search={(prev) => ({ ...prev, mentorId: "" })}
+            // Both mentor narrowings: the page scope and the list's own filter.
+            search={(prev) => ({ ...prev, mentorId: "", mentor: "" })}
             className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground ml-2"
           >
             <X className="size-3" /> Show all mentors
