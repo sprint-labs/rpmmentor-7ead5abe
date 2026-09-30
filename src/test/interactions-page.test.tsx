@@ -319,6 +319,21 @@ describe("Interactions page", () => {
     }
   });
 
+  it("does not jump to the top of the page when the search or a filter changes", async () => {
+    const { router } = await renderAt("mentor_manager", "/interactions");
+    const scrollTo = vi.spyOn(window, "scrollTo").mockImplementation(() => {});
+    try {
+      fireEvent.change(screen.getByRole("searchbox", { name: "Search interactions" }), {
+        target: { value: "Christian" },
+      });
+      await waitFor(() => expect(router.state.location.search).toMatchObject({ q: "Christian" }));
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(scrollTo).not.toHaveBeenCalled();
+    } finally {
+      scrollTo.mockRestore();
+    }
+  });
+
   it("keeps a filter changed just before following Open report", async () => {
     const { router } = await renderAt("mentor_manager", "/interactions");
     fireEvent.change(screen.getByRole("combobox", { name: "Filter by interaction type" }), {

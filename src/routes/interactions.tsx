@@ -191,6 +191,8 @@ function InteractionsPage() {
         mentor: filters.mentor ?? "",
       }),
       replace: true,
+      // Filtering is not leaving the page: keep the list where it is.
+      resetScroll: false,
     });
 
   return (
