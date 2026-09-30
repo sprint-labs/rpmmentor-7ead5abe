@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { NotebookPen, X } from "lucide-react";
 import { PageHeader, Pill } from "@/components/primitives";
 import { getMentor } from "@/lib/mock-data";
@@ -172,20 +172,18 @@ function InteractionsPage() {
     return seeds;
   }, [initialType, mentorFilter]);
 
-  // The list's search and filters live in the URL, so opening a record on a
-  // phone and pressing Back returns to the same filtered list. Typing is
-  // debounced so each keystroke is not a history write.
-  type FilterState = { search: string; filters: Record<string, string> };
-  const filterSync = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const pendingFilters = useRef<FilterState | null>(null);
-  useEffect(
-    () => () => {
-      if (filterSync.current) clearTimeout(filterSync.current);
-    },
-    [],
-  );
-  const writeFilters = ({ search: text, filters }: FilterState) =>
-    navigate({
+  // The list's search and filters live in the URL, so leaving the page (a
+  // record on a phone, Open report, Open calendar) and pressing Back returns to
+  // the same list. Written on every change with replace, so there is never a
+  // pending write to lose and no history entry per keystroke.
+  const persistFilters = ({
+    search: text,
+    filters,
+  }: {
+    search: string;
+    filters: Record<string, string>;
+  }) =>
+    void navigate({
       search: (prev) => ({
         ...prev,
         q: text,
@@ -194,24 +192,6 @@ function InteractionsPage() {
       }),
       replace: true,
     });
-  const persistFilters = (state: FilterState) => {
-    if (filterSync.current) clearTimeout(filterSync.current);
-    pendingFilters.current = state;
-    filterSync.current = setTimeout(() => {
-      filterSync.current = null;
-      pendingFilters.current = null;
-      void writeFilters(state);
-    }, 300);
-  };
-  /** Write any still-debounced filter change now, before leaving the list. */
-  const flushFilters = async () => {
-    if (!filterSync.current || !pendingFilters.current) return;
-    clearTimeout(filterSync.current);
-    filterSync.current = null;
-    const state = pendingFilters.current;
-    pendingFilters.current = null;
-    await writeFilters(state);
-  };
 
   return (
     <div className="space-y-4">
@@ -304,13 +284,12 @@ function InteractionsPage() {
             initialFilters={initialFilters}
             initialSearch={q}
             onFiltersChange={persistFilters}
-            onOpenCompact={async (interaction) => {
-              await flushFilters();
-              await navigate({
+            onOpenCompact={(interaction) =>
+              navigate({
                 to: "/interactions/$interactionId",
                 params: { interactionId: interaction.id },
-              });
-            }}
+              })
+            }
             renderActions={(interaction) => (
               <InteractionActions
                 interaction={interaction}

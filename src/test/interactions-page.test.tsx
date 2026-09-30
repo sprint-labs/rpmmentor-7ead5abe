@@ -319,6 +319,18 @@ describe("Interactions page", () => {
     }
   });
 
+  it("keeps a filter changed just before following Open report", async () => {
+    const { router } = await renderAt("mentor_manager", "/interactions");
+    fireEvent.change(screen.getByRole("combobox", { name: "Filter by interaction type" }), {
+      target: { value: "Live Match Observation" },
+    });
+    fireEvent.click(within(detailPanel()).getByRole("link", { name: /Open report/ }));
+    await waitFor(() => expect(router.state.location.pathname).toBe("/reports/report-generated"));
+    router.history.back();
+    await waitFor(() => expect(router.state.location.pathname).toBe("/interactions"));
+    expect(router.state.location.search).toMatchObject({ type: "Live Match Observation" });
+  });
+
   it("shows loading, not an empty or missing state, while the session is checked", async () => {
     interactionsState.sessionPending = true;
     await renderAt("mentor_manager", "/interactions");

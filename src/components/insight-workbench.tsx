@@ -97,13 +97,14 @@ interface InsightWorkbenchProps<T> {
   placeholder: string;
 }
 
-/** Order-independent key for a filter set, ignoring cleared ("") values. */
-function filtersKey(values: Record<string, string>): string {
-  return JSON.stringify(
-    Object.entries(values)
+/** Order-independent key for a search and filter set, ignoring cleared ("") values. */
+function stateKey(search: string, values: Record<string, string>): string {
+  return JSON.stringify({
+    search,
+    filters: Object.entries(values)
       .filter(([, value]) => Boolean(value))
       .sort(([a], [b]) => a.localeCompare(b)),
-  );
+  });
 }
 
 const TILE_COLUMNS: Record<number, string> = {
@@ -142,30 +143,42 @@ export function InsightWorkbench<T>({
   );
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  // Follow the seeds when they change from outside (e.g. Back, or a link that
-  // clears the URL) so what is shown always matches where the user is.
-  const initialFiltersKey = filtersKey(initialFilters ?? {});
+  // The owner may mirror search and filters somewhere that survives leaving
+  // the page (the URL) and hand them back as the seeds. Each change reported
+  // is remembered until it comes back, so those echoes are ignored and only a
+  // genuinely outside change (Back, or a link that clears the URL) replaces
+  // what is on screen. Without this, a slow echo of "a" could overwrite "ab"
+  // while someone is still typing.
+  const seedKey = stateKey(initialSearch ?? "", initialFilters ?? {});
+  const echoes = useRef<string[]>([]);
+  const currentKey = stateKey(search, filterValues);
+  const currentKeyRef = useRef(currentKey);
+  currentKeyRef.current = currentKey;
   useEffect(() => {
-    setSearch(initialSearch ?? "");
-  }, [initialSearch]);
-  useEffect(() => {
-    setFilterValues((current) =>
-      filtersKey(current) === initialFiltersKey
-        ? current
-        : Object.fromEntries(JSON.parse(initialFiltersKey) as [string, string][]),
-    );
-  }, [initialFiltersKey]);
+    const echoAt = echoes.current.indexOf(seedKey);
+    if (echoAt >= 0) {
+      echoes.current.splice(0, echoAt + 1);
+      return;
+    }
+    echoes.current = [];
+    if (seedKey === currentKeyRef.current) return;
+    const seed = JSON.parse(seedKey) as { search: string; filters: [string, string][] };
+    setSearch(seed.search);
+    setFilterValues(Object.fromEntries(seed.filters));
+  }, [seedKey]);
 
   const onFiltersChangeRef = useRef(onFiltersChange);
   onFiltersChangeRef.current = onFiltersChange;
-  const hasMounted = useRef(false);
+  const lastReported = useRef(currentKey);
   useEffect(() => {
-    if (!hasMounted.current) {
-      hasMounted.current = true;
-      return;
-    }
-    onFiltersChangeRef.current?.({ search, filters: filterValues });
-  }, [search, filterValues]);
+    if (currentKey === lastReported.current) return;
+    lastReported.current = currentKey;
+    if (!onFiltersChangeRef.current) return;
+    echoes.current.push(currentKey);
+    onFiltersChangeRef.current({ search, filters: filterValues });
+    // `currentKey` captures both values.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentKey]);
 
   const detailPanelRef = useRef<HTMLElement>(null);
   const detailHeadingRef = useRef<HTMLHeadingElement>(null);
