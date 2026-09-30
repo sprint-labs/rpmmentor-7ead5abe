@@ -10,9 +10,9 @@ describe("eventSummaryLine", () => {
         startTimeLabel: "15:00",
         location: "Lamex Stadium",
         goalkeeperName: "Joe Lumley",
-        mentorAttendingName: "Ben Beson",
+        mentorAttendingName: "Ben Benson",
       }),
-    ).toBe("15:00 · Joe Lumley · Ben Beson attending");
+    ).toBe("15:00 · Joe Lumley · Ben Benson attending");
   });
 
   it("drops a match's location, which its title already names", () => {
@@ -37,7 +37,7 @@ describe("eventSummaryLine", () => {
       type: "Match",
       startTimeLabel: "15:00",
       goalkeeperName: "Joe Lumley",
-      mentorAttendingName: "Ben Beson",
+      mentorAttendingName: "Ben Benson",
     });
 
     expect(line).not.toMatch(/added by/i);

@@ -34,7 +34,7 @@ function report(overrides: Partial<MatchReportRow> = {}): MatchReportRow {
     legacy_report_id: "r1-legacy",
     row_index: 1,
     goalkeeper: "Joe Lumley",
-    coach: "Ben Beson",
+    coach: "Ben Benson",
     team: "Stevenage",
     opponent: "Sheffield Wednesday",
     competition: "League One",
@@ -68,7 +68,7 @@ describe("ReportCard", () => {
     expect(screen.getByText("Joe Lumley")).not.toBeNull();
     expect(screen.getByText("Stevenage v Sheffield Wednesday")).not.toBeNull();
     expect(screen.getByText("3.2")).not.toBeNull();
-    expect(screen.getByText(/Reported by Ben Beson/)).not.toBeNull();
+    expect(screen.getByText(/Reported by Ben Benson/)).not.toBeNull();
   });
 
   it("puts all seven pillar scores on the card", () => {
