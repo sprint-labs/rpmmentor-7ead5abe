@@ -23,7 +23,11 @@ vi.mock("@/lib/auth", () => ({
       title: "Test",
     },
     loading: false,
-    can: (permission: string) => permission === "goalkeepers.view",
+    // Mirrors the matrix in src/lib/auth.tsx for the two permissions this page
+    // reads: every role views, and only mentors cannot add a goalkeeper.
+    can: (permission: string) =>
+      permission === "goalkeepers.view" ||
+      (permission === "goalkeepers.create" && authState.role !== "mentor"),
     signIn: vi.fn(),
     signOut: vi.fn(),
     setViewAsRole: vi.fn(),
@@ -130,7 +134,7 @@ const { listPlayerDutyOfCareMock, listPlayersMock, DUTY_ROWS, PLAYER_ROWS } = vi
 vi.mock("@/lib/duty-of-care.functions", () => ({
   listPlayerDutyOfCare: listPlayerDutyOfCareMock,
 }));
-vi.mock("@/lib/players.functions", () => ({ listPlayers: listPlayersMock }));
+vi.mock("@/lib/players.functions", () => ({ listPlayers: listPlayersMock, createPlayer: vi.fn() }));
 
 // The page calls more than one server function and they answer with different
 // shapes, so the stub dispatches on which one it was handed rather than giving
@@ -532,4 +536,25 @@ describe("Goalkeepers page", () => {
     });
     expect(sort.value).toBe("goalkeeper");
   });
+
+  it("hides Add Goalkeeper from mentors", async () => {
+    await renderGoalkeepers("/goalkeepers", "mentor");
+
+    expect(screen.queryByRole("button", { name: "Add Goalkeeper" })).toBeNull();
+  });
+
+  it.each(["mentor_manager", "admin", "super_admin"])(
+    "offers %s an Add Goalkeeper button that opens the add goalkeeper form",
+    async (role) => {
+      await renderGoalkeepers("/goalkeepers", role);
+
+      fireEvent.click(screen.getByRole("button", { name: "Add Goalkeeper" }));
+
+      const dialog = await screen.findByRole("dialog");
+      expect(
+        within(dialog).getByText("Saved to the RPM database · added to the live roster"),
+      ).toBeTruthy();
+    },
+    60_000,
+  );
 });
