@@ -79,7 +79,7 @@ const NAV: NavItem[] = [
   { to: "/reports", label: "Match Reports", icon: FileText, perm: "reports.view" },
   {
     to: "/interactions",
-    label: "Interactions Log",
+    label: "Interactions",
     icon: MessageSquare,
     perm: "interactions.view",
   },

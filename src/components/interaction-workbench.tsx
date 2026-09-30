@@ -1,14 +1,28 @@
-import { Link } from "@tanstack/react-router";
-import { ArrowRight, Mic2 } from "lucide-react";
+import type { ReactNode } from "react";
+import { Mic2 } from "lucide-react";
 import { InsightWorkbench } from "@/components/insight-workbench";
 import { DetailFact } from "@/components/workbench-primitives";
 import { initialsOf } from "@/lib/initials";
 import { useInteractionAudioState } from "@/lib/interactions/use-interactions";
-import { formatDateOnly, type LoggedInteraction } from "@/lib/interactions/schema";
+import {
+  formatDateOnly,
+  isDashboardInteractionType,
+  type LoggedInteraction,
+} from "@/lib/interactions/schema";
 
 interface InteractionWorkbenchProps {
   interactions: LoggedInteraction[];
   periodLabel: string;
+  /** Shown in the Scope tile when the list is already narrowed to one mentor. */
+  scopeLabel?: string;
+  initialFilters?: Record<string, string>;
+  initialSearch?: string;
+  /** Narrow screens: open the record on its own page instead of inline. */
+  onOpenCompact?: (interaction: LoggedInteraction) => void;
+  onFiltersChange?: (state: { search: string; filters: Record<string, string> }) => void;
+  variant?: "drilldown" | "page";
+  /** Edit / Open report / Delete buttons for the selected record. */
+  renderActions?: (interaction: LoggedInteraction) => ReactNode;
 }
 
 function formatDateTime(value: string | null | undefined): string {
@@ -30,14 +44,24 @@ function sourceLabel(interaction: LoggedInteraction): string {
   return "Logged directly";
 }
 
-/** Own component so the audio query keys off whichever record is selected. */
-function InteractionDetail({ interaction }: { interaction: LoggedInteraction }) {
+/**
+ * The complete read-only record. Its own component so the audio query keys off
+ * whichever record is selected; also used by the standalone detail page.
+ */
+export function InteractionDetail({
+  interaction,
+  actions,
+}: {
+  interaction: LoggedInteraction;
+  actions?: ReactNode;
+}) {
   const interactionAudio = useInteractionAudioState([interaction.id]);
   const clips = interactionAudio.audioByInteraction.get(interaction.id) ?? [];
 
   return (
     <>
-      <dl className="mt-5 grid grid-cols-1 gap-x-5 gap-y-3 sm:grid-cols-2">
+      {actions}
+      <dl className="mt-5 grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2 2xl:grid-cols-3">
         <DetailFact label="Mentor" value={interaction.mentorName || "Not recorded"} />
         <DetailFact label="Club" value={interaction.club || "Not recorded"} />
         <DetailFact label="Interaction type" value={interaction.interactionType} />
@@ -52,7 +76,7 @@ function InteractionDetail({ interaction }: { interaction: LoggedInteraction }) 
         >
           Notes
         </h3>
-        <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-relaxed text-foreground/90">
+        <p className="mt-2 max-w-[72ch] whitespace-pre-wrap break-words text-sm leading-relaxed text-foreground/90">
           {interaction.notes || "No notes recorded."}
         </p>
       </section>
@@ -64,7 +88,7 @@ function InteractionDetail({ interaction }: { interaction: LoggedInteraction }) 
         >
           Follow-up action
         </h3>
-        <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-relaxed text-foreground/90">
+        <p className="mt-2 max-w-[72ch] whitespace-pre-wrap break-words text-sm leading-relaxed text-foreground/90">
           {interaction.followUp || "No follow-up action recorded."}
         </p>
       </section>
@@ -121,31 +145,29 @@ function InteractionDetail({ interaction }: { interaction: LoggedInteraction }) 
           value={interaction.updatedAt ? formatDateTime(interaction.updatedAt) : "Not edited"}
         />
       </dl>
-
-      {interaction.matchReportId ? (
-        <Link
-          to="/reports/$reportId"
-          params={{ reportId: interaction.matchReportId }}
-          className="mt-5 inline-flex min-h-10 items-center gap-1.5 rounded-md border border-border px-3 text-xs font-medium hover:bg-accent/40"
-        >
-          View source report <ArrowRight className="size-3.5" aria-hidden="true" />
-        </Link>
-      ) : interaction.calendarEventId ? (
-        <Link
-          to="/calendar"
-          className="mt-5 inline-flex min-h-10 items-center gap-1.5 rounded-md border border-border px-3 text-xs font-medium hover:bg-accent/40"
-        >
-          Open calendar <ArrowRight className="size-3.5" aria-hidden="true" />
-        </Link>
-      ) : null}
     </>
   );
 }
 
-export function InteractionWorkbench({ interactions, periodLabel }: InteractionWorkbenchProps) {
+export function InteractionWorkbench({
+  interactions,
+  periodLabel,
+  scopeLabel,
+  initialFilters,
+  initialSearch,
+  onOpenCompact,
+  onFiltersChange,
+  variant,
+  renderActions,
+}: InteractionWorkbenchProps) {
   return (
     <InsightWorkbench<LoggedInteraction>
       items={interactions}
+      initialFilters={initialFilters}
+      initialSearch={initialSearch}
+      onOpenCompact={onOpenCompact}
+      onFiltersChange={onFiltersChange}
+      variant={variant}
       idOf={(interaction) => interaction.id}
       domId="selected-interaction-detail"
       headingId="selected-interaction-heading"
@@ -176,24 +198,35 @@ export function InteractionWorkbench({ interactions, periodLabel }: InteractionW
           matches: (interaction, value) => interaction.mentorName === value,
         },
       ]}
-      tiles={(visible, all, filterValues) => [
-        {
-          label: "Interactions",
-          mono: true,
-          value: (
-            <>
-              {visible.length}
-              {visible.length !== all.length ? (
-                <span className="ml-1 text-xs font-normal text-muted-foreground">
-                  of {all.length}
-                </span>
-              ) : null}
-            </>
-          ),
-        },
-        { label: "Period", value: periodLabel },
-        { label: "Scope", value: filterValues.mentor || "All mentors" },
-      ]}
+      tiles={(visible, all, filterValues) => {
+        // Match observations are counted apart so the headline matches the
+        // dashboard's Interactions Logged figure, which excludes them.
+        const touchpoints = visible.filter((i) => isDashboardInteractionType(i.interactionType));
+        const allTouchpoints = all.filter((i) => isDashboardInteractionType(i.interactionType));
+        return [
+          {
+            label: "Interactions",
+            mono: true,
+            value: (
+              <>
+                {touchpoints.length}
+                {touchpoints.length !== allTouchpoints.length ? (
+                  <span className="ml-1 text-xs font-normal text-muted-foreground">
+                    of {allTouchpoints.length}
+                  </span>
+                ) : null}
+              </>
+            ),
+          },
+          {
+            label: "Match observations",
+            mono: true,
+            value: visible.length - touchpoints.length,
+          },
+          { label: "Period", value: periodLabel },
+          { label: "Scope", value: filterValues.mentor || scopeLabel || "All mentors" },
+        ];
+      }}
       rowAriaLabel={(interaction) =>
         `Show details for ${interaction.goalkeeperName} on ${formatDateOnly(interaction.occurredAt)}`
       }
@@ -211,7 +244,11 @@ export function InteractionWorkbench({ interactions, periodLabel }: InteractionW
         subtitle: `${interaction.interactionType} · ${formatDateOnly(interaction.occurredAt)}`,
       })}
       renderDetail={(interaction) => (
-        <InteractionDetail key={interaction.id} interaction={interaction} />
+        <InteractionDetail
+          key={interaction.id}
+          interaction={interaction}
+          actions={renderActions?.(interaction)}
+        />
       )}
       noMatchLabel="No interactions match these filters."
       placeholder="Select an interaction to review its complete record."
