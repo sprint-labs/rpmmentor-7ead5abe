@@ -16,8 +16,8 @@ export const Route = createFileRoute("/settings")({
 });
 
 const APPEARANCES: { value: Theme; label: string; hint: string; icon: typeof Sun }[] = [
-  { value: "light", label: "Light", hint: "Bright background, dark text", icon: Sun },
-  { value: "dark", label: "Dark", hint: "Carbon background, light text", icon: Moon },
+  { value: "light", label: "Light", hint: "Light background", icon: Sun },
+  { value: "dark", label: "Dark", hint: "Carbon background", icon: Moon },
 ];
 
 function SettingsPage() {
