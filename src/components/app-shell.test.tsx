@@ -211,3 +211,45 @@ describe("menu: More group", () => {
     expect(document.activeElement).toBe(last);
   });
 });
+
+describe("menu: footer", () => {
+  it.each<Role>(["mentor", "mentor_manager", "admin", "super_admin"])(
+    "shows only Account, Settings, Help and Sign out to %s",
+    async (role) => {
+      const { menu } = await renderShell(role);
+      const nav = within(menu).getByRole("navigation", { name: "Main" });
+      const footer = nav.nextElementSibling as HTMLElement;
+
+      expect(
+        Array.from(footer.querySelectorAll("a, button")).map((item) => item.textContent),
+      ).toEqual(["Account", "Settings", "Help", "Sign out"]);
+      expect(within(footer).getByRole("link", { name: "Account" }).getAttribute("href")).toBe(
+        "/account",
+      );
+      expect(within(footer).getByRole("link", { name: "Settings" }).getAttribute("href")).toBe(
+        "/settings",
+      );
+      // Moved out of the menu: Add Goalkeeper is on /goalkeepers, appearance
+      // is on /settings, and Help & Messages is inside Help.
+      for (const gone of [
+        "Add Goalkeeper",
+        "Help & updates",
+        "Help & Messages",
+        "Light appearance",
+        "Dark appearance",
+      ]) {
+        expect(within(menu).queryByText(gone)).toBeNull();
+      }
+    },
+  );
+
+  it("opens Help & updates from Help, which leads on to your messages", async () => {
+    const { menu } = await renderShell("mentor");
+
+    fireEvent.click(within(menu).getByRole("button", { name: "Help" }));
+
+    const help = await screen.findByRole("dialog", { name: "Help & updates" });
+    expect(screen.queryByRole("dialog", { name: "Test User" })).toBeNull();
+    expect(within(help).getByRole("button", { name: "Open your messages" })).toBeTruthy();
+  });
+});

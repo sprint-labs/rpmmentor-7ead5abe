@@ -28,6 +28,7 @@ import {
   Columns3,
   ChevronDown,
   MoreHorizontal,
+  Settings,
 } from "lucide-react";
 import { useTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
@@ -73,8 +74,8 @@ type NavItem = {
 };
 const NAV: NavItem[] = [
   // The order a mentor works in: what happened, who it was about, what is
-  // owed, what is coming. Reference and admin sit under it, and both ways of
-  // getting help sit at the foot of the menu rather than in this list.
+  // owed, what is coming. Reference and admin sit under it. Account,
+  // Settings, Help and Sign out sit at the foot of the menu, not in this list.
   { to: "/", label: "Dashboard", icon: LayoutDashboard, exact: true, perm: "goalkeepers.view" },
   { to: "/bulletins", label: "Bulletin Board", icon: Columns3, perm: "bulletins.view" },
   { to: "/goalkeepers", label: "Goalkeepers", icon: Users, perm: "goalkeepers.view" },
@@ -117,6 +118,10 @@ const MORE_NAV: NavItem[] = [
     perm: "system.manage",
   },
 ];
+
+const FOOTER_ITEM =
+  "flex min-h-11 min-w-0 items-center gap-2 rounded-[6px] px-3 py-2 text-[12px] font-semibold uppercase tracking-[0.05em] text-sidebar-foreground/70 transition-colors hover:bg-sidebar-accent/60 hover:text-sidebar-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
+const FOOTER_ITEM_ACTIVE = "bg-sidebar-accent text-sidebar-accent-foreground";
 
 function isNavActive(item: NavItem, path: string): boolean {
   return item.exact ? path === item.to : path.startsWith(item.to);
@@ -958,70 +963,60 @@ export function AppShell() {
                 </div>
               )}
             </nav>
-            <div className="p-3 border-t border-sidebar-border space-y-2">
-              {/* Mentor Managers' header button is Log Interaction, so the
-                  menu is where every role allowed to add a goalkeeper finds it. */}
-              {can("goalkeepers.create") && (
-                <button
-                  onClick={() => {
-                    setWorkflow("goalkeeper");
-                    setNavOpen(false);
-                  }}
-                  className="w-full min-h-11 flex items-center gap-2 px-3 py-2 rounded-md bg-primary text-primary-foreground text-xs uppercase tracking-[0.06em] font-semibold hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                >
-                  <Plus className="size-4" />
-                  Add Goalkeeper
-                </button>
-              )}
-              <ThemeToggle menu />
+            {/* Four quiet actions, two by two, so the foot of the menu stays
+                small. Help opens Help & updates, which also leads to your
+                messages (/support). */}
+            <div className="grid grid-cols-2 gap-1 p-3 md:p-2 border-t border-sidebar-border">
+              <Link
+                to={"/account" as never}
+                onClick={closeMenu}
+                aria-current={path === "/account" ? "page" : undefined}
+                className={cn(FOOTER_ITEM, path === "/account" && FOOTER_ITEM_ACTIVE)}
+              >
+                <KeyRound className="size-4" aria-hidden="true" />
+                Account
+              </Link>
+              <Link
+                to={"/settings" as never}
+                onClick={closeMenu}
+                aria-current={path === "/settings" ? "page" : undefined}
+                className={cn(FOOTER_ITEM, path === "/settings" && FOOTER_ITEM_ACTIVE)}
+              >
+                <Settings className="size-4" aria-hidden="true" />
+                Settings
+              </Link>
               {canSeeSupport && (
                 <button
+                  type="button"
                   onClick={() => {
                     setNavOpen(false);
                     setBellOpen(false);
                     setHelpOpen(true);
                   }}
-                  className="w-full min-h-11 flex items-center gap-2 px-3 py-2 rounded-md border border-border text-xs uppercase tracking-[0.06em] font-semibold hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className={cn(FOOTER_ITEM, path === "/support" && FOOTER_ITEM_ACTIVE)}
                 >
-                  <LifeBuoy className="size-4" />
-                  {/* "Help & updates", verbatim: the dialog's accessible name
-                      spells the ampersand, and the two must match for a speech
-                      user saying what they read. */}
-                  Help &amp; updates
+                  <LifeBuoy className="size-4" aria-hidden="true" />
+                  Help
                   {helpUnread > 0 && (
                     <span className="ml-auto grid h-[18px] min-w-[18px] place-items-center rounded-full bg-primary px-1 font-mono text-[10px] font-semibold text-primary-foreground">
-                      {helpUnread > 9 ? "9+" : helpUnread}
+                      <span aria-hidden="true">{helpUnread > 9 ? "9+" : helpUnread}</span>
+                      <span className="sr-only">
+                        , {helpUnread} unread {helpUnread === 1 ? "update" : "updates"}
+                      </span>
                     </span>
                   )}
                 </button>
               )}
-              {canSeeSupport && (
-                <Link
-                  to={"/support" as never}
-                  onClick={closeMenu}
-                  className="w-full min-h-11 flex items-center gap-2 px-3 py-2 rounded-md border border-border text-xs uppercase tracking-[0.06em] font-semibold hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                >
-                  <MessageSquare className="size-4" />
-                  Help &amp; Messages
-                </Link>
-              )}
-              <Link
-                to={"/account" as never}
-                onClick={closeMenu}
-                className="w-full min-h-11 flex items-center gap-2 px-3 py-2 rounded-md border border-border text-xs uppercase tracking-[0.06em] font-semibold hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                <KeyRound className="size-4" />
-                Account
-              </Link>
               <button
+                type="button"
                 onClick={() => {
                   signOut();
                   setNavOpen(false);
                   navigate({ to: "/login" as never });
                 }}
-                className="w-full min-h-11 flex items-center gap-2 px-3 py-2 rounded-md border border-border text-xs uppercase tracking-[0.06em] font-semibold hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className={FOOTER_ITEM}
               >
-                <LogOut className="size-4" />
+                <LogOut className="size-4" aria-hidden="true" />
                 Sign out
               </button>
             </div>
@@ -1053,7 +1048,7 @@ function NavLink({ item, active }: { item: NavItem; active: boolean }) {
   );
 }
 
-function ThemeToggle({ className, menu = false }: { className?: string; menu?: boolean }) {
+function ThemeToggle({ className }: { className?: string }) {
   const { theme, toggle } = useTheme();
   const isDark = theme === "dark";
   return (
@@ -1062,15 +1057,12 @@ function ThemeToggle({ className, menu = false }: { className?: string; menu?: b
       title={isDark ? "Switch to light mode" : "Switch to dark mode"}
       aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
       className={cn(
-        menu
-          ? "flex min-h-11 w-full items-center gap-2 rounded-md border border-border px-3 py-2 text-xs font-semibold uppercase tracking-[0.06em] hover:bg-accent sm:hidden"
-          : "size-11 shrink-0 place-items-center rounded-md border border-border text-foreground/80 hover:bg-accent md:size-9",
+        "size-11 shrink-0 place-items-center rounded-md border border-border text-foreground/80 hover:bg-accent md:size-9",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
         className,
       )}
     >
       {isDark ? <Sun className="size-4" /> : <Moon className="size-4" />}
-      {menu && <span>{isDark ? "Light appearance" : "Dark appearance"}</span>}
     </button>
   );
 }
