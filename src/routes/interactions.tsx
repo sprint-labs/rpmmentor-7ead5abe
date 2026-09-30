@@ -123,7 +123,11 @@ function InteractionsPage() {
   const preset = presetFor(hasPeriod ? fromDate : "", hasPeriod ? toDate : "");
   const periodLabel = hasPeriod ? `${fromDate} → ${toDate}` : "All time";
 
-  const { data, isLoading, isError } = useLoggedInteractions();
+  const { data, isError } = useLoggedInteractions();
+  // The query stays disabled (not "loading") until the browser session is
+  // confirmed, so "no data yet" is what counts as loading. Otherwise a hard
+  // refresh flashes an empty or "not found" state first.
+  const isLoading = data === undefined && !isError;
 
   const mentorScopeName = useMemo(() => {
     if (!mentorId) return "";

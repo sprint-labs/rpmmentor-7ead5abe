@@ -31,7 +31,11 @@ function InteractionPage() {
   const router = useRouter();
   const canGoBack = useCanGoBack();
   const navigate = useNavigate();
-  const { data, isLoading, isError } = useLoggedInteractions();
+  const { data, isError } = useLoggedInteractions();
+  // The query stays disabled (not "loading") until the browser session is
+  // confirmed, so "no data yet" is what counts as loading. Otherwise a hard
+  // refresh flashes an empty or "not found" state first.
+  const isLoading = data === undefined && !isError;
   const [editing, setEditing] = useState<LoggedInteraction | null>(null);
   const [pendingDelete, setPendingDelete] = useState<LoggedInteraction | null>(null);
 
