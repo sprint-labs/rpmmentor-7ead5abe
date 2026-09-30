@@ -13,7 +13,7 @@ function report(
     legacy_report_id: "legacy",
     row_index: 1,
     goalkeeper: "Max O'Leary",
-    coach: "Ben Beson",
+    coach: "Ben Benson",
     team: "Bristol City",
     opponent: "Hull City",
     competition: "EFL Championship",
