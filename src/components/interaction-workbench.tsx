@@ -19,6 +19,7 @@ interface InteractionWorkbenchProps {
   initialSearch?: string;
   /** Narrow screens: open the record on its own page instead of inline. */
   onOpenCompact?: (interaction: LoggedInteraction) => void;
+  onFiltersChange?: (state: { search: string; filters: Record<string, string> }) => void;
   /** Edit / Open report / Delete buttons for the selected record. */
   renderActions?: (interaction: LoggedInteraction) => ReactNode;
 }
@@ -154,6 +155,7 @@ export function InteractionWorkbench({
   initialFilters,
   initialSearch,
   onOpenCompact,
+  onFiltersChange,
   renderActions,
 }: InteractionWorkbenchProps) {
   return (
@@ -162,6 +164,7 @@ export function InteractionWorkbench({
       initialFilters={initialFilters}
       initialSearch={initialSearch}
       onOpenCompact={onOpenCompact}
+      onFiltersChange={onFiltersChange}
       idOf={(interaction) => interaction.id}
       domId="selected-interaction-detail"
       headingId="selected-interaction-heading"

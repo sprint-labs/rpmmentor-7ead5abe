@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { X } from "lucide-react";
 import { PageHeader, Pill } from "@/components/primitives";
 import { getMentor } from "@/lib/mock-data";
@@ -23,6 +23,8 @@ const interactionsSearchSchema = z.object({
   type: fallback(z.string(), "").default(""),
   source: fallback(z.string(), "").default(""),
   q: fallback(z.string(), "").default(""),
+  /** Mentor chosen in the list's mentor filter (by name), kept for Back. */
+  mentor: fallback(z.string(), "").default(""),
   /** Kept so older links still parse; the list now scrolls instead of paging. */
   page: fallback(z.number().int(), 1).default(1),
   /**
@@ -82,6 +84,7 @@ function InteractionsPage() {
     type: typeParam,
     source,
     q,
+    mentor: mentorFilter,
     openLog,
     gkId: prefillGkId,
     date: prefillDate,
@@ -149,6 +152,43 @@ function InteractionsPage() {
   };
 
   const initialType = resolveType(typeParam);
+  const initialFilters = useMemo(() => {
+    const seeds: Record<string, string> = {};
+    if (initialType) seeds.type = initialType;
+    if (mentorFilter) seeds.mentor = mentorFilter;
+    return seeds;
+  }, [initialType, mentorFilter]);
+
+  // The list's search and filters live in the URL, so opening a record on a
+  // phone and pressing Back returns to the same filtered list. Typing is
+  // debounced so each keystroke is not a history write.
+  const filterSync = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      if (filterSync.current) clearTimeout(filterSync.current);
+    },
+    [],
+  );
+  const persistFilters = ({
+    search: text,
+    filters,
+  }: {
+    search: string;
+    filters: Record<string, string>;
+  }) => {
+    if (filterSync.current) clearTimeout(filterSync.current);
+    filterSync.current = setTimeout(() => {
+      navigate({
+        search: (prev) => ({
+          ...prev,
+          q: text,
+          type: filters.type ?? "",
+          mentor: filters.mentor ?? "",
+        }),
+        replace: true,
+      });
+    }, 300);
+  };
 
   return (
     <div className="space-y-4">
@@ -219,7 +259,7 @@ function InteractionsPage() {
             {(hasPeriod || mentorId) && (
               <Link
                 to="/interactions"
-                search={{ from: "", to: "", mentorId: "", type: "", source: "", q: "" }}
+                search={{ from: "", to: "", mentorId: "", type: "", source: "", q: "", mentor: "" }}
                 className="mt-3 inline-flex h-9 items-center gap-1.5 rounded-md border border-border px-3 text-xs hover:bg-accent/40"
               >
                 <X className="size-3.5" /> Show all interactions
@@ -228,12 +268,12 @@ function InteractionsPage() {
           </div>
         ) : (
           <InteractionWorkbench
-            key={`${initialType}|${q}`}
             interactions={rows}
             periodLabel={periodLabel}
             scopeLabel={mentorScopeName || undefined}
-            initialFilters={initialType ? { type: initialType } : undefined}
+            initialFilters={initialFilters}
             initialSearch={q}
+            onFiltersChange={persistFilters}
             onOpenCompact={(interaction) =>
               navigate({
                 to: "/interactions/$interactionId",

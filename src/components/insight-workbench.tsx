@@ -1,5 +1,5 @@
 import { Search, X } from "lucide-react";
-import { useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Avatar } from "@/components/primitives";
 
 /**
@@ -75,6 +75,11 @@ interface InsightWorkbenchProps<T> {
    * only shown from the `lg` breakpoint up.
    */
   onOpenCompact?: (item: T) => void;
+  /**
+   * Reports search and filter changes so the owner can keep them somewhere
+   * that survives leaving the page (e.g. the URL). Not called on first render.
+   */
+  onFiltersChange?: (state: { search: string; filters: Record<string, string> }) => void;
   listLabel: string;
   rowAriaLabel: (item: T) => string;
   rowOf: (item: T) => WorkbenchRowContent;
@@ -84,6 +89,15 @@ interface InsightWorkbenchProps<T> {
   noMatchLabel: string;
   /** Shown in the detail pane when there is nothing at all to select. */
   placeholder: string;
+}
+
+/** Order-independent key for a filter set, ignoring cleared ("") values. */
+function filtersKey(values: Record<string, string>): string {
+  return JSON.stringify(
+    Object.entries(values)
+      .filter(([, value]) => Boolean(value))
+      .sort(([a], [b]) => a.localeCompare(b)),
+  );
 }
 
 const TILE_COLUMNS: Record<number, string> = {
@@ -106,6 +120,7 @@ export function InsightWorkbench<T>({
   initialFilters,
   initialSearch,
   onOpenCompact,
+  onFiltersChange,
   listLabel,
   rowAriaLabel,
   rowOf,
@@ -119,6 +134,32 @@ export function InsightWorkbench<T>({
     () => initialFilters ?? {},
   );
   const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  // Follow the seeds when they change from outside (e.g. Back, or a link that
+  // clears the URL) so what is shown always matches where the user is.
+  const initialFiltersKey = filtersKey(initialFilters ?? {});
+  useEffect(() => {
+    setSearch(initialSearch ?? "");
+  }, [initialSearch]);
+  useEffect(() => {
+    setFilterValues((current) =>
+      filtersKey(current) === initialFiltersKey
+        ? current
+        : Object.fromEntries(JSON.parse(initialFiltersKey) as [string, string][]),
+    );
+  }, [initialFiltersKey]);
+
+  const onFiltersChangeRef = useRef(onFiltersChange);
+  onFiltersChangeRef.current = onFiltersChange;
+  const hasMounted = useRef(false);
+  useEffect(() => {
+    if (!hasMounted.current) {
+      hasMounted.current = true;
+      return;
+    }
+    onFiltersChangeRef.current?.({ search, filters: filterValues });
+  }, [search, filterValues]);
+
   const detailPanelRef = useRef<HTMLElement>(null);
   const detailHeadingRef = useRef<HTMLHeadingElement>(null);
 

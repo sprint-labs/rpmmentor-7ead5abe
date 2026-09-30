@@ -260,6 +260,31 @@ describe("Interactions page", () => {
     });
   });
 
+  it("keeps search and filters in the URL so Back returns to the same list", async () => {
+    const { router } = await renderAt("mentor_manager", "/interactions");
+    fireEvent.change(screen.getByRole("searchbox", { name: "Search interactions" }), {
+      target: { value: "Outside" },
+    });
+    fireEvent.change(screen.getByRole("combobox", { name: "Filter by interaction type" }), {
+      target: { value: "Phone Call" },
+    });
+    await waitFor(() =>
+      expect(router.state.location.search).toMatchObject({ q: "Outside", type: "Phone Call" }),
+    );
+    cleanup();
+
+    await renderAt(
+      "mentor_manager",
+      "/interactions?q=Outside&type=Phone%20Call&mentor=Martyn%20Margetson",
+    );
+    const searchbox = screen.getByRole("searchbox", { name: "Search interactions" });
+    expect((searchbox as HTMLInputElement).value).toBe("Outside");
+    const mentor = screen.getByRole("combobox", { name: "Filter by mentor" });
+    expect((mentor as HTMLSelectElement).value).toBe("Martyn Margetson");
+    expect(screen.getByRole("button", { name: /Show details for Outside Window/ })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /Show details for Christian Walton/ })).toBeNull();
+  });
+
   it("opens a single interaction on its own page", async () => {
     await renderAt(
       "mentor_manager",
