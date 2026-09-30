@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   createMemoryHistory,
@@ -158,7 +158,17 @@ describe("menu: More group", () => {
   });
 
   it("opens More on its own when the current page is a system tool", async () => {
+    const scrollIntoView = vi.fn();
+    Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
+      configurable: true,
+      value: scrollIntoView,
+    });
     const { menu } = await renderShell("super_admin", "/system/data-quality");
+    // The current page is brought into view even when the list is long.
+    await waitFor(() => expect(scrollIntoView).toHaveBeenCalled());
+    expect(scrollIntoView.mock.contexts[0]).toBe(
+      within(menu).getByRole("link", { name: "Data Quality" }),
+    );
 
     const more = within(menu).getByRole("button", { name: "More" });
     expect(more.getAttribute("aria-expanded")).toBe("true");

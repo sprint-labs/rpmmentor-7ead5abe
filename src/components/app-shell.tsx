@@ -375,7 +375,14 @@ export function AppShell() {
 
   useEffect(() => {
     if (navOpen) {
-      requestAnimationFrame(() => menuCloseRef.current?.focus());
+      requestAnimationFrame(() => {
+        menuCloseRef.current?.focus();
+        // A long list (More open on a system page) can put the current page
+        // below the fold; bring it into view without moving focus.
+        menuDialogRef.current
+          ?.querySelector<HTMLElement>('nav [aria-current="page"]')
+          ?.scrollIntoView?.({ block: "nearest" });
+      });
     } else if (wasMenuOpenRef.current) {
       menuTriggerRef.current?.focus();
     }
