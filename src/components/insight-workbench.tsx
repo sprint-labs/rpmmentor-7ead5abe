@@ -80,6 +80,12 @@ interface InsightWorkbenchProps<T> {
    * that survives leaving the page (e.g. the URL). Not called on first render.
    */
   onFiltersChange?: (state: { search: string; filters: Record<string, string> }) => void;
+  /**
+   * "drilldown" (default) is the square, framed insight view. "page" is a
+   * full page: rounded like the Match Report cards, and on desktop the list
+   * and detail fill the height of the window instead of stopping at 68%.
+   */
+  variant?: "drilldown" | "page";
   listLabel: string;
   rowAriaLabel: (item: T) => string;
   rowOf: (item: T) => WorkbenchRowContent;
@@ -121,6 +127,7 @@ export function InsightWorkbench<T>({
   initialSearch,
   onOpenCompact,
   onFiltersChange,
+  variant = "drilldown",
   listLabel,
   rowAriaLabel,
   rowOf,
@@ -207,22 +214,37 @@ export function InsightWorkbench<T>({
   };
 
   const summaryTiles = tiles(visibleItems, items, filterValues);
+  const isPage = variant === "page";
+  // Page variant: the split view takes the rest of the window on desktop, and
+  // each side scrolls on its own. 19rem is the header, page title and tiles.
+  const paneHeight = isPage
+    ? "lg:min-h-0 lg:overflow-y-auto"
+    : "lg:max-h-[min(68vh,48rem)] lg:overflow-y-auto lg:supports-[height:100dvh]:max-h-[min(68dvh,48rem)]";
   const header = selectedItem ? detailHeader(selectedItem) : null;
 
   return (
     <div className="space-y-3">
       <div
-        className={`grid grid-cols-1 border border-border bg-card ${
-          TILE_COLUMNS[summaryTiles.length] ?? "sm:grid-cols-3"
-        }`}
+        className={
+          isPage
+            ? // Hairline grid: two up on phones so the list starts sooner.
+              `grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-border bg-border ${
+                TILE_COLUMNS[summaryTiles.length] ?? "sm:grid-cols-3"
+              }`
+            : `grid grid-cols-1 border border-border bg-card ${
+                TILE_COLUMNS[summaryTiles.length] ?? "sm:grid-cols-3"
+              }`
+        }
       >
         {summaryTiles.map((tile, index) => (
           <div
             key={tile.label}
             className={`px-4 py-3 ${
-              index === summaryTiles.length - 1
-                ? ""
-                : "border-b border-border sm:border-b-0 sm:border-r"
+              isPage
+                ? "min-w-0 bg-card"
+                : index === summaryTiles.length - 1
+                  ? ""
+                  : "border-b border-border sm:border-b-0 sm:border-r"
             }`}
           >
             <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
@@ -239,13 +261,27 @@ export function InsightWorkbench<T>({
         ))}
       </div>
 
-      <div className="grid min-w-0 border border-border bg-card lg:grid-cols-[minmax(19rem,0.82fr)_minmax(0,1.18fr)]">
+      <div
+        className={`grid min-w-0 border border-border bg-card ${
+          isPage
+            ? "overflow-hidden rounded-lg lg:h-[calc(100vh-19rem)] lg:min-h-[30rem] lg:grid-cols-[minmax(20rem,26rem)_minmax(0,1fr)] lg:supports-[height:100dvh]:h-[calc(100dvh-19rem)]"
+            : "lg:grid-cols-[minmax(19rem,0.82fr)_minmax(0,1.18fr)]"
+        }`}
+      >
         <section
-          className={`min-w-0 border-border lg:border-b-0 lg:border-r ${onOpenCompact ? "" : "border-b"}`}
+          className={`min-w-0 border-border lg:border-b-0 lg:border-r ${onOpenCompact ? "" : "border-b"} ${
+            isPage ? "lg:flex lg:min-h-0 lg:flex-col" : ""
+          }`}
           aria-label={listLabel}
         >
-          <div className="grid grid-cols-1 gap-2 border-b border-border bg-card p-3 sm:grid-cols-2 lg:sticky lg:top-0 lg:z-[1] lg:grid-cols-1 xl:grid-cols-2">
-            <label className="relative sm:col-span-2 lg:col-span-1 xl:col-span-2">
+          <div
+            className={`grid gap-2 border-b border-border bg-card p-3 lg:sticky lg:top-0 lg:z-[1] ${
+              isPage ? "grid-cols-2" : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2"
+            }`}
+          >
+            <label
+              className={`relative ${isPage ? "col-span-2" : "sm:col-span-2 lg:col-span-1 xl:col-span-2"}`}
+            >
               <span className="sr-only">{searchLabel}</span>
               <Search
                 className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground"
@@ -282,14 +318,16 @@ export function InsightWorkbench<T>({
               <button
                 type="button"
                 onClick={clearFilters}
-                className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-md border border-border px-3 text-xs text-muted-foreground hover:bg-accent/40 hover:text-foreground sm:col-span-2 lg:col-span-1 xl:col-span-2"
+                className={`inline-flex min-h-10 items-center justify-center gap-1.5 rounded-md border border-border px-3 text-xs text-muted-foreground hover:bg-accent/40 hover:text-foreground ${
+                  isPage ? "col-span-2" : "sm:col-span-2 lg:col-span-1 xl:col-span-2"
+                }`}
               >
                 <X className="size-3.5" aria-hidden="true" /> Clear filters
               </button>
             ) : null}
           </div>
 
-          <div className="lg:max-h-[min(68vh,48rem)] lg:overflow-y-auto lg:supports-[height:100dvh]:max-h-[min(68dvh,48rem)]">
+          <div className={isPage ? `lg:flex-1 ${paneHeight}` : paneHeight}>
             {visibleItems.length === 0 ? (
               <div className="px-4 py-12 text-center text-xs text-muted-foreground">
                 {noMatchLabel}
@@ -309,7 +347,10 @@ export function InsightWorkbench<T>({
                     onClick={() => selectItem(item)}
                     className={`grid min-h-20 w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-b border-border/70 px-3 py-3 text-left transition-colors last:border-b-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring xl:grid-cols-[minmax(0,1.25fr)_minmax(8rem,0.75fr)_auto] ${
                       isSelected
-                        ? "bg-primary/10 shadow-[inset_3px_0_0_var(--primary)]"
+                        ? onOpenCompact
+                          ? // On phones a tap opens the record, so nothing is "selected".
+                            "hover:bg-accent/25 lg:bg-primary/10 lg:shadow-[inset_3px_0_0_var(--primary)]"
+                          : "bg-primary/10 shadow-[inset_3px_0_0_var(--primary)]"
                         : "hover:bg-accent/25"
                     }`}
                   >
@@ -362,7 +403,9 @@ export function InsightWorkbench<T>({
           id={domId}
           aria-labelledby={selectedItem ? headingId : undefined}
           aria-label={selectedItem ? undefined : listLabel}
-          className={`min-w-0 scroll-mt-20 bg-muted/20 p-4 sm:p-5 ${onOpenCompact ? "hidden lg:block" : ""} lg:max-h-[min(68vh,48rem)] lg:overflow-y-auto lg:supports-[height:100dvh]:max-h-[min(68dvh,48rem)]`}
+          className={`min-w-0 scroll-mt-20 bg-muted/20 p-4 sm:p-5 ${
+            isPage ? "lg:px-8 lg:py-7" : ""
+          } ${onOpenCompact ? "hidden lg:block" : ""} ${paneHeight}`}
         >
           {selectedItem && header ? (
             <>
@@ -375,7 +418,11 @@ export function InsightWorkbench<T>({
                     ref={detailHeadingRef}
                     id={headingId}
                     tabIndex={-1}
-                    className="break-words text-xl font-semibold tracking-tight"
+                    className={
+                      isPage
+                        ? "break-words font-display text-2xl font-bold tracking-tight"
+                        : "break-words text-xl font-semibold tracking-tight"
+                    }
                   >
                     {header.title}
                   </h2>

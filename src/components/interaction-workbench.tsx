@@ -20,6 +20,7 @@ interface InteractionWorkbenchProps {
   /** Narrow screens: open the record on its own page instead of inline. */
   onOpenCompact?: (interaction: LoggedInteraction) => void;
   onFiltersChange?: (state: { search: string; filters: Record<string, string> }) => void;
+  variant?: "drilldown" | "page";
   /** Edit / Open report / Delete buttons for the selected record. */
   renderActions?: (interaction: LoggedInteraction) => ReactNode;
 }
@@ -60,7 +61,7 @@ export function InteractionDetail({
   return (
     <>
       {actions}
-      <dl className="mt-5 grid grid-cols-1 gap-x-5 gap-y-3 sm:grid-cols-2">
+      <dl className="mt-5 grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2 2xl:grid-cols-3">
         <DetailFact label="Mentor" value={interaction.mentorName || "Not recorded"} />
         <DetailFact label="Club" value={interaction.club || "Not recorded"} />
         <DetailFact label="Interaction type" value={interaction.interactionType} />
@@ -75,7 +76,7 @@ export function InteractionDetail({
         >
           Notes
         </h3>
-        <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-relaxed text-foreground/90">
+        <p className="mt-2 max-w-[72ch] whitespace-pre-wrap break-words text-sm leading-relaxed text-foreground/90">
           {interaction.notes || "No notes recorded."}
         </p>
       </section>
@@ -87,7 +88,7 @@ export function InteractionDetail({
         >
           Follow-up action
         </h3>
-        <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-relaxed text-foreground/90">
+        <p className="mt-2 max-w-[72ch] whitespace-pre-wrap break-words text-sm leading-relaxed text-foreground/90">
           {interaction.followUp || "No follow-up action recorded."}
         </p>
       </section>
@@ -156,6 +157,7 @@ export function InteractionWorkbench({
   initialSearch,
   onOpenCompact,
   onFiltersChange,
+  variant,
   renderActions,
 }: InteractionWorkbenchProps) {
   return (
@@ -165,6 +167,7 @@ export function InteractionWorkbench({
       initialSearch={initialSearch}
       onOpenCompact={onOpenCompact}
       onFiltersChange={onFiltersChange}
+      variant={variant}
       idOf={(interaction) => interaction.id}
       domId="selected-interaction-detail"
       headingId="selected-interaction-heading"

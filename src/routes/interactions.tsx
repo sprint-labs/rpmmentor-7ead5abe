@@ -2,11 +2,15 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { X } from "lucide-react";
+import { NotebookPen, X } from "lucide-react";
 import { PageHeader, Pill } from "@/components/primitives";
 import { getMentor } from "@/lib/mock-data";
 import { useLoggedInteractions } from "@/lib/interactions/use-interactions";
-import { DASHBOARD_INTERACTION_TYPES, type LoggedInteraction } from "@/lib/interactions/schema";
+import {
+  DASHBOARD_INTERACTION_TYPES,
+  isDashboardInteractionType,
+  type LoggedInteraction,
+} from "@/lib/interactions/schema";
 import { withPermission } from "@/components/require-permission";
 import { getNavSource } from "@/lib/nav-source";
 import { WorkflowDialog, type WorkflowKind } from "@/components/workflows";
@@ -140,6 +144,11 @@ function InteractionsPage() {
     });
   }, [data, hasPeriod, fromDate, toDate, mentorId, mentorScopeName]);
 
+  const touchpointCount = useMemo(
+    () => rows.filter((i) => isDashboardInteractionType(i.interactionType)).length,
+    [rows],
+  );
+
   const setPeriod = (value: string) => {
     if (value === "all") {
       navigate({ search: (prev) => ({ ...prev, from: "", to: "" }) });
@@ -197,7 +206,13 @@ function InteractionsPage() {
           navSource ? [{ label: "Dashboard", to: "/" }, { label: navSource.label }] : undefined
         }
         title="Interactions"
-        description="Every logged touchpoint between mentors and goalkeepers."
+        description={
+          isLoading
+            ? "Loading interactions…"
+            : `${touchpointCount} interaction${touchpointCount === 1 ? "" : "s"} · ${
+                hasPeriod ? periodLabel : "all time"
+              } · newest first`
+        }
         action={
           <div className="flex flex-wrap items-center gap-2">
             <label>
@@ -205,7 +220,7 @@ function InteractionsPage() {
               <select
                 value={preset}
                 onChange={(event) => setPeriod(event.target.value)}
-                className="h-9 rounded-md border border-border bg-background px-3 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="h-9 rounded-md border border-border bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <option value="all">All time</option>
                 {PERIOD_PRESETS.map((days) => (
@@ -219,9 +234,9 @@ function InteractionsPage() {
             {can("interactions.log") && (
               <button
                 onClick={() => setWorkflow("interaction")}
-                className="h-9 px-3 rounded-md bg-primary text-primary-foreground text-sm font-medium"
+                className="h-9 px-3 rounded-md bg-primary text-primary-foreground text-sm font-medium inline-flex items-center gap-1.5"
               >
-                Log Interaction
+                <NotebookPen className="size-3.5" aria-hidden="true" /> Log Interaction
               </button>
             )}
           </div>
@@ -242,13 +257,13 @@ function InteractionsPage() {
         </div>
       )}
 
-      <div className="command-panel p-3 sm:p-5">
+      <div>
         {isLoading ? (
           <Empty label="Loading…" />
         ) : isError ? (
           <Empty label="Interactions could not be loaded. Please refresh." />
         ) : rows.length === 0 ? (
-          <div className="pb-8 text-center">
+          <div className="rounded-lg border border-border bg-card pb-8 text-center">
             <Empty
               label={
                 hasPeriod || mentorId
@@ -268,6 +283,7 @@ function InteractionsPage() {
           </div>
         ) : (
           <InteractionWorkbench
+            variant="page"
             interactions={rows}
             periodLabel={periodLabel}
             scopeLabel={mentorScopeName || undefined}
@@ -314,7 +330,7 @@ function InteractionsPage() {
 
 function Empty({ label }: { label: string }) {
   return (
-    <div className="py-10 text-center text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
+    <div className="rounded-lg py-10 text-center text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
       {label}
     </div>
   );
