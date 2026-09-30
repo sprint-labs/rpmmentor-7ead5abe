@@ -171,32 +171,42 @@ function InteractionsPage() {
   // The list's search and filters live in the URL, so opening a record on a
   // phone and pressing Back returns to the same filtered list. Typing is
   // debounced so each keystroke is not a history write.
+  type FilterState = { search: string; filters: Record<string, string> };
   const filterSync = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingFilters = useRef<FilterState | null>(null);
   useEffect(
     () => () => {
       if (filterSync.current) clearTimeout(filterSync.current);
     },
     [],
   );
-  const persistFilters = ({
-    search: text,
-    filters,
-  }: {
-    search: string;
-    filters: Record<string, string>;
-  }) => {
+  const writeFilters = ({ search: text, filters }: FilterState) =>
+    navigate({
+      search: (prev) => ({
+        ...prev,
+        q: text,
+        type: filters.type ?? "",
+        mentor: filters.mentor ?? "",
+      }),
+      replace: true,
+    });
+  const persistFilters = (state: FilterState) => {
     if (filterSync.current) clearTimeout(filterSync.current);
+    pendingFilters.current = state;
     filterSync.current = setTimeout(() => {
-      navigate({
-        search: (prev) => ({
-          ...prev,
-          q: text,
-          type: filters.type ?? "",
-          mentor: filters.mentor ?? "",
-        }),
-        replace: true,
-      });
+      filterSync.current = null;
+      pendingFilters.current = null;
+      void writeFilters(state);
     }, 300);
+  };
+  /** Write any still-debounced filter change now, before leaving the list. */
+  const flushFilters = async () => {
+    if (!filterSync.current || !pendingFilters.current) return;
+    clearTimeout(filterSync.current);
+    filterSync.current = null;
+    const state = pendingFilters.current;
+    pendingFilters.current = null;
+    await writeFilters(state);
   };
 
   return (
@@ -290,12 +300,13 @@ function InteractionsPage() {
             initialFilters={initialFilters}
             initialSearch={q}
             onFiltersChange={persistFilters}
-            onOpenCompact={(interaction) =>
-              navigate({
+            onOpenCompact={async (interaction) => {
+              await flushFilters();
+              await navigate({
                 to: "/interactions/$interactionId",
                 params: { interactionId: interaction.id },
-              })
-            }
+              });
+            }}
             renderActions={(interaction) => (
               <InteractionActions
                 interaction={interaction}

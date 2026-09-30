@@ -41,7 +41,7 @@ function InteractionPage() {
   // somewhere to go back to; a shared link falls back to the full list.
   const goBack = () => {
     if (canGoBack) router.history.back();
-    else navigate({ to: "/interactions" });
+    else navigate({ to: "/interactions", replace: true });
   };
 
   return (
@@ -103,7 +103,9 @@ function InteractionPage() {
       <DeleteInteractionDialog
         interaction={pendingDelete}
         onClose={() => setPendingDelete(null)}
-        onDeleted={() => navigate({ to: "/interactions", replace: true })}
+        // Back to the list the record was opened from (its period and
+        // filters), or the full list when the record was opened by link.
+        onDeleted={goBack}
       />
     </div>
   );

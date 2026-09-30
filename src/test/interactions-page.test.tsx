@@ -285,6 +285,34 @@ describe("Interactions page", () => {
     expect(screen.queryByRole("button", { name: /Show details for Christian Walton/ })).toBeNull();
   });
 
+  it("on a phone, keeps a filter changed just before opening a record", async () => {
+    const original = window.matchMedia;
+    window.matchMedia = ((query: string) => ({
+      matches: query.includes("max-width"),
+      media: query,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    })) as unknown as typeof window.matchMedia;
+    try {
+      const { router } = await renderAt("mentor_manager", "/interactions");
+      fireEvent.change(screen.getByRole("searchbox", { name: "Search interactions" }), {
+        target: { value: "Outside" },
+      });
+      // Opened straight away, inside the debounce window.
+      fireEvent.click(screen.getByRole("button", { name: /Show details for Outside Window/ }));
+      await waitFor(() =>
+        expect(router.state.location.pathname).toBe(
+          "/interactions/44444444-4444-4444-8444-444444444444",
+        ),
+      );
+      router.history.back();
+      await waitFor(() => expect(router.state.location.pathname).toBe("/interactions"));
+      expect(router.state.location.search).toMatchObject({ q: "Outside" });
+    } finally {
+      window.matchMedia = original;
+    }
+  });
+
   it("opens a single interaction on its own page", async () => {
     await renderAt(
       "mentor_manager",
