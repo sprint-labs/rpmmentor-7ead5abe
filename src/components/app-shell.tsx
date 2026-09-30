@@ -26,6 +26,8 @@ import {
   Database,
   LifeBuoy,
   Columns3,
+  ChevronDown,
+  MoreHorizontal,
 } from "lucide-react";
 import { useTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
@@ -91,6 +93,14 @@ const NAV: NavItem[] = [
   { to: "/audit", label: "Audit Log", icon: History, perm: "audit.view" },
   { to: "/alerts", label: "Notification Centre", icon: BellRing, perm: "alerts.view" },
   { to: "/executive", label: "Executive", icon: BarChart3, perm: "executive.view" },
+];
+
+/**
+ * System tools. Used rarely and only by Super Admins, so they sit in a
+ * collapsed "More" group under the main list instead of doubling its length.
+ * The group opens on its own when the current page is one of them.
+ */
+const MORE_NAV: NavItem[] = [
   { to: "/system/users", label: "Manage Users", icon: ShieldCheck, perm: "system.manage" },
   {
     to: "/system/permissions",
@@ -108,11 +118,17 @@ const NAV: NavItem[] = [
   },
 ];
 
+function isNavActive(item: NavItem, path: string): boolean {
+  return item.exact ? path === item.to : path.startsWith(item.to);
+}
+
 export function AppShell() {
   const { user, loading, can, signOut, setViewAsRole, passwordRecoveryPending } = useAuth();
   const path = useRouterState({ select: (s) => s.location.pathname });
   const navigate = useNavigate();
   const [navOpen, setNavOpen] = useState(false);
+  // null until the user touches the toggle, so the group follows the page.
+  const [moreToggled, setMoreToggled] = useState<boolean | null>(null);
   const [bellOpen, setBellOpen] = useState(false);
   const [newSinceOpen, setNewSinceOpen] = useState<ReadonlySet<string>>(() => new Set());
   const [resolvedInboxIds, setResolvedInboxIds] = useState<readonly string[]>([]);
@@ -349,6 +365,10 @@ export function AppShell() {
   }, [path]);
 
   useEffect(() => {
+    if (!navOpen) setMoreToggled(null);
+  }, [navOpen]);
+
+  useEffect(() => {
     if (navOpen) {
       requestAnimationFrame(() => menuCloseRef.current?.focus());
     } else if (wasMenuOpenRef.current) {
@@ -416,6 +436,8 @@ export function AppShell() {
 
   // Role-gated visible nav
   const visible = NAV.filter((n) => can(n.perm));
+  const visibleMore = MORE_NAV.filter((n) => can(n.perm));
+  const moreOpen = moreToggled ?? visibleMore.some((n) => isNavActive(n, path));
 
   const canLog = can("interactions.log");
 
@@ -900,26 +922,41 @@ export function AppShell() {
                 <X className="size-4" />
               </button>
             </div>
-            <nav className="flex-1 p-3 md:p-2 space-y-1 md:space-y-0.5 overflow-y-auto">
-              {visible.map((n) => {
-                const active = n.exact ? path === n.to : path.startsWith(n.to);
-                const Icon = n.icon;
-                return (
-                  <Link
-                    key={n.to}
-                    to={n.to as never}
-                    className={cn(
-                      "flex min-h-11 items-center gap-2.5 px-3 py-2 rounded-[6px] text-[13px] md:text-[12.5px] font-semibold uppercase tracking-[0.05em] transition-colors",
-                      active
-                        ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                        : "text-sidebar-foreground/75 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground",
-                    )}
+            <nav
+              aria-label="Main"
+              className="flex-1 p-3 md:p-2 space-y-1 md:space-y-0.5 overflow-y-auto"
+            >
+              {visible.map((n) => (
+                <NavLink key={n.to} item={n} active={isNavActive(n, path)} />
+              ))}
+              {visibleMore.length > 0 && (
+                <div className="pt-2 mt-2 border-t border-sidebar-border/70">
+                  <button
+                    type="button"
+                    aria-expanded={moreOpen}
+                    aria-controls="menu-more"
+                    onClick={() => setMoreToggled(!moreOpen)}
+                    className="flex w-full min-h-11 items-center gap-2.5 px-3 py-2 rounded-[6px] text-[13px] md:text-[12.5px] font-semibold uppercase tracking-[0.05em] text-sidebar-foreground/60 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   >
-                    <Icon className="size-4" />
-                    {n.label}
-                  </Link>
-                );
-              })}
+                    <MoreHorizontal className="size-4" aria-hidden="true" />
+                    More
+                    <ChevronDown
+                      className={cn(
+                        "ml-auto size-4 transition-transform motion-reduce:transition-none",
+                        moreOpen && "rotate-180",
+                      )}
+                      aria-hidden="true"
+                    />
+                  </button>
+                  {moreOpen && (
+                    <div id="menu-more" className="mt-1 md:mt-0.5 space-y-1 md:space-y-0.5">
+                      {visibleMore.map((n) => (
+                        <NavLink key={n.to} item={n} active={isNavActive(n, path)} />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </nav>
             <div className="p-3 border-t border-sidebar-border space-y-2">
               {/* Mentor Managers' header button is Log Interaction, so the
@@ -994,6 +1031,25 @@ export function AppShell() {
 
       <WorkflowDialog kind={workflow} onClose={() => setWorkflow(null)} prefillPagePath={path} />
     </div>
+  );
+}
+
+function NavLink({ item, active }: { item: NavItem; active: boolean }) {
+  const Icon = item.icon;
+  return (
+    <Link
+      to={item.to as never}
+      aria-current={active ? "page" : undefined}
+      className={cn(
+        "flex min-h-11 items-center gap-2.5 px-3 py-2 rounded-[6px] text-[13px] md:text-[12.5px] font-semibold uppercase tracking-[0.05em] transition-colors",
+        active
+          ? "bg-sidebar-accent text-sidebar-accent-foreground"
+          : "text-sidebar-foreground/75 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground",
+      )}
+    >
+      <Icon className="size-4" aria-hidden="true" />
+      {item.label}
+    </Link>
   );
 }
 
