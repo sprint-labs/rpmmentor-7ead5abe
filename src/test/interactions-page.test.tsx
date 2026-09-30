@@ -371,6 +371,16 @@ describe("Interactions page", () => {
     expect(screen.queryByText("Interaction not found")).toBeNull();
   });
 
+  it("gives a bare old drilldown link its 14-day default window", async () => {
+    const { router } = await renderAt("mentor_manager", "/insights/interactions");
+    await waitFor(() => expect(router.state.location.pathname).toBe("/interactions"));
+    const { from, to } = router.state.location.search as { from: string; to: string };
+    expect(from).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(to).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    const days = (Date.parse(to) - Date.parse(from)) / 86_400_000 + 1;
+    expect(days).toBe(14);
+  });
+
   it("opens a single interaction on its own page", async () => {
     await renderAt(
       "mentor_manager",

@@ -86,13 +86,16 @@ export const Route = createFileRoute("/insights/$metric")({
   beforeLoad: ({ params, search }) => {
     // Interactions has one home: the Interactions page is the same
     // master-detail view with editing added, so the tab lands there with the
-    // window it was opened with.
+    // window it was opened with, or the drilldown's own 14-day default when a
+    // bare link carried none.
     if (params.metric === "interactions") {
+      const hasWindow = Boolean(search.from) && Boolean(search.to);
+      const fallback = lastNDaysPeriod(14);
       throw redirect({
         to: "/interactions",
         search: {
-          from: search.from.slice(0, 10),
-          to: search.to.slice(0, 10),
+          from: hasWindow ? search.from.slice(0, 10) : fallback.fromDate,
+          to: hasWindow ? search.to.slice(0, 10) : fallback.toDate,
           source: "interactions-logged",
         },
         replace: true,
