@@ -67,6 +67,14 @@ interface InsightWorkbenchProps<T> {
   filters?: WorkbenchFilterSpec<T>[];
   /** Filter values to open with, e.g. a duty band deep-linked from the dashboard. */
   initialFilters?: Record<string, string>;
+  /** Search text to open with, e.g. a `q` value carried in the URL. */
+  initialSearch?: string;
+  /**
+   * On narrow screens, open the record somewhere else (its own page) instead
+   * of scrolling down to the inline detail pane. When set, the inline pane is
+   * only shown from the `lg` breakpoint up.
+   */
+  onOpenCompact?: (item: T) => void;
   listLabel: string;
   rowAriaLabel: (item: T) => string;
   rowOf: (item: T) => WorkbenchRowContent;
@@ -96,6 +104,8 @@ export function InsightWorkbench<T>({
   searchFieldsOf,
   filters = [],
   initialFilters,
+  initialSearch,
+  onOpenCompact,
   listLabel,
   rowAriaLabel,
   rowOf,
@@ -104,7 +114,7 @@ export function InsightWorkbench<T>({
   noMatchLabel,
   placeholder,
 }: InsightWorkbenchProps<T>) {
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState(initialSearch ?? "");
   const [filterValues, setFilterValues] = useState<Record<string, string>>(
     () => initialFilters ?? {},
   );
@@ -141,10 +151,14 @@ export function InsightWorkbench<T>({
     setFilterValues({});
   };
 
-  const selectItem = (id: string) => {
-    setSelectedId(id);
+  const selectItem = (item: T) => {
+    setSelectedId(idOf(item));
     if (typeof window.matchMedia !== "function") return;
     if (!window.matchMedia("(max-width: 1023px)").matches) return;
+    if (onOpenCompact) {
+      onOpenCompact(item);
+      return;
+    }
     window.requestAnimationFrame(() => {
       detailPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
       detailHeadingRef.current?.focus({ preventScroll: true });
@@ -186,7 +200,7 @@ export function InsightWorkbench<T>({
 
       <div className="grid min-w-0 border border-border bg-card lg:grid-cols-[minmax(19rem,0.82fr)_minmax(0,1.18fr)]">
         <section
-          className="min-w-0 border-b border-border lg:border-b-0 lg:border-r"
+          className={`min-w-0 border-border lg:border-b-0 lg:border-r ${onOpenCompact ? "" : "border-b"}`}
           aria-label={listLabel}
         >
           <div className="grid grid-cols-1 gap-2 border-b border-border bg-card p-3 sm:grid-cols-2 lg:sticky lg:top-0 lg:z-[1] lg:grid-cols-1 xl:grid-cols-2">
@@ -251,7 +265,7 @@ export function InsightWorkbench<T>({
                     aria-pressed={isSelected}
                     aria-controls={domId}
                     aria-label={rowAriaLabel(item)}
-                    onClick={() => selectItem(id)}
+                    onClick={() => selectItem(item)}
                     className={`grid min-h-20 w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-b border-border/70 px-3 py-3 text-left transition-colors last:border-b-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring xl:grid-cols-[minmax(0,1.25fr)_minmax(8rem,0.75fr)_auto] ${
                       isSelected
                         ? "bg-primary/10 shadow-[inset_3px_0_0_var(--primary)]"
@@ -307,7 +321,7 @@ export function InsightWorkbench<T>({
           id={domId}
           aria-labelledby={selectedItem ? headingId : undefined}
           aria-label={selectedItem ? undefined : listLabel}
-          className="min-w-0 scroll-mt-20 bg-muted/20 p-4 sm:p-5 lg:max-h-[min(68vh,48rem)] lg:overflow-y-auto lg:supports-[height:100dvh]:max-h-[min(68dvh,48rem)]"
+          className={`min-w-0 scroll-mt-20 bg-muted/20 p-4 sm:p-5 ${onOpenCompact ? "hidden lg:block" : ""} lg:max-h-[min(68vh,48rem)] lg:overflow-y-auto lg:supports-[height:100dvh]:max-h-[min(68dvh,48rem)]`}
         >
           {selectedItem && header ? (
             <>

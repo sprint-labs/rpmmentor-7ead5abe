@@ -478,9 +478,15 @@ function Dashboard() {
           />
         </Link>
         <Link
-          to="/insights/$metric"
-          params={{ metric: "interactions" }}
-          search={{ from: period.fromDate, to: period.toDate, level: "", tier: "" }}
+          to="/interactions"
+          search={{
+            from: period.fromDate,
+            to: period.toDate,
+            mentorId: "",
+            type: "",
+            source: "interactions-logged",
+            q: "",
+          }}
           className="group block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-info"
         >
           <span className="sr-only">Break down: </span>

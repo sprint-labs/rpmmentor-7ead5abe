@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createMemoryHistory, createRouter, Outlet, RouterProvider } from "@tanstack/react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -22,7 +22,10 @@ vi.mock("@/lib/auth", () => ({
       title: "Management",
     },
     loading: false,
-    can: (permission: string) => permission !== "alerts.view" || authState.role === "super_admin",
+    can: (permission: string) =>
+      permission === "alerts.view" || permission === "interactions.delete"
+        ? authState.role === "super_admin"
+        : true,
     signIn: vi.fn(),
     signOut: vi.fn(),
     setViewAsRole: vi.fn(),
@@ -149,17 +152,16 @@ vi.mock("@tanstack/react-start", async (importOriginal) => {
   return { ...actual, useServerFn: () => vi.fn() };
 });
 
-async function renderInteractionsInsight(
+async function renderAt(
   role: "mentor_manager" | "admin" | "super_admin",
-  initialEntry = "/insights/interactions?from=2026-08-08&to=2026-08-21",
+  initialEntry: string,
+  heading: string | null = "Interactions",
 ) {
   authState.role = role;
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const router = createRouter({
     context: { queryClient },
-    history: createMemoryHistory({
-      initialEntries: [initialEntry],
-    }),
+    history: createMemoryHistory({ initialEntries: [initialEntry] }),
     routeTree,
   });
 
@@ -169,8 +171,14 @@ async function renderInteractionsInsight(
       <RouterProvider router={router} />
     </QueryClientProvider>,
   );
-  await screen.findByRole("heading", { name: "Interactions Logged", level: 1 });
+  if (heading) await screen.findByRole("heading", { name: heading, level: 1 });
   return { ...rendered, router };
+}
+
+function detailPanel(): HTMLElement {
+  const panel = document.getElementById("selected-interaction-detail");
+  if (!panel) throw new Error("Selected interaction detail panel was not rendered");
+  return panel;
 }
 
 afterEach(() => {
@@ -178,41 +186,88 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-describe("Interactions Logged workbench route", () => {
+describe("Interactions page", () => {
   it.each(["mentor_manager", "admin", "super_admin"] as const)(
-    "shows the scoped master-detail workbench to a %s",
+    "shows the dashboard window as a read-only master-detail view to a %s",
     async (role) => {
-      const { router } = await renderInteractionsInsight(role);
+      await renderAt(
+        role,
+        "/interactions?from=2026-08-08&to=2026-08-21&source=interactions-logged",
+      );
 
       const row = screen.getByRole("button", {
         name: "Show details for Christian Walton on 20 Aug 2026",
       });
       expect(row.getAttribute("aria-pressed")).toBe("true");
       expect(screen.queryByText("Outside Window")).toBeNull();
-      expect(screen.queryByText("Report Observation")).toBeNull();
+      // Match observations stay in the list, counted separately.
+      expect(screen.getByText("Report Observation")).toBeTruthy();
 
-      const detail = document.getElementById("selected-interaction-detail");
-      expect(detail).toBeTruthy();
-      expect(within(detail!).getByText("Complete selected interaction notes.")).toBeTruthy();
-      expect(within(detail!).getByText("Review the agreed actions next week.")).toBeTruthy();
+      const detail = within(detailPanel());
+      expect(detail.getByText("Complete selected interaction notes.")).toBeTruthy();
+      expect(detail.getByText("Review the agreed actions next week.")).toBeTruthy();
+      expect(detail.getByRole("button", { name: /Edit interaction/ })).toBeTruthy();
       expect(screen.getAllByText("2026-08-08 → 2026-08-21").length).toBeGreaterThan(0);
-
-      const fullLog = screen.getByRole("link", { name: /Open full interaction log/ });
-      const destination = new URL(fullLog.getAttribute("href") ?? "", "http://localhost");
-      expect(destination.pathname).toBe("/interactions");
-      expect(destination.searchParams.get("from")).toBe("2026-08-08");
-      expect(destination.searchParams.get("to")).toBe("2026-08-21");
-      expect(destination.searchParams.get("source")).toBe("interactions-logged");
-      expect(router.state.location.pathname).toBe("/insights/interactions");
     },
   );
 
-  it("forwards the default local period to the full log as date-only values", async () => {
-    await renderInteractionsInsight("mentor_manager", "/insights/interactions");
+  it("offers Delete to super admins only", async () => {
+    await renderAt("mentor_manager", "/interactions?from=2026-08-08&to=2026-08-21");
+    expect(within(detailPanel()).queryByRole("button", { name: /Delete interaction/ })).toBeNull();
+    cleanup();
 
-    const fullLog = screen.getByRole("link", { name: /Open full interaction log/ });
-    const destination = new URL(fullLog.getAttribute("href") ?? "", "http://localhost");
-    expect(destination.searchParams.get("from")).toMatch(/^\d{4}-\d{2}-\d{2}$/);
-    expect(destination.searchParams.get("to")).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    await renderAt("super_admin", "/interactions?from=2026-08-08&to=2026-08-21");
+    expect(within(detailPanel()).getByRole("button", { name: /Delete interaction/ })).toBeTruthy();
+  });
+
+  it("gives mentor managers Open report on a match observation", async () => {
+    await renderAt("mentor_manager", "/interactions?from=2026-08-08&to=2026-08-21");
+    fireEvent.click(screen.getByRole("button", { name: /Show details for Report Observation/ }));
+    const link = within(detailPanel()).getByRole("link", { name: /Open report/ });
+    expect(link.getAttribute("href")).toBe("/reports/report-generated");
+  });
+
+  it("makes a delete take two steps and the typed goalkeeper and type", async () => {
+    await renderAt("super_admin", "/interactions?from=2026-08-08&to=2026-08-21");
+    fireEvent.click(within(detailPanel()).getByRole("button", { name: /Delete interaction/ }));
+    fireEvent.click(await screen.findByRole("button", { name: "Continue" }));
+
+    const confirm = await screen.findByRole("button", { name: /Delete interaction/ });
+    expect((confirm as HTMLButtonElement).disabled).toBe(true);
+    const input = screen.getByRole("textbox", { name: /to confirm/ });
+    fireEvent.change(input, { target: { value: "Christian Walton" } });
+    expect((confirm as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.change(input, { target: { value: "  christian walton   training ground visit " } });
+    expect((confirm as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it("shows every interaction when opened from the menu with no window", async () => {
+    await renderAt("mentor_manager", "/interactions");
+    expect(screen.getByText("Outside Window")).toBeTruthy();
+    expect(screen.getAllByText("All time").length).toBeGreaterThan(0);
+  });
+
+  it("sends the old Interactions Logged drilldown to the Interactions page", async () => {
+    const { router } = await renderAt(
+      "mentor_manager",
+      "/insights/interactions?from=2026-08-08&to=2026-08-21",
+    );
+    await waitFor(() => expect(router.state.location.pathname).toBe("/interactions"));
+    expect(router.state.location.search).toMatchObject({
+      from: "2026-08-08",
+      to: "2026-08-21",
+      source: "interactions-logged",
+    });
+  });
+
+  it("opens a single interaction on its own page", async () => {
+    await renderAt(
+      "mentor_manager",
+      "/interactions/11111111-1111-4111-8111-111111111111",
+      "Christian Walton",
+    );
+    expect(screen.getByText("Complete selected interaction notes.")).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Edit interaction/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Interactions/ })).toBeTruthy();
   });
 });

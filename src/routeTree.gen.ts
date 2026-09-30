@@ -35,6 +35,7 @@ import { Route as SystemIntegrationsRouteImport } from './routes/system.integrat
 import { Route as SystemGithubRouteImport } from './routes/system.github'
 import { Route as SystemDataQualityRouteImport } from './routes/system.data-quality'
 import { Route as ReportsReportIdRouteImport } from './routes/reports.$reportId'
+import { Route as InteractionsInteractionIdRouteImport } from './routes/interactions_.$interactionId'
 import { Route as InsightsMetricRouteImport } from './routes/insights.$metric'
 import { Route as GoalkeepersGkIdRouteImport } from './routes/goalkeepers.$gkId'
 import { Route as DesignGkhqRouteImport } from './routes/design.gkhq'
@@ -179,6 +180,12 @@ const ReportsReportIdRoute = ReportsReportIdRouteImport.update({
   path: '/reports/$reportId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const InteractionsInteractionIdRoute =
+  InteractionsInteractionIdRouteImport.update({
+    id: '/interactions_/$interactionId',
+    path: '/interactions/$interactionId',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const InsightsMetricRoute = InsightsMetricRouteImport.update({
   id: '/insights/$metric',
   path: '/insights/$metric',
@@ -275,6 +282,7 @@ export interface FileRoutesByFullPath {
   '/design/gkhq': typeof DesignGkhqRoute
   '/goalkeepers/$gkId': typeof GoalkeepersGkIdRoute
   '/insights/$metric': typeof InsightsMetricRoute
+  '/interactions/$interactionId': typeof InteractionsInteractionIdRoute
   '/reports/$reportId': typeof ReportsReportIdRoute
   '/system/data-quality': typeof SystemDataQualityRoute
   '/system/github': typeof SystemGithubRoute
@@ -316,6 +324,7 @@ export interface FileRoutesByTo {
   '/design/gkhq': typeof DesignGkhqRoute
   '/goalkeepers/$gkId': typeof GoalkeepersGkIdRoute
   '/insights/$metric': typeof InsightsMetricRoute
+  '/interactions/$interactionId': typeof InteractionsInteractionIdRoute
   '/reports/$reportId': typeof ReportsReportIdRoute
   '/system/data-quality': typeof SystemDataQualityRoute
   '/system/github': typeof SystemGithubRoute
@@ -358,6 +367,7 @@ export interface FileRoutesById {
   '/design/gkhq': typeof DesignGkhqRoute
   '/goalkeepers/$gkId': typeof GoalkeepersGkIdRoute
   '/insights/$metric': typeof InsightsMetricRoute
+  '/interactions_/$interactionId': typeof InteractionsInteractionIdRoute
   '/reports/$reportId': typeof ReportsReportIdRoute
   '/system/data-quality': typeof SystemDataQualityRoute
   '/system/github': typeof SystemGithubRoute
@@ -401,6 +411,7 @@ export interface FileRouteTypes {
     | '/design/gkhq'
     | '/goalkeepers/$gkId'
     | '/insights/$metric'
+    | '/interactions/$interactionId'
     | '/reports/$reportId'
     | '/system/data-quality'
     | '/system/github'
@@ -442,6 +453,7 @@ export interface FileRouteTypes {
     | '/design/gkhq'
     | '/goalkeepers/$gkId'
     | '/insights/$metric'
+    | '/interactions/$interactionId'
     | '/reports/$reportId'
     | '/system/data-quality'
     | '/system/github'
@@ -483,6 +495,7 @@ export interface FileRouteTypes {
     | '/design/gkhq'
     | '/goalkeepers/$gkId'
     | '/insights/$metric'
+    | '/interactions_/$interactionId'
     | '/reports/$reportId'
     | '/system/data-quality'
     | '/system/github'
@@ -524,6 +537,7 @@ export interface RootRouteChildren {
   DesignBentoFeaturesRoute: typeof DesignBentoFeaturesRoute
   DesignGkhqRoute: typeof DesignGkhqRoute
   InsightsMetricRoute: typeof InsightsMetricRoute
+  InteractionsInteractionIdRoute: typeof InteractionsInteractionIdRoute
   ReportsReportIdRoute: typeof ReportsReportIdRoute
   SystemDataQualityRoute: typeof SystemDataQualityRoute
   SystemGithubRoute: typeof SystemGithubRoute
@@ -723,6 +737,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ReportsReportIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/interactions_/$interactionId': {
+      id: '/interactions_/$interactionId'
+      path: '/interactions/$interactionId'
+      fullPath: '/interactions/$interactionId'
+      preLoaderRoute: typeof InteractionsInteractionIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/insights/$metric': {
       id: '/insights/$metric'
       path: '/insights/$metric'
@@ -856,6 +877,7 @@ const rootRouteChildren: RootRouteChildren = {
   DesignBentoFeaturesRoute: DesignBentoFeaturesRoute,
   DesignGkhqRoute: DesignGkhqRoute,
   InsightsMetricRoute: InsightsMetricRoute,
+  InteractionsInteractionIdRoute: InteractionsInteractionIdRoute,
   ReportsReportIdRoute: ReportsReportIdRoute,
   SystemDataQualityRoute: SystemDataQualityRoute,
   SystemGithubRoute: SystemGithubRoute,

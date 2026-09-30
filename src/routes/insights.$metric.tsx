@@ -4,7 +4,6 @@ import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { ArrowUpRight, AlertTriangle } from "lucide-react";
 import { PageHeader, SectionTitle } from "@/components/primitives";
-import { InteractionWorkbench } from "@/components/interaction-workbench";
 import {
   ActiveMentorWorkbench,
   DutyOfCareWorkbench,
@@ -12,7 +11,6 @@ import {
   ScheduledEventWorkbench,
 } from "@/components/insight-drilldowns";
 import { useAuth } from "@/lib/auth";
-import { useLoggedInteractions } from "@/lib/interactions/use-interactions";
 import { listPlayers } from "@/lib/players.functions";
 import { listUsersAndRoles } from "@/lib/users-and-roles.functions";
 import { listAssignableMentors, listCalendarEvents } from "@/lib/calendar.functions";
@@ -20,8 +18,7 @@ import { alerts as systemAlerts } from "@/lib/mock-data";
 import { toGoalkeepers } from "@/lib/roster/live-goalkeepers";
 import { listPlayerDutyOfCare } from "@/lib/duty-of-care.functions";
 import { buildRosterDutyIndex, rosterDutyFor } from "@/lib/duty-of-care-roster";
-import { isDateOnlyInPeriod, lastNDaysPeriod } from "@/lib/dashboard-period";
-import { isDashboardInteractionType } from "@/lib/interactions/schema";
+import { lastNDaysPeriod } from "@/lib/dashboard-period";
 import { buildActiveMentorInsightRows } from "@/lib/active-mentor-insights";
 import { RequirePermission } from "@/components/require-permission";
 
@@ -87,6 +84,20 @@ export const Route = createFileRoute("/insights/$metric")({
   // richer view of the same reports, so old links land there, keeping the
   // window they were opened with.
   beforeLoad: ({ params, search }) => {
+    // Interactions has one home: the Interactions page is the same
+    // master-detail view with editing added, so the tab lands there with the
+    // window it was opened with.
+    if (params.metric === "interactions") {
+      throw redirect({
+        to: "/interactions",
+        search: {
+          from: search.from.slice(0, 10),
+          to: search.to.slice(0, 10),
+          source: "interactions-logged",
+        },
+        replace: true,
+      });
+    }
     if (params.metric === "reports") {
       throw redirect({
         to: "/reports",
@@ -185,9 +196,6 @@ function InsightDrilldown() {
     enabled: enabled && active === "events",
     staleTime: 30_000,
   });
-  const interactions = useLoggedInteractions(
-    enabled && (active === "interactions" || active === "duty"),
-  );
 
   // Duty of Care reads `public.player_duty_of_care`, the same projection the
   // dashboard headline, the roster chips and every profile badge read. It was
@@ -211,13 +219,11 @@ function InsightDrilldown() {
     );
   }
 
-  const periodLabel = `${period.fromDate} → ${period.toDate}`;
-
   return (
     <div className="space-y-4">
       <PageHeader
         title={meta.title}
-        description={`${meta.description}${active === "interactions" ? ` · ${periodLabel}` : ""}`}
+        description={meta.description}
         action={
           <div className="flex items-center gap-3">
             <Link
@@ -226,28 +232,12 @@ function InsightDrilldown() {
             >
               Dashboard
             </Link>
-            {active === "interactions" ? (
-              <Link
-                to="/interactions"
-                search={{
-                  from: period.fromDate,
-                  to: period.toDate,
-                  mentorId: "",
-                  type: "",
-                  source: "interactions-logged",
-                }}
-                className="text-[10px] font-mono uppercase tracking-widest text-primary-ink inline-flex items-center gap-1"
-              >
-                Open full interaction log <ArrowUpRight className="size-3" />
-              </Link>
-            ) : (
-              <Link
-                to={meta.to}
-                className="text-[10px] font-mono uppercase tracking-widest text-primary-ink inline-flex items-center gap-1"
-              >
-                {meta.linkLabel} <ArrowUpRight className="size-3" />
-              </Link>
-            )}
+            <Link
+              to={meta.to}
+              className="text-[10px] font-mono uppercase tracking-widest text-primary-ink inline-flex items-center gap-1"
+            >
+              {meta.linkLabel} <ArrowUpRight className="size-3" />
+            </Link>
           </div>
         }
       />
@@ -278,21 +268,6 @@ function InsightDrilldown() {
             const rows = players.data ?? [];
             if (rows.length === 0) return <Empty label="No player records" />;
             return <PlayerRecordWorkbench players={rows} initialTier={search.tier} />;
-          })()}
-
-        {active === "interactions" &&
-          (() => {
-            const rows = (interactions.data ?? [])
-              .filter(
-                (i) =>
-                  isDashboardInteractionType(i.interactionType) &&
-                  isDateOnlyInPeriod(i.occurredAt, period.fromDate, period.toDate),
-              )
-              .sort((a, b) => b.occurredAt.localeCompare(a.occurredAt));
-            if (interactions.isLoading) return <Empty label="Loading…" />;
-            if (interactions.isError) return <Empty label="Interactions unavailable" />;
-            if (rows.length === 0) return <Empty label="No interactions in this window" />;
-            return <InteractionWorkbench interactions={rows} periodLabel={periodLabel} />;
           })()}
 
         {active === "duty" &&

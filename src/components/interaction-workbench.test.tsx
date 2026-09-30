@@ -113,9 +113,6 @@ describe("InteractionWorkbench", () => {
     expect(detail.getByText("Review the agreed actions next week.")).toBeTruthy();
     expect(detail.getByText("Action plan agreed")).toBeTruthy();
     expect(detail.getByText("Created from a Match Report")).toBeTruthy();
-    expect(detail.getByRole("link", { name: /View source report/ }).getAttribute("href")).toBe(
-      "/reports/report-123",
-    );
 
     fireEvent.click(second);
     detail = within(detailPanel());
@@ -124,9 +121,63 @@ describe("InteractionWorkbench", () => {
     expect(detail.getByText("Second record notes about recovery and confidence.")).toBeTruthy();
     expect(detail.getByText("No follow-up action recorded.")).toBeTruthy();
     expect(detail.getByText("Logged for a scheduled event")).toBeTruthy();
-    expect(detail.getByRole("link", { name: /Open calendar/ }).getAttribute("href")).toBe(
-      "/calendar",
+  });
+
+  it("renders the actions for whichever record is selected", () => {
+    render(
+      <InteractionWorkbench
+        interactions={interactions}
+        periodLabel="All time"
+        renderActions={(interaction) => (
+          <button type="button">Edit {interaction.goalkeeperName}</button>
+        )}
+      />,
     );
+    expect(
+      within(detailPanel()).getByRole("button", { name: "Edit Christian Walton" }),
+    ).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /Show details for James Beadle/ }));
+    expect(within(detailPanel()).getByRole("button", { name: "Edit James Beadle" })).toBeTruthy();
+  });
+
+  it("counts match observations apart from interactions so the headline matches the dashboard", () => {
+    render(
+      <InteractionWorkbench
+        interactions={[
+          ...interactions,
+          { ...interactions[0]!, id: "obs-1", interactionType: "Live Match Observation" },
+        ]}
+        periodLabel="All time"
+      />,
+    );
+    const interactionsTile = screen.getByText("Interactions", { selector: "div" }).parentElement!;
+    expect(within(interactionsTile).getByText("2")).toBeTruthy();
+    const observationsTile = screen.getByText("Match observations").parentElement!;
+    expect(within(observationsTile).getByText("1")).toBeTruthy();
+  });
+
+  it("opens the record elsewhere on narrow screens when asked to", () => {
+    const original = window.matchMedia;
+    window.matchMedia = ((query: string) => ({
+      matches: query.includes("max-width"),
+      media: query,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    })) as unknown as typeof window.matchMedia;
+    const open = vi.fn();
+    try {
+      render(
+        <InteractionWorkbench
+          interactions={interactions}
+          periodLabel="All time"
+          onOpenCompact={open}
+        />,
+      );
+      fireEvent.click(screen.getByRole("button", { name: /Show details for James Beadle/ }));
+      expect(open).toHaveBeenCalledWith(interactions[1]);
+    } finally {
+      window.matchMedia = original;
+    }
   });
 
   it("filters by search, type and mentor while keeping a visible interaction selected", () => {
