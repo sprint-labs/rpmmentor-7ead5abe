@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as UsersRouteImport } from './routes/users'
 import { Route as SupportRouteImport } from './routes/support'
+import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as MediaRouteImport } from './routes/media'
 import { Route as McpRouteImport } from './routes/mcp'
@@ -58,6 +59,11 @@ const UsersRoute = UsersRouteImport.update({
 const SupportRoute = SupportRouteImport.update({
   id: '/support',
   path: '/support',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsRoute = SettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ResetPasswordRoute = ResetPasswordRouteImport.update({
@@ -272,6 +278,7 @@ export interface FileRoutesByFullPath {
   '/mcp': typeof McpRoute
   '/media': typeof MediaRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/settings': typeof SettingsRoute
   '/support': typeof SupportRoute
   '/users': typeof UsersRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
@@ -314,6 +321,7 @@ export interface FileRoutesByTo {
   '/mcp': typeof McpRoute
   '/media': typeof MediaRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/settings': typeof SettingsRoute
   '/support': typeof SupportRoute
   '/users': typeof UsersRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
@@ -357,6 +365,7 @@ export interface FileRoutesById {
   '/mcp': typeof McpRoute
   '/media': typeof MediaRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/settings': typeof SettingsRoute
   '/support': typeof SupportRoute
   '/users': typeof UsersRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
@@ -401,6 +410,7 @@ export interface FileRouteTypes {
     | '/mcp'
     | '/media'
     | '/reset-password'
+    | '/settings'
     | '/support'
     | '/users'
     | '/.mcp/list-tools'
@@ -443,6 +453,7 @@ export interface FileRouteTypes {
     | '/mcp'
     | '/media'
     | '/reset-password'
+    | '/settings'
     | '/support'
     | '/users'
     | '/.mcp/list-tools'
@@ -485,6 +496,7 @@ export interface FileRouteTypes {
     | '/mcp'
     | '/media'
     | '/reset-password'
+    | '/settings'
     | '/support'
     | '/users'
     | '/.mcp/list-tools'
@@ -528,6 +540,7 @@ export interface RootRouteChildren {
   McpRoute: typeof McpRoute
   MediaRoute: typeof MediaRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
+  SettingsRoute: typeof SettingsRoute
   SupportRoute: typeof SupportRoute
   UsersRoute: typeof UsersRoute
   Char91DotmcpChar93ListToolsRoute: typeof Char91DotmcpChar93ListToolsRoute
@@ -567,6 +580,13 @@ declare module '@tanstack/react-router' {
       path: '/support'
       fullPath: '/support'
       preLoaderRoute: typeof SupportRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings': {
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof SettingsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/reset-password': {
@@ -867,6 +887,7 @@ const rootRouteChildren: RootRouteChildren = {
   McpRoute: McpRoute,
   MediaRoute: MediaRoute,
   ResetPasswordRoute: ResetPasswordRoute,
+  SettingsRoute: SettingsRoute,
   SupportRoute: SupportRoute,
   UsersRoute: UsersRoute,
   Char91DotmcpChar93ListToolsRoute: Char91DotmcpChar93ListToolsRoute,
