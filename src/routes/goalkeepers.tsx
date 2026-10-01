@@ -51,7 +51,9 @@ import {
   DrawerTrigger,
 } from "@/components/ui/drawer";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { ChevronDown, ChevronUp, ChevronsUpDown, SlidersHorizontal, X } from "lucide-react";
+import { useAuth } from "@/lib/auth";
+import { WorkflowDialog } from "@/components/workflows";
+import { ChevronDown, ChevronUp, ChevronsUpDown, Plus, SlidersHorizontal, X } from "lucide-react";
 
 // ---------- URL search-param schema ----------
 // Values are stored as CSV strings for multi-selects to keep URLs short and
@@ -525,6 +527,9 @@ function GoalkeepersList() {
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [mobileAdvOpen, setMobileAdvOpen] = useState(false);
   const [sort, setSort] = useState<Sort | null>(null);
+  const { can } = useAuth();
+  const canAddGoalkeeper = can("goalkeepers.create");
+  const [addOpen, setAddOpen] = useState(false);
 
   // The roster itself now comes from `public.players`, so this list and the
   // dashboard count the same goalkeepers. Same query key as the profile page,
@@ -816,7 +821,22 @@ function GoalkeepersList() {
             ? "Loading the roster…"
             : `${goalkeepers.length} RPM clients under management across the UK and internationally.`
         }
+        action={
+          canAddGoalkeeper ? (
+            <button
+              type="button"
+              onClick={() => setAddOpen(true)}
+              className="inline-flex h-11 items-center gap-1.5 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:h-9"
+            >
+              <Plus className="size-4" aria-hidden="true" />
+              Add Goalkeeper
+            </button>
+          ) : undefined
+        }
       />
+      {canAddGoalkeeper && (
+        <WorkflowDialog kind={addOpen ? "goalkeeper" : null} onClose={() => setAddOpen(false)} />
+      )}
 
       <div className="flex flex-wrap items-center gap-2">
         <input

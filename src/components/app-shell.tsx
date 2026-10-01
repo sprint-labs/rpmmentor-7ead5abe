@@ -26,6 +26,9 @@ import {
   Database,
   LifeBuoy,
   Columns3,
+  ChevronDown,
+  MoreHorizontal,
+  Settings,
 } from "lucide-react";
 import { useTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
@@ -71,8 +74,8 @@ type NavItem = {
 };
 const NAV: NavItem[] = [
   // The order a mentor works in: what happened, who it was about, what is
-  // owed, what is coming. Reference and admin sit under it, and both ways of
-  // getting help sit at the foot of the menu rather than in this list.
+  // owed, what is coming. Reference and admin sit under it. Account,
+  // Settings, Help and Sign out sit at the foot of the menu, not in this list.
   { to: "/", label: "Dashboard", icon: LayoutDashboard, exact: true, perm: "goalkeepers.view" },
   { to: "/bulletins", label: "Bulletin Board", icon: Columns3, perm: "bulletins.view" },
   { to: "/goalkeepers", label: "Goalkeepers", icon: Users, perm: "goalkeepers.view" },
@@ -91,6 +94,14 @@ const NAV: NavItem[] = [
   { to: "/audit", label: "Audit Log", icon: History, perm: "audit.view" },
   { to: "/alerts", label: "Notification Centre", icon: BellRing, perm: "alerts.view" },
   { to: "/executive", label: "Executive", icon: BarChart3, perm: "executive.view" },
+];
+
+/**
+ * System tools. Used rarely and only by Super Admins, so they sit in a
+ * collapsed "More" group under the main list instead of doubling its length.
+ * The group opens on its own when the current page is one of them.
+ */
+const MORE_NAV: NavItem[] = [
   { to: "/system/users", label: "Manage Users", icon: ShieldCheck, perm: "system.manage" },
   {
     to: "/system/permissions",
@@ -108,11 +119,21 @@ const NAV: NavItem[] = [
   },
 ];
 
+const FOOTER_ITEM =
+  "flex min-h-11 min-w-0 items-center gap-2 rounded-[6px] px-3 py-2 text-[12px] font-semibold uppercase tracking-[0.05em] text-sidebar-foreground/70 transition-colors hover:bg-sidebar-accent/60 hover:text-sidebar-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
+const FOOTER_ITEM_ACTIVE = "bg-sidebar-accent text-sidebar-accent-foreground";
+
+function isNavActive(item: NavItem, path: string): boolean {
+  return item.exact ? path === item.to : path.startsWith(item.to);
+}
+
 export function AppShell() {
   const { user, loading, can, signOut, setViewAsRole, passwordRecoveryPending } = useAuth();
   const path = useRouterState({ select: (s) => s.location.pathname });
   const navigate = useNavigate();
   const [navOpen, setNavOpen] = useState(false);
+  // null until the user touches the toggle, so the group follows the page.
+  const [moreToggled, setMoreToggled] = useState<boolean | null>(null);
   const [bellOpen, setBellOpen] = useState(false);
   const [newSinceOpen, setNewSinceOpen] = useState<ReadonlySet<string>>(() => new Set());
   const [resolvedInboxIds, setResolvedInboxIds] = useState<readonly string[]>([]);
@@ -349,8 +370,19 @@ export function AppShell() {
   }, [path]);
 
   useEffect(() => {
+    if (!navOpen) setMoreToggled(null);
+  }, [navOpen]);
+
+  useEffect(() => {
     if (navOpen) {
-      requestAnimationFrame(() => menuCloseRef.current?.focus());
+      requestAnimationFrame(() => {
+        menuCloseRef.current?.focus();
+        // A long list (More open on a system page) can put the current page
+        // below the fold; bring it into view without moving focus.
+        menuDialogRef.current
+          ?.querySelector<HTMLElement>('nav [aria-current="page"]')
+          ?.scrollIntoView?.({ block: "nearest" });
+      });
     } else if (wasMenuOpenRef.current) {
       menuTriggerRef.current?.focus();
     }
@@ -416,6 +448,8 @@ export function AppShell() {
 
   // Role-gated visible nav
   const visible = NAV.filter((n) => can(n.perm));
+  const visibleMore = MORE_NAV.filter((n) => can(n.perm));
+  const moreOpen = moreToggled ?? visibleMore.some((n) => isNavActive(n, path));
 
   const canLog = can("interactions.log");
 
@@ -900,91 +934,96 @@ export function AppShell() {
                 <X className="size-4" />
               </button>
             </div>
-            <nav className="flex-1 p-3 md:p-2 space-y-1 md:space-y-0.5 overflow-y-auto">
-              {visible.map((n) => {
-                const active = n.exact ? path === n.to : path.startsWith(n.to);
-                const Icon = n.icon;
-                return (
-                  <Link
-                    key={n.to}
-                    to={n.to as never}
-                    className={cn(
-                      "flex min-h-11 items-center gap-2.5 px-3 py-2 rounded-[6px] text-[13px] md:text-[12.5px] font-semibold uppercase tracking-[0.05em] transition-colors",
-                      active
-                        ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                        : "text-sidebar-foreground/75 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground",
-                    )}
+            <nav
+              aria-label="Main"
+              className="flex-1 p-3 md:p-2 space-y-1 md:space-y-0.5 overflow-y-auto"
+            >
+              {visible.map((n) => (
+                <NavLink key={n.to} item={n} active={isNavActive(n, path)} />
+              ))}
+              {visibleMore.length > 0 && (
+                <div className="pt-2 mt-2 border-t border-sidebar-border/70">
+                  <button
+                    type="button"
+                    aria-expanded={moreOpen}
+                    aria-controls="menu-more"
+                    onClick={() => setMoreToggled(!moreOpen)}
+                    className="flex w-full min-h-11 items-center gap-2.5 px-3 py-2 rounded-[6px] text-[13px] md:text-[12.5px] font-semibold uppercase tracking-[0.05em] text-sidebar-foreground/60 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   >
-                    <Icon className="size-4" />
-                    {n.label}
-                  </Link>
-                );
-              })}
-            </nav>
-            <div className="p-3 border-t border-sidebar-border space-y-2">
-              {/* Mentor Managers' header button is Log Interaction, so the
-                  menu is where every role allowed to add a goalkeeper finds it. */}
-              {can("goalkeepers.create") && (
-                <button
-                  onClick={() => {
-                    setWorkflow("goalkeeper");
-                    setNavOpen(false);
-                  }}
-                  className="w-full min-h-11 flex items-center gap-2 px-3 py-2 rounded-md bg-primary text-primary-foreground text-xs uppercase tracking-[0.06em] font-semibold hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                >
-                  <Plus className="size-4" />
-                  Add Goalkeeper
-                </button>
+                    <MoreHorizontal className="size-4" aria-hidden="true" />
+                    More
+                    <ChevronDown
+                      className={cn(
+                        "ml-auto size-4 transition-transform motion-reduce:transition-none",
+                        moreOpen && "rotate-180",
+                      )}
+                      aria-hidden="true"
+                    />
+                  </button>
+                  {moreOpen && (
+                    <div id="menu-more" className="mt-1 md:mt-0.5 space-y-1 md:space-y-0.5">
+                      {visibleMore.map((n) => (
+                        <NavLink key={n.to} item={n} active={isNavActive(n, path)} />
+                      ))}
+                    </div>
+                  )}
+                </div>
               )}
-              <ThemeToggle menu />
+            </nav>
+            {/* Four quiet actions, two by two, so the foot of the menu stays
+                small. Help opens Help & updates, which also leads to your
+                messages (/support). */}
+            <div className="grid grid-cols-2 gap-1 p-3 md:p-2 border-t border-sidebar-border">
+              <Link
+                to={"/account" as never}
+                onClick={closeMenu}
+                aria-current={path === "/account" ? "page" : undefined}
+                className={cn(FOOTER_ITEM, path === "/account" && FOOTER_ITEM_ACTIVE)}
+              >
+                <KeyRound className="size-4" aria-hidden="true" />
+                Account
+              </Link>
+              <Link
+                to={"/settings" as never}
+                onClick={closeMenu}
+                aria-current={path === "/settings" ? "page" : undefined}
+                className={cn(FOOTER_ITEM, path === "/settings" && FOOTER_ITEM_ACTIVE)}
+              >
+                <Settings className="size-4" aria-hidden="true" />
+                Settings
+              </Link>
               {canSeeSupport && (
                 <button
+                  type="button"
                   onClick={() => {
                     setNavOpen(false);
                     setBellOpen(false);
                     setHelpOpen(true);
                   }}
-                  className="w-full min-h-11 flex items-center gap-2 px-3 py-2 rounded-md border border-border text-xs uppercase tracking-[0.06em] font-semibold hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className={cn(FOOTER_ITEM, path === "/support" && FOOTER_ITEM_ACTIVE)}
                 >
-                  <LifeBuoy className="size-4" />
-                  {/* "Help & updates", verbatim: the dialog's accessible name
-                      spells the ampersand, and the two must match for a speech
-                      user saying what they read. */}
-                  Help &amp; updates
+                  <LifeBuoy className="size-4" aria-hidden="true" />
+                  Help
                   {helpUnread > 0 && (
                     <span className="ml-auto grid h-[18px] min-w-[18px] place-items-center rounded-full bg-primary px-1 font-mono text-[10px] font-semibold text-primary-foreground">
-                      {helpUnread > 9 ? "9+" : helpUnread}
+                      <span aria-hidden="true">{helpUnread > 9 ? "9+" : helpUnread}</span>
+                      <span className="sr-only">
+                        , {helpUnread} unread {helpUnread === 1 ? "update" : "updates"}
+                      </span>
                     </span>
                   )}
                 </button>
               )}
-              {canSeeSupport && (
-                <Link
-                  to={"/support" as never}
-                  onClick={closeMenu}
-                  className="w-full min-h-11 flex items-center gap-2 px-3 py-2 rounded-md border border-border text-xs uppercase tracking-[0.06em] font-semibold hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                >
-                  <MessageSquare className="size-4" />
-                  Help &amp; Messages
-                </Link>
-              )}
-              <Link
-                to={"/account" as never}
-                onClick={closeMenu}
-                className="w-full min-h-11 flex items-center gap-2 px-3 py-2 rounded-md border border-border text-xs uppercase tracking-[0.06em] font-semibold hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                <KeyRound className="size-4" />
-                Account
-              </Link>
               <button
+                type="button"
                 onClick={() => {
                   signOut();
                   setNavOpen(false);
                   navigate({ to: "/login" as never });
                 }}
-                className="w-full min-h-11 flex items-center gap-2 px-3 py-2 rounded-md border border-border text-xs uppercase tracking-[0.06em] font-semibold hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className={FOOTER_ITEM}
               >
-                <LogOut className="size-4" />
+                <LogOut className="size-4" aria-hidden="true" />
                 Sign out
               </button>
             </div>
@@ -997,7 +1036,26 @@ export function AppShell() {
   );
 }
 
-function ThemeToggle({ className, menu = false }: { className?: string; menu?: boolean }) {
+function NavLink({ item, active }: { item: NavItem; active: boolean }) {
+  const Icon = item.icon;
+  return (
+    <Link
+      to={item.to as never}
+      aria-current={active ? "page" : undefined}
+      className={cn(
+        "flex min-h-11 items-center gap-2.5 px-3 py-2 rounded-[6px] text-[13px] md:text-[12.5px] font-semibold uppercase tracking-[0.05em] transition-colors",
+        active
+          ? "bg-sidebar-accent text-sidebar-accent-foreground"
+          : "text-sidebar-foreground/75 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground",
+      )}
+    >
+      <Icon className="size-4" aria-hidden="true" />
+      {item.label}
+    </Link>
+  );
+}
+
+function ThemeToggle({ className }: { className?: string }) {
   const { theme, toggle } = useTheme();
   const isDark = theme === "dark";
   return (
@@ -1006,15 +1064,12 @@ function ThemeToggle({ className, menu = false }: { className?: string; menu?: b
       title={isDark ? "Switch to light mode" : "Switch to dark mode"}
       aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
       className={cn(
-        menu
-          ? "flex min-h-11 w-full items-center gap-2 rounded-md border border-border px-3 py-2 text-xs font-semibold uppercase tracking-[0.06em] hover:bg-accent sm:hidden"
-          : "size-11 shrink-0 place-items-center rounded-md border border-border text-foreground/80 hover:bg-accent md:size-9",
+        "size-11 shrink-0 place-items-center rounded-md border border-border text-foreground/80 hover:bg-accent md:size-9",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
         className,
       )}
     >
       {isDark ? <Sun className="size-4" /> : <Moon className="size-4" />}
-      {menu && <span>{isDark ? "Light appearance" : "Dark appearance"}</span>}
     </button>
   );
 }
