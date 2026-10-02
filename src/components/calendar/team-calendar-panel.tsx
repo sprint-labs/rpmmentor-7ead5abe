@@ -518,7 +518,18 @@ export function TeamCalendarPanel({
                   <X className="size-3" aria-hidden="true" /> Show upcoming
                 </button>
               </div>
-              {selectedEvents.length === 0 && selectedLogged.length === 0 ? (
+              {/* Gated on the calendar read, as the upcoming list is: a day
+                  picked before it lands, or before it fails, must not read as
+                  a day with nothing booked. */}
+              {pending ? (
+                <p className="py-6 text-center text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
+                  Loading calendar…
+                </p>
+              ) : error ? (
+                <p className="py-6 text-center text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
+                  Calendar didn't load
+                </p>
+              ) : selectedEvents.length === 0 && selectedLogged.length === 0 ? (
                 <p className="py-6 text-center text-[11px] text-muted-foreground">
                   {loggedUnknown ? loggedNote : "Nothing on this day."}
                 </p>

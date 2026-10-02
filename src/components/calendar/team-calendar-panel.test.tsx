@@ -204,6 +204,17 @@ describe("TeamCalendarPanel", () => {
     expect(within(list()).queryByText("Nothing on this day.")).toBeNull();
   });
 
+  it("does not call a picked day empty while the calendar is still loading or failed", () => {
+    const { rerender } = renderPanel({ events: undefined, pending: true });
+    fireEvent.click(screen.getByLabelText(/^2026-09-26/));
+    expect(within(list()).getByText("Loading calendar…")).toBeTruthy();
+    expect(within(list()).queryByText("Nothing on this day.")).toBeNull();
+
+    rerender(<TeamCalendarPanel events={undefined} pending={false} error today={TODAY} />);
+    expect(within(list()).getByText("Calendar didn't load")).toBeTruthy();
+    expect(within(list()).queryByText("Nothing on this day.")).toBeNull();
+  });
+
   it("says when logged interactions failed to load", () => {
     renderPanel({ events: [], interactions: undefined, interactionsError: true });
     expect(screen.getByText(/logged interactions unavailable in September 2026/)).toBeTruthy();
