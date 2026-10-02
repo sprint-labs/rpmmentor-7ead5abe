@@ -754,6 +754,8 @@ function Dashboard() {
           interactions={loggedInteractions}
           pending={calendarPending}
           error={calendarError}
+          interactionsPending={interactionsPending}
+          interactionsError={interactionsError}
           today={todayIso}
           resolveGoalkeeper={(name) => goalkeeperByName(name, rosterRows)}
           actions={

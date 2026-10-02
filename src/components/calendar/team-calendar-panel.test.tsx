@@ -187,6 +187,31 @@ describe("TeamCalendarPanel", () => {
     expect(screen.queryByLabelText(/2026-10-01/)).toBeNull();
   });
 
+  it("does not report logged interactions as none while their read is in flight", () => {
+    renderPanel({
+      events: [event("a", "2026-09-25", { title: "Day fixture" })],
+      interactions: undefined,
+      interactionsPending: true,
+    });
+    expect(screen.getByText(/logged interactions loading in September 2026/)).toBeTruthy();
+    expect(screen.queryByText(/0 logged/)).toBeNull();
+
+    fireEvent.click(screen.getByLabelText(/^2026-09-25/));
+    expect(within(list()).getByText("Day fixture")).toBeTruthy();
+    expect(within(list()).getByText("Loading logged interactions…")).toBeTruthy();
+
+    fireEvent.click(screen.getByLabelText(/^2026-09-26/));
+    expect(within(list()).queryByText("Nothing on this day.")).toBeNull();
+  });
+
+  it("says when logged interactions failed to load", () => {
+    renderPanel({ events: [], interactions: undefined, interactionsError: true });
+    expect(screen.getByText(/logged interactions unavailable in September 2026/)).toBeTruthy();
+    fireEvent.click(screen.getByLabelText(/^2026-09-26/));
+    expect(within(list()).getByText(/Logged interactions didn't load/)).toBeTruthy();
+    expect(within(list()).queryByText("Nothing on this day.")).toBeNull();
+  });
+
   it("says the calendar failed rather than rendering an empty month", () => {
     renderPanel({ events: undefined, error: true });
     expect(screen.getByRole("status").textContent).toMatch(/didn't load/i);

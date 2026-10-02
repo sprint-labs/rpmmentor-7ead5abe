@@ -146,8 +146,16 @@ function plural(count: number, one: string, many = `${one}s`): string {
 export interface TeamCalendarPanelProps {
   events: readonly TeamCalendarPanelEvent[] | undefined;
   interactions?: readonly TeamCalendarPanelInteraction[] | undefined;
+  /** The calendar read. */
   pending: boolean;
   error: boolean;
+  /**
+   * The logged-interactions read, which is separate from the calendar's. While
+   * it is in flight or has failed, the panel says so rather than reporting
+   * "0 logged" or an empty day as if the read had come back empty.
+   */
+  interactionsPending?: boolean;
+  interactionsError?: boolean;
   /**
    * Today, as a local `YYYY-MM-DD`. Injected so tests can pin it and so the
    * whole dashboard agrees on one value for "today".
@@ -165,6 +173,8 @@ export function TeamCalendarPanel({
   interactions,
   pending,
   error,
+  interactionsPending = false,
+  interactionsError = false,
   today,
   resolveGoalkeeper,
   actions,
@@ -267,6 +277,12 @@ export function TeamCalendarPanel({
     passesFilter(eventKind(e), filter),
   );
   const selectedLogged = passesFilter("logged", filter) ? (selectedDay?.logged ?? []) : [];
+  /** Logged interactions are in view but their read has not come back whole. */
+  const loggedUnknown =
+    passesFilter("logged", filter) && (interactionsPending || interactionsError);
+  const loggedNote = interactionsPending
+    ? "Loading logged interactions…"
+    : "Logged interactions didn't load, so this day may be missing some.";
 
   const navButton =
     "inline-flex size-8 items-center justify-center rounded border border-border text-muted-foreground hover:border-primary/50 hover:text-primary-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary";
@@ -473,7 +489,13 @@ export function TeamCalendarPanel({
                 <span>
                   {pending
                     ? "Loading events…"
-                    : `${plural(monthTotals.scheduled, "event")} scheduled · ${monthTotals.logged} logged in ${monthLabel(cursor)}`}
+                    : `${plural(monthTotals.scheduled, "event")} scheduled · ${
+                        interactionsPending
+                          ? "logged interactions loading"
+                          : interactionsError
+                            ? "logged interactions unavailable"
+                            : `${monthTotals.logged} logged`
+                      } in ${monthLabel(cursor)}`}
                 </span>
               </div>
             </>
@@ -498,7 +520,7 @@ export function TeamCalendarPanel({
               </div>
               {selectedEvents.length === 0 && selectedLogged.length === 0 ? (
                 <p className="py-6 text-center text-[11px] text-muted-foreground">
-                  Nothing on this day.
+                  {loggedUnknown ? loggedNote : "Nothing on this day."}
                 </p>
               ) : (
                 <div className="divide-y divide-border">
@@ -517,6 +539,9 @@ export function TeamCalendarPanel({
                   {selectedLogged.map((interaction) => (
                     <LoggedRow key={interaction.id} interaction={interaction} />
                   ))}
+                  {loggedUnknown && (
+                    <p className="py-3 text-[11px] text-muted-foreground">{loggedNote}</p>
+                  )}
                 </div>
               )}
             </>
