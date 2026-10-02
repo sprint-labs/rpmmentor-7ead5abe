@@ -7,6 +7,7 @@ import {
   type TeamCalendarPanelEvent,
   type TeamCalendarPanelInteraction,
 } from "@/components/calendar/team-calendar-panel";
+import { dayLabel } from "@/lib/calendar/day-label";
 
 // The panel only needs Link to render an anchor carrying its target; the
 // router itself is not under test here.
@@ -212,6 +213,15 @@ describe("TeamCalendarPanel", () => {
     expect(within(list()).queryByText("Nothing on this day.")).toBeNull();
   });
 
+  it("keeps known logged interactions on the grid while bookings load", () => {
+    renderPanel({ events: undefined, pending: true, interactions: [logged("i1", "2026-09-25")] });
+    expect(
+      screen.getByLabelText("2026-09-25 — 1 interaction logged, bookings loading"),
+    ).toBeTruthy();
+    expect(screen.getByLabelText("2026-09-26 — nothing logged, bookings loading")).toBeTruthy();
+    expect(screen.queryByLabelText(/nothing on/)).toBeNull();
+  });
+
   it("does not call a picked day empty while the calendar is still loading or failed", () => {
     const { rerender } = renderPanel({ events: undefined, pending: true });
     fireEvent.click(screen.getByLabelText(/^2026-09-26/));
@@ -246,5 +256,28 @@ describe("TeamCalendarPanel", () => {
     expect(screen.getByText("Loading events…")).toBeTruthy();
     expect(screen.queryByText(/scheduled ·/)).toBeNull();
     expect(within(list()).getByText("Loading calendar…")).toBeTruthy();
+  });
+});
+
+describe("dayLabel", () => {
+  const fixture = { kind: "fixture" as const };
+  const loggedEntry = { kind: "logged" as const };
+
+  it("says nothing on only when both reads are in", () => {
+    expect(dayLabel([], { bookingsLoading: false, loggedState: "known" })).toBe("nothing on");
+    expect(dayLabel([], { bookingsLoading: false, loggedState: "hidden" })).toBe("nothing on");
+    expect(dayLabel([], { bookingsLoading: true, loggedState: "loading" })).toBe(
+      "bookings loading, logged interactions loading",
+    );
+    expect(dayLabel([], { bookingsLoading: true, loggedState: "hidden" })).toBe("bookings loading");
+  });
+
+  it("names what is known, then what is not", () => {
+    expect(dayLabel([fixture], { bookingsLoading: false, loggedState: "unavailable" })).toBe(
+      "1 fixture, logged interactions unavailable",
+    );
+    expect(dayLabel([loggedEntry], { bookingsLoading: true, loggedState: "known" })).toBe(
+      "1 interaction logged, bookings loading",
+    );
   });
 });

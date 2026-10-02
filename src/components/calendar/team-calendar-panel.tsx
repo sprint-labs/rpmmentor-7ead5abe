@@ -33,6 +33,7 @@ import {
   WEEKDAY_NAMES,
   type MonthCursor,
 } from "@/lib/calendar/month";
+import { dayLabel, type EntryKind } from "@/lib/calendar/day-label";
 import { cn } from "@/lib/utils";
 
 /** The calendar columns this panel reads. */
@@ -61,8 +62,6 @@ export interface TeamCalendarPanelInteraction {
 
 type ResolvedGoalkeeper = Pick<Goalkeeper, "id" | "tier">;
 
-/** fixture: a Match. interaction: any other calendar event. logged: a saved interaction. */
-type EntryKind = "fixture" | "interaction" | "logged";
 type KindFilter = "" | "fixtures" | "interactions";
 
 const KIND_FILTERS: readonly { id: KindFilter; label: string }[] = [
@@ -403,35 +402,25 @@ export function TeamCalendarPanel({
                     );
                   }
 
-                  const entries = pending ? [] : entriesFor(cell.iso);
+                  // What is known about the day is shown and announced even
+                  // while one of the two reads is out; the other half is then
+                  // named as loading or unavailable rather than counted as
+                  // nothing. Bookings are empty until the calendar lands.
+                  const entries = entriesFor(cell.iso);
                   const shown = entries.slice(0, ENTRIES_SHOWN);
                   const extra = entries.length - shown.length;
                   const isToday = cell.iso === today;
                   const isSelected = cell.iso === selected;
-                  const fixtures = entries.filter((e) => e.kind === "fixture").length;
-                  const booked = entries.filter((e) => e.kind === "interaction").length;
-                  const logged = entries.filter((e) => e.kind === "logged").length;
-                  const parts = [
-                    fixtures ? plural(fixtures, "fixture") : "",
-                    booked ? plural(booked, "interaction booked", "interactions booked") : "",
-                    logged ? plural(logged, "interaction logged", "interactions logged") : "",
-                  ].filter(Boolean);
-                  // While the logged-interactions read is out, a square only
-                  // knows its bookings, so its label says so rather than
-                  // claiming the day is empty or complete.
-                  const label = `${cell.iso} — ${
-                    parts.length
-                      ? parts.join(", ")
-                      : loggedUnknown
-                        ? "nothing booked"
-                        : "nothing on"
-                  }${
-                    loggedUnknown
+                  const label = `${cell.iso} — ${dayLabel(entries, {
+                    bookingsLoading: pending,
+                    loggedState: loggedUnknown
                       ? interactionsPending
-                        ? ", logged interactions loading"
-                        : ", logged interactions unavailable"
-                      : ""
-                  }${isToday ? " (today)" : ""}`;
+                        ? "loading"
+                        : "unavailable"
+                      : passesFilter("logged", filter)
+                        ? "known"
+                        : "hidden",
+                  })}${isToday ? " (today)" : ""}`;
 
                   return (
                     <button
