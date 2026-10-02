@@ -213,7 +213,7 @@ select 'F5  tier_effective_from column present',
 -- GROUP G · Manual resets
 --
 -- A reset means "up to date as of today" for every tier. Before
--- 20261002120000_duty_of_care_tier3_resets a Tier 3 reset changed nothing, so a
+-- 20261002111928_duty_of_care_tier3_resets a Tier 3 reset changed nothing, so a
 -- goalkeeper reset after a missed checkpoint stayed Overdue. G1 replays every
 -- Tier 3 goalkeeper's latest reset on its own date. G2 holds the line that a
 -- reset clears a badge but never counts as contact toward the season target.
