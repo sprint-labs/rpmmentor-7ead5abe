@@ -335,8 +335,10 @@ function Dashboard() {
         level: "overdue",
         label: "Overdue",
         hint: "Past required cadence",
-        bar: "bg-warning",
-        value: "text-warning",
+        // Red, not amber: overdue is the end of the traffic light, and amber
+        // is already "Due soon" directly above it.
+        bar: "bg-destructive",
+        value: "text-destructive",
       },
       {
         level: "not_required",
@@ -506,7 +508,7 @@ function Dashboard() {
           to="/insights/$metric"
           params={{ metric: "duty" }}
           search={{ from: period.fromDate, to: period.toDate, level: "overdue", tier: "" }}
-          className="group block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-warning"
+          className="group block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive"
         >
           <span className="sr-only">Break down: </span>
           <StatCard
@@ -525,7 +527,8 @@ function Dashboard() {
                     ? `Goalkeepers past required cadence · of ${dutyOverview.total}`
                     : "Nothing overdue"
             }
-            accent="warning"
+            // The number is the overdue count, so it takes overdue's red.
+            accent="destructive"
             emptyMessage="Nothing overdue"
           />
         </Link>

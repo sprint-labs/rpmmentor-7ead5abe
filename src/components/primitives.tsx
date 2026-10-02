@@ -165,8 +165,9 @@ export function StatCard({
   // carry a more saturated hue than body copy, which is what stops the light
   // theme's deep ink reading as muddy at headline size. The raw `--primary`
   // volt is still not an option: at 2.35:1 on a white card it fails even the
-  // large-text floor. `--destructive` has no display grade because no KPI card
-  // uses it; it keeps the ink value.
+  // large-text floor. `--destructive` has no display grade: its ink value
+  // already clears AA as body text in both themes, so the Duty of Care card's
+  // overdue count uses it as is.
   const valueTone =
     accent === "warning"
       ? "text-warning-display"
