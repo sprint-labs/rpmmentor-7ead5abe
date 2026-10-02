@@ -196,6 +196,14 @@ describe("TeamCalendarPanel", () => {
     expect(screen.getByText(/logged interactions loading in September 2026/)).toBeTruthy();
     expect(screen.queryByText(/0 logged/)).toBeNull();
 
+    // The squares qualify what they know rather than claiming a day is empty.
+    expect(
+      screen.getByLabelText("2026-09-26 — nothing booked, logged interactions loading"),
+    ).toBeTruthy();
+    expect(
+      screen.getByLabelText("2026-09-25 — 1 fixture, logged interactions loading"),
+    ).toBeTruthy();
+
     fireEvent.click(screen.getByLabelText(/^2026-09-25/));
     expect(within(list()).getByText("Day fixture")).toBeTruthy();
     expect(within(list()).getByText("Loading logged interactions…")).toBeTruthy();
@@ -217,6 +225,9 @@ describe("TeamCalendarPanel", () => {
 
   it("says when logged interactions failed to load", () => {
     renderPanel({ events: [], interactions: undefined, interactionsError: true });
+    expect(
+      screen.getByLabelText("2026-09-26 — nothing booked, logged interactions unavailable"),
+    ).toBeTruthy();
     expect(screen.getByText(/logged interactions unavailable in September 2026/)).toBeTruthy();
     fireEvent.click(screen.getByLabelText(/^2026-09-26/));
     expect(within(list()).getByText(/Logged interactions didn't load/)).toBeTruthy();

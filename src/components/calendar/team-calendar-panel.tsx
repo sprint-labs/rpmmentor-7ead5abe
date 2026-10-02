@@ -384,7 +384,10 @@ export function TeamCalendarPanel({
                 ))}
               </div>
 
-              <div className="grid grid-cols-7 gap-1" aria-busy={pending}>
+              <div
+                className="grid grid-cols-7 gap-1"
+                aria-busy={pending || (loggedUnknown && interactionsPending)}
+              >
                 {cells.map((cell) => {
                   // Days borrowed from the neighbouring months hold the
                   // weekday columns in line and nothing else. They stay as
@@ -413,8 +416,21 @@ export function TeamCalendarPanel({
                     booked ? plural(booked, "interaction booked", "interactions booked") : "",
                     logged ? plural(logged, "interaction logged", "interactions logged") : "",
                   ].filter(Boolean);
+                  // While the logged-interactions read is out, a square only
+                  // knows its bookings, so its label says so rather than
+                  // claiming the day is empty or complete.
                   const label = `${cell.iso} — ${
-                    parts.length ? parts.join(", ") : "nothing on"
+                    parts.length
+                      ? parts.join(", ")
+                      : loggedUnknown
+                        ? "nothing booked"
+                        : "nothing on"
+                  }${
+                    loggedUnknown
+                      ? interactionsPending
+                        ? ", logged interactions loading"
+                        : ", logged interactions unavailable"
+                      : ""
                   }${isToday ? " (today)" : ""}`;
 
                   return (
