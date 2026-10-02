@@ -69,7 +69,7 @@ export function followUpDetail(
       return cancellationReason ? `Event cancelled — ${cancellationReason}` : "Event cancelled";
     case "not_required":
       if (followUp.waived) {
-        return waiverReason ? `Waived — ${waiverReason}` : "Waived by a manager";
+        return waiverReason ? `Waived — ${waiverReason}` : "Marked not required";
       }
       if (followUp.participationStatus === "did_not_play") {
         return "Did not play — no Match Report required";

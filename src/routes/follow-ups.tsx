@@ -12,7 +12,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useMemo, useState } from "react";
-import { AlertCircle, AlertTriangle, RefreshCw } from "lucide-react";
+import { AlertCircle, AlertTriangle, Pencil, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader, Card, SectionTitle } from "@/components/primitives";
 import { withPermission } from "@/components/require-permission";
@@ -36,6 +36,10 @@ import { updateMatchParticipation } from "@/lib/calendar.functions";
 import { MatchParticipationControl } from "@/components/events/match-participation-control";
 import type { MatchParticipationStatus } from "@/lib/events/participation";
 import { isFollowUpListItem } from "@/lib/events/follow-up-list";
+import {
+  WaiveWriteUpDialog,
+  type WaiveWriteUpTarget,
+} from "@/components/events/waive-write-up-dialog";
 
 export const Route = createFileRoute("/follow-ups")({
   component: withPermission(FollowUpsPage, "calendar.view"),
@@ -68,6 +72,7 @@ function FollowUpsPage() {
   const syncOverdue = useServerFn(syncOverdueFollowUpNotifications);
   const setMatchParticipation = useServerFn(updateMatchParticipation);
   const [filter, setFilter] = useState<Filter>("open");
+  const [waiveTarget, setWaiveTarget] = useState<WaiveWriteUpTarget | null>(null);
   const [mineOnly, setMineOnly] = useState(false);
   const [participationSaving, setParticipationSaving] = useState<string | null>(null);
 
@@ -315,6 +320,25 @@ function FollowUpsPage() {
                       label={`Submit ${followUpRequirementLabel(row.followUp.kind)}`}
                       canConfirmParticipation={Boolean(data?.canManage)}
                     />
+                    {(row.mine || data?.canManage) &&
+                      row.followUp.kind !== null &&
+                      (row.followUp.status === "pending" || row.followUp.status === "overdue") && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setWaiveTarget({
+                              eventId: row.eventId,
+                              title: row.title,
+                              goalkeeperName: row.goalkeeperName,
+                              eventDate: row.eventDate,
+                              mine: row.mine,
+                            })
+                          }
+                          className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:underline"
+                        >
+                          <Pencil className="size-3" aria-hidden="true" /> Edit
+                        </button>
+                      )}
                     <Link to="/calendar" className="text-[11px] text-muted-foreground hover:underline">
                       View in calendar
                     </Link>
@@ -353,8 +377,9 @@ function FollowUpsPage() {
             nothing is owed.
           </li>
           <li>
-            <strong className="text-foreground">Not required</strong> — a manager waived it and
-            recorded why, or the goalkeeper was confirmed as Did not play.
+            <strong className="text-foreground">Not required</strong> — the assigned mentor or a
+            manager marked it not required and recorded why, or the goalkeeper was confirmed as Did
+            not play.
           </li>
         </ul>
         <p className="mt-2 text-xs text-muted-foreground">
@@ -362,6 +387,8 @@ function FollowUpsPage() {
           completed by its Interaction. Deadlines are counted in London time.
         </p>
       </Card>
+
+      <WaiveWriteUpDialog target={waiveTarget} onClose={() => setWaiveTarget(null)} />
     </div>
   );
 }

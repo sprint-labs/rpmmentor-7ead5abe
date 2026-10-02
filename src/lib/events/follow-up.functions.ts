@@ -24,6 +24,39 @@ export const FOLLOW_UP_MANAGE_ROLES: readonly AppRole[] = [
   "super_admin",
 ];
 
+/**
+ * Roles that may waive the write-up on an event assigned to themselves: the
+ * roles that do mentoring work of their own (mirrors `INTERACTION_LOG_ROLES`).
+ */
+export const FOLLOW_UP_SELF_WAIVE_ROLES: readonly AppRole[] = [
+  "mentor",
+  "mentor_manager",
+  "super_admin",
+];
+
+/**
+ * Throws unless `userId` may waive this event's write-up themselves: the event
+ * exists, is assigned to them, is not cancelled and is not already waived.
+ */
+export function assertSelfWaivable(
+  event: {
+    assigned_mentor_id: string | null;
+    status: string;
+    follow_up_waived_at: string | null;
+  } | null,
+  userId: string,
+): void {
+  if (!event || event.assigned_mentor_id !== userId) {
+    throw new Error("You can only remove write-ups for events assigned to you.");
+  }
+  if (event.status === "cancelled") {
+    throw new Error("This event was cancelled, so no write-up is due.");
+  }
+  if (event.follow_up_waived_at) {
+    throw new Error("This write-up has already been marked not required.");
+  }
+}
+
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export type { EventFollowUpRow };
@@ -159,6 +192,62 @@ export const waiveEventFollowUp = createServerFn({ method: "POST" })
       .maybeSingle();
     if (error) throw new Error(error.message);
     if (!row) throw new Error("That follow-up could not be waived.");
+    return { ok: true };
+  });
+
+/**
+ * A mentor records that their own write-up is not required, for example a
+ * Match they did not attend.
+ *
+ * Only the mentor the event is assigned to may do this, and only with a
+ * reason. Calendar RLS lets managers alone update events, so after this
+ * function has checked the assignment through the caller's own client, the
+ * one narrow write runs through the privileged client, still bound to the
+ * caller's id. Managers keep using `waiveEventFollowUp`, and can reinstate
+ * anything a mentor waives here.
+ */
+export const waiveMyEventFollowUp = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((data: { id: string; reason: string }) => {
+    if (!UUID_RE.test(data?.id ?? "")) throw new Error("An event id is required.");
+    const reason = (data?.reason ?? "").trim();
+    if (!reason) throw new Error("Give a reason why no write-up is required.");
+    if (reason.length > 500) throw new Error("Reason must be 500 characters or fewer.");
+    return { id: data.id, reason };
+  })
+  .handler(async ({ data, context }): Promise<{ ok: true }> => {
+    await requireRole(
+      context.supabase,
+      context.userId,
+      FOLLOW_UP_SELF_WAIVE_ROLES,
+      "remove your own write-up",
+    );
+    const { data: event, error: readError } = await context.supabase
+      .from("calendar_events")
+      .select("id, assigned_mentor_id, status, follow_up_waived_at")
+      .eq("id", data.id)
+      .maybeSingle();
+    if (readError) throw new Error(readError.message);
+    assertSelfWaivable(event, context.userId);
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: row, error } = await supabaseAdmin
+      .from("calendar_events")
+      .update({
+        follow_up_waived_at: new Date().toISOString(),
+        follow_up_waived_by: context.userId,
+        follow_up_waiver_reason: data.reason,
+      })
+      .eq("id", data.id)
+      // Repeat the checks on the write, so a reassignment or cancellation
+      // between the read and this update affects no row.
+      .eq("assigned_mentor_id", context.userId)
+      .neq("status", "cancelled")
+      .is("follow_up_waived_at", null)
+      .select("id")
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!row) throw new Error("That write-up could not be removed. Please refresh.");
     return { ok: true };
   });
 

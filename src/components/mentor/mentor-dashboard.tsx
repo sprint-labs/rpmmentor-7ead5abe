@@ -2,7 +2,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowUpRight, CalendarClock, CalendarPlus, Plus } from "lucide-react";
+import { ArrowUpRight, CalendarClock, CalendarPlus, Pencil, Plus } from "lucide-react";
 import { MentorPrimaryActions } from "./mentor-primary-actions";
 import { cn } from "@/lib/utils";
 import {
@@ -37,6 +37,10 @@ import {
   FollowUpStatusPill,
   followUpDetail,
 } from "@/components/events/follow-up-status";
+import {
+  WaiveWriteUpDialog,
+  type WaiveWriteUpTarget,
+} from "@/components/events/waive-write-up-dialog";
 import { formatDateOnly } from "@/lib/interactions/schema";
 import { BulletinDashboardCard } from "@/components/bulletins/dashboard-card";
 import { MentorMonthPanel } from "@/components/calendar/mentor-month-panel";
@@ -85,6 +89,7 @@ export function MentorDashboard({ user }: Props) {
     setWorkflow("interaction");
   }
   const [rangeDays, setRangeDays] = useState(14);
+  const [waiveTarget, setWaiveTarget] = useState<WaiveWriteUpTarget | null>(null);
   const [filters, setFilters] = useState<string[]>([]);
   const fetchStats = useServerFn(getMentorDashboardStats);
   const queryClient = useQueryClient();
@@ -363,6 +368,24 @@ export function MentorDashboard({ user }: Props) {
                       followUp={row.followUp}
                       label={`Submit ${followUpRequirementLabel(row.followUp.kind)}`}
                     />
+                    {/* For an event the mentor did not attend: marks the
+                        write-up not required, with a reason a manager can
+                        review and reverse. */}
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setWaiveTarget({
+                          eventId: row.eventId,
+                          title: row.title,
+                          goalkeeperName: row.goalkeeperName,
+                          eventDate: row.eventDate,
+                          mine: row.mine,
+                        })
+                      }
+                      className="inline-flex min-h-9 items-center gap-1.5 rounded-md border border-border px-3 text-xs font-medium hover:bg-accent/40"
+                    >
+                      <Pencil className="size-3.5" aria-hidden="true" /> Edit
+                    </button>
                   </div>
                 ))}
               </div>
@@ -591,6 +614,7 @@ export function MentorDashboard({ user }: Props) {
           setLogPrefill({});
         }}
       />
+      <WaiveWriteUpDialog target={waiveTarget} onClose={() => setWaiveTarget(null)} />
     </div>
   );
 }
