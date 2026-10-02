@@ -1796,6 +1796,17 @@ function ReportForm({
     () => (players.length ? players.map((p) => p.full_name) : goalkeepers.map((g) => g.name)),
     [players],
   );
+  /**
+   * A goalkeeper outside the RPM roster: an opponent's keeper, or one scored
+   * from video. The field has always kept whatever name is typed, but nothing
+   * said so, while Log Interaction offers an explicit Non-RPM Goalkeeper
+   * option. The same option now sits here. Either way the report is stored
+   * under the typed name with every other Match Report.
+   */
+  const [goalkeeperNotOnRpm, setGoalkeeperNotOnRpm] = useState(false);
+  const goalkeeperOnRoster = playersByName.has(goalkeeper.trim().toLowerCase());
+  // Only claim "not on the roster" once the roster has actually loaded.
+  const goalkeeperOffRoster = players.length > 0 && !!goalkeeper.trim() && !goalkeeperOnRoster;
   // Once the keeper is picked, Team is known, and a club plays a knowable set of
   // competitions — its league plus the cups that league enters. A Birmingham
   // report should not have to scroll past the Allsvenskan to reach the
@@ -2027,6 +2038,7 @@ function ReportForm({
     if (!user) return;
     clearDraft(user.id);
     setGoalkeeper("");
+    setGoalkeeperNotOnRpm(false);
     setCompetition("");
     setTeam("");
     setOpponent("");
@@ -2458,15 +2470,55 @@ function ReportForm({
     <form onSubmit={onSubmit} className="space-y-4">
       <div className="grid grid-cols-2 gap-3">
         <Field label="Goalkeeper *">
-          <ComboField
-            value={goalkeeper}
-            onValueChange={setGoalkeeper}
-            options={goalkeeperOptions}
-            ariaLabel="Goalkeeper"
-            placeholder="e.g. James Beadle"
-            emptyMessage="Not on the RPM roster — what you typed is kept."
-            required
-          />
+          {goalkeeperNotOnRpm ? (
+            <div className="space-y-1">
+              <input
+                aria-label="Goalkeeper"
+                className={inputCls}
+                required
+                value={goalkeeper}
+                onChange={(e) => setGoalkeeper(e.target.value)}
+                placeholder="Goalkeeper's full name"
+                maxLength={80}
+              />
+              <p className="text-[10px] text-muted-foreground">
+                {goalkeeperOnRoster
+                  ? "On the RPM roster · this report counts toward their duty of care"
+                  : "Not on the RPM roster · saved with the other Match Reports"}
+              </p>
+              <button
+                type="button"
+                onClick={() => setGoalkeeperNotOnRpm(false)}
+                className="text-[11px] text-primary-ink hover:underline"
+              >
+                Choose from RPM roster
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-1">
+              <ComboField
+                value={goalkeeper}
+                onValueChange={setGoalkeeper}
+                options={goalkeeperOptions}
+                ariaLabel="Goalkeeper"
+                placeholder="e.g. James Beadle"
+                emptyMessage="Not on the RPM roster — what you typed is kept."
+                hint={
+                  goalkeeperOffRoster
+                    ? "Not on the RPM roster · saved as a Non-RPM Goalkeeper"
+                    : undefined
+                }
+                required
+              />
+              <button
+                type="button"
+                onClick={() => setGoalkeeperNotOnRpm(true)}
+                className="text-[11px] text-primary-ink hover:underline"
+              >
+                Non-RPM Goalkeeper
+              </button>
+            </div>
+          )}
         </Field>
         <Field label="Coach (you) *">
           <input
