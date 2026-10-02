@@ -9,131 +9,51 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as UsersRouteImport } from './routes/users'
-import { Route as SupportRouteImport } from './routes/support'
-import { Route as SettingsRouteImport } from './routes/settings'
-import { Route as ResetPasswordRouteImport } from './routes/reset-password'
-import { Route as MediaRouteImport } from './routes/media'
-import { Route as McpRouteImport } from './routes/mcp'
-import { Route as MatchClipsRouteImport } from './routes/match-clips'
-import { Route as LoginRouteImport } from './routes/login'
-import { Route as InteractionsRouteImport } from './routes/interactions'
-import { Route as InstallRouteImport } from './routes/install'
-import { Route as GoalkeepersRouteImport } from './routes/goalkeepers'
-import { Route as FollowUpsRouteImport } from './routes/follow-ups'
-import { Route as ExecutiveRouteImport } from './routes/executive'
-import { Route as CalendarRouteImport } from './routes/calendar'
-import { Route as BulletinsRouteImport } from './routes/bulletins'
-import { Route as AuditRouteImport } from './routes/audit'
-import { Route as AlertsRouteImport } from './routes/alerts'
-import { Route as AccountRouteImport } from './routes/account'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as ReportsIndexRouteImport } from './routes/reports.index'
-import { Route as SystemUsersRouteImport } from './routes/system.users'
-import { Route as SystemSyncVerificationRouteImport } from './routes/system.sync-verification'
-import { Route as SystemPermissionsRouteImport } from './routes/system.permissions'
-import { Route as SystemIntegrationsRouteImport } from './routes/system.integrations'
-import { Route as SystemGithubRouteImport } from './routes/system.github'
-import { Route as SystemDataQualityRouteImport } from './routes/system.data-quality'
-import { Route as ReportsReportIdRouteImport } from './routes/reports.$reportId'
-import { Route as InteractionsInteractionIdRouteImport } from './routes/interactions_.$interactionId'
-import { Route as InsightsMetricRouteImport } from './routes/insights.$metric'
-import { Route as GoalkeepersGkIdRouteImport } from './routes/goalkeepers.$gkId'
-import { Route as DesignGkhqRouteImport } from './routes/design.gkhq'
-import { Route as DesignBentoFeaturesRouteImport } from './routes/design.bento-features'
-import { Route as DesignAnimatedSidebarRouteImport } from './routes/design.animated-sidebar'
-import { Route as DesignAccentProposalRouteImport } from './routes/design.accent-proposal'
-import { Route as Char91DotwellKnownChar93OauthProtectedResourceRouteImport } from './routes/[.well-known]/oauth-protected-resource'
+import { Route as AccountRouteImport } from './routes/account'
+import { Route as AlertsRouteImport } from './routes/alerts'
+import { Route as AuditRouteImport } from './routes/audit'
+import { Route as BulletinsRouteImport } from './routes/bulletins'
+import { Route as CalendarRouteImport } from './routes/calendar'
+import { Route as ExecutiveRouteImport } from './routes/executive'
+import { Route as FollowUpsRouteImport } from './routes/follow-ups'
+import { Route as GoalkeepersRouteImport } from './routes/goalkeepers'
+import { Route as InstallRouteImport } from './routes/install'
+import { Route as InteractionsRouteImport } from './routes/interactions'
+import { Route as LoginRouteImport } from './routes/login'
+import { Route as MatchClipsRouteImport } from './routes/match-clips'
+import { Route as McpRouteImport } from './routes/mcp'
+import { Route as MediaRouteImport } from './routes/media'
+import { Route as ResetPasswordRouteImport } from './routes/reset-password'
+import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as SupportRouteImport } from './routes/support'
+import { Route as UsersRouteImport } from './routes/users'
 import { Route as Char91DotmcpChar93ListToolsRouteImport } from './routes/[.mcp]/list-tools'
+import { Route as Char91DotwellKnownChar93OauthProtectedResourceRouteImport } from './routes/[.well-known]/oauth-protected-resource'
+import { Route as DesignAccentProposalRouteImport } from './routes/design.accent-proposal'
+import { Route as DesignAnimatedSidebarRouteImport } from './routes/design.animated-sidebar'
+import { Route as DesignBentoFeaturesRouteImport } from './routes/design.bento-features'
+import { Route as DesignGkhqRouteImport } from './routes/design.gkhq'
+import { Route as GoalkeepersGkIdRouteImport } from './routes/goalkeepers.$gkId'
+import { Route as InsightsMetricRouteImport } from './routes/insights.$metric'
+import { Route as InteractionsInteractionIdRouteImport } from './routes/interactions_.$interactionId'
+import { Route as ReportsIndexRouteImport } from './routes/reports.index'
+import { Route as ReportsReportIdRouteImport } from './routes/reports.$reportId'
+import { Route as SystemDataQualityRouteImport } from './routes/system.data-quality'
+import { Route as SystemGithubRouteImport } from './routes/system.github'
+import { Route as SystemIntegrationsRouteImport } from './routes/system.integrations'
+import { Route as SystemPermissionsRouteImport } from './routes/system.permissions'
+import { Route as SystemSyncVerificationRouteImport } from './routes/system.sync-verification'
+import { Route as SystemUsersRouteImport } from './routes/system.users'
+import { Route as DotlovableOauthConsentRouteImport } from './routes/[.]lovable.oauth.consent'
+import { Route as Char91DotmcpChar93InvokeToolToolRouteImport } from './routes/[.mcp]/invoke-tool/$tool'
+import { Route as GoalkeepersGkIdDossierRouteImport } from './routes/goalkeepers_.$gkId.dossier'
 import { Route as SystemPlayersIndexRouteImport } from './routes/system.players.index'
 import { Route as SystemPlayersPlayerIdRouteImport } from './routes/system.players.$playerId'
-import { Route as GoalkeepersGkIdDossierRouteImport } from './routes/goalkeepers_.$gkId.dossier'
-import { Route as Char91DotmcpChar93InvokeToolToolRouteImport } from './routes/[.mcp]/invoke-tool/$tool'
-import { Route as DotlovableOauthConsentRouteImport } from './routes/[.]lovable.oauth.consent'
 
-const UsersRoute = UsersRouteImport.update({
-  id: '/users',
-  path: '/users',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const SupportRoute = SupportRouteImport.update({
-  id: '/support',
-  path: '/support',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const SettingsRoute = SettingsRouteImport.update({
-  id: '/settings',
-  path: '/settings',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ResetPasswordRoute = ResetPasswordRouteImport.update({
-  id: '/reset-password',
-  path: '/reset-password',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const MediaRoute = MediaRouteImport.update({
-  id: '/media',
-  path: '/media',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const McpRoute = McpRouteImport.update({
-  id: '/mcp',
-  path: '/mcp',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const MatchClipsRoute = MatchClipsRouteImport.update({
-  id: '/match-clips',
-  path: '/match-clips',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const LoginRoute = LoginRouteImport.update({
-  id: '/login',
-  path: '/login',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const InteractionsRoute = InteractionsRouteImport.update({
-  id: '/interactions',
-  path: '/interactions',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const InstallRoute = InstallRouteImport.update({
-  id: '/install',
-  path: '/install',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const GoalkeepersRoute = GoalkeepersRouteImport.update({
-  id: '/goalkeepers',
-  path: '/goalkeepers',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const FollowUpsRoute = FollowUpsRouteImport.update({
-  id: '/follow-ups',
-  path: '/follow-ups',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ExecutiveRoute = ExecutiveRouteImport.update({
-  id: '/executive',
-  path: '/executive',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const CalendarRoute = CalendarRouteImport.update({
-  id: '/calendar',
-  path: '/calendar',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const BulletinsRoute = BulletinsRouteImport.update({
-  id: '/bulletins',
-  path: '/bulletins',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AuditRoute = AuditRouteImport.update({
-  id: '/audit',
-  path: '/audit',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AlertsRoute = AlertsRouteImport.update({
-  id: '/alerts',
-  path: '/alerts',
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AccountRoute = AccountRouteImport.update({
@@ -141,49 +61,131 @@ const AccountRoute = AccountRouteImport.update({
   path: '/account',
   getParentRoute: () => rootRouteImport,
 } as any)
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+const AlertsRoute = AlertsRouteImport.update({
+  id: '/alerts',
+  path: '/alerts',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ReportsIndexRoute = ReportsIndexRouteImport.update({
-  id: '/reports/',
-  path: '/reports/',
+const AuditRoute = AuditRouteImport.update({
+  id: '/audit',
+  path: '/audit',
   getParentRoute: () => rootRouteImport,
 } as any)
-const SystemUsersRoute = SystemUsersRouteImport.update({
-  id: '/system/users',
-  path: '/system/users',
+const BulletinsRoute = BulletinsRouteImport.update({
+  id: '/bulletins',
+  path: '/bulletins',
   getParentRoute: () => rootRouteImport,
 } as any)
-const SystemSyncVerificationRoute = SystemSyncVerificationRouteImport.update({
-  id: '/system/sync-verification',
-  path: '/system/sync-verification',
+const CalendarRoute = CalendarRouteImport.update({
+  id: '/calendar',
+  path: '/calendar',
   getParentRoute: () => rootRouteImport,
 } as any)
-const SystemPermissionsRoute = SystemPermissionsRouteImport.update({
-  id: '/system/permissions',
-  path: '/system/permissions',
+const ExecutiveRoute = ExecutiveRouteImport.update({
+  id: '/executive',
+  path: '/executive',
   getParentRoute: () => rootRouteImport,
 } as any)
-const SystemIntegrationsRoute = SystemIntegrationsRouteImport.update({
-  id: '/system/integrations',
-  path: '/system/integrations',
+const FollowUpsRoute = FollowUpsRouteImport.update({
+  id: '/follow-ups',
+  path: '/follow-ups',
   getParentRoute: () => rootRouteImport,
 } as any)
-const SystemGithubRoute = SystemGithubRouteImport.update({
-  id: '/system/github',
-  path: '/system/github',
+const GoalkeepersRoute = GoalkeepersRouteImport.update({
+  id: '/goalkeepers',
+  path: '/goalkeepers',
   getParentRoute: () => rootRouteImport,
 } as any)
-const SystemDataQualityRoute = SystemDataQualityRouteImport.update({
-  id: '/system/data-quality',
-  path: '/system/data-quality',
+const InstallRoute = InstallRouteImport.update({
+  id: '/install',
+  path: '/install',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ReportsReportIdRoute = ReportsReportIdRouteImport.update({
-  id: '/reports/$reportId',
-  path: '/reports/$reportId',
+const InteractionsRoute = InteractionsRouteImport.update({
+  id: '/interactions',
+  path: '/interactions',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MatchClipsRoute = MatchClipsRouteImport.update({
+  id: '/match-clips',
+  path: '/match-clips',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const McpRoute = McpRouteImport.update({
+  id: '/mcp',
+  path: '/mcp',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MediaRoute = MediaRouteImport.update({
+  id: '/media',
+  path: '/media',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ResetPasswordRoute = ResetPasswordRouteImport.update({
+  id: '/reset-password',
+  path: '/reset-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsRoute = SettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SupportRoute = SupportRouteImport.update({
+  id: '/support',
+  path: '/support',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const UsersRoute = UsersRouteImport.update({
+  id: '/users',
+  path: '/users',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const Char91DotmcpChar93ListToolsRoute =
+  Char91DotmcpChar93ListToolsRouteImport.update({
+    id: '/.mcp/list-tools',
+    path: '/.mcp/list-tools',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const Char91DotwellKnownChar93OauthProtectedResourceRoute =
+  Char91DotwellKnownChar93OauthProtectedResourceRouteImport.update({
+    id: '/.well-known/oauth-protected-resource',
+    path: '/.well-known/oauth-protected-resource',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const DesignAccentProposalRoute = DesignAccentProposalRouteImport.update({
+  id: '/design/accent-proposal',
+  path: '/design/accent-proposal',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DesignAnimatedSidebarRoute = DesignAnimatedSidebarRouteImport.update({
+  id: '/design/animated-sidebar',
+  path: '/design/animated-sidebar',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DesignBentoFeaturesRoute = DesignBentoFeaturesRouteImport.update({
+  id: '/design/bento-features',
+  path: '/design/bento-features',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DesignGkhqRoute = DesignGkhqRouteImport.update({
+  id: '/design/gkhq',
+  path: '/design/gkhq',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GoalkeepersGkIdRoute = GoalkeepersGkIdRouteImport.update({
+  id: '/$gkId',
+  path: '/$gkId',
+  getParentRoute: () => GoalkeepersRoute,
+} as any)
+const InsightsMetricRoute = InsightsMetricRouteImport.update({
+  id: '/insights/$metric',
+  path: '/insights/$metric',
   getParentRoute: () => rootRouteImport,
 } as any)
 const InteractionsInteractionIdRoute =
@@ -192,61 +194,49 @@ const InteractionsInteractionIdRoute =
     path: '/interactions/$interactionId',
     getParentRoute: () => rootRouteImport,
   } as any)
-const InsightsMetricRoute = InsightsMetricRouteImport.update({
-  id: '/insights/$metric',
-  path: '/insights/$metric',
+const ReportsIndexRoute = ReportsIndexRouteImport.update({
+  id: '/reports/',
+  path: '/reports/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const GoalkeepersGkIdRoute = GoalkeepersGkIdRouteImport.update({
-  id: '/$gkId',
-  path: '/$gkId',
-  getParentRoute: () => GoalkeepersRoute,
-} as any)
-const DesignGkhqRoute = DesignGkhqRouteImport.update({
-  id: '/design/gkhq',
-  path: '/design/gkhq',
+const ReportsReportIdRoute = ReportsReportIdRouteImport.update({
+  id: '/reports/$reportId',
+  path: '/reports/$reportId',
   getParentRoute: () => rootRouteImport,
 } as any)
-const DesignBentoFeaturesRoute = DesignBentoFeaturesRouteImport.update({
-  id: '/design/bento-features',
-  path: '/design/bento-features',
+const SystemDataQualityRoute = SystemDataQualityRouteImport.update({
+  id: '/system/data-quality',
+  path: '/system/data-quality',
   getParentRoute: () => rootRouteImport,
 } as any)
-const DesignAnimatedSidebarRoute = DesignAnimatedSidebarRouteImport.update({
-  id: '/design/animated-sidebar',
-  path: '/design/animated-sidebar',
+const SystemGithubRoute = SystemGithubRouteImport.update({
+  id: '/system/github',
+  path: '/system/github',
   getParentRoute: () => rootRouteImport,
 } as any)
-const DesignAccentProposalRoute = DesignAccentProposalRouteImport.update({
-  id: '/design/accent-proposal',
-  path: '/design/accent-proposal',
+const SystemIntegrationsRoute = SystemIntegrationsRouteImport.update({
+  id: '/system/integrations',
+  path: '/system/integrations',
   getParentRoute: () => rootRouteImport,
 } as any)
-const Char91DotwellKnownChar93OauthProtectedResourceRoute =
-  Char91DotwellKnownChar93OauthProtectedResourceRouteImport.update({
-    id: '/.well-known/oauth-protected-resource',
-    path: '/.well-known/oauth-protected-resource',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const Char91DotmcpChar93ListToolsRoute =
-  Char91DotmcpChar93ListToolsRouteImport.update({
-    id: '/.mcp/list-tools',
-    path: '/.mcp/list-tools',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const SystemPlayersIndexRoute = SystemPlayersIndexRouteImport.update({
-  id: '/system/players/',
-  path: '/system/players/',
+const SystemPermissionsRoute = SystemPermissionsRouteImport.update({
+  id: '/system/permissions',
+  path: '/system/permissions',
   getParentRoute: () => rootRouteImport,
 } as any)
-const SystemPlayersPlayerIdRoute = SystemPlayersPlayerIdRouteImport.update({
-  id: '/system/players/$playerId',
-  path: '/system/players/$playerId',
+const SystemSyncVerificationRoute = SystemSyncVerificationRouteImport.update({
+  id: '/system/sync-verification',
+  path: '/system/sync-verification',
   getParentRoute: () => rootRouteImport,
 } as any)
-const GoalkeepersGkIdDossierRoute = GoalkeepersGkIdDossierRouteImport.update({
-  id: '/goalkeepers_/$gkId/dossier',
-  path: '/goalkeepers/$gkId/dossier',
+const SystemUsersRoute = SystemUsersRouteImport.update({
+  id: '/system/users',
+  path: '/system/users',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DotlovableOauthConsentRoute = DotlovableOauthConsentRouteImport.update({
+  id: '/.lovable/oauth/consent',
+  path: '/.lovable/oauth/consent',
   getParentRoute: () => rootRouteImport,
 } as any)
 const Char91DotmcpChar93InvokeToolToolRoute =
@@ -255,9 +245,19 @@ const Char91DotmcpChar93InvokeToolToolRoute =
     path: '/.mcp/invoke-tool/$tool',
     getParentRoute: () => rootRouteImport,
   } as any)
-const DotlovableOauthConsentRoute = DotlovableOauthConsentRouteImport.update({
-  id: '/.lovable/oauth/consent',
-  path: '/.lovable/oauth/consent',
+const GoalkeepersGkIdDossierRoute = GoalkeepersGkIdDossierRouteImport.update({
+  id: '/goalkeepers_/$gkId/dossier',
+  path: '/goalkeepers/$gkId/dossier',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SystemPlayersIndexRoute = SystemPlayersIndexRouteImport.update({
+  id: '/system/players/',
+  path: '/system/players/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SystemPlayersPlayerIdRoute = SystemPlayersPlayerIdRouteImport.update({
+  id: '/system/players/$playerId',
+  path: '/system/players/$playerId',
   getParentRoute: () => rootRouteImport,
 } as any)
 
@@ -568,123 +568,11 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/users': {
-      id: '/users'
-      path: '/users'
-      fullPath: '/users'
-      preLoaderRoute: typeof UsersRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/support': {
-      id: '/support'
-      path: '/support'
-      fullPath: '/support'
-      preLoaderRoute: typeof SupportRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/settings': {
-      id: '/settings'
-      path: '/settings'
-      fullPath: '/settings'
-      preLoaderRoute: typeof SettingsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/reset-password': {
-      id: '/reset-password'
-      path: '/reset-password'
-      fullPath: '/reset-password'
-      preLoaderRoute: typeof ResetPasswordRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/media': {
-      id: '/media'
-      path: '/media'
-      fullPath: '/media'
-      preLoaderRoute: typeof MediaRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/mcp': {
-      id: '/mcp'
-      path: '/mcp'
-      fullPath: '/mcp'
-      preLoaderRoute: typeof McpRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/match-clips': {
-      id: '/match-clips'
-      path: '/match-clips'
-      fullPath: '/match-clips'
-      preLoaderRoute: typeof MatchClipsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/login': {
-      id: '/login'
-      path: '/login'
-      fullPath: '/login'
-      preLoaderRoute: typeof LoginRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/interactions': {
-      id: '/interactions'
-      path: '/interactions'
-      fullPath: '/interactions'
-      preLoaderRoute: typeof InteractionsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/install': {
-      id: '/install'
-      path: '/install'
-      fullPath: '/install'
-      preLoaderRoute: typeof InstallRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/goalkeepers': {
-      id: '/goalkeepers'
-      path: '/goalkeepers'
-      fullPath: '/goalkeepers'
-      preLoaderRoute: typeof GoalkeepersRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/follow-ups': {
-      id: '/follow-ups'
-      path: '/follow-ups'
-      fullPath: '/follow-ups'
-      preLoaderRoute: typeof FollowUpsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/executive': {
-      id: '/executive'
-      path: '/executive'
-      fullPath: '/executive'
-      preLoaderRoute: typeof ExecutiveRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/calendar': {
-      id: '/calendar'
-      path: '/calendar'
-      fullPath: '/calendar'
-      preLoaderRoute: typeof CalendarRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/bulletins': {
-      id: '/bulletins'
-      path: '/bulletins'
-      fullPath: '/bulletins'
-      preLoaderRoute: typeof BulletinsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/audit': {
-      id: '/audit'
-      path: '/audit'
-      fullPath: '/audit'
-      preLoaderRoute: typeof AuditRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/alerts': {
-      id: '/alerts'
-      path: '/alerts'
-      fullPath: '/alerts'
-      preLoaderRoute: typeof AlertsRouteImport
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/account': {
@@ -694,116 +582,130 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AccountRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+    '/alerts': {
+      id: '/alerts'
+      path: '/alerts'
+      fullPath: '/alerts'
+      preLoaderRoute: typeof AlertsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/reports/': {
-      id: '/reports/'
-      path: '/reports'
-      fullPath: '/reports/'
-      preLoaderRoute: typeof ReportsIndexRouteImport
+    '/audit': {
+      id: '/audit'
+      path: '/audit'
+      fullPath: '/audit'
+      preLoaderRoute: typeof AuditRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/system/users': {
-      id: '/system/users'
-      path: '/system/users'
-      fullPath: '/system/users'
-      preLoaderRoute: typeof SystemUsersRouteImport
+    '/bulletins': {
+      id: '/bulletins'
+      path: '/bulletins'
+      fullPath: '/bulletins'
+      preLoaderRoute: typeof BulletinsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/system/sync-verification': {
-      id: '/system/sync-verification'
-      path: '/system/sync-verification'
-      fullPath: '/system/sync-verification'
-      preLoaderRoute: typeof SystemSyncVerificationRouteImport
+    '/calendar': {
+      id: '/calendar'
+      path: '/calendar'
+      fullPath: '/calendar'
+      preLoaderRoute: typeof CalendarRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/system/permissions': {
-      id: '/system/permissions'
-      path: '/system/permissions'
-      fullPath: '/system/permissions'
-      preLoaderRoute: typeof SystemPermissionsRouteImport
+    '/executive': {
+      id: '/executive'
+      path: '/executive'
+      fullPath: '/executive'
+      preLoaderRoute: typeof ExecutiveRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/system/integrations': {
-      id: '/system/integrations'
-      path: '/system/integrations'
-      fullPath: '/system/integrations'
-      preLoaderRoute: typeof SystemIntegrationsRouteImport
+    '/follow-ups': {
+      id: '/follow-ups'
+      path: '/follow-ups'
+      fullPath: '/follow-ups'
+      preLoaderRoute: typeof FollowUpsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/system/github': {
-      id: '/system/github'
-      path: '/system/github'
-      fullPath: '/system/github'
-      preLoaderRoute: typeof SystemGithubRouteImport
+    '/goalkeepers': {
+      id: '/goalkeepers'
+      path: '/goalkeepers'
+      fullPath: '/goalkeepers'
+      preLoaderRoute: typeof GoalkeepersRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/system/data-quality': {
-      id: '/system/data-quality'
-      path: '/system/data-quality'
-      fullPath: '/system/data-quality'
-      preLoaderRoute: typeof SystemDataQualityRouteImport
+    '/install': {
+      id: '/install'
+      path: '/install'
+      fullPath: '/install'
+      preLoaderRoute: typeof InstallRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/reports/$reportId': {
-      id: '/reports/$reportId'
-      path: '/reports/$reportId'
-      fullPath: '/reports/$reportId'
-      preLoaderRoute: typeof ReportsReportIdRouteImport
+    '/interactions': {
+      id: '/interactions'
+      path: '/interactions'
+      fullPath: '/interactions'
+      preLoaderRoute: typeof InteractionsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/interactions_/$interactionId': {
-      id: '/interactions_/$interactionId'
-      path: '/interactions/$interactionId'
-      fullPath: '/interactions/$interactionId'
-      preLoaderRoute: typeof InteractionsInteractionIdRouteImport
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/insights/$metric': {
-      id: '/insights/$metric'
-      path: '/insights/$metric'
-      fullPath: '/insights/$metric'
-      preLoaderRoute: typeof InsightsMetricRouteImport
+    '/match-clips': {
+      id: '/match-clips'
+      path: '/match-clips'
+      fullPath: '/match-clips'
+      preLoaderRoute: typeof MatchClipsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/goalkeepers/$gkId': {
-      id: '/goalkeepers/$gkId'
-      path: '/$gkId'
-      fullPath: '/goalkeepers/$gkId'
-      preLoaderRoute: typeof GoalkeepersGkIdRouteImport
-      parentRoute: typeof GoalkeepersRoute
-    }
-    '/design/gkhq': {
-      id: '/design/gkhq'
-      path: '/design/gkhq'
-      fullPath: '/design/gkhq'
-      preLoaderRoute: typeof DesignGkhqRouteImport
+    '/mcp': {
+      id: '/mcp'
+      path: '/mcp'
+      fullPath: '/mcp'
+      preLoaderRoute: typeof McpRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/design/bento-features': {
-      id: '/design/bento-features'
-      path: '/design/bento-features'
-      fullPath: '/design/bento-features'
-      preLoaderRoute: typeof DesignBentoFeaturesRouteImport
+    '/media': {
+      id: '/media'
+      path: '/media'
+      fullPath: '/media'
+      preLoaderRoute: typeof MediaRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/design/animated-sidebar': {
-      id: '/design/animated-sidebar'
-      path: '/design/animated-sidebar'
-      fullPath: '/design/animated-sidebar'
-      preLoaderRoute: typeof DesignAnimatedSidebarRouteImport
+    '/reset-password': {
+      id: '/reset-password'
+      path: '/reset-password'
+      fullPath: '/reset-password'
+      preLoaderRoute: typeof ResetPasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/design/accent-proposal': {
-      id: '/design/accent-proposal'
-      path: '/design/accent-proposal'
-      fullPath: '/design/accent-proposal'
-      preLoaderRoute: typeof DesignAccentProposalRouteImport
+    '/settings': {
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/support': {
+      id: '/support'
+      path: '/support'
+      fullPath: '/support'
+      preLoaderRoute: typeof SupportRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/users': {
+      id: '/users'
+      path: '/users'
+      fullPath: '/users'
+      preLoaderRoute: typeof UsersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/.mcp/list-tools': {
+      id: '/.mcp/list-tools'
+      path: '/.mcp/list-tools'
+      fullPath: '/.mcp/list-tools'
+      preLoaderRoute: typeof Char91DotmcpChar93ListToolsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/.well-known/oauth-protected-resource': {
@@ -813,11 +715,130 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof Char91DotwellKnownChar93OauthProtectedResourceRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/.mcp/list-tools': {
-      id: '/.mcp/list-tools'
-      path: '/.mcp/list-tools'
-      fullPath: '/.mcp/list-tools'
-      preLoaderRoute: typeof Char91DotmcpChar93ListToolsRouteImport
+    '/design/accent-proposal': {
+      id: '/design/accent-proposal'
+      path: '/design/accent-proposal'
+      fullPath: '/design/accent-proposal'
+      preLoaderRoute: typeof DesignAccentProposalRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/design/animated-sidebar': {
+      id: '/design/animated-sidebar'
+      path: '/design/animated-sidebar'
+      fullPath: '/design/animated-sidebar'
+      preLoaderRoute: typeof DesignAnimatedSidebarRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/design/bento-features': {
+      id: '/design/bento-features'
+      path: '/design/bento-features'
+      fullPath: '/design/bento-features'
+      preLoaderRoute: typeof DesignBentoFeaturesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/design/gkhq': {
+      id: '/design/gkhq'
+      path: '/design/gkhq'
+      fullPath: '/design/gkhq'
+      preLoaderRoute: typeof DesignGkhqRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/goalkeepers/$gkId': {
+      id: '/goalkeepers/$gkId'
+      path: '/$gkId'
+      fullPath: '/goalkeepers/$gkId'
+      preLoaderRoute: typeof GoalkeepersGkIdRouteImport
+      parentRoute: typeof GoalkeepersRoute
+    }
+    '/insights/$metric': {
+      id: '/insights/$metric'
+      path: '/insights/$metric'
+      fullPath: '/insights/$metric'
+      preLoaderRoute: typeof InsightsMetricRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/interactions_/$interactionId': {
+      id: '/interactions_/$interactionId'
+      path: '/interactions/$interactionId'
+      fullPath: '/interactions/$interactionId'
+      preLoaderRoute: typeof InteractionsInteractionIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reports/': {
+      id: '/reports/'
+      path: '/reports'
+      fullPath: '/reports/'
+      preLoaderRoute: typeof ReportsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reports/$reportId': {
+      id: '/reports/$reportId'
+      path: '/reports/$reportId'
+      fullPath: '/reports/$reportId'
+      preLoaderRoute: typeof ReportsReportIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/system/data-quality': {
+      id: '/system/data-quality'
+      path: '/system/data-quality'
+      fullPath: '/system/data-quality'
+      preLoaderRoute: typeof SystemDataQualityRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/system/github': {
+      id: '/system/github'
+      path: '/system/github'
+      fullPath: '/system/github'
+      preLoaderRoute: typeof SystemGithubRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/system/integrations': {
+      id: '/system/integrations'
+      path: '/system/integrations'
+      fullPath: '/system/integrations'
+      preLoaderRoute: typeof SystemIntegrationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/system/permissions': {
+      id: '/system/permissions'
+      path: '/system/permissions'
+      fullPath: '/system/permissions'
+      preLoaderRoute: typeof SystemPermissionsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/system/sync-verification': {
+      id: '/system/sync-verification'
+      path: '/system/sync-verification'
+      fullPath: '/system/sync-verification'
+      preLoaderRoute: typeof SystemSyncVerificationRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/system/users': {
+      id: '/system/users'
+      path: '/system/users'
+      fullPath: '/system/users'
+      preLoaderRoute: typeof SystemUsersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/.lovable/oauth/consent': {
+      id: '/.lovable/oauth/consent'
+      path: '/.lovable/oauth/consent'
+      fullPath: '/.lovable/oauth/consent'
+      preLoaderRoute: typeof DotlovableOauthConsentRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/.mcp/invoke-tool/$tool': {
+      id: '/.mcp/invoke-tool/$tool'
+      path: '/.mcp/invoke-tool/$tool'
+      fullPath: '/.mcp/invoke-tool/$tool'
+      preLoaderRoute: typeof Char91DotmcpChar93InvokeToolToolRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/goalkeepers_/$gkId/dossier': {
+      id: '/goalkeepers_/$gkId/dossier'
+      path: '/goalkeepers/$gkId/dossier'
+      fullPath: '/goalkeepers/$gkId/dossier'
+      preLoaderRoute: typeof GoalkeepersGkIdDossierRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/system/players/': {
@@ -832,27 +853,6 @@ declare module '@tanstack/react-router' {
       path: '/system/players/$playerId'
       fullPath: '/system/players/$playerId'
       preLoaderRoute: typeof SystemPlayersPlayerIdRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/goalkeepers_/$gkId/dossier': {
-      id: '/goalkeepers_/$gkId/dossier'
-      path: '/goalkeepers/$gkId/dossier'
-      fullPath: '/goalkeepers/$gkId/dossier'
-      preLoaderRoute: typeof GoalkeepersGkIdDossierRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/.mcp/invoke-tool/$tool': {
-      id: '/.mcp/invoke-tool/$tool'
-      path: '/.mcp/invoke-tool/$tool'
-      fullPath: '/.mcp/invoke-tool/$tool'
-      preLoaderRoute: typeof Char91DotmcpChar93InvokeToolToolRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/.lovable/oauth/consent': {
-      id: '/.lovable/oauth/consent'
-      path: '/.lovable/oauth/consent'
-      fullPath: '/.lovable/oauth/consent'
-      preLoaderRoute: typeof DotlovableOauthConsentRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
