@@ -517,6 +517,92 @@ describe("Match Report form", () => {
   });
 });
 
+describe("Match Report on a goalkeeper outside the RPM roster", () => {
+  it("offers Non-RPM Goalkeeper and files the report under the typed name", async () => {
+    mocks.submitMatchReport.mockResolvedValueOnce(successfulResponse());
+    renderReport();
+    await waitFor(() => expect(mocks.loadDraft).toHaveBeenCalledWith(USER.id));
+
+    fireEvent.click(screen.getByRole("button", { name: "Non-RPM Goalkeeper" }));
+    expect(screen.queryByRole("combobox", { name: "Goalkeeper" })).toBeNull();
+    fireEvent.change(screen.getByLabelText("Goalkeeper"), {
+      target: { value: "Opposition Keeper" },
+    });
+    expect(await screen.findByText(/Not on the RPM roster · saved with the other/i)).toBeTruthy();
+
+    fireEvent.change(screen.getByPlaceholderText("e.g. EFL Championship"), {
+      target: { value: "EFL Championship" },
+    });
+    fireEvent.change(screen.getByPlaceholderText("e.g. Wolves"), {
+      target: { value: "Blackburn Rovers" },
+    });
+    fireEvent.change(screen.getByPlaceholderText("e.g. Blackburn Rovers"), {
+      target: { value: "Birmingham City" },
+    });
+    fireEvent.change(document.querySelector('input[type="date"]')!, {
+      target: { value: "2026-01-05" },
+    });
+    fireEvent.change(screen.getByPlaceholderText(/Write the mentor's match observations/i), {
+      target: { value: VALID_COMMENTS },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Submit Match Report" }));
+
+    await waitFor(() => expect(mocks.submitMatchReport).toHaveBeenCalledTimes(1));
+    const call = mocks.submitMatchReport.mock.calls[0]![0] as {
+      data: { payload: Record<string, unknown> };
+    };
+    expect(call.data.payload).toMatchObject({
+      goalkeeper: "Opposition Keeper",
+      team: "Blackburn Rovers",
+      opponent: "Birmingham City",
+    });
+  });
+
+  it("keeps the typed name when switching back to the roster", async () => {
+    renderReport();
+    await waitFor(() => expect(mocks.loadDraft).toHaveBeenCalledWith(USER.id));
+
+    fireEvent.click(screen.getByRole("button", { name: "Non-RPM Goalkeeper" }));
+    fireEvent.change(screen.getByLabelText("Goalkeeper"), {
+      target: { value: "Opposition Keeper" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Choose from RPM roster" }));
+
+    const roster = screen.getByRole("combobox", { name: "Goalkeeper" }) as HTMLInputElement;
+    expect(roster.value).toBe("Opposition Keeper");
+  });
+
+  it("says when a name typed in the roster field is not on the roster", async () => {
+    renderReport();
+    await waitFor(() => expect(mocks.listPlayers).toHaveBeenCalled());
+    const field = screen.getByPlaceholderText("e.g. James Beadle");
+
+    fireEvent.change(field, { target: { value: "Opposition Keeper" } });
+    expect(
+      await screen.findByText("Not on the RPM roster · saved as a Non-RPM Goalkeeper"),
+    ).toBeTruthy();
+
+    fireEvent.change(field, { target: { value: TEST_PLAYER.full_name } });
+    await waitFor(() =>
+      expect(
+        screen.queryByText("Not on the RPM roster · saved as a Non-RPM Goalkeeper"),
+      ).toBeNull(),
+    );
+  });
+
+  it("warns when a roster goalkeeper is typed under Non-RPM Goalkeeper", async () => {
+    renderReport();
+    await waitFor(() => expect(mocks.listPlayers).toHaveBeenCalled());
+
+    fireEvent.click(screen.getByRole("button", { name: "Non-RPM Goalkeeper" }));
+    fireEvent.change(screen.getByLabelText("Goalkeeper"), {
+      target: { value: TEST_PLAYER.full_name },
+    });
+
+    expect(await screen.findByText(/On the RPM roster · this report counts/i)).toBeTruthy();
+  });
+});
+
 describe("Match Report rating scale", () => {
   // Word for word as RPM set it, highest first. Written out, not read from the
   // shared constant, so a drift in either place fails here.

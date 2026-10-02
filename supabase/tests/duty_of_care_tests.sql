@@ -210,6 +210,37 @@ select 'F5  tier_effective_from column present',
 
 
 -- =============================================================================
+-- GROUP G · Manual resets
+--
+-- A reset means "up to date as of today" for every tier. Before
+-- 20261002111928_duty_of_care_tier3_resets a Tier 3 reset changed nothing, so a
+-- goalkeeper reset after a missed checkpoint stayed Overdue. G1 replays every
+-- Tier 3 goalkeeper's latest reset on its own date. G2 holds the line that a
+-- reset clears a badge but never counts as contact toward the season target.
+-- =============================================================================
+
+select 'G1  a Tier 3 goalkeeper is never Overdue on the day of a reset' as test,
+       case when (
+         select count(*)
+         from (
+           select r.player_id, max(r.reset_at)::date as reset_on
+           from public.duty_of_care_resets r
+           group by r.player_id
+         ) latest
+         cross join lateral public.duty_of_care_at(latest.reset_on) d
+         where d.player_id = latest.player_id
+           and d.tier = 'Tier 3'
+           and d.state = 'red'
+       ) = 0 then 'PASS' else 'FAIL — Tier 3 resets are being ignored' end as result
+union all
+select 'G2  a reset never records a Tier 3 season target as met',
+       case when (
+         select count(*) from public.player_duty_of_care
+         where season_outcome = 'met' and season_count < period_target
+       ) = 0 then 'PASS' else 'FAIL' end;
+
+
+-- =============================================================================
 -- EYEBALL · Not assertions. Review these with RPM before cutover.
 -- =============================================================================
 
