@@ -213,13 +213,7 @@ function cellFor(name: string): HTMLElement {
 }
 
 /** Every panel of the operational grid, by the accessible name of its heading. */
-const PANELS = [
-  "Duty of Care",
-  "Recent Activity",
-  "Calendar",
-  "Upcoming Fixtures",
-  "Tiers & Tags Distribution",
-];
+const PANELS = ["Duty of Care", "Recent Activity", "Calendar", "Tiers & Tags Distribution"];
 
 describe("dashboard operational grid", () => {
   it("gives every panel its own content height rather than its row's", async () => {
@@ -254,17 +248,12 @@ describe("dashboard operational grid", () => {
     // One-sentence rows; a wide measure makes them harder to scan, not easier.
     expect(cellFor("Recent Activity").className).toContain("lg:col-span-4");
 
-    // The calendar takes the same span as the fixtures beside it, so the pair
-    // reads as balanced and row two fills exactly. The ceiling stops it buying
-    // height it has nothing to put in on a wide monitor.
-    expect(cellFor("Calendar").className).toContain("lg:col-span-6");
-    expect(cellFor("Calendar").className).toContain("max-w-[640px]");
-
-    // Rows whose third line truncates, so this one keeps the wider measure.
-    expect(cellFor("Upcoming Fixtures").className).toContain("lg:col-span-6");
-
-    // Each now carries its own placement instead of sharing a wrapper cell.
-    expect(cellFor("Upcoming Fixtures")).not.toBe(cellFor("Calendar"));
+    // The month and its upcoming fixtures and interactions are one panel,
+    // full width at every size: it splits its own width between the grid and
+    // the list, so it carries no lg span and no ceiling of its own.
+    expect(cellFor("Calendar").className).not.toMatch(/(^|\s)lg:col-span-/);
+    expect(cellFor("Calendar").className).not.toContain("max-w-");
+    expect(screen.queryByRole("heading", { level: 2, name: "Upcoming Fixtures" })).toBeNull();
   });
 
   it("keeps the page free of the xl-only breakpoint that stacked the calendar pair", async () => {

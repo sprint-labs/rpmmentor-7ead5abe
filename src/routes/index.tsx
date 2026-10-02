@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { WorkflowDialog, type WorkflowKind } from "@/components/workflows";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { PageHeader, StatCard, SectionTitle, TierBadge } from "@/components/primitives";
+import { PageHeader, StatCard, SectionTitle } from "@/components/primitives";
 // Helpers only — no seeded roster or activity data reaches this page.
 import { formatRelative } from "@/lib/mock-data";
 import { useLoggedInteractions } from "@/lib/interactions/use-interactions";
@@ -20,12 +20,12 @@ function initialsOf(name: string) {
   );
 }
 
-import { ArrowUpRight, AlertTriangle, CalendarClock, FileText, Plus } from "lucide-react";
+import { ArrowUpRight, AlertTriangle, FileText, Plus } from "lucide-react";
 import { useAuth, ROLE_LABEL } from "@/lib/auth";
 import { MentorDashboard } from "@/components/mentor/mentor-dashboard";
 import { SyncStatusChip } from "@/components/sync-status-chip";
 import { DataFreshnessChip } from "@/components/data-freshness-chip";
-import { CalendarMonthCard } from "@/components/calendar/month-card";
+import { TeamCalendarPanel } from "@/components/calendar/team-calendar-panel";
 import { describeDataFreshness } from "@/lib/data-freshness";
 import { localDateIso } from "@/lib/calendar/month";
 import { listMatchReports } from "@/lib/match-reports/reports.functions";
@@ -372,22 +372,11 @@ function Dashboard() {
     barWidth: dutyBandCounts[index] === 0 ? 0 : Math.max(MIN_VISIBLE_BAR, dutyBandPercents[index]),
   }));
 
-  // Upcoming interactions come from the shared team calendar only. There is
-  // no sample/placeholder fallback — an empty schedule shows an empty state.
   // Local calendar date, not `toISOString()`. The ISO form is UTC, so between
   // midnight and 01:00 BST it still reads as yesterday and today's fixtures
-  // reappear in this list under a "Yesterday" label — worse still for a viewer
-  // in a timezone behind UTC.
+  // reappear under a "Yesterday" label — worse still for a viewer in a
+  // timezone behind UTC.
   const todayIso = localDateIso(new Date());
-  const upcomingAll = (teamEvents ?? [])
-    .filter((e) => e.event_date >= todayIso && e.status !== "cancelled")
-    .sort(
-      (a, b) =>
-        a.event_date.localeCompare(b.event_date) ||
-        (a.start_time ?? "").localeCompare(b.start_time ?? ""),
-    );
-  const UPCOMING_SHOWN = 6;
-  const upcoming = upcomingAll.slice(0, UPCOMING_SHOWN);
 
   /**
    * When this screen's figures were last read from the database.
@@ -755,147 +744,40 @@ function Dashboard() {
           </ErrorBoundary>
         </BentoCell>
 
-        {/* Month calendar. The one panel where extra width is actively
-            harmful: its day cells are aspect-square, so every 100px of width
-            buys ~85px of empty square. Capped rather than stretched. */}
-        <CalendarMonthCard
-          className={bentoSpan("matrix")}
+        {/* The month and what is on it, as one panel: the grid names each
+            day's fixtures and interactions, and the list beside it is the
+            upcoming schedule until a day is picked. Both read the same
+            `["calendar-events"]` cache as /calendar, so they cannot disagree. */}
+        <TeamCalendarPanel
+          className={bentoSpan("wide")}
           events={teamEvents}
           interactions={loggedInteractions}
           pending={calendarPending}
           error={calendarError}
           today={todayIso}
-        />
-
-        {/* Upcoming fixtures, beside the month they fall in. Both read the
-            same `["calendar-events"]` cache, so a date on the grid and a
-            row in this list can never disagree. Wider than the calendar
-            because each row's third line concatenates type, goalkeeper and
-            location behind `truncate`, and narrowing it loses information. */}
-        <BentoCell size="detail" className="command-panel p-5">
-          <SectionTitle
-            action={
-              <span className="inline-flex items-center gap-3">
-                {can("calendar.manage") && (
-                  <Link
-                    to="/calendar"
-                    search={{ gkId: "", new: true }}
-                    className="text-[10px] font-mono uppercase tracking-widest text-primary-ink inline-flex items-center gap-1 hover:underline"
-                  >
-                    <Plus className="size-3" /> New event
-                  </Link>
-                )}
-                <Link
-                  to="/insights/$metric"
-                  params={{ metric: "events" }}
-                  search={{ from: period.fromDate, to: period.toDate, level: "", tier: "" }}
-                  className="text-[10px] font-mono uppercase tracking-widest text-primary-ink inline-flex items-center gap-1"
-                >
-                  All events <ArrowUpRight className="size-3" />
-                </Link>
-              </span>
-            }
-          >
-            Upcoming Fixtures
-          </SectionTitle>
-          {/* An undisclosed cap on a list like this reads as "there are only
-                six". Live data regularly has several times that in the next week
-                alone, so the count says what is being withheld. */}
-          {!calendarPending && !calendarError && upcomingAll.length > upcoming.length ? (
-            <p className="-mt-2 mb-2 text-[10px] text-muted-foreground">
-              Showing the next {upcoming.length} of {upcomingAll.length} scheduled.
-            </p>
-          ) : null}
-          <div className="divide-y divide-border">
-            {calendarPending ? (
-              <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground py-6 text-center">
-                Loading calendar…
-              </div>
-            ) : calendarError ? (
-              <div className="space-y-2 py-6 text-center">
-                <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
-                  Calendar didn't load
-                </div>
+          resolveGoalkeeper={(name) => goalkeeperByName(name, rosterRows)}
+          actions={
+            <>
+              {can("calendar.manage") && (
                 <Link
                   to="/calendar"
-                  search={{ gkId: "", new: false }}
-                  className="text-[10px] font-mono uppercase tracking-widest text-primary-ink hover:underline"
+                  search={{ gkId: "", new: true }}
+                  className="text-[10px] font-mono uppercase tracking-widest text-primary-ink inline-flex items-center gap-1 hover:underline"
                 >
-                  Open calendar
+                  <Plus className="size-3" /> New event
                 </Link>
-              </div>
-            ) : upcoming.length === 0 ? (
-              <div className="space-y-2 py-6 text-center">
-                <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
-                  Nothing scheduled
-                </div>
-                <p className="text-[11px] text-muted-foreground px-2">
-                  This reads the shared team calendar. Schedule a visit or catch-up to fill it.
-                </p>
-                {can("calendar.manage") ? (
-                  <Link
-                    to="/calendar"
-                    search={{ gkId: "", new: true }}
-                    className="text-[10px] font-mono uppercase tracking-widest text-primary-ink hover:underline"
-                  >
-                    Schedule an event
-                  </Link>
-                ) : (
-                  <Link
-                    to="/calendar"
-                    search={{ gkId: "", new: false }}
-                    className="text-[10px] font-mono uppercase tracking-widest text-primary-ink hover:underline"
-                  >
-                    View calendar
-                  </Link>
-                )}
-              </div>
-            ) : (
-              upcoming.map((e) => {
-                // Resolved against the live roster, so an event for a
-                // goalkeeper signed since the seed was captured still links to
-                // their profile and still shows their real tier.
-                const gk = e.goalkeeper_name
-                  ? goalkeeperByName(e.goalkeeper_name, rosterRows)
-                  : null;
-                const content = (
-                  <>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-[10px] font-mono text-primary-ink mb-1 uppercase tracking-widest">
-                        {formatRelative(e.event_date)}
-                        {e.start_time ? ` · ${e.start_time.slice(0, 5)}` : ""}
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-medium truncate">{e.title}</span>
-                        {gk ? <TierBadge tier={gk.tier} /> : null}
-                      </div>
-                      <div className="text-[10px] text-muted-foreground truncate">
-                        {e.event_type}
-                        {e.goalkeeper_name ? ` · ${e.goalkeeper_name}` : ""}
-                        {e.location ? ` · ${e.location}` : ""}
-                      </div>
-                    </div>
-                    <CalendarClock className="size-3.5 text-muted-foreground shrink-0" />
-                  </>
-                );
-                return gk ? (
-                  <Link
-                    key={e.id}
-                    to="/goalkeepers/$gkId"
-                    params={{ gkId: gk.id }}
-                    className="flex items-start gap-3 py-3 hover:bg-accent/30 -mx-2 px-2 transition-colors"
-                  >
-                    {content}
-                  </Link>
-                ) : (
-                  <div key={e.id} className="flex items-start gap-3 py-3 -mx-2 px-2">
-                    {content}
-                  </div>
-                );
-              })
-            )}
-          </div>
-        </BentoCell>
+              )}
+              <Link
+                to="/insights/$metric"
+                params={{ metric: "events" }}
+                search={{ from: period.fromDate, to: period.toDate, level: "", tier: "" }}
+                className="text-[10px] font-mono uppercase tracking-widest text-primary-ink inline-flex items-center gap-1 hover:underline"
+              >
+                All events <ArrowUpRight className="size-3" />
+              </Link>
+            </>
+          }
+        />
       </BentoGrid>
 
       <WorkflowDialog kind={workflow} onClose={() => setWorkflow(null)} />
