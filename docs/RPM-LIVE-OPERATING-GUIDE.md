@@ -99,7 +99,7 @@ All 18 public tables are RLS-enabled. The most important live counts at this sna
 
 The current database was recreated from the repository's historical migrations with security-minded adjustments. Crucially, its `handle_new_user()` function creates a profile but **does not automatically grant a role**. Provision a role deliberately. Do not assume older source comments saying that a default mentor role is seeded are still true.
 
-The repository's migration history and the live database are reconciled: `supabase/migrations/` holds **55** SQL files and the live project's ledger reports **55** applied entries. `20260925180000_match_reports_canonical_goalkeeper_name.sql` is the latest applied: it was verified live on 27 Sep 2026 — the function, its `BEFORE INSERT OR UPDATE OF goalkeeper` trigger on `public.match_reports_cache`, and the `REVOKE` that keeps `anon` and `authenticated` off it are all in place, matching the reviewed SQL — and moved into the manifest's production list at its ledger version. There are no reviewed forward migrations outstanding. `docs/supabase-production-migration-manifest.json` is the captured baseline (project `zdxxezquhvpjmoxlecjp`, recaptured 2026-09-27) and `npm run check:migrations` verifies the repository against it on every pull request. Treat that parity as a checked invariant, not as permission to run migrations against production. Before any schema, Auth, RLS, trigger, policy, storage or data change: inspect the live target, prepare a forward-only migration, review it, back up/validate the affected data, and obtain explicit production approval.
+The repository's migration history and the live database are reconciled: `supabase/migrations/` holds **56** SQL files and the live project's ledger reports **55** applied entries. `20260925180000_match_reports_canonical_goalkeeper_name.sql` is the latest applied: it was verified live on 27 Sep 2026 — the function, its `BEFORE INSERT OR UPDATE OF goalkeeper` trigger on `public.match_reports_cache`, and the `REVOKE` that keeps `anon` and `authenticated` off it are all in place, matching the reviewed SQL — and moved into the manifest's production list at its ledger version. `20261002120000_duty_of_care_tier3_resets.sql` is a reviewed forward migration awaiting production approval; once applied, move it into the manifest's production list at its ledger version. `docs/supabase-production-migration-manifest.json` is the captured baseline (project `zdxxezquhvpjmoxlecjp`, recaptured 2026-09-27) and `npm run check:migrations` verifies the repository against it on every pull request. Treat that parity as a checked invariant, not as permission to run migrations against production. Before any schema, Auth, RLS, trigger, policy, storage or data change: inspect the live target, prepare a forward-only migration, review it, back up/validate the affected data, and obtain explicit production approval.
 
 ### Why the code looks this way
 
@@ -183,6 +183,28 @@ Use this short release gate:
 9. ~~**Google sign-in shipped before its provider state was confirmed**~~ — **Resolved 21 Sep 2026 (process).** The button shipped in #110 and needed three same-day corrective pull requests (#111, #112, #113) because the provider's live configuration was never evidenced before release: the provider held a placeholder client id, so Supabase handed the browser to Google, which answered `Error 401: invalid_client` on a page of its own — a signed-out user taken off the site entirely, in Google's words, and invisible to CI and to a local build. `src/lib/auth-providers.ts` now carries `GOOGLE_SIGN_IN_ENABLED` as the single kill switch and documents every precondition; the release gate above now requires those preconditions to be evidenced against the live project, plus one real sign-in on the preview deployment, before a provider change merges. The same gate applies to any future provider (Microsoft, Apple, magic link).
 
 8. **`list_mentor_directory()` security lint** — The function now rejects callers who are not `mentor`, `mentor_manager`, `admin`, or `super_admin`. Supabase may still surface `authenticated_security_definer_function_executable` because `authenticated` retains `EXECUTE` on a `SECURITY DEFINER` RPC; that is required for calendar/insights reads from the browser client.
+
+### 2 Oct 2026: Tier 3 duty-of-care resets were ignored (fix awaiting production approval)
+
+Management report (David Rouse, 2 Oct 2026): goalkeepers whose duty of care had been reset were still listed as Overdue.
+
+| Item | State |
+| --- | --- |
+| Cause | `duty_of_care_at()` folded a reset only into `last_interaction_at`, which only the Tier 1 / Tier 2 recency rule reads. Tier 3 is scored on checkpoints met, so a reset changed nothing. The first Tier 3 checkpoint fell on 1 Oct 2026, which turned every Tier 3 goalkeeper without a qualifying contact Overdue at once. |
+| Evidence | Live, read-only: every Tier 1 and Tier 2 goalkeeper with a reset read Up to date; the four Tier 3 goalkeepers reset on 2 Oct (13 resets between them) all still read Overdue. G1 in `supabase/tests/duty_of_care_tests.sql` fails against the live function. |
+| Fix | `20261002120000_duty_of_care_tier3_resets.sql`. Every Tier 3 checkpoint already due on the date of the latest reset counts as met, and qualifying contact after the reset counts toward the checkpoints that follow. `season_count` and `season_outcome` still count real contacts only, so a reset never records a season target as met. |
+| Checked before applying | The new body was run read-only against live data for 20 Sep, 2 Oct, 18 Nov and 20 Nov 2026 and 31 May and 15 Jun 2027, and compared with the live function on every column. Only the four reset Tier 3 goalkeepers differ: Up to date on 2 Oct, Due soon on 18 Nov, Overdue again on 20 Nov if nobody logs contact, off season with the target not met on 15 Jun. The other 111 goalkeepers are identical on every date. |
+| Reversal | Re-run the `duty_of_care_at()` definition in `20260915174038_duty_of_care_manual_resets.sql`. No data is changed either way. |
+
+### 2 Oct 2026: Match Reports and Live Match Observations audit (read-only)
+
+Owner question: were Match Reports on goalkeepers outside the roster split between Match Reports and Live Match Observations?
+
+| Item | State |
+| --- | --- |
+| Answer | No. All 145 live Live Match Observations were created by a Match Report submission — the Log Interaction form does not offer that type — and 144 point at a live report in `match_reports_cache`. A Live Match Observation is the duty-of-care record a report leaves in Interactions, not a second copy of the report. |
+| Counts | 239 live reports in `match_reports_cache`: 144 filed in Mentor Hub, 95 from the Sheet era. 70 of the Mentor Hub reports are on goalkeepers outside the roster. |
+| Left alone, for management | One Live Match Observation whose report was deleted the day it was filed (August 2026, before deleting a report also withdrew its interaction). It is that goalkeeper's only counted contact, so removing it changes the goalkeeper's duty of care. Five Live Match Observations were filed before their goalkeeper joined the roster and carry no `player_id`; neither goalkeeper has a tier, so duty of care is unaffected. Two goalkeepers each have two reports on the same date against the same opponent, spelled differently, which look like duplicates. Names and ids are in the live tables, not here. |
 
 ### 28 Sep 2026: Match Report goalkeeper names reconciled with the roster (completed)
 

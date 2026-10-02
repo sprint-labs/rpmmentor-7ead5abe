@@ -399,7 +399,15 @@
       }
     ]
   },
-  "reviewed_forward_migrations": [],
+  "reviewed_forward_migrations": [
+    {
+      "version": "20261002120000",
+      "name": "duty_of_care_tier3_resets",
+      "statement_count": 2,
+      "sql_length": 8262,
+      "sql_md5": "cdc68a3b43a3b5381c08755891d600ee"
+    }
+  ],
   "repository_comparison": {
     "live_rows_with_byte_exact_local_statement": 27,
     "live_rows_contained_inside_a_larger_local_file": 2,
