@@ -9,7 +9,7 @@ afterEach(() => {
   cleanup();
 });
 
-const SIZES: BentoSize[] = ["list", "detail", "matrix"];
+const SIZES: BentoSize[] = ["list", "detail", "matrix", "wide"];
 
 /** Class order is twMerge's business; what a panel renders as is the set. */
 const classSet = (s: string) => new Set(s.trim().split(/\s+/));
@@ -46,6 +46,7 @@ describe("bentoSpan", () => {
     expect(BENTO_SPAN.matrix).toContain("max-w-[640px]");
     expect(BENTO_SPAN.list).not.toContain("max-w-");
     expect(BENTO_SPAN.detail).not.toContain("max-w-");
+    expect(BENTO_SPAN.wide).not.toContain("max-w-");
   });
 
   it("replaces a span within one breakpoint tier and adds across tiers", () => {

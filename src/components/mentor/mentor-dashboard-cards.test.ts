@@ -25,7 +25,7 @@ describe("mentor home primary actions", () => {
   it("names match report, interaction, then calendar", () => {
     expect(mentorPrimaryActionLabels).toEqual({
       logMatchReport: "Submit match report",
-      logInteraction: "Log interaction",
+      logInteraction: "Log an interaction",
       viewCalendar: "View calendar",
     });
   });

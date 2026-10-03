@@ -40,7 +40,7 @@ describe("MentorPrimaryActions", () => {
     );
 
     const report = screen.getByRole("button", { name: /submit match report/i });
-    const interaction = screen.getByRole("button", { name: /log interaction/i });
+    const interaction = screen.getByRole("button", { name: /log an interaction/i });
 
     expect(
       report.compareDocumentPosition(interaction) & Node.DOCUMENT_POSITION_FOLLOWING,
@@ -62,7 +62,7 @@ describe("MentorPrimaryActions", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: /submit match report/i }));
-    fireEvent.click(screen.getByRole("button", { name: /log interaction/i }));
+    fireEvent.click(screen.getByRole("button", { name: /log an interaction/i }));
 
     expect(onLogReport).toHaveBeenCalledTimes(1);
     expect(onLogInteraction).toHaveBeenCalledTimes(1);
@@ -79,6 +79,6 @@ describe("MentorPrimaryActions", () => {
     );
 
     expect(screen.queryByRole("button", { name: /submit match report/i })).toBeNull();
-    expect(screen.queryByRole("button", { name: /log interaction/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /log an interaction/i })).toBeNull();
   });
 });

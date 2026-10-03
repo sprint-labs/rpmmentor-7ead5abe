@@ -5,11 +5,11 @@ import { cn } from "@/lib/utils";
 /**
  * The dashboard's placement vocabulary.
  *
- * Three tokens, named for the three content shapes the operational grid
- * actually holds rather than for their width, because the width is the
- * consequence and the content is the reason.
+ * Four tokens, named for the content shapes the operational grid actually
+ * holds rather than for their width, because the width is the consequence and
+ * the content is the reason.
  */
-export type BentoSize = "list" | "detail" | "matrix";
+export type BentoSize = "list" | "detail" | "matrix" | "wide";
 
 /**
  * The whole vocabulary, and the only place a column span may be written for
@@ -33,11 +33,17 @@ export const BENTO_SPAN: Record<BentoSize, string> = {
    * that on a wide monitor it stops buying height it has nothing to put in.
    */
   matrix: "col-span-12 self-start max-w-[640px] lg:col-span-6",
+  /**
+   * A matrix and the list it drives, side by side inside one panel: the
+   * calendar and its upcoming schedule. Full width at every size, because the
+   * panel splits its own width between the two halves.
+   */
+  wide: "col-span-12 self-start",
 };
 
 /**
  * Placement classes for a cell whose root element belongs to someone else —
- * a component that owns its own root (CalendarMonthCard, GoalkeeperDistribution)
+ * a component that owns its own root (TeamCalendarPanel, GoalkeeperDistribution)
  * or a `<Link>` that cannot be wrapped without adding a node.
  *
  * Override semantics, verified against the installed tailwind-merge 3.6.0:

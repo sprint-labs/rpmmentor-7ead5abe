@@ -261,9 +261,10 @@ function CalendarPage() {
 
   const [draft, setDraft] = useState<Draft | null>(null);
   /**
-   * The event being read rather than edited. Someone without
-   * `calendar.manage` had no way to see what an entry actually held: the chip
-   * was a plain div, and its detail lived only in a `title` tooltip.
+   * The event being read rather than edited. Clicking an entry opens this for
+   * everyone, managers included: it used to drop a manager straight into the
+   * edit form, so reading an event meant risking a change to it. Edit is one
+   * click further, from here, for those allowed to make it.
    */
   const [viewing, setViewing] = useState<DisplayEvent | null>(null);
   const [saving, setSaving] = useState(false);
@@ -791,7 +792,7 @@ function CalendarPage() {
                       return (
                         <div key={e.id}>
                           <button
-                            onClick={() => (canManage ? openEdit(e) : setViewing(e))}
+                            onClick={() => setViewing(e)}
                             className={
                               cls +
                               " hover:brightness-125 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -1005,7 +1006,7 @@ function CalendarPage() {
         )}
       </Card>
 
-      {/* Read-only detail, for everyone who cannot edit. It prints the same
+      {/* Read-only detail, opened by clicking an entry. It prints the same
           fields the form captures, so an entry answers itself rather than
           hiding what it holds behind a tooltip. */}
       {viewing && (
@@ -1064,13 +1065,24 @@ function CalendarPage() {
                 ))}
             </dl>
 
-            <div className="mt-4 flex justify-end">
+            <div className="mt-4 flex flex-wrap justify-end gap-2">
               <button
                 onClick={() => setViewing(null)}
                 className="rounded-md border border-border px-3 py-1.5 text-xs uppercase tracking-wider text-muted-foreground hover:text-foreground"
               >
                 Close
               </button>
+              {canManage && (
+                <button
+                  onClick={() => {
+                    openEdit(viewing);
+                    setViewing(null);
+                  }}
+                  className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-primary-foreground hover:opacity-90"
+                >
+                  <Pencil className="size-3.5" aria-hidden="true" /> Edit event
+                </button>
+              )}
             </div>
           </div>
         </div>

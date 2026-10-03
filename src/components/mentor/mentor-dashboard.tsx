@@ -55,19 +55,6 @@ interface Props {
   mentorProfileId: string;
 }
 
-function formatRelativeTime(iso: string) {
-  const then = new Date(iso).getTime();
-  const now = Date.now();
-  const seconds = Math.floor((now - then) / 1000);
-  if (seconds < 60) return "just now";
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  return `${days}d ago`;
-}
-
 // `value` is the stored planned type and must not be renamed: normalisePlannedType()
 // maps "Match" and "Observation" onto "Attend Live Match", and /interactions filters
 // on that same string. Only the chip caption is presentational.
@@ -170,7 +157,6 @@ export function MentorDashboard({ user }: Props) {
 
   const upcoming = useMemo(() => data?.upcomingList ?? [], [data?.upcomingList]);
   const upcomingUnavailable = !isLoading && !isError && data?.upcomingAvailable === false;
-  const updatedAt = data?.lastUpdatedAt ? formatRelativeTime(data.lastUpdatedAt) : undefined;
   const period = `Last ${rangeDays} days`;
 
   const filteredUpcoming = useMemo(() => {
@@ -287,7 +273,6 @@ export function MentorDashboard({ user }: Props) {
               value={isLoading ? "…" : isError ? "—" : (data?.reportsLast14 ?? "—")}
               hint={isError ? "Count unavailable" : period}
               accent="primary"
-              updatedAt={updatedAt}
             />
           </Link>
           <Link
@@ -302,7 +287,6 @@ export function MentorDashboard({ user }: Props) {
               value={isLoading ? "…" : isError ? "—" : (data?.interactionsLast14 ?? "—")}
               hint={isError ? "Count unavailable" : period}
               accent="info"
-              updatedAt={updatedAt}
             />
           </Link>
         </div>
